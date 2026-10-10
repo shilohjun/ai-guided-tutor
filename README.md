@@ -30,6 +30,51 @@ node scripts/eval.js
 
 ---
 
+## 部署（三种形态）
+
+同一套代码支持三种部署方式。`src/server/router.js` 是共用的业务逻辑，
+**本地服务与 serverless 函数不会漂移成两套行为**。
+
+### 形态一：本地运行（开发 / 答辩现场）
+
+```bash
+node server/server.js
+```
+
+### 形态二：公开在线 Demo（Vercel，推荐）
+
+仓库已包含 `vercel.json` 与 `api/index.js`，零配置即可部署：
+
+```bash
+npx vercel        # 首次会引导登录
+npx vercel --prod # 正式发布
+```
+
+或在 Vercel 网站导入本仓库，**无需改任何设置**。
+
+**公开 Demo 会强制使用离线规则桩**（`api/index.js` 里显式清空 Key），原因：
+
+- 公网服务带着 API Key 跑真模型 = 把额度挂出去
+- 本 PoC 的安全保证（7 类守卫、层级护栏）全在决策层与守卫层，**与模型能力无关** ——
+  离线桩下安全指标同样是 0
+
+所以在线 Demo 与本地真模型演示，**安全性完全一致，只是话术更模板化**。
+
+> ⚠️ serverless 的已知局限：会话存在进程内存里，冷启动或换实例会丢上下文，
+> 因此「学习报告」页在长时间间隔后可能提示会话失效（已做友好降级）。本地运行不受影响。
+
+### 形态三：单文件演示页（GitHub Pages）
+
+`showcase/` 目录是**零依赖的单文件演示文稿**，适合直接发布成公开链接：
+
+GitHub 仓库 → **Settings → Pages** → Source 选 `Deploy from a branch`
+→ Branch 选 `main`（或 `master`）→ 目录选 `/showcase` → Save
+
+链接形如 `https://<用户名>.github.io/<仓库名>/`，打开即是那 11 页成果，
+能翻页、能 `Ctrl/Cmd+P` 导出 PDF，读者不需要懂代码、不需要装任何东西。
+
+---
+
 ## 我要的 Key 是什么
 
 一个**OpenAI 兼容协议的 chat completions Key**。国内任选一条：
