@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI 重难题引导助手 · 核心能力汇报</title>
+    <style>
+      /* =====================================================================
+         单文件演示文稿：不依赖网络、不依赖服务器，双击即可打开。
+         导航：← → / 空格 / 点击左右半屏；按 P 或 Ctrl+P 直接导出 PDF。
+         ===================================================================== */
+      :root {
+        --ink: #0f172a;
+        --ink-2: #475569;
+        --ink-3: #94a3b8;
+        --line: #e2e8f0;
+        --brand: #1d4ed8;
+        --brand-soft: #eff6ff;
+        --brand-line: #bfdbfe;
+        --green: #047857;
+        --green-soft: #ecfdf5;
+        --amber: #b45309;
+        --amber-soft: #fffbeb;
+        --red: #b91c1c;
+        --red-soft: #fef2f2;
+        --purple: #6d28d9;
+        --purple-soft: #f5f3ff;
+        --paper: #ffffff;
+        --bg: #eef1f6;
+        --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0; padding: 0; background: var(--bg); color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ---------------- 放映框架 ---------------- */
+      #deck { padding: 28px 20px 76px; max-width: 1180px; margin: 0 auto; }
+
+      .slide {
+        position: relative;
+        background: var(--paper);
+        border-radius: 14px;
+        box-shadow: 0 6px 28px rgba(15, 23, 42, 0.09);
+        aspect-ratio: 16 / 9;
+        padding: 40px 52px;
+        margin: 0 0 26px;
+        overflow: hidden;
+        display: none;
+        flex-direction: column;
+      }
+      .slide.active { display: flex; }
+      /* 打印/PDF 时全部展开 */
+      @media print {
+        @page { size: A4 landscape; margin: 10mm; }
+        body { background: #fff; }
+        #deck { padding: 0; max-width: none; }
+        .slide {
+          display: flex !important;
+          aspect-ratio: auto;
+          height: 178mm;
+          box-shadow: none;
+          border: 1px solid var(--line);
+          border-radius: 0;
+          margin: 0 0 6mm;
+          break-inside: avoid;
+          page-break-after: always;
+        }
+        .slide:last-child { page-break-after: auto; }
+        #nav, #hint { display: none !important; }
+      }
+
+      /* ---------------- 幻灯片内部排版 ---------------- */
+      .kicker {
+        font-size: 12.5px; font-weight: 700; letter-spacing: 0.08em;
+        color: var(--brand); text-transform: uppercase; margin-bottom: 8px;
+      }
+      h1 { font-size: 34px; line-height: 1.28; margin: 0 0 12px; letter-spacing: -0.01em; }
+      h2 { font-size: 25px; line-height: 1.3; margin: 0 0 18px; letter-spacing: -0.01em; }
+      h3 { font-size: 15px; margin: 0 0 8px; }
+      p { margin: 0 0 12px; font-size: 14.5px; line-height: 1.75; color: var(--ink-2); }
+      p.lead { font-size: 16.5px; color: var(--ink); }
+      strong { color: var(--ink); }
+      em { font-style: normal; background: linear-gradient(transparent 62%, #fde68a 62%); padding: 0 1px; }
+      ul, ol { margin: 0 0 12px; padding-left: 20px; }
+      li { font-size: 14.5px; line-height: 1.8; color: var(--ink-2); margin-bottom: 3px; }
+      li strong { color: var(--ink); }
+      .body { flex: 1 1 auto; min-height: 0; }
+
+      code {
+        font-family: var(--mono); font-size: 0.88em; background: #f1f5f9;
+        padding: 1px 5px; border-radius: 4px; color: #334155;
+      }
+
+      /* 卡片 */
+      .cols { display: grid; gap: 14px; }
+      .c2 { grid-template-columns: 1fr 1fr; }
+      .c3 { grid-template-columns: repeat(3, 1fr); }
+      .c4 { grid-template-columns: repeat(4, 1fr); }
+      .card {
+        border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;
+        background: #fcfdfe;
+      }
+      .card.accent { border-color: var(--brand-line); background: var(--brand-soft); }
+      .card.warn { border-color: #fde68a; background: var(--amber-soft); }
+      .card.risk { border-color: #fecaca; background: var(--red-soft); }
+      .card.ok { border-color: #a7f3d0; background: var(--green-soft); }
+      .card h3 { font-size: 14px; }
+      .card p, .card li { font-size: 13px; line-height: 1.7; }
+
+      /* 指标 */
+      .metric { text-align: center; }
+      .metric .v {
+        display: block; font-size: 34px; font-weight: 800; line-height: 1.1;
+        font-variant-numeric: tabular-nums; color: var(--brand);
+      }
+      .metric .v.g { color: var(--green); }
+      .metric .k { font-size: 12px; color: var(--ink-3); }
+
+      /* 表格 */
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { font-size: 12px; color: var(--ink-3); font-weight: 700; letter-spacing: 0.03em; }
+      td { color: var(--ink-2); }
+      tr:last-child td { border-bottom: none; }
+
+      /* 对话示例 */
+      .chat { display: flex; flex-direction: column; gap: 9px; }
+      .bub { border-radius: 10px; padding: 9px 13px; font-size: 13px; line-height: 1.7; max-width: 94%; }
+      .bub .who { display: block; font-size: 11px; color: var(--ink-3); margin-bottom: 3px; }
+      .bub.s { background: var(--brand); color: #fff; align-self: flex-end; }
+      .bub.s .who { color: #dbeafe; }
+      .bub.a { background: #f8fafc; border: 1px solid var(--line); }
+      .bub.bad { background: var(--red-soft); border: 1px solid #fecaca; }
+      .bub.good { background: var(--green-soft); border: 1px solid #a7f3d0; }
+      .tag {
+        display: inline-block; font-size: 10.5px; font-weight: 700; padding: 2px 7px;
+        border-radius: 999px; margin-right: 5px; vertical-align: 1px;
+      }
+      .tag.l1 { background: var(--brand-soft); color: var(--brand); border: 1px solid var(--brand-line); }
+      .tag.l2 { background: var(--purple-soft); color: var(--purple); border: 1px solid #ddd6fe; }
+      .tag.l3 { background: var(--amber-soft); color: var(--amber); border: 1px solid #fde68a; }
+      .tag.guard { background: var(--green-soft); color: var(--green); border: 1px solid #a7f3d0; }
+
+      /* 流程条 */
+      .flow { display: flex; align-items: stretch; gap: 0; margin: 6px 0 14px; }
+      .flow .n {
+        flex: 1; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+        font-size: 12.5px; line-height: 1.5; background: #fcfdfe; text-align: center;
+      }
+      .flow .n b { display: block; font-size: 13px; color: var(--ink); margin-bottom: 2px; }
+      .flow .arw { display: flex; align-items: center; padding: 0 7px; color: var(--ink-3); font-size: 15px; }
+
+      /* 页码 */
+      .pageno {
+        position: absolute; right: 24px; bottom: 16px;
+        font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums;
+      }
+      .footer {
+        position: absolute; left: 52px; bottom: 16px;
+        font-size: 11.5px; color: var(--ink-3);
+      }
+      .note {
+        font-size: 12px; color: var(--ink-3); line-height: 1.65;
+        border-top: 1px dashed var(--line); padding-top: 9px; margin-top: auto;
+      }
+
+      /* 封面 */
+      .cover { justify-content: center; }
+      .cover h1 { font-size: 40px; }
+      .cover .sub { font-size: 17px; color: var(--ink-2); margin-bottom: 22px; }
+      .cover .meta { font-size: 13px; color: var(--ink-3); }
+
+      /* 导航条 */
+      #nav {
+        position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+        display: flex; align-items: center; gap: 8px; z-index: 50;
+        background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(10px);
+        border: 1px solid var(--line); border-radius: 999px;
+        padding: 7px 10px; box-shadow: 0 6px 22px rgba(15, 23, 42, 0.12);
+      }
+      #nav button {
+        font: inherit; font-size: 13px; border: 1px solid var(--line);
+        background: #fff; color: var(--ink); border-radius: 999px;
+        padding: 6px 13px; cursor: pointer;
+      }
+      #nav button:hover { background: #f8fafc; }
+      #nav button:disabled { opacity: 0.4; cursor: default; }
+      #nav .pos { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; padding: 0 6px; }
+      #hint {
+        position: fixed; right: 18px; bottom: 22px; font-size: 11.5px;
+        color: var(--ink-3); z-index: 50;
+      }
+      @media (max-width: 860px) {
+        .slide { padding: 22px; aspect-ratio: auto; }
+        h1 { font-size: 24px; } h2 { font-size: 19px; }
+        .c2, .c3, .c4 { grid-template-columns: 1fr; }
+        #hint { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="deck">
+      <!-- ============================= 1 封面 ============================= -->
+      <section class="slide cover active">
+        <div class="kicker">项目汇报</div>
+        <h1>AI 重难题引导助手</h1>
+        <div class="sub">
+          让学生先交出思路，AI 看懂他卡在哪一步，<br />
+          然后<strong>只给提示、不给答案</strong>。
+        </div>
+        <div class="meta">
+          核心能力 PoC · 物理（电磁感应）+ 数学（反证法）<br />
+          已在真实大模型（智谱 glm-4-plus）上完成验证
+        </div>
+        <div class="pageno">1 / 11</div>
+      </section>
+
+      <!-- ============================= 2 问题 ============================= -->
+      <section class="slide">
+        <div class="kicker">01 · 我们要解决的问题</div>
+        <h2>现在所有学习产品的入口都是「学生提问 → AI 回答」</h2>
+        <div class="body">
+          <div class="cols c2">
+            <div class="card risk">
+              <h3>❌ 现状：AI 只看最后那个答案</h3>
+              <ul>
+                <li>学生拍一道题，AI 直接给讲解 —— 学生抄完就走</li>
+                <li>AI 不知道学生<strong>已经想到了哪一步</strong></li>
+                <li>讲的是"平均水平的通用剧本"，对不上这个学生的真实卡点</li>
+                <li>结果是：题做完了，方法没学会，下次换一道还卡</li>
+              </ul>
+            </div>
+            <div class="card ok">
+              <h3>✅ 我们要做的：反过来</h3>
+              <ul>
+                <li>学生<strong>先把自己的思路交出来</strong>（文字/语音/草稿）</li>
+                <li>AI 判断他卡在哪一步、为什么卡</li>
+                <li>给<strong>恰好够用</strong>的提示，逼他自己往前走一步</li>
+                <li>关注的是"他怎么走到这一步"，而不是"他答对没有"</li>
+              </ul>
+            </div>
+          </div>
+          <p style="margin-top: 16px">
+            这个方向的变化带来一个全新的技术难题：
+            <strong>怎么保证 AI 在"帮"学生的同时，绝不把答案给出去？</strong>
+          </p>
+        </div>
+        <div class="pageno">2 / 11</div>
+      </section>
+
+      <!-- ============================= 3 系统全貌 ============================= -->
+      <section class="slide">
+        <div class="kicker">02 · 系统全貌</div>
+        <h2>一条完整链路，两个 Agent</h2>
+        <div class="body">
+          <div class="flow">
+            <div class="n"><b>学生输入</b>自由表述的思路</div>
+            <div class="arw">→</div>
+            <div class="n"><b>思路诊断 Agent</b>对照标准解题路径</div>
+            <div class="arw">→</div>
+            <div class="n"><b>结构化学习状态</b>卡在哪 / 为什么卡</div>
+            <div class="arw">→</div>
+            <div class="n"><b>提示引擎</b>层级决策 + 生成 + 守卫</div>
+            <div class="arw">→</div>
+            <div class="n"><b>学生可见提示</b>只指方向</div>
+          </div>
+
+          <div class="cols c2" style="margin-top: 4px">
+            <div class="card">
+              <h3>前半段：诊断 Agent（"医生"）</h3>
+              <p>
+                把学生的自然语言思路转成结构化状态：
+                <strong>完成到第几步、当前在哪、属于哪类卡点、有没有用错规律</strong>。
+              </p>
+              <p style="margin: 0">
+                关键技术：<strong>双通道定位</strong> ——
+                一路读学生原话里的线索，一路让模型做语义理解，
+                两边交叉校验。<em>两者冲突时采信学生原话</em>。
+              </p>
+            </div>
+            <div class="card">
+              <h3>后半段：提示引擎（"老师"）</h3>
+              <p>
+                拿到诊断结论后，决定<strong>该给几级提示</strong>，
+                在层级约束下写出提示，再由守卫做出口检查。
+              </p>
+              <p style="margin: 0">
+                关键技术：<strong>层级由规则引擎决定，模型无权修改</strong>；
+                提示文本必须通过 7 类确定性检查才能出给学生。
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="pageno">3 / 11</div>
+      </section>
+
+      <!-- ============================= 4 卡点分类 ============================= -->
+      <section class="slide">
+        <div class="kicker">03 · 核心机制之一</div>
+        <h2>把"学生卡住了"拆成 7 种互不相同的处境</h2>
+        <p>
+          同样是"我不会"，学生实际可能处在完全不同的状态。
+          搞错这一步，后面给的提示就是错的 ——
+          <strong>而错误的提示比不给提示伤害更大</strong>。
+        </p>
+        <div class="body">
+          <table>
+            <tr><th style="width: 26%">卡点类型</th><th style="width: 38%">学生实际处境</th><th>AI 应该怎么应对</th></tr>
+            <tr><td><code>not_started</code></td><td>还没形成思路</td><td>只帮他分清"已知什么/要求什么"，<strong>不给任何方向</strong></td></tr>
+            <tr><td><code>precondition_gap</code></td><td>知道用哪个规律，但漏了前提条件</td><td><strong>条件追问</strong>（本产品最高价值的场景）</td></tr>
+            <tr><td><code>knowledge_gap</code></td><td>不知道用哪个规律</td><td>问过程性质，不点名公式</td></tr>
+            <tr><td><code>direction_lost</code></td><td>知道规律但走不下去</td><td>指出该关注哪两个量的关系，不给式子</td></tr>
+            <tr><td><code>dead_end_path</code></td><td>当前这条路走不通</td><td>引导"换一个工具"，而不是继续往下算</td></tr>
+            <tr><td><code>execution_error</code></td><td>思路对，只是算错</td><td>邀请他自查，不直接指出错在哪</td></tr>
+            <tr><td><code>finished</code></td><td>已接近完成</td><td><strong>AI 应该沉默</strong>，把收尾留给学生</td></tr>
+          </table>
+        </div>
+        <div class="pageno">4 / 11</div>
+      </section>
+
+      <!-- ============================= 5 分层提示 ============================= -->
+      <section class="slide">
+        <div class="kicker">04 · 核心机制之二</div>
+        <h2>四层递进：每次只多给一点，绝不一次给到底</h2>
+        <div class="body">
+          <div class="cols c2" style="grid-template-columns: 1fr 1fr; gap: 12px">
+            <div class="card">
+              <h3><span class="tag l1">L0</span>结构化澄清</h3>
+              <p style="margin: 0">学生还没形成思路。只帮他把已知、目标、困惑说清楚。<br />
+                <span style="color: var(--red)">禁止：任何学科方向</span></p>
+            </div>
+            <div class="card">
+              <h3><span class="tag l1">L1</span>条件追问</h3>
+              <p style="margin: 0">只提问，不指方向。<br />
+                <em>"题目特意说'匀速'，这个信息在力学里对应什么条件？"</em><br />
+                <span style="color: var(--red)">禁止：出现公式；点名该用哪个公式</span></p>
+            </div>
+            <div class="card">
+              <h3><span class="tag l2">L2</span>方向提示</h3>
+              <p style="margin: 0">指出该关注哪两个量之间的<strong>关系</strong>。<br />
+                <em>"力的大小和电流有关，电流又和速度有关 —— 先想这两个'有关'怎么连起来。"</em><br />
+                <span style="color: var(--red)">禁止：给出关系式或数值</span></p>
+            </div>
+            <div class="card">
+              <h3><span class="tag l3">L3</span>降级示范</h3>
+              <p style="margin: 0">只示范<strong>一个动作</strong>（选对象 / 写式子左边 / 列条件清单）。<br />
+                <em>"我们先只写左边：恒力的冲量该怎么写？"</em><br />
+                <span style="color: var(--red)">禁止：给出数值结果、完整表达式</span></p>
+            </div>
+          </div>
+
+          <div class="card accent" style="margin-top: 12px">
+            <h3>两条硬护栏（防止 AI 过度帮助）</h3>
+            <ul style="margin: 0">
+              <li><strong>禁止跳级</strong>：能达到的层级 = 从 L1 开始的最长连续段 + 1。
+                学生反复喊难也只能一级一级升。</li>
+              <li><strong>禁止原地打转</strong>：同一卡点同一层级给过 2 次即升一级；
+                已到最高层则改为<strong>要求学生复述自己的下一步</strong>。</li>
+            </ul>
+          </div>
+        </div>
+        <div class="pageno">5 / 11</div>
+      </section>
+
+      <!-- ============================= 6 守卫 ============================= -->
+      <section class="slide">
+        <div class="kicker">05 · 核心机制之三（最关键）</div>
+        <h2>"不给答案"不能靠拜托模型，必须做成工程约束</h2>
+        <p>
+          提示文本在出口必须通过 <strong>7 类确定性检查</strong>。
+          拦截后自动降级重写；模型最多重试一次；两次都不过就用安全兜底模板。
+        </p>
+        <div class="body">
+          <table>
+            <tr><th style="width: 30%">检查项</th><th>拦截内容</th><th style="width: 12%">示例</th></tr>
+            <tr><td><code>answer_in_text</code></td><td>数值答案（含中文说法"一库仑"）</td><td>"0.2 N"</td></tr>
+            <tr><td><code>formula_leak</code></td><td>解法性公式的完整表达式</td><td>"E = BLv"</td></tr>
+            <tr><td><code>level_overflow</code></td><td>内容超出声明层级（L1/L2 出现公式）</td><td>—</td></tr>
+            <tr><td><code>solution_dump</code></td><td>列出完整步骤序列或推导链</td><td>"1、…2、…3、…"</td></tr>
+            <tr><td><code>final_conclusion</code></td><td>替学生收尾的句式</td><td>"所以答案是"</td></tr>
+            <tr><td><code>concept_out_of_domain</code></td><td><strong>跑题</strong>：引用本题不存在的概念</td><td>电路题里聊"动量定理"</td></tr>
+            <tr><td><code>solution_insight</code></td><td><strong>说出解题核心结论</strong></td><td>"r 是内阻"</td></tr>
+          </table>
+          <div class="card warn" style="margin-top: 12px">
+            <p style="margin: 0">
+              <strong>最后两条是实测抓出来的。</strong>
+              模型会用"完全合规的方式"把答案说出去：
+              它可能不写公式、不给数值，但一句"导体棒相当于电源，r 是内阻"，
+              学生漏掉的那个知识点就被递过去了。这类问题<strong>只有跑真模型才能发现</strong>。
+            </p>
+          </div>
+        </div>
+        <div class="pageno">6 / 11</div>
+      </section>
+
+      <!-- ============================= 7 实测数据 ============================= -->
+      <section class="slide">
+        <div class="kicker">06 · 验证结果</div>
+        <h2>真模型实测：安全指标全部为 0</h2>
+        <div class="body">
+          <div class="cols c4" style="margin-bottom: 14px">
+            <div class="card metric"><span class="v g">0%</span><span class="k">泄题率</span></div>
+            <div class="card metric"><span class="v g">0%</span><span class="k">跳级率</span></div>
+            <div class="card metric"><span class="v g">0</span><span class="k">确认答案次数</span></div>
+            <div class="card metric"><span class="v g">0</span><span class="k">解法倾倒次数</span></div>
+          </div>
+          <div class="cols c4" style="margin-bottom: 14px">
+            <div class="card metric"><span class="v">92.9%</span><span class="k">定位命中率</span></div>
+            <div class="card metric"><span class="v">100%</span><span class="k">错因命中率</span></div>
+            <div class="card metric"><span class="v">100%</span><span class="k">可行动率</span></div>
+            <div class="card metric"><span class="v">100%</span><span class="k">静默正确率</span></div>
+          </div>
+          <div class="cols c2">
+            <div class="card ok">
+              <h3>压力测试：换成一个"每轮都故意泄题"的模型</h3>
+              <p style="margin: 0">
+                最终交付给学生的文本，泄题率<strong>仍然是 0%</strong> ——
+                全部被守卫拦下重写。这说明"不给答案"是<strong>系统保证</strong>，不是"模型听话"。
+              </p>
+            </div>
+            <div class="card">
+              <h3>护栏在真模型下确实在干活</h3>
+              <p style="margin: 0">
+                19 个场景、39 轮对话里，守卫<strong>拦下了 6–10 次</strong>提示。
+                没有守卫的话，这些内容会直接发给学生。
+                <br /><span style="color: var(--ink-3)">拦截次数＞0 是好消息，不是坏消息。</span>
+              </p>
+            </div>
+          </div>
+          <div class="note">
+            数据口径：19 个教研标注场景（15 物理 + 4 数学）/ 39 轮对话 · 模型智谱 glm-4-plus · 多次运行安全指标一致。
+            唯一的定位偏差出现在数学证明题上（预期第 5 步、实际第 2 步；但错因判定正确）——
+            <strong>物理题的步骤能用公式符号精确定位，数学证明题要靠"证明动作"判断，更难匹配。</strong>
+            <br /><strong>这些数字证明"安全"，不证明"有用"</strong> —— 教学质量需要教研盲评（见第 10 页）。
+          </div>
+        </div>
+        <div class="pageno">7 / 11</div>
+      </section>
+
+      <!-- ============================= 8 真实对话 ============================= -->
+      <section class="slide">
+        <div class="kicker">07 · 看真实效果</div>
+        <h2>三段真实对话（真模型输出，非人工润色）</h2>
+        <div class="body">
+          <div class="cols c2" style="gap: 16px">
+            <div>
+              <div class="chat">
+                <div class="bub s"><span class="who">学生</span>我用欧姆定律算电流，电流我直接用 I=E/R 算就行了，电阻只有R</div>
+                <div class="bub a">
+                  <span class="tag l1">L1 条件追问</span><span class="tag guard">已过防泄题检查</span><br />
+                  你用了闭合电路欧姆定律来算电流，但这个定律的前提条件是什么？电路中哪些部分应该被考虑进去？
+                  <br /><span style="color: var(--ink-3)">👉 检查这个规律的前提，然后告诉我哪一条最可疑。</span>
+                </div>
+              </div>
+              <p style="margin-top: 10px; font-size: 13px">
+                <strong>解读：</strong>系统准确识别出学生<strong>漏掉了导体棒自身的内阻</strong>，
+                但没有说破 —— 而是追问"定律的前提条件"，逼他自己去检查。
+              </p>
+            </div>
+            <div>
+              <div class="chat">
+                <div class="bub bad">
+                  <span class="who">模型原本想说的（被守卫拦下）</span>
+                  "导体棒产生的电动势相当于电源，而电阻 R 和导体棒自身的电阻 r 组成了外电路和内阻。"
+                </div>
+                <div class="bub good">
+                  <span class="who">实际交付给学生的</span>
+                  你已经在用闭合电路欧姆定律了，但需要明确电路中的电动势、内阻和外阻是如何连接的。导体棒产生的感应电动势相当于电源，而电阻 R 和导体棒自身的电阻 r 组成了电路的不同部分。
+                </div>
+              </div>
+              <p style="margin-top: 10px; font-size: 13px">
+                <strong>解读：</strong>前者没有公式、没有数值，格式上完全合规，
+                但<strong>把答案说出来了</strong>。守卫识别后改写成"组成了电路的不同部分"，
+                保留了引导、去掉了结论。
+              </p>
+            </div>
+          </div>
+          <div class="card" style="margin-top: 12px">
+            <h3>跨学科：同一套引擎处理数学证明题（代码未改一行）</h3>
+            <p style="margin: 0; font-size: 13px">
+              学生："我假设√2=a/b，两边平方得到 a²=2b²，所以 a 和 b 都是偶数。<strong>但是接下来不知道怎么办了</strong>。"<br />
+              系统：识别出卡点是 <code>m-math-coprime-not-used</code>（<strong>没有用"互质"这个前提去构造矛盾</strong>），
+              这是反证法里最典型的断链位置。
+            </p>
+          </div>
+        </div>
+        <div class="pageno">8 / 11</div>
+      </section>
+
+      <!-- ============================= 9 方法论 ============================= -->
+      <section class="slide">
+        <div class="kicker">08 · 过程中的发现</div>
+        <h2>8 个问题都是"评测跑出来的"，不是设计时想到的</h2>
+        <p>这一页想说明的是：<strong>我们建立起了一套能自己发现问题的机制</strong>。</p>
+        <div class="body">
+          <div class="cols c2">
+            <div class="card">
+              <h3>阶段一：离线开发时发现（5 个）</h3>
+              <ul style="margin: 0">
+                <li>单测全绿但评测全红 —— 错因命中率 <strong>0%</strong>。
+                  根因：中文修饰语会拆散关键词（"安培力<strong>应该</strong>向右"匹配不到"安培力向右"）</li>
+                <li>否定识别误伤："不变""不知道"里的"不"被当成否定词</li>
+                <li>定位打分权重失衡，步骤序号压过了命中数</li>
+                <li><strong>评测指标本身定义错了</strong> —— 差点去修一个不存在的问题</li>
+                <li><strong>跳级护栏有真实漏洞</strong>：历史缺 L1 时学生能直达最高层</li>
+              </ul>
+            </div>
+            <div class="card warn">
+              <h3>阶段二：接入真模型后才发现（3 个）</h3>
+              <ul style="margin: 0">
+                <li>冲突消解规则太保守，采信了模型的误判 ——
+                  定位命中率只有 72.7%，改对后<strong>升到 100%</strong></li>
+                <li>模型用"合规的方式"说出答案（见上一页）</li>
+                <li>我们留了一条捷径：学生只要声称"我算错了"就能拿到最强提示 —— 已移除</li>
+              </ul>
+              <p style="margin: 10px 0 0; font-size: 12.5px">
+                <strong>这三条离线环境永远看不到</strong>，因为离线模板里本来就不含答案。
+              </p>
+            </div>
+          </div>
+          <div class="cols c2" style="margin-top: 12px">
+            <div class="card accent">
+              <h3>教训一：测试数据必须来自真实语料</h3>
+              <p style="margin: 0; font-size: 13px">
+                最初的单元测试用例是从规则表原文抄的，天然匹配 ——
+                所以 44/44 全绿，而真实评测是 0%。
+                这是"测试数据太干净"导致的<strong>假通过</strong>。
+              </p>
+            </div>
+            <div class="card accent">
+              <h3>教训二：安全靠确定性，不靠模型自觉</h3>
+              <p style="margin: 0; font-size: 13px">
+                实测中模型两次运行的能力指标有波动，但<strong>安全指标稳定为 0</strong>。
+                确定性的部分（护栏、层级决策）不受模型随机性影响 —— 这正是分层架构的价值。
+              </p>
+            </div>
+          </div>
+          <div class="card" style="margin-top: 12px; border-color: #fde68a; background: var(--amber-soft)">
+            <h3>还发现了一个跨学科的差异（不是 bug，是规律）</h3>
+            <p style="margin: 0; font-size: 13px">
+              加入数学证明题后，引擎<strong>代码未改一行</strong>就能处理，说明抽象成立。
+              但<strong>定位准确率从 100% 降到 92.9%</strong> —— 唯一的偏差就出在数学题上。
+              <br />
+              原因：物理题的步骤能用公式符号（<code>a²=2b²</code>）精确定位；
+              数学证明题的步骤要靠"证明动作"（假设 / 平方 / 用到互质）判断，
+              同一个动作可能出现在多个步骤里，更难匹配。
+              <br />
+              <strong>结论：抽象不绑学科，但每科的质量需要各自的语料来调。</strong>
+            </p>
+          </div>
+        </div>
+        <div class="pageno">9 / 11</div>
+      </section>
+
+      <!-- ============================= 10 局限 ============================= -->
+      <section class="slide">
+        <div class="kicker">09 · 诚实的边界</div>
+        <h2>现在证明了什么，还没证明什么</h2>
+        <div class="body">
+          <div class="cols c2">
+            <div class="card ok">
+              <h3>✅ 已经证明</h3>
+              <ul style="margin: 0">
+                <li>架构成立：从学生自然语言思路到分层提示，链路完整跑通</li>
+                <li>"不给答案"是<strong>系统级保证</strong>，换恶意模型也守得住</li>
+                <li>跨学科可复用：数学证明题代码未改一行即可处理</li>
+                <li>可复现：一条命令跑出全部指标</li>
+              </ul>
+            </div>
+            <div class="card risk">
+              <h3>❌ 尚未证明</h3>
+              <ul style="margin: 0">
+                <li><strong>提示的教学质量</strong> —— 需要教研盲评，现在只有"安全"没有"有用"</li>
+                <li><strong>真实学生语料的适应性</strong> —— 当前 19 个场景是人工编写的</li>
+                <li>长会话稳定性 —— 场景集最长 3 轮</li>
+                <li>多模型表现 —— 只测了一个模型</li>
+                <li>数学场景的定位质量 —— 目前低于物理（92.9%）</li>
+                <li>拍照识题、实时笔迹 —— 依赖视觉模型与硬件采集</li>
+              </ul>
+            </div>
+          </div>
+          <div class="card accent" style="margin-top: 14px">
+            <h3>准确的表述方式</h3>
+            <p style="margin: 0">
+              ✅ "框架已建成，并在真实模型上验证通过；教学质量与真实语料适应性待验证。"<br />
+              ❌ <s>"这个能力已经做成了。"</s>
+            </p>
+          </div>
+          <div class="note">
+            我们刻意没有夸大数据，也没有伪造"拍照识题已完成"的假象 ——
+            把边界说清楚，排期判断才不失真。
+          </div>
+        </div>
+        <div class="pageno">10 / 11</div>
+      </section>
+
+      <!-- ============================= 11 下一步 ============================= -->
+      <section class="slide">
+        <div class="kicker">10 · 下一步</div>
+        <h2>最缺的不是工程，是真实学生语料</h2>
+        <div class="body">
+          <div class="cols c2">
+            <div class="card accent">
+              <h3>🔴 最需要支持的两件事</h3>
+              <ul style="margin: 0">
+                <li><strong>真实学生解题记录（语音/文字）</strong><br />
+                  哪怕几十条，就能把评测场景从 19 个扩到 50+，
+                  验证"能不能应对真实学生的说法"</li>
+                <li><strong>教研盲评 20 轮真实对话</strong><br />
+                  约半天投入，补上"提示质量"这个目前缺失的指标</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>工程侧计划</h3>
+              <ul style="margin: 0">
+                <li>长会话疲劳测试（10+ 轮）</li>
+                <li>拍照识题链路（需视觉模型 + 教研复核图谱）</li>
+                <li>多模型横评，为选型提供依据</li>
+                <li>题库按模块扩充 —— <strong>教研投入是主要成本项</strong></li>
+              </ul>
+            </div>
+          </div>
+          <div class="card" style="margin-top: 14px">
+            <h3>关键时间点提醒</h3>
+            <p style="margin: 0">
+              Proposal 里定的核心功能交付节点是 <strong>11 月底 / 12 月初</strong>。
+              当前核心能力已跑通，<strong>风险不在技术实现，而在验证深度</strong> ——
+              如果真实语料不能及时到位，交付的将是一个"能演示但未经真实检验"的系统。
+            </p>
+          </div>
+        </div>
+        <div class="footer">谢谢 · 欢迎提问与质疑</div>
+        <div class="pageno">11 / 11</div>
+      </section>
+    </div>
+
+    <!-- ===================== 导航 ===================== -->
+    <div id="nav">
+      <button id="prev">← 上一页</button>
+      <span class="pos" id="pos">1 / 11</span>
+      <button id="next">下一页 →</button>
+      <button id="print">导出 PDF</button>
+    </div>
+    <div id="hint">← → 翻页 · 空格下一页 · Ctrl/Cmd+P 导出 PDF</div>
+
+    <script>
+      const slides = [...document.querySelectorAll('.slide')];
+      let i = 0;
+      const total = slides.length;
+
+      function render() {
+        slides.forEach((s, n) => s.classList.toggle('active', n === i));
+        document.getElementById('pos').textContent = i + 1 + ' / ' + total;
+        document.getElementById('prev').disabled = i === 0;
+        document.getElementById('next').disabled = i === total - 1;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      function go(d) {
+        i = Math.max(0, Math.min(total - 1, i + d));
+        render();
+      }
+
+      document.getElementById('prev').onclick = () => go(-1);
+      document.getElementById('next').onclick = () => go(1);
+      document.getElementById('print').onclick = () => window.print();
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(-1); }
+        else if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); go(1); }
+        else if (e.key === 'Home') { i = 0; render(); }
+        else if (e.key === 'End') { i = total - 1; render(); }
+        else if (e.key === 'p' || e.key === 'P') { window.print(); }
+      });
+
+      // 点击左右半屏翻页（避开导航条与链接）
+      document.getElementById('deck').addEventListener('click', (e) => {
+        if (e.target.closest('a, button')) return;
+        const r = e.currentTarget.getBoundingClientRect();
+        go(e.clientX - r.left < r.width / 2 ? -1 : 1);
+      });
+
+      // 触屏滑动
+      let x0 = null;
+      document.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+      document.addEventListener('touchend', (e) => {
+        if (x0 === null) return;
+        const dx = e.changedTouches[0].clientX - x0;
+        if (Math.abs(dx) > 45) go(dx < 0 ? 1 : -1);
+        x0 = null;
+      }, { passive: true });
+
+      render();
+    </script>
+  </body>
+</html>
