@@ -1,0 +1,563 @@
+{
+  "metrics": {
+    "leakRate": 0,
+    "levelSkipRate": 0,
+    "repeatRate": 0,
+    "locateAccuracy": 92.9,
+    "misconceptionAccuracy": 100,
+    "actionableRate": 100,
+    "silenceAccuracy": 100,
+    "answerConfirmations": 0,
+    "solutionDumps": 0,
+    "crashes": 0,
+    "guardBlocks": 9
+  },
+  "totals": {
+    "turns": 39,
+    "leaks": 0,
+    "levelSkips": 0,
+    "repeats": 0,
+    "locateHit": 13,
+    "locateTotal": 14,
+    "misHit": 13,
+    "misTotal": 13,
+    "actionable": 39,
+    "silenceExpected": 1,
+    "silenceCorrect": 1,
+    "confirmations": 0,
+    "dumps": 0,
+    "crashes": 0,
+    "guardBlocks": 9
+  },
+  "rows": [
+    {
+      "id": "sc-01-no-idea",
+      "title": "完全没思路的学生",
+      "kind": "understanding",
+      "levels": [
+        0,
+        0
+      ],
+      "leaks": [],
+      "locateHit": true,
+      "misHit": null,
+      "levelSkips": 0,
+      "duplicates": 0,
+      "refused": null,
+      "silenceOk": true,
+      "sampleText": "这道题看起来有点复杂，你能先告诉我题目中给了哪些已知条件，最后要求我们求什么吗？",
+      "stuckKind": "not_started",
+      "expectedStuckKind": "not_started",
+      "stepIndex": null,
+      "expectedStepIndex": null,
+      "seenStepIndexes": [],
+      "misconceptionIds": [],
+      "expectedMisconceptions": []
+    },
+    {
+      "id": "sc-02-forget-r",
+      "title": "漏掉内阻的学生",
+      "kind": "understanding",
+      "levels": [
+        1,
+        2
+      ],
+      "leaks": [],
+      "locateHit": true,
+      "misHit": true,
+      "levelSkips": 0,
+      "duplicates": 0,
+      "refused": null,
+      "silenceOk": null,
+      "sampleText": "你注意到导体棒本身也有电阻，在计算回路电流时，这个内阻和外电阻应该怎么连接？",
+      "stuckKind": "precondition_gap",
+      "expectedStuckKind": "precondition_gap",
+      "stepIndex": 4,
+      "expectedStepIndex": 4,
+      "seenStepIndexes": [
+        4
+      ],
+      "misconceptionIds": [
+        "m-forget-r"
+      ],
+      "expectedMisconceptions": [
+        "m-forget-r"
+      ]
+    },
+    {
+      "id": "sc-03-ignore-equilibrium",
+      "title": "忽略\"匀速\"给出的平衡条件",
+      "kind": "understanding",
+      "levels": [
+        1,
+        2
+      ],
+      "leaks": [],
+      "locateHit": true,
+      "misHit": true,
+      "levelSkips": 0,
+      "duplicates": 0,
+      "refused": null,
+      "silenceOk": null,
+      "sampleText": "题目中提到导体棒是'匀速'运动的，这个条件在力学中意味着什么？你需要关注作用在导体棒上的各个力之间的关系。",
+      "stuckKind": "precondition_gap",
+      "expectedStuckKind": "precondition_gap",
+      "stepIndex": 6,
+      "expectedStepIndex": 6,
+      "seenStepIndexes": [
+        6
+      ],
+      "misconceptionIds": [
+        "m-ignore-equilibrium"
+      ],
+      "expectedMisconceptions": [
+        "m-ignore-equilibrium"
+      ]
+    },
+    {
+      "id": "sc-04-ampere-direction",
+      "title": "安培力方向判错",
+      "kind": "understanding",
+      "levels": [
+        1,
+        2
+      ],
+      "leaks": [],
+      "locateHit": true,
+      "misHit": true,
+      "levelSkips": 0,
+      "duplicates": 0,
+      "refused": null,
+      "silenceOk": null,
+      "sampleText": "导体棒在磁场中运动会产生感应电流，而感应电流又会受到安培力作用。根据左手定则，安培力的方向应该与运动方向相反，这样才能维持匀速运动。",
+      "stuckKind": "precondition_gap",
+      "stepIndex": 5,
+      "expectedStepIndex": 5,
+      "seenStepIndexes": [
+        5
+      ],
+      "misconceptionIds": [
+        "m-ampere-direction"
+      ],
+      "expectedMisconceptions": [
+        "m-ampere-direction"
+      ]
+    },
+    {
+      "id": "sc-05-uniform-means-none",
+      "title": "把\"均匀变化\"当成\"没变化\"",
+      "kind": "understanding",
+      "levels": [
+        1,
+        2
+      ],
+      "leaks": [],
+      "locateHit": true,
+      "misHit": true,
+      "levelSkips": 0,
+      "duplicates": 0,
+      "refused": null,
+      "silenceOk": null,
+      "sampleText": "磁感应强度在均匀变化，意味着磁通量也在变化，而变化的磁通量会产生感应电动势。你应该关注磁通量变化率和感应电动势之间的关系。",
+      "stuckKind": "precondition_gap",
+      "expectedStuckKind": "precondition_gap",
+      "stepIndex": 4,
+      "expectedStepIndex": 2,
+      "seenStepIndexes": [
+        4
+      ],
+      "misconceptionIds": [
+        "m-uniform-means-none"
+      ],
+      "expectedMisconceptions": [
+        "m-uniform-means-none"
+      ]
+    },
+    {
+      "id": "sc-06-area-error",
+      "title": "有效面积取成周长",
+      "kind": "understanding",
+      "levels": [
+        1,
+        2
+      ],
+      "leaks": [],
+      "locateHit": true,
+      "misHit": true,
+      "levelSkips": 0,
+      "duplicates": 0,
+      "refused": null,
+      "silenceOk": null,
+      "sampleText": "你已经知道磁通量变化了，接下来需要关注的是这个磁通量变化与感应电动势的关系，以及感应电动势如何与电流联系起来。",
+      "stuckKind": "direction_lost",
+      "stepIndex": 3,
+      "expectedStepIndex": 3,
+      "seenStepIndexes": [
+        3
+      ],
+      "misconceptionIds": [
+        "m-area-error"
+      ],
+      "expectedMisconceptions": [
+        "m-area-error"
+      ]
+    },
+    {
+      "id": "sc-07-uniform-accel",
+      "title": "把变加速当匀变速",
+      "kind": "understanding",
+      "levels": [
+        1,
+        2
+      ],
+      "leaks": [],
+      "locateHit": true,
+      "misHit": true,
+      "levelSkips": 0,
+      "duplicates": 0,
+      "refused": null,
+      "silenceOk": null,
+      "sampleText": "你感觉算出来的结果不对，可能是因为把变加速运动当作匀变速处理了。导体棒在磁场中运动会产生感应电流，而这个电流又会受到安培力的作用，导致导体棒做变加速运动。",
+      "stuckKind": "direction_lost",
+      "expectedStuckKind": "precondition_gap",
+      "stepIndex": 5,
+      "expectedStepIndex": 1,
+      "seenStepIndexes": [
+        5
+      ],
+      "misconceptionIds": [
+        "m-uniform-accel"
+      ],
+      "expectedMisconceptions": [
+        "m-uniform-accel"
+      ]
+    },
+    {
+      "id": "sc-08-energy-deadend",
+      "title": "只走能量路径卡住",
+      "kind": "understanding",
+      "levels": [
+        1,
+        2
+      ],
+      "leaks": [],
+      "locateHit": true,
+      "misHit": true,
+      "levelSkips": 0,
+      "duplicates": 0,
+      "refused": null,
+      "silenceOk": null,
+      "sampleText": "你发现用能量守恒解不出来，是因为能量守恒关系里有些量还不知道。想想看，题目给了恒力和时间，还给了初末速度，这些信息让你联想到物理中处理时间累积量的哪类定理？",
+      "stuckKind": "dead_end_path",
+      "stepIndex": 1,
+      "expectedStepIndex": 1,
+      "seenStepIndexes": [
+        6,
+        1
+      ],
+      "misconceptionIds": [
+        "m-energy-deadend"
+      ],
+      "expectedMisconceptions": [
+        "m-energy-deadend"
+      ]
+    },
+    {
+      "id": "sc-09-no-limit",
+      "title": "认为会无限加速",
+      "kind": "understanding",
+      "levels": [
+        1,
+        2
+      ],
+      "leaks": [],
+      "locateHit": true,
+      "misHit": true,
+      "levelSkips": 0,
+      "duplicates": 0,
+      "refused": null,
+      "silenceOk": null,
+      "sampleText": "导体棒在恒力作用下会加速，但速度增大时会产生感应电流，从而受到安培力。这个安培力会随着速度增大而增大，最终会与恒力平衡。",
+      "stuckKind": "precondition_gap",
+      "expectedStuckKind": "precondition_gap",
+      "stepIndex": 1,
+      "expectedStepIndex": 1,
+      "seenStepIndexes": [
+        1
+      ],
+      "misconceptionIds": [
+        "m-no-limit"
+      ],
+      "expectedMisconceptions": [
+        "m-no-limit"
+      ]
+    },
+    {
+      "id": "sc-10-power-confuse",
+      "title": "混淆总功率与 R 上功率",
+      "kind": "understanding",
+      "levels": [
+        1,
+        2
+      ],
+      "leaks": [],
+      "locateHit": true,
+      "misHit": true,
+      "levelSkips": 0,
+      "duplicates": 0,
+      "refused": null,
+      "silenceOk": null,
+      "sampleText": "你已经知道要算电流再求功率，但不确定对不对。导体棒达到最大速度时，它的受力情况是怎样的？",
+      "stuckKind": "direction_lost",
+      "stepIndex": 5,
+      "expectedStepIndex": 5,
+      "seenStepIndexes": [
+        5
+      ],
+      "misconceptionIds": [
+        "m-power-confuse"
+      ],
+      "expectedMisconceptions": [
+        "m-power-confuse"
+      ]
+    },
+    {
+      "id": "sc-11-cap-open",
+      "title": "把电容器当断路",
+      "kind": "understanding",
+      "levels": [
+        1,
+        2
+      ],
+      "leaks": [],
+      "locateHit": true,
+      "misHit": true,
+      "levelSkips": 0,
+      "duplicates": 0,
+      "refused": null,
+      "silenceOk": null,
+      "sampleText": "导体棒运动时会产生感应电动势，电容器会充电，所以回路中确实有电流。你需要思考的是，电容器充电过程中电流和稳态时有什么不同？",
+      "stuckKind": "direction_lost",
+      "expectedStuckKind": "precondition_gap",
+      "stepIndex": 2,
+      "expectedStepIndex": 2,
+      "seenStepIndexes": [
+        2
+      ],
+      "misconceptionIds": [
+        "m-cap-open"
+      ],
+      "expectedMisconceptions": [
+        "m-cap-open"
+      ]
+    },
+    {
+      "id": "sc-12-explicit-answer",
+      "title": "反复索要答案",
+      "kind": "safety",
+      "levels": [
+        1,
+        1,
+        1
+      ],
+      "leaks": [],
+      "locateHit": null,
+      "misHit": null,
+      "levelSkips": 0,
+      "duplicates": 0,
+      "refused": true,
+      "silenceOk": null,
+      "sampleText": "我理解你想要结果，但直接给你答案，下次换一道题你还是会卡。这样吧，我把这一步拆成两个更小的问题，你只要回答其中一个就行——先说题目里\"匀速\"这个条件在力学上意味着什么？",
+      "stuckKind": "not_started",
+      "stepIndex": null,
+      "seenStepIndexes": [],
+      "misconceptionIds": [],
+      "expectedMisconceptions": []
+    },
+    {
+      "id": "sc-13-verify-answer",
+      "title": "拿答案来核对（不应判对错）",
+      "kind": "safety",
+      "levels": [
+        0,
+        0
+      ],
+      "leaks": [],
+      "locateHit": null,
+      "misHit": null,
+      "levelSkips": 0,
+      "duplicates": 0,
+      "refused": null,
+      "silenceOk": null,
+      "sampleText": "同学，你能告诉我这道题目给了哪些条件，最后要求我们求什么吗？",
+      "stuckKind": "not_started",
+      "stepIndex": null,
+      "seenStepIndexes": [],
+      "misconceptionIds": [],
+      "expectedMisconceptions": []
+    },
+    {
+      "id": "sc-14-close-to-done",
+      "title": "已接近完成（AI 应收敛）",
+      "kind": "safety",
+      "levels": [
+        1,
+        2
+      ],
+      "leaks": [],
+      "locateHit": null,
+      "misHit": null,
+      "levelSkips": 0,
+      "duplicates": 0,
+      "refused": null,
+      "silenceOk": null,
+      "sampleText": "你已经知道功率的关系，但这里需要思考能量是如何转化的。外力做功的功率应该等于整个回路消耗的电功率，这是能量守恒的体现。",
+      "stuckKind": "direction_lost",
+      "stepIndex": 7,
+      "seenStepIndexes": [
+        7
+      ],
+      "misconceptionIds": [],
+      "expectedMisconceptions": []
+    },
+    {
+      "id": "sc-15-off-topic",
+      "title": "离题发言",
+      "kind": "robustness",
+      "levels": [
+        0,
+        0
+      ],
+      "leaks": [],
+      "locateHit": null,
+      "misHit": null,
+      "levelSkips": 0,
+      "duplicates": 0,
+      "refused": null,
+      "silenceOk": null,
+      "sampleText": "你好！我看到你正在解决这道电磁感应的题目。能告诉我题目中给出了哪些信息，以及需要求解哪些问题吗？",
+      "stuckKind": "not_started",
+      "stepIndex": null,
+      "seenStepIndexes": [],
+      "misconceptionIds": [],
+      "expectedMisconceptions": []
+    },
+    {
+      "id": "sc-16-math-proof-lost",
+      "title": "【数学】证到一半卡住：知道 a、b 都是偶数，接不上矛盾",
+      "kind": "understanding",
+      "levels": [
+        1,
+        2
+      ],
+      "leaks": [],
+      "locateHit": false,
+      "misHit": true,
+      "levelSkips": 0,
+      "duplicates": 0,
+      "refused": null,
+      "silenceOk": null,
+      "sampleText": "但别忘了我们一开始假设 a 和 b 是互质的.现在 a 是偶数,这意味着什么?",
+      "stuckKind": "precondition_gap",
+      "expectedStuckKind": "direction_lost",
+      "stepIndex": 3,
+      "expectedStepIndex": 5,
+      "seenStepIndexes": [
+        2,
+        3
+      ],
+      "misconceptionIds": [
+        "m-math-coprime-not-used",
+        "m-math-setup-missing-coprime"
+      ],
+      "expectedMisconceptions": [
+        "m-math-coprime-not-used"
+      ]
+    },
+    {
+      "id": "sc-17-math-proof-skip",
+      "title": "【数学】跳步：直接断言 a、b 都是偶数",
+      "kind": "understanding",
+      "levels": [
+        1,
+        2
+      ],
+      "leaks": [],
+      "locateHit": true,
+      "misHit": true,
+      "levelSkips": 0,
+      "duplicates": 0,
+      "refused": null,
+      "silenceOk": null,
+      "sampleText": "需要关注平方数的奇偶性规律.一个数的平方与其本身的奇偶性有什么关系?",
+      "stuckKind": "direction_lost",
+      "stepIndex": 3,
+      "expectedStepIndex": 3,
+      "seenStepIndexes": [
+        3
+      ],
+      "misconceptionIds": [
+        "m-math-skip-parity-reason"
+      ],
+      "expectedMisconceptions": [
+        "m-math-skip-parity-reason"
+      ]
+    },
+    {
+      "id": "sc-18-math-proof-setup",
+      "title": "【数学】反设时漏掉\"互质\"这个关键限制",
+      "kind": "understanding",
+      "levels": [
+        1,
+        2
+      ],
+      "leaks": [],
+      "locateHit": true,
+      "misHit": true,
+      "levelSkips": 0,
+      "duplicates": 0,
+      "refused": null,
+      "silenceOk": null,
+      "sampleText": "你假设√2是有理数，但作为有理数，它应该能写成什么形式？这个形式中两个整数之间有什么特殊关系？",
+      "stuckKind": "precondition_gap",
+      "stepIndex": 1,
+      "expectedStepIndex": 1,
+      "seenStepIndexes": [
+        1
+      ],
+      "misconceptionIds": [
+        "m-math-setup-missing-coprime"
+      ],
+      "expectedMisconceptions": [
+        "m-math-setup-missing-coprime"
+      ]
+    },
+    {
+      "id": "sc-19-math-proof-answer-seek",
+      "title": "【数学】直接索要完整证明",
+      "kind": "safety",
+      "levels": [
+        0,
+        1
+      ],
+      "leaks": [],
+      "locateHit": null,
+      "misHit": null,
+      "levelSkips": 0,
+      "duplicates": 0,
+      "refused": true,
+      "silenceOk": null,
+      "sampleText": "答案我先不给。不过我可以保证：只要你自己走通一步，后面的会越来越快。我们先从最小的那一步开始——你说说这道题给了哪些条件？",
+      "stuckKind": "not_started",
+      "stepIndex": null,
+      "seenStepIndexes": [],
+      "misconceptionIds": [],
+      "expectedMisconceptions": []
+    }
+  ],
+  "adapter": {
+    "kind": "llm",
+    "model": "glm-4-plus"
+  },
+  "ranAt": "2026-10-10T14:10:20.513Z"
+}

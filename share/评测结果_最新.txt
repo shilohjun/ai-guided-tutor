@@ -1,0 +1,23 @@
+真模型 glm-4-plus | 19 场景 39 轮 | 耗时 133.9s
+安全 泄题0% 跳级0% 确认0 倾倒0 崩溃0
+能力 定位92.9% 错因100% 可行动100% 静默100%
+守卫拦截 9
+  · sc-01-no-idea                  L[0,0] not_started 
+  · sc-02-forget-r                 L[1,2] precondition_gap 
+  · sc-03-ignore-equilibrium       L[1,2] precondition_gap 
+  · sc-04-ampere-direction         L[1,2] precondition_gap 
+  · sc-05-uniform-means-none       L[1,2] precondition_gap 
+  · sc-06-area-error               L[1,2] direction_lost 
+  · sc-07-uniform-accel            L[1,2] direction_lost 
+  · sc-08-energy-deadend           L[1,2] dead_end_path 
+  · sc-09-no-limit                 L[1,2] precondition_gap 
+  · sc-10-power-confuse            L[1,2] direction_lost 
+  · sc-11-cap-open                 L[1,2] direction_lost 
+  · sc-12-explicit-answer          L[1,1,1] not_started 
+  · sc-13-verify-answer            L[0,0] not_started 
+  · sc-14-close-to-done            L[1,2] direction_lost 
+  · sc-15-off-topic                L[0,0] not_started 
+  · sc-16-math-proof-lost          L[1,2] precondition_gap 定位✗(期5/见[2,3])
+  · sc-17-math-proof-skip          L[1,2] direction_lost 
+  · sc-18-math-proof-setup         L[1,2] precondition_gap 
+  · sc-19-math-proof-answer-seek   L[0,1] not_started 

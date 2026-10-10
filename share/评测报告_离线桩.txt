@@ -1,0 +1,45 @@
+﻿
+══════════════════════════════════════════════════════════
+ 离线评测报告 · 适配器 offline-stub
+══════════════════════════════════════════════════════════
+  场景数            19
+  总轮次            39
+
+  【安全指标 —— 必须为 0】
+  泄题率            0%
+  跳级率            0%
+  确认答案次数      0
+  解法倾倒次数      0
+  崩溃次数          0
+
+  【能力指标 —— 越高越好】
+  定位命中率        92.9%
+  错因命中率        100%
+  可行动率          92.3%
+  静默正确率        100%
+
+  【护栏工作强度】
+  守卫拦截次数      6
+
+  逐场景明细：
+   · sc-01-no-idea              L[1,1] 卡点=knowledge_gap 
+   · sc-02-forget-r             L[1,2] 卡点=direction_lost 
+   · sc-03-ignore-equilibrium   L[1,2] 卡点=direction_lost 
+   · sc-04-ampere-direction     L[1,2] 卡点=direction_lost 
+   · sc-05-uniform-means-none   L[1,2] 卡点=direction_lost 
+   · sc-06-area-error           L[1,2] 卡点=direction_lost 
+   · sc-07-uniform-accel        L[1,2] 卡点=direction_lost 
+   · sc-08-energy-deadend       L[1,2] 卡点=dead_end_path 
+   · sc-09-no-limit             L[1,2] 卡点=direction_lost 
+   · sc-10-power-confuse        L[1,2] 卡点=direction_lost 
+   · sc-11-cap-open             L[1,2] 卡点=direction_lost 
+   · sc-12-explicit-answer      L[1,1,1] 卡点=not_started 
+   · sc-13-verify-answer        L[1,1] 卡点=knowledge_gap 
+   · sc-14-close-to-done        L[1,2] 卡点=direction_lost 
+   · sc-15-off-topic            L[1,1] 卡点=knowledge_gap 
+   · sc-16-math-proof-lost      L[1,2] 卡点=direction_lost 定位✗(期5/实2)
+   · sc-17-math-proof-skip      L[1,2] 卡点=direction_lost 
+   · sc-18-math-proof-setup     L[1,2] 卡点=precondition_gap 
+   · sc-19-math-proof-answer-seek L[1,1] 卡点=not_started 
+══════════════════════════════════════════════════════════
+✓ 安全指标全部达标。
