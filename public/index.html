@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI 重难题引导助手 · 提示引擎 Demo</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>"
+    />
+  </head>
+  <body>
+    <!-- ================= 顶栏 ================= -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">🧭</span>
+        <div class="brand-text">
+          <strong>AI 重难题引导助手</strong>
+          <span class="brand-sub">只给提示 · 不给答案 —— 提示引擎 PoC（物理 · 电磁感应）</span>
+        </div>
+      </div>
+
+      <nav class="steps" id="nav">
+        <button class="step" data-page="page-upload">
+          <span class="step-no">①</span><span class="step-label">上传 / 选题</span>
+        </button>
+        <button class="step" data-page="page-chat">
+          <span class="step-no">②</span><span class="step-label">对话引导</span>
+        </button>
+        <button class="step" data-page="page-report">
+          <span class="step-no">③</span><span class="step-label">学习报告</span>
+        </button>
+      </nav>
+
+      <div class="topbar-right">
+        <span class="engine-badge" id="engine-badge" title="当前引擎模式">…</span>
+        <label class="switch" title="展示诊断依据（教研视角）">
+          <input type="checkbox" id="teacher-toggle" />
+          <span>教师视图</span>
+        </label>
+      </div>
+    </header>
+
+    <main>
+      <!-- ================= 页①：上传 / 选题 ================= -->
+      <section class="page" id="page-upload">
+        <div class="hero">
+          <h1>先把题目交给我，我不会直接告诉你答案</h1>
+          <p class="hero-sub">
+            我会先看懂这道题的<strong>标准解题路径</strong>，然后等你把自己的思路说出来 ——
+            我再判断你卡在哪一步、该往哪个方向想。
+          </p>
+        </div>
+
+        <div class="grid-2">
+          <!-- 拍照上传 -->
+          <div class="card">
+            <div class="card-head">
+              <h2>① 拍照上传题目</h2>
+              <span class="pill pill-muted">视觉解析待接入</span>
+            </div>
+            <label class="dropzone" id="dropzone">
+              <input type="file" id="file-input" accept="image/*" hidden />
+              <div class="dropzone-inner">
+                <span class="dropzone-icon">📷</span>
+                <strong>点击选择照片，或把图片拖进来</strong>
+                <span class="muted">支持 JPG / PNG / HEIC 截图</span>
+              </div>
+            </label>
+            <img id="preview" class="preview" alt="题目预览" hidden />
+            <div class="notice notice-warn" id="ocr-notice" hidden>
+              <strong>这一环还没有接。</strong>
+              图像 → 题干需要视觉模型（如 <code>qwen-vl-max</code> / <code>glm-4v</code>）。
+              我没有伪造解析结果，而是把这条链路显式标出来，方便你判断排期。
+              <div class="notice-actions">
+                <button class="btn btn-ghost" id="ocr-explain">看这条链路怎么补</button>
+              </div>
+              <pre class="code" id="ocr-plan" hidden></pre>
+            </div>
+            <p class="muted small">
+              本 PoC 聚焦 proposal 的第②③环节（看懂思路 → 分层提示 → 报告）。
+              为了让演示可复现，题目从下面的题库中选择。
+            </p>
+          </div>
+
+          <!-- 题库 -->
+          <div class="card">
+            <div class="card-head">
+              <h2>② 或直接从题库选一题</h2>
+              <span class="pill" id="problem-count">—</span>
+            </div>
+            <div class="problem-list" id="problem-list">
+              <div class="skeleton"></div>
+              <div class="skeleton"></div>
+              <div class="skeleton"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 页②：对话引导 ================= -->
+      <section class="page" id="page-chat">
+        <div class="chat-layout">
+          <!-- 左：题目 + 提示层级 + 引擎指标 -->
+          <aside class="chat-aside">
+            <div class="card card-tight">
+              <div class="card-head">
+                <h3>当前题目</h3>
+                <button class="btn btn-ghost btn-sm" id="btn-change-problem">换一题</button>
+              </div>
+              <div class="stem" id="chat-stem">尚未选择题目</div>
+              <div class="givens" id="chat-givens"></div>
+            </div>
+
+            <!-- 提示层级阶梯：让"分层"这件事可见 -->
+            <div class="card card-tight">
+              <div class="card-head"><h3>提示层级阶梯</h3></div>
+              <p class="muted small">
+                每次最多只升一级。L3 之后不再升级 —— 剩下的必须由学生自己完成。
+              </p>
+              <ol class="ladder" id="ladder">
+                <li data-level="0">
+                  <span class="ladder-dot"></span>
+                  <div><strong>L0 结构化澄清</strong><em>先分清已知 / 目标 / 困惑</em></div>
+                </li>
+                <li data-level="1">
+                  <span class="ladder-dot"></span>
+                  <div><strong>L1 条件追问</strong><em>只问前提，不指方向</em></div>
+                </li>
+                <li data-level="2">
+                  <span class="ladder-dot"></span>
+                  <div><strong>L2 方向提示</strong><em>指该看哪个关系，不给式子</em></div>
+                </li>
+                <li data-level="3">
+                  <span class="ladder-dot"></span>
+                  <div><strong>L3 降级示范</strong><em>示范一个动作，不给数值</em></div>
+                </li>
+              </ol>
+            </div>
+
+            <!-- 护栏状态：把"不给答案"变成可观测指标 -->
+            <div class="card card-tight">
+              <div class="card-head"><h3>防泄题护栏</h3></div>
+              <div class="stat-row">
+                <div class="stat"><span class="stat-num" id="stat-turns">0</span><span class="stat-label">对话轮次</span></div>
+                <div class="stat"><span class="stat-num" id="stat-blocked">0</span><span class="stat-label">守卫拦截</span></div>
+                <div class="stat"><span class="stat-num green" id="stat-leak">0</span><span class="stat-label">答案泄漏</span></div>
+              </div>
+              <p class="muted small">
+                每条提示在出口都会过 5 类检查（答案数值 / 解法公式 / 层级越界 / 步骤倾倒 / 收口句式）。
+                拦截后自动重写；两次不过就用安全兜底模板。
+              </p>
+              <button class="btn btn-ghost btn-sm btn-block" id="btn-run-eval">当场跑一遍离线评测</button>
+            </div>
+
+            <!-- 演示剧本 -->
+            <div class="card card-tight">
+              <div class="card-head"><h3>演示剧本</h3></div>
+              <p class="muted small">点一下自动填入「典型学生的说法」，方便现场演示。</p>
+              <div class="script-list" id="script-list"></div>
+            </div>
+          </aside>
+
+          <!-- 右：对话 -->
+          <div class="chat-main">
+            <div class="card card-chat">
+              <div class="chat-head">
+                <h3 id="chat-title">对话引导</h3>
+                <div class="chat-head-right">
+                  <label class="switch">
+                    <input type="checkbox" id="mode-toggle" checked />
+                    <span id="mode-label">AI 陪伴模式</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="messages" id="messages">
+                <div class="empty-state" id="chat-empty">
+                  <span class="empty-icon">💬</span>
+                  <strong>先说说你自己的想法</strong>
+                  <p>
+                    不用写得很规范。哪怕是"我只知道要用安培力，但不知道力怎么求"这种半句话都可以 ——
+                    我的任务就是从这种半句话里看出你卡在哪。
+                  </p>
+                  <p class="muted small">AI 不会给你答案。你随时可以要提示，但要不到答案。</p>
+                </div>
+              </div>
+
+              <form class="composer" id="composer">
+                <textarea
+                  id="input"
+                  rows="2"
+                  placeholder="例：我用欧姆定律算电流，电流我直接用 I=E/R 算就行了，电阻只有R……"
+                  disabled
+                ></textarea>
+                <div class="composer-right">
+                  <label class="checkbox small">
+                    <input type="checkbox" id="help-seeking" checked />
+                    <span>我在求助</span>
+                  </label>
+                  <button class="btn btn-primary" type="submit" id="btn-send" disabled>发送</button>
+                </div>
+              </form>
+            </div>
+
+            <!-- 教师视图：诊断依据 -->
+            <div class="card card-teacher" id="teacher-panel" hidden>
+              <div class="card-head">
+                <h3>🔍 教师视图 · 诊断依据</h3>
+                <span class="pill pill-muted">学生看不到这一栏</span>
+              </div>
+              <div id="teacher-content">
+                <p class="muted small">发出第一条消息后，这里会显示引擎的完整判断链路。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 页③：学习报告 ================= -->
+      <section class="page" id="page-report">
+        <div class="hero hero-slim">
+          <h1>学习报告</h1>
+          <p class="hero-sub">
+            报告不评价你"对了几步"，而是回答三件事：<strong>卡在哪、为什么卡、下一步做什么</strong>。
+          </p>
+        </div>
+        <div id="report-body">
+          <div class="empty-state card">
+            <span class="empty-icon">📄</span>
+            <strong>还没有可以汇总的对话</strong>
+            <p>先去「对话引导」页跟 AI 聊几轮，再回来生成报告。</p>
+            <button class="btn btn-primary" id="btn-goto-chat">去对话引导</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
