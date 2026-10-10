@@ -1,0 +1,28 @@
+{
+  "name": "ai-guided-tutor-hint-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "面向中学生重难题的 AI 引导解题助手 —— 「看懂学生思路 + 只给提示不给答案」提示引擎 PoC（物理·电磁感应）",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node --watch server/server.js",
+    "test": "node test/run.js",
+    "eval": "node scripts/eval.js",
+    "eval:llm": "node scripts/eval.js --adapter llm",
+    "all": "node test/run.js && node scripts/eval.js"
+  },
+  "keywords": [
+    "education",
+    "ai-tutor",
+    "hint-engine",
+    "guardrail",
+    "physics"
+  ],
+  "license": "UNLICENSED",
+  "dependencies": {},
+  "devDependencies": {}
+}
