@@ -1,0 +1,57 @@
+# =============================================================================
+# 把 showcase/ 目录发布为 GitHub Pages
+#
+# 为什么需要这个工作流：
+#   GitHub Pages 的"分支模式"只允许选择 `/ (root)` 或 `/docs` 两个目录，
+#   不支持任意子目录。而本仓库的 docs/ 已经用于文档，showcase/ 才是演示页。
+#   改用"GitHub Actions"发布模式后，可以精确指定要发布的目录。
+#
+# 使用前提（一次性设置）：
+#   仓库 → Settings → Pages → Source 选 **GitHub Actions**（不要选 Deploy from a branch）
+#
+# 发布结果：https://<用户名>.github.io/<仓库名>/
+# =============================================================================
+
+name: Deploy showcase to Pages
+
+on:
+  push:
+    branches: [main]
+    # 只在演示页或其说明变更时才触发，避免改代码也重新发布
+    paths:
+      - 'showcase/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只允许一个发布任务，避免并发写坏 Pages
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload showcase/ as Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # 关键：只发布 showcase/ 目录的内容作为站点根目录
+          path: showcase
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
