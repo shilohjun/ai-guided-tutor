@@ -65,13 +65,24 @@ npx vercel --prod # 正式发布
 
 ### 形态三：单文件演示页（GitHub Pages）
 
-`showcase/` 目录是**零依赖的单文件演示文稿**，适合直接发布成公开链接：
+`showcase/` 目录是**零依赖的单文件演示文稿**，适合直接发布成公开链接。
 
-GitHub 仓库 → **Settings → Pages** → Source 选 `Deploy from a branch`
-→ Branch 选 `main`（或 `master`）→ 目录选 `/showcase` → Save
+**注意：不能用「Deploy from a branch」模式。** 该模式的目录下拉框
+只提供 `/ (root)` 和 `/docs` 两个选项，**不支持任意子目录** ——
+所以在里面搜不到 `/showcase`。正确做法是用 Actions 模式：
+
+1. 仓库 → **Settings → Pages** → Source 选 **`GitHub Actions`**
+   （不要选 `Deploy from a branch`）
+2. 工作流已随仓库提供：`.github/workflows/pages.yml`，
+   它把 `showcase/` 作为站点根目录发布
+3. 推送到 `main` 后，**Actions** 标签页会出现 `Deploy showcase to Pages`，
+   跑完即可在 **Settings → Pages** 顶部看到链接
 
 链接形如 `https://<用户名>.github.io/<仓库名>/`，打开即是那 11 页成果，
 能翻页、能 `Ctrl/Cmd+P` 导出 PDF，读者不需要懂代码、不需要装任何东西。
+
+> 该工作流的触发条件已限制为 `showcase/**` 或工作流文件本身变更，
+> 因此改代码不会触发重新部署。
 
 ---
 
