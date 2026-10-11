@@ -191,14 +191,26 @@ interface Diagnosis {
 
 ## 四、HTTP 接口契约
 
+> **本节最重要的约定：学生视图与教师视图在服务端分流。**
+>
+> | 端点 | 谁可以拿 | 内容 |
+> |---|---|---|
+> | `/api/problem`、`/api/chat`、`/api/report` | 学生 | **白名单投影**：无路径名、无步骤、无指纹、无参考答案、无错因标签、无守卫细节 |
+> | `/api/teacher/*` | 带 `TEACHER_KEY` 的人 | 完整图谱、参考答案、三组指纹、逐轮 trace |
+>
+> 这是**服务端不给**，不是前端不显示 —— 学生打开 F12 也拿不到。
+> 判定一个改动有没有破坏它，看 `test/ui.test.js`（密钥扫描）与
+> `test/analysis.test.js`（学生载荷反向断言）。
+
 ### 4.1 `GET /api/problem?id=<problemId>`
 
-下发题目。**注意：参考答案、错因教研标签、答案指纹绝不出网。**
+下发题目与学生版解析。**注意：参考答案、错因教研标签、答案指纹、路径内容决不出网。**
 
 ```json
 {
   "problem": {
     "id": "phy-emi-01",
+    "source": "library",              // 或 "imported"
     "subject": "physics",
     "topics": ["电磁感应", "法拉第电磁感应定律", "..."],
     "difficulty": 2,
@@ -206,14 +218,85 @@ interface Diagnosis {
     "givens": ["L = 0.5 m", "B = 0.4 T", "..."],
     "asked": ["感应电动势 E", "感应电流 I", "..."],
     "figure": "水平导轨，竖直向上磁场……",
-    "graphSummary": [{ "id": "phy-emi-01-g1", "name": "电动势—电流—安培力—平衡", "stepCount": 8 }],
-    "conceptTags": ["回路构成", "电源与内阻", "..."]
+    "stepCount": 8,
+    "analysis": {
+      "summary": "物理题，考点集中在电磁感应、法拉第电磁感应定律：……",
+      "variables": {
+        "given": [{ "id": "v0", "kind": "given", "raw": "L = 0.5 m", "symbol": "L", "value": "0.5", "unit": "m", "note": "长度 / 距离" }],
+        "asked": [{ "id": "v0", "kind": "asked", "raw": "感应电动势 E", "symbol": "E", "value": null, "unit": "", "note": "感应电动势 E" }],
+        "qualitative": ["匀速运动"]
+      },
+      "keyConditions": [
+        {
+          "text": "…使导体棒沿导轨以恒定速度 v = 2 m/s 向右…",
+          "label": "匀速（速度不变）",
+          "kind": "constraint",
+          "meaning": null,                                  // ← 会剧透，所以不给
+          "question": "\"匀速\"在力学上等价于什么条件？先把这句话翻译出来。",
+          "revealsInsight": true
+        },
+        {
+          "text": "…水平放置的两条光滑平行金属导轨…",
+          "label": "接触面光滑",
+          "kind": "qualitative",
+          "meaning": "摩擦力为零，沿接触面方向上只有重力分量与外力参与，不需要再引入摩擦系数。",
+          "question": null,
+          "revealsInsight": false
+        }
+      ],
+      "knowledgeGraph": {
+        "nodes": [{ "id": "电磁感应", "name": "电磁感应", "role": "core", "level": 1, "note": "" }],
+        "edges": [{ "from": "安培力", "to": "电磁感应", "relation": "prereq", "label": "前置" }],
+        "edgeSource": "derived",        // model = 读题时模型判断；derived = 按文本推导
+        "scope": "topics-only"          // 学生图谱刻意不含步骤概念
+      }
+    }
   }
 }
 ```
 
-`graphSummary` 只暴露"有几条路径、各有几步"，不暴露路径内容 ——
-否则学生可以直接反推解法。
+两条刻意的取舍，写在这里以免后人"顺手补全"：
+
+- **没有 `graphSummary` / 路径名。** 路径名（如"电动势—电流—安培力—平衡"）本身就把解法说出来了。
+  学生只知道"一共几步"。
+- **没有 `conceptTags`。** 曾经有，是 `steps[].concepts` 的汇总 ——
+  而那里面包含「电源与内阻」「匀速直线运动合力为零」，**恰好是本题的两个 `solutionInsight`**。
+  等于把答案印在题目下面。现在知识点只从 `topics`（章节级）来。
+
+### 4.1b `POST /api/problem/import` —— 读一道新题
+
+**请求**
+
+```json
+{ "rawText": "质量为 0.5 kg 的小球从高 h = 20 m 处由静止开始自由下落……", "subjectHint": null }
+```
+
+**响应**（`problem` 的形状与 4.1 完全一致）
+
+```json
+{
+  "problem": { "...": "同上" },
+  "intake": {
+    "usedModel": true,
+    "latencyMs": 9125,
+    "topics": ["自由落体运动", "匀变速直线运动"],
+    "stepCount": 7,
+    "graphReady": true,               // 有答案指纹 ⇒ 数值防泄题有效
+    "analysisFromModel": true,
+    "conditionCount": 3,
+    "notice": "已读懂这道题：条件、目标、知识点与解题路径都已建档（路径对学生不可见，只用于后续引导）。"
+  }
+}
+```
+
+| 状态码 | 含义 |
+|---|---|
+| 400 | 题干短于 8 字 |
+| 422 | 读题失败（模型不可用且降级也失败） |
+| 200 | 成功；**降级也会返回 200**，但 `usedModel:false` + `notice` 会写明"路径是通用骨架" |
+
+> 降级返回 200 而不是报错，是刻意的：学生应该拿到一个能用的（哪怕更弱的）引导，
+> 而不是一个错误页。代价是"降级"必须**显式可见** —— 所以有 `usedModel` 和 `notice`。
 
 ### 4.2 `POST /api/chat`
 
@@ -233,7 +316,7 @@ interface Diagnosis {
 
 ```json
 {
-  "message": "我理解你的意思是：……\n\n这段电路里，谁是提供电动势的那一部分？\n\n👉 检查一下这个规律的前提条件",
+  "message": "我理解你的意思是：……\n\n这段电路里，谁是提供电动势的那一部分？\n\n【下一步】检查一下这个规律的前提条件",
   "hint": {
     "level": 1,
     "levelName": "L1 条件追问",
@@ -274,11 +357,22 @@ interface Diagnosis {
 |---|---|
 | `message` | 学生可见的完整文本（复述 + 提示 + 下一步）。**唯一应该渲染给学生看的字段。** |
 | `hint.text` | 仅提示部分，不含复述。用于 UI 分行着色 |
-| `diagnosis.teacherView` | **教研视角信息，默认折叠**。学生看到"错因标签"会反推出答案方向 |
+| `hint.levelNote` | 层级的人话版本（"我在问你一个前提"）。给学生的不是 `L1 条件追问` 这种教研语言 |
+| `progress` | `{ stepIndex, stepCount, confidenceLabel }` —— 只给"第几步 / 共几步 / 把握粗档" |
+| `enginePath` | 引擎判断链路的**学生版投影**（见 §4.6） |
+| `understood` | 学生已经想对的地方（正面反馈，报告与鼓励都从这里出） |
 | `refusal` | 非空表示本轮走的是"拒绝给答案"路径，`count` 是累计次数（话术递进） |
 | `suppressed` | true 表示"决定不介入"（自主训练静默 / 学生已完成） |
-| `meta.guardBlocked` | 守卫拦截次数。**>0 是好事**，说明护栏在工作 |
 | `allowedNextLevel` | 下一轮最多可升到几级，供 UI 提示"再想想还能要提示" |
+
+**响应里刻意不存在的东西**（不是"前端不显示"，是根本没发）：
+
+`diagnosis.stuckKind`、`confidence` 数值、`hint.rationale`、`meta.guardPassed`、
+`guardBlocked`、`guardHistory`、错因标签、路径名、步骤标题。
+
+> 早期版本把 `diagnosis.teacherView`（错因标签 + 证据原话 + 完整 trace）
+> 和学生消息一起返回，靠前端一个 checkbox 决定显不显示 —— 打开 F12 就能看到。
+> 现在这些只在 `/api/teacher/*` 里，且必须带口令。
 
 ### 4.3 `GET /api/report?sessionId=<id>`
 
@@ -287,9 +381,69 @@ interface Diagnosis {
 ### 4.4 `POST /api/eval`
 
 一键跑离线评测，返回指标。**用途：路演/评审时当场证明"泄题率 0%"**，
-而不是只给一个漂亮的演示样例。
+而不是只给一个漂亮的演示截图。
+
+> 入口在学生界面里已经移除了 —— 它是工程质量指标，
+> 放在学生页面上学生会以为"AI 在考核我"。现在只在教师视图 → 质量评测里。
 
 ### 4.5 `GET /api/health`
+
+返回引擎模式、读题能力、教师视图形态、题目注册表统计。**绝不回传口令本身。**
+
+```json
+{
+  "engine": "llm",
+  "model": "deepseek-chat",
+  "llmConfigured": true,
+  "keyMask": "sk-91a…789f（共 35 位）",
+  "capabilities": { "intake": true, "intakeFallback": true },
+  "teacherView": "open",            // open | key | off
+  "registry": { "library": 6, "imported": 0, "importTtlHours": 6, "maxImported": 200 }
+}
+```
+
+### 4.6 教师视图端点（需 `TEACHER_KEY`）
+
+三种形态由**部署形态**决定，不由"有没有配口令"决定（见 `router.js` 的 `teacherMode`）：
+
+| 形态 | 触发条件 | 行为 |
+|---|---|---|
+| `open` | 本地运行且 `TEACHER_KEY` 留空 | 直接进（自己看图谱/复盘方便） |
+| `key` | 配了 `TEACHER_KEY` | 不带口令一律 401 |
+| `off` | 公网部署（`api/index.js` 强制置位）且没配口令 | 403，整体关闭 |
+
+**为什么公网一定要 `off`**：教师接口返回的是**完整解题路径 + 参考答案 + 答案指纹**。
+如果"没配口令 = 开放"这个默认值跟着代码上了 Vercel，
+那份公开链接就等于把答案挂在网上 —— 而这恰恰是最容易发生的疏忽：
+本地跑得好好的，部署时没人会想起来"还得去配个口令"。
+三档形态在 `test/ui.test.js` 里各有断言，其中一条专门检查
+`api/index.js` 那段强制锁死逻辑还在不在（删掉不会有任何报错）。
+
+| 端点 | 返回 |
+|---|---|
+| `GET /api/teacher/overview` | 跨会话聚合：帮助强度分布、卡点性质分布、会话列表 |
+| `GET /api/teacher/session?sessionId=` | 逐轮复盘：层级、卡点性质、定位步骤、**被拦下的原句与违规类型**、学生原话证据、voice 体检、完整 trace |
+| `GET /api/teacher/problem?id=` | 完整图谱 + 参考答案 + 三组指纹 + 教师版解析（含剧透标记） |
+
+**引擎判断链路（§4.6 的核心）在两个视图里是两次独立的投影，不是同一份数据加打码**：
+
+| | 学生版 | 教师版 |
+|---|---|---|
+| 来源 | `prompt.js` 的 `buildStudentEnginePath()` 白名单构造 | `diagnosis.trace` 完整内容 |
+| 内容 | 读题 / 听懂（引用学生自己的词）/ 定位（只说第几步）/ 决定（给人话）/ 成文 | 双通道定位数值、冲突与采信、卡点性质、层级策略、守卫违规 |
+| 刻意没有 | 错因标签、置信度数字、违规类型、层级策略名、路径名、步骤标题 | —— |
+
+打码依赖"记得打哪里"，每加一个字段都要重审一遍；白名单依赖"允许说什么"，
+漏一处只是少说一句话。这和守卫用**封闭词表**而不是黑名单是同一条思路。
+
+### 4.7 其它
+
+| 端点 | 说明 |
+|---|---|
+| `GET /api/problems` | 题目列表（题库 + 现场导入），导入题会带 `graphConfidence` 标记 |
+| `GET /api/demo-scripts` | 演示剧本（典型学生的说法），供现场一键填入 |
+| `POST /api/reset` | 清掉某个会话 |
+
 
 返回引擎模式、是否已配 Key（**只回显脱敏信息**）、提示策略摘要。
 
@@ -345,7 +499,7 @@ const DEEPER_PATTERNS = [
 
 ## 六、防泄题守卫契约
 
-### 6.1 六类检查
+### 6.1 七类检查
 
 | # | kind | 拦截内容 | 生效层级 |
 |---|---|---|---|
@@ -355,6 +509,20 @@ const DEEPER_PATTERNS = [
 | 4 | `solution_dump` | 编号步骤 >2 个，或推导箭头 >2 个 | 全部 |
 | 5 | `final_conclusion` | "所以答案是/最终结果/因此可得"类收口句式 | 全部 |
 | 6 | `concept_out_of_domain` | 跑题：引用了本题不存在的物理概念 | 全部 |
+| 7 | `solution_insight` | **说出解题核心结论**（如"导体棒是电源，r 是内阻"） | L0–L2 |
+
+第 7 类的判据是"**指派**"而不是"提及"：
+
+- ✅ 允许："谁是提供电动势的那一部分？它自身有没有电阻？"（在问）
+- ❌ 拦截："导体棒相当于电源，它的电阻就是内阻。"（在答）
+
+它来自一次真模型实测：那句回复没有公式、没有数值，形式上完全合规，
+但学生漏的正是"导体棒有内阻"—— 前 6 类检查全都拦不住。
+
+> **同一套 `solutionInsights` 指纹也被"解析层"复用**（见 `analysis.js` 的 `doesReveal`）。
+> 这是刻意的：解析面板里的"关键条件含义"如果会剧透，判定基准必须与守卫完全一致，
+> 否则会出现"解析里能说、提示里不能说"的口径矛盾 —— 那种矛盾教研一眼就能看出来，
+> 而且会让人不再相信任何一条拦截记录。
 
 ### 6.2 检查 1 的双通道设计
 
