@@ -3,7 +3,7 @@
  * 这里刻意构造各种"模型可能的绕过手法"，验证守卫能拦住。
  */
 
-import { describe, it, assert, assertEquals } from './runner.js';
+import { describe, it, assert, assertEquals, assertIncludes, assertNotIncludes } from './runner.js';
 import {
   guard,
   checkAnswerLeak,
@@ -15,8 +15,12 @@ import {
   checkSolutionInsight,
   extractValueUnits,
   safeFallbackHint,
+  isTitleSafeForStudent,
+  safeStepRef,
 } from '../src/core/guard.js';
 import { getProblem, PROBLEMS } from '../src/core/problems.data.js';
+import { createEngine } from '../src/core/engine.js';
+import { createOfflineAdapter } from '../src/core/llm.js';
 
 const P1 = getProblem('phy-emi-01'); // 答案 0.4V / 1A / 0.2N / 0.4W
 const P3 = getProblem('phy-emi-03'); // 答案 q=1C / x=1m / Q=1J
@@ -251,5 +255,66 @@ describe('守卫 · 端到端与降级重写', () => {
     assertEquals(typeof g.passed, 'boolean');
     assert(Array.isArray(g.violations));
     assert(g.violations.every((v) => typeof v.kind === 'string' && typeof v.detail === 'string'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 步骤标题的对外安全（真模型评测抓到过的漏洞）
+// ---------------------------------------------------------------------------
+
+describe('步骤标题 · 含结论的标题不许说给学生', () => {
+  /**
+   * 实测事故：复述段原样引用步骤标题，而那一步的标题是
+   *   「因此 a、b 有公因数 2，与"互质"矛盾」
+   * —— 等于把整个证明的结论递过去了。
+   *
+   * 这个洞一直存在，只是离线桩的定位很少落到那一步，所以一直没被看见。
+   * 结论：**步骤标题是教研语言，不是学生语言**，能不能给学生看要逐条判断。
+   */
+  const math = PROBLEMS.find((p) => p.subject === 'math');
+
+  it('命中答案/公式/结论指纹的标题被判为不可展示', () => {
+    const risky = math.solutionGraphs
+      .flatMap((g) => g.steps)
+      .map((s) => s.title)
+      .filter((t) => !isTitleSafeForStudent(t, math));
+    assert(risky.length > 0, '这道数学题应当至少有一个含结论的步骤标题被拦下');
+  });
+
+  it('安全引用：不安全的退到"第 N 步（动作类型）"，而不是照抄标题', () => {
+    const step = math.solutionGraphs[0].steps.find((s) => !isTitleSafeForStudent(s.title, math));
+    assert(step, '需要一个不安全的步骤做样本');
+    const ref = safeStepRef(math, step);
+    assert(!ref.includes(step.title), `不该照抄标题：${ref}`);
+    assertIncludes(ref, `第 ${step.index} 步`, '应退到带序号的说法');
+    assertIncludes(ref, '步（', '应带上动作类型，让学生知道那一步在做什么');
+  });
+
+  it('derive / conclude 两类标题一律不引（它们天然写结果）', () => {
+    const step = { index: 9, title: '把数值代进去算出来', kind: 'conclude' };
+    const ref = safeStepRef(P1, step);
+    assert(!ref.includes('把数值代进去'), `conclude 步骤不该引标题：${ref}`);
+  });
+
+  it('引擎复述段里不出现任何未经检查的步骤标题', async () => {
+    const engine = createEngine({ adapter: createOfflineAdapter(), problem: math });
+    const history = [];
+    for (const u of ['我假设√2=a/b，两边平方得到 a²=2b²，所以 a 和 b 都是偶数', '然后呢', '还是不会']) {
+      const res = await engine.handleTurn({
+        problemId: math.id,
+        utterance: u,
+        history,
+        mode: 'ai_companion',
+        explicitHelpSeeking: true,
+      });
+      for (const g of math.solutionGraphs) {
+        for (const s of g.steps) {
+          if (isTitleSafeForStudent(s.title, math)) continue;
+          assertNotIncludes(res.message, s.title, `学生可见文本里出现了不安全标题：「${s.title}」`);
+        }
+      }
+      history.push({ role: 'student', text: u, at: '' });
+      history.push({ role: 'ai', text: res.hint.text, at: '', level: res.hint.level });
+    }
   });
 });

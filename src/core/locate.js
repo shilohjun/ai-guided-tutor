@@ -11,6 +11,7 @@
  */
 
 import { canonicalize, clip, hasSubstantiveContent, matchAll, matchSignatures, normalize } from './text.js';
+import { safeStepRef } from './guard.js';
 
 // ---------------------------------------------------------------------------
 // 双通道定位
@@ -480,7 +481,9 @@ export function buildRestatement(problem, observation, position, stuckKind, opts
 
   // 没有任何实质信息可复述时不要硬凑 —— 宁可不说，也不要复读学生的废话
   if (parts.length === 0) {
-    const posOnly = step ? `你之前停在「${step.title}」这一步，我们接着往下。` : '我们接着刚才的地方往下。';
+    const posOnly = step
+      ? `你之前停在${safeStepRef(problem, step)}这一步，我们接着往下。`
+      : '我们接着刚才的地方往下。';
     return posOnly;
   }
 
@@ -492,8 +495,14 @@ export function buildRestatement(problem, observation, position, stuckKind, opts
     ? `这一步你想对的地方是：${strengths.slice(0, 3).join('；')}。`
     : '';
 
+  /**
+   * 这里刻意**不直接引用步骤标题**（见 guard.js 的 isTitleSafeForStudent）：
+   * 步骤标题是教研语言，有些标题本身就是答案
+   * （实测："因此 a、b 有公因数 2，与'互质'矛盾"）。
+   * 安全的标题照引，不安全的退到"第 N 步（动作类型）"。
+   */
   const posText = step
-    ? `按这个思路，你大概停在「${step.title}」这一步。`
+    ? `按这个思路，你大概停在${safeStepRef(problem, step)}这一步。`
     : '我暂时没能确定你具体停在哪一步。';
 
   const misNote =
@@ -535,7 +544,8 @@ function buildStrengths(problem, observation, position) {
 
   // ③ 当前步骤本身如果做对了一部分（有错因说明这一步有问题，就不算）
   if (step && (observation.candidateMisconceptionIds ?? []).length === 0 && position.stepIndex != null) {
-    out.push(`在「${step.title}」这一步上方向是清楚的`);
+    // 同样不直接引标题：strengths 会进复述段与"我读懂了你的这些想法"，是学生可见文本
+    out.push(`在${safeStepRef(problem, step)}这一步上方向是清楚的`);
   }
 
   return dedupe(out).slice(0, 3);

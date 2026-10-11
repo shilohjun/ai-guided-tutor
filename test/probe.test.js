@@ -12,10 +12,11 @@
  * 另外补一条防重复的护栏测试：同一层级不能在长会话里复读同一句话。
  */
 
-import { describe, it, assert, assertEquals, assertNotIncludes } from './runner.js';
+import { describe, it, assert, assertEquals, assertIncludes, assertNotIncludes } from './runner.js';
 import { createEngine } from '../src/core/engine.js';
 import { createOfflineAdapter } from '../src/core/llm.js';
 import { getProblem } from '../src/core/problems.data.js';
+import { polishVoice } from '../src/core/prompt.js';
 
 const P1 = getProblem('phy-emi-01');
 
@@ -208,5 +209,65 @@ describe('长会话 · 不得复读同一句提示', () => {
     for (let i = 1; i < texts.length; i += 1) {
       assert(texts[i] !== texts[i - 1], `第 ${i + 1} 轮与上一轮完全重复：${texts[i]}`);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 语域：AI 的措辞要像一个资深教师，而不是一个陪聊机器人
+// ---------------------------------------------------------------------------
+
+describe('语域 · 措辞的专业度（由代码保证，不靠模型自觉）', () => {
+  it('空话、夸张、卖萌由代码删除，而不是靠提示词里写一句"不要空话"', () => {
+    assertEquals(polishVoice('加油，你可以的！我们先看看回路里有哪些电阻。').text, '我们先看看回路里有哪些电阻。');
+    assertEquals(polishVoice('太棒了！你算出了 E。接下来看电流怎么求？').text, '你算出了 E。接下来看电流怎么求？');
+  });
+
+  it('句尾语气词与波浪号被清掉（但不误伤"吗/呢"这类疑问助词）', () => {
+    const r = polishVoice('你先列出受力分析的式子吧～');
+    assert(!r.text.includes('～'), `波浪号应被清掉：${r.text}`);
+    // "吗"是正常疑问助词，必须保留，否则提问会被破坏
+    assertEquals(polishVoice('这个规律成立吗？').text, '这个规律成立吗？');
+  });
+
+  it('emoji 被清掉（资深教师不会在理科提示里放表情）', () => {
+    const r = polishVoice('先看回路的构成 👇 谁是电源？');
+    assert(!/[\u{1F300}-\u{1FAFF}]/u.test(r.text), `仍然有 emoji：${r.text}`);
+    assertIncludes(r.text, '谁是电源', '删 emoji 不能连正文一起删');
+  });
+
+  it('整句都是空话时不返回断头标点（调用方会退回原文）', () => {
+    assertEquals(polishVoice('加油！').text, '');
+    assertEquals(polishVoice('很棒！这道题不难，你再仔细想想。').text, '这道题不难。');
+  });
+
+  it('删小句之后不留"！我们先…"这种断头句', () => {
+    const t = polishVoice('加油，你可以的！我们先看看回路里有哪些电阻。').text;
+    assert(!/^[，。！？、]/.test(t), `开头不应是标点：${t}`);
+  });
+
+  it('一句话里问了两个问题会被标出来（不擅自改写，只如实记录）', () => {
+    const r = polishVoice('你先试试。你觉得这个规律成立吗？那前提满足了吗？');
+    assertEquals(r.multiQuestion, true, '两个问号应被标记');
+    assertIncludes(r.text, '你觉得这个规律成立吗', '标记归标记，不能擅自删掉学生的选择权');
+  });
+
+  it('引擎产出的提示文本里不含语气词与 emoji', () => {
+    const banned = /[\u{1F300}-\u{1FAFF}]|[啦呀哦嗯哈诶哎]|～|~/u;
+    return (async () => {
+      const engine = createEngine({ adapter: createOfflineAdapter(), problem: P1 });
+      const history = [];
+      for (const u of ['我不会', '还是不会', '提示一下', '再给点提示']) {
+        const res = await engine.handleTurn({
+          problemId: P1.id,
+          utterance: u,
+          history,
+          mode: 'ai_companion',
+          explicitHelpSeeking: true,
+        });
+        assert(!banned.test(res.message), `提示文本含不专业措辞：${res.message}`);
+        history.push({ role: 'student', text: u, at: '' });
+        history.push({ role: 'ai', text: res.hint.text, at: '', level: res.hint.level });
+      }
+    })();
   });
 });

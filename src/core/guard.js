@@ -19,7 +19,15 @@
  *   若两次都失败，就用"安全兜底模板"直接产出（保证永不泄题优先于文采）。
  */
 
-import { canonicalize, chineseNumeralToArabic, clip, normalize, safeRegex } from './text.js';
+import {
+  canonicalize,
+  chineseNumeralToArabic,
+  clip,
+  normalize,
+  safeRegex,
+  stripEnumerators,
+  unfoldScripts,
+} from './text.js';
 
 // ---------------------------------------------------------------------------
 // 规则表
@@ -96,19 +104,45 @@ const LEVEL_RULES = {
  *   b) 从 referenceAnswer 里抽出所有"数值+单位"组合做兜底（召回高）
  * 通道 b 的存在是为了防"教研漏写指纹"这类人为疏漏。
  */
+/**
+ * 指纹匹配：`²` 与 `^2` 两种写法都要试。
+ *
+ * 背景：归一化层为了让学生打的 `v^2` 能命中教师写的 cue `v²`，
+ * 把 `^2` 折成了 `²`（见 text.js 的 foldSuperscripts）。
+ * 代价是**写成 `^2` 的指纹会变成死指纹** —— 而指纹是防泄题的主力，
+ * 一条悄悄失效的指纹比一条没有的指纹更危险（因为没人知道它没在工作）。
+ *
+ * 所以这里同时用摊平形式再试一次。多一次正则匹配的代价，
+ * 换"不存在静默失效的指纹"。
+ */
+export function fingerprintMatches(fp, text) {
+  const t = String(text ?? '');
+  const re = () => safeRegex(fp, 'i');
+  try {
+    if (re().test(t)) return true;
+  } catch {
+    return false;
+  }
+  const unfolded = unfoldScripts(t);
+  if (unfolded === t) return false;
+  try {
+    return re().test(unfolded);
+  } catch {
+    return false;
+  }
+}
 export function checkAnswerLeak(text, problem) {
   const violations = [];
   const t = chineseNumeralToArabic(normalize(text));
 
   for (const fp of problem.answerFingerprints ?? []) {
-    const m = t.match(safeRegex(fp, 'i'));
-    if (m) {
-      violations.push({
-        kind: 'answer_in_text',
-        detail: `命中答案指纹 /${fp}/`,
-        match: clip(m[0], 40),
-      });
-    }
+    if (!fingerprintMatches(fp, t)) continue;
+    const m = t.match(safeRegex(fp, 'i')) ?? unfoldScripts(t).match(safeRegex(fp, 'i'));
+    violations.push({
+      kind: 'answer_in_text',
+      detail: `命中答案指纹 /${fp}/`,
+      match: clip(m?.[0] ?? fp, 40),
+    });
   }
 
   // 通道 b：从参考答案里抽数值-单位对
@@ -138,10 +172,9 @@ export function checkFormulaLeak(text, problem, level) {
 
   const t = canonicalize(text);
   for (const fp of problem.formulaFingerprints ?? []) {
-    const m = t.match(safeRegex(fp, 'i'));
-    if (m) {
-      violations.push({ kind: 'formula_leak', detail: `命中解法公式指纹 /${fp}/`, match: clip(m[0], 40) });
-    }
+    if (!fingerprintMatches(fp, t)) continue;
+    const m = t.match(safeRegex(fp, 'i')) ?? unfoldScripts(t).match(safeRegex(fp, 'i'));
+    violations.push({ kind: 'formula_leak', detail: `命中解法公式指纹 /${fp}/`, match: clip(m?.[0] ?? fp, 40) });
   }
   return violations;
 }
@@ -307,6 +340,11 @@ export function buildDomainText(problem) {
     problem.stem ?? '',
     (problem.asked ?? []).join(''),
     (problem.givens ?? []).join(''),
+    // 知识点标签也算本题领域。
+    // 为什么补这一条：导入题（intake）的知识点是模型标的，
+    // 有些术语只出现在 topics 里、没有出现在题干或步骤里 ——
+    // 不补就会被自己的跑题检查拦掉，表现为"引擎对导入题频繁使用兜底模板"。
+    (problem.topics ?? []).join(' '),
     problem.referenceAnswer ?? '',
   ];
   for (const g of problem.solutionGraphs ?? []) {
@@ -320,6 +358,56 @@ export function buildDomainText(problem) {
     parts.push(m.label ?? '', m.rootCause ?? '', ...(m.signature ?? []), ...(m.hintSeeds ?? []));
   }
   return parts.filter(Boolean).join(' ');
+}
+
+/**
+ * 一个步骤标题能不能原样说给学生听。
+ *
+ * ============================================================================
+ * 为什么需要这个（真模型评测抓到的漏洞）
+ * ============================================================================
+ * 复述段里有一句"你大概停在「<步骤标题>」这一步"，而步骤标题**可能就是答案**。
+ * 实测（sc-16 反证法）：那一步的标题是
+ *   「因此 a、b 有公因数 2，与"互质"矛盾」
+ * 引擎把它原样复述给学生 —— 等于把整个证明的结论递过去了。
+ *
+ * 这个洞一直存在，只是离线桩的定位很少落到那一步，所以一直没被看见。
+ * 它说明一件事：**步骤标题是"教研语言"，不是"学生语言"**，
+ * 能不能给学生看要逐条判断，不能默认放行。
+ *
+ * 判据复用守卫的三组指纹（答案 / 解法公式 / 结论要点），
+ * 与其它所有"什么算说漏了"的判断保持同一套基准。
+ *
+ * 另外：`derive` / `conclude` 这两类步骤的标题天然倾向于写结果
+ * （"代入数值并给出结论"），即使指纹没命中也不引 —— 那类标题给不出有用信息，
+ * 只会把"你停在哪"变成"答案是什么"。
+ */
+export function isTitleSafeForStudent(title, problem) {
+  const text = String(title ?? '').trim();
+  if (!text) return false;
+  if (/^[\d\s.、]+$/.test(text)) return false;
+  if (checkAnswerLeak(text, problem).length) return false;
+  if (checkFormulaLeak(text, problem, 0).length) return false;
+  if (checkSolutionInsight(text, problem, 0).length) return false;
+  return true;
+}
+
+/** 学生可见的"步骤引用"：安全就引标题，不安全就退到"第 N 步（动作类型）" */
+const STEP_KIND_LABEL = {
+  setup: '建立模型',
+  identify: '选择规律',
+  precondition: '检查前提',
+  apply: '列关系式',
+  derive: '做运算',
+  interpret: '解释含义',
+  conclude: '收尾结论',
+};
+
+export function safeStepRef(problem, step) {
+  if (!step) return null;
+  const riskyKind = step.kind === 'derive' || step.kind === 'conclude';
+  if (!riskyKind && isTitleSafeForStudent(step.title, problem)) return `「${step.title}」`;
+  return `第 ${step.index} 步（${STEP_KIND_LABEL[step.kind] ?? '这一步'}）`;
 }
 
 /** 保留旧名以兼容既有引用 */
@@ -421,6 +509,12 @@ export function repairHint(text, problem, level, violations, opts = {}) {
 /**
  * 安全兜底模板 —— 永不泄题的最后一道防线。
  * 只依赖层级与步骤的"动作类型"，不依赖任何题目数值。
+ *
+ * 两个刻意的性质：
+ *   ① **不依赖题目**：所以它对任意学科、任意新题目都成立（导入题目同样走这里）。
+ *   ② **按 step.kind 分派 L3**：L3 是"示范一个动作"，
+ *      而"动作"必须匹配这一步在做什么 —— 学生在算电流，你让他去列受力，
+ *      他一眼就知道你没看懂题。这条事故在题库时代踩过一次，导入题目时代同样会踩。
  */
 export function safeFallbackHint(problem, level, opts = {}) {
   const step = opts.step ?? null;
@@ -429,14 +523,32 @@ export function safeFallbackHint(problem, level, opts = {}) {
 
   switch (level) {
     case 0:
-      return '先别急着算。你能把"题目给了什么"和"要求什么"各说一遍吗？说完我们再决定往哪个方向想。';
+      return '先别急着算。你能把"题目给了什么"和"要求什么"各说一遍吗？说完我们再定方向。';
     case 1:
-      return `你提到的这个规律，它成立需要的前提条件，题目里的条件都满足了吗？先只检查前提，不用往下算。`;
+      return '你提到的这个规律，它成立需要的前提条件，题目里的条件满足了吗？先只检查前提，不用往下算。';
     case 2:
-      return `方向提示：这一步的关键是${concept}与运动状态之间的联系。先想清楚这个联系是怎么建立的，再考虑用什么式子。`;
+      return `方向提示：这一步的关键是${concept}与题目里另一个量之间的联系。先想清楚这个联系是怎么建立的，再考虑用什么式子。`;
     default:
-      return `我示范一个动作：你先只把研究对象单独拎出来，按方向逐一列出它受到的各个力（只写方向和名字）。列完之后告诉我，哪一个力和运动状态有关。`;
+      return kindActionFallback(kind, concept, opts.other);
   }
+}
+
+/**
+ * L3 兜底动作：按"这一步在做什么"给一个可执行的动作。
+ * 全部与学科无关（画图、列条件、写左边、列两栏），因此对导入题目同样安全。
+ */
+export function kindActionFallback(kind, concept = '这一步', other = '相关的量') {
+  const map = {
+    setup: '我示范一个动作：先把这道题涉及的对象和量画/写在纸上，只写名字，不写数值。写完告诉我：哪一个是已知的，哪一个是要求的。',
+    identify: '我示范一个动作：先不选公式。你把题目里"发生了什么过程"用一句话写下来，写完我们再决定用哪个规律。',
+    precondition:
+      '我示范一个动作：把你打算用的这条关系成立所需要的条件，逐条写成清单（只写条件，不写公式），再拿题干的每个条件对上去，看哪一条没对上。',
+    apply: '我示范一个动作：把这一步要用的关系式的左边先写出来，右边留空。只写左边这一个动作，写完告诉我右边应该放哪个量。',
+    derive: `我示范一个动作：先不代数值，只用文字写出「${concept} → ${other} → 结果」这条影响链，写三步就够。`,
+    interpret: '我示范一个动作：先不看数字，用一句话回答"这一步算出来的量，在题目里代表什么"。说不清楚就说明式子还没选对。',
+    conclude: '我示范一个动作：把前面每一步得到的量按顺序列出来，检查单位对不对。数值计算留给你自己完成。',
+  };
+  return map[kind] ?? map.identify;
 }
 
 // ---------------------------------------------------------------------------
@@ -455,18 +567,31 @@ export function extractValueUnits(referenceAnswer) {
   return out;
 }
 
-/** 该数值是否是题干已给的已知量（是则不算泄漏） */
+/**
+ * 该数值是否是题干已给的已知量（是则不算泄漏）。
+ *
+ * 判定基准**必须包含题干全文**，而不只是 problem.givens。
+ * 实测事故（导入题目）：题干里写"落地前 1 s 内下落的高度"，
+ * 而模型生成的 givens 只列了 h、g，没有列这个 1 s。
+ * 于是守卫把"1 s"当成答案数值，凡是提到它的提示全被拦掉 ——
+ * 对学生表现为"AI 一直在打太极，不肯说题目里的 1 秒"。
+ *
+ * 规则本身是自洽的：**题干里已经写出来的数，不可能是答案。**
+ */
 function isGivenValue(problem, value) {
   const target = Number(value);
   if (Number.isNaN(target)) return false;
-  return problem.givens.some((g) => {
-    const nums = normalize(g).match(/-?\d+(?:\.\d+)?/g) ?? [];
-    return nums.some((n) => Math.abs(Number(n) - target) < 1e-9);
-  });
+  const pools = [problem.givens ?? [], [stripEnumerators(problem.stem ?? '')], problem.asked ?? []];
+  return pools.some((pool) =>
+    pool.some((g) => {
+      const nums = normalize(g).match(/-?\d+(?:\.\d+)?/g) ?? [];
+      return nums.some((n) => Math.abs(Number(n) - target) < 1e-9);
+    }),
+  );
 }
 
 /** 单位的中文/符号等价写法，用于构造宽松匹配 */
-function unitAlternatives(unit) {
+export function unitAlternatives(unit) {
   const map = {
     V: 'V|伏|伏特',
     A: 'A|安|安培',
@@ -488,37 +613,43 @@ function unitAlternatives(unit) {
 /**
  * 判断一个等号片段是否"无害"（不算给公式）。
  *
- * 判定标准刻意收得很紧：**右侧必须是一个纯数值（可带单位）或问号/文字**。
+ * 判定标准刻意收得很紧：**右侧开头必须是一个纯数值（可带单位），且这个数值是题干给的**。
  * 早期版本允许"右侧是已知量数值"就放行，结果 `I = E/(R+r)` 因为含数字而被放过 ——
  * 这正是"守卫有漏洞"的典型形态：宽松规则会同时放过善意引用和恶意给公式。
- * 现在的取舍是：宁可让模型重写一次，也不放过一条解法表达式。
  *
  * 允许：
- *   - "B = 0.4 T"      右侧纯数值 + 单位（引用题干）
- *   - "位移 x = ?"      右侧问号
- *   - "设电流为 I"      无等号
+ *   - "B = 0.4 T"                右侧纯数值 + 单位（引用题干）
+ *   - "h = 20 m 和 g = 10 m/s²"  右侧以题干量开头，后面还有并列内容
+ *   - "位移 x = ?"               右侧问号
+ *   - "设电流为 I"                无等号
  * 禁止：
- *   - "I = E/(R+r)"   右侧含字母与运算符
- *   - "E = BLv"       右侧含字母
+ *   - "I = E/(R+r)"   右侧以字母开头
+ *   - "E = BLv"       右侧以字母开头
+ *
+ * 这里为什么要容忍"右侧后面还有别的内容"（如"和 g"）：
+ *   EQUATION_PATTERN 的右侧是贪婪的，会一路吃到中文连词。
+ *   实测事故：L1 提示"题目给了 h = 20 m 和 g = 10 m/s²，你先看这两个量能求出什么？"
+ *   被判成 level_overflow —— 于是**引用题干本身都成了违规**，模型只能被迫说空话。
+ *   现在只看右侧开头那个数值，够用且不再误伤。
+ *
+ * 注意这条检查是**形状检查**（secondary），真正的答案拦截靠 answerFingerprints
+ * （primary）。所以这里宁可少拦一次，也不要把正常教学语言拦成一片。
  */
 function isBenignEquality(snippet, problem) {
   const s = normalize(snippet);
   const rhs = (s.split(/[=＝]/)[1] ?? '').trim();
   if (!rhs) return true;
 
-  // 右侧是问号 / 文字开头 ⇒ 不是公式
+  // 右侧是问号 / 中文开头 ⇒ 不是公式
   if (/^[?？]/.test(rhs)) return true;
   if (/^[\u4e00-\u9fa5]/.test(rhs)) return true;
 
-  // 右侧必须是"数字 + 可选单位"，除此之外不能有其他符号或字母
-  const numericWithUnit =
-    /^-?\d+(?:\.\d+)?(?:\s*[×x]\s*10\s*\^?-?\d+)?\s*(?:[A-Za-zΩμ°/²³·]+)?$/;
-  if (!numericWithUnit.test(rhs)) return false;
+  // 只看右侧开头那个"数值 + 可选单位"
+  const leading = rhs.match(/^(-?\d+(?:\.\d+)?(?:\s*[×x]\s*10\s*\^?-?\d+)?)\s*([A-Za-zΩμ°/²³·]*)/);
+  if (!leading) return false; // 右侧以字母/符号开头 ⇒ 是公式
 
-  // 即便是纯数值，也要确认它确实是题干给的已知量（防止 "F = 0.2 N" 这类答案赋值被放过）
-  const nums = rhs.match(/-?\d+(?:\.\d+)?/g) ?? [];
-  if (nums.length === 0) return true;
-  return isGivenValue(problem, nums[0]);
+  const value = leading[1];
+  return isGivenValue(problem, value);
 }
 
 /** 剥离公式片段：连公式所在的整个小句一起删掉，而不是原地留个占位符 */

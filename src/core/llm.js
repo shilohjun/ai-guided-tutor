@@ -115,11 +115,33 @@ ${utterance}
 请输出 JSON 观察结果。再次强调：不要出现任何数值结果和公式表达式。`;
 }
 
-/** draft 阶段的系统提示：把"只给提示"写成硬约束 + 反例 */
-export const DRAFT_SYSTEM_PROMPT = `你是中学物理的引导型老师。你的任务是根据诊断结论，写出"恰好卡在指定层级"的一句提示。
+/** draft 阶段的系统提示：把"只给提示"写成硬约束 + 反例 + 说话方式 */
+export const DRAFT_SYSTEM_PROMPT = `你是一位有二十年教龄的中学理科教师，此刻以"学伴"的身份陪一个学生做这道题。
+你的任务是根据诊断结论，说出**恰好卡在指定层级**的一句话。
 
 【最高原则】
 你是在帮学生自己想出来，不是替他想。学生看完你的话，必须还需要自己动脑才能往前走。
+
+【语言规范 —— 这一节与层级约束同等重要】
+你的措辞应当让一个资深教师看起来专业，而不是像一个陪聊机器人。具体要求：
+
+1. 用规范的学科语言。术语必须准确；涉及量时写清名称与单位（"电流为 1 安"而不是"电流是 1"）。
+2. **不用语气词、拟声词、颜文字**：啊、哦、嗯、啦、呀、哈、诶、~、以及任何 emoji。
+3. **不用夸张与卖萌**：超级、非常非常、太棒了、好厉害、完美、绝了。
+4. 句子完整，不省略主语。一句话只做一件事：要么复述、要么提问、要么给方向。
+5. 用「你」称呼学生，用「我们」承担共同探索的部分。不用「你应该」「你必须」。
+6. **一次只问一个问题。** 出现两个问号就是失败 —— 学生不知道该先回答哪个。
+7. 不要评判。不出现"错""不对""不严谨"。要指出问题，就说「值得再确认一下」「这里可以走慢一点」。
+8. **必须落到这道题的具体内容上**：至少引用一个学生自己说过的词、或者题干里的一个量。
+   反面例子（空话，禁止）："再仔细想想""注意审题""把知识点掌握牢固""相信你可以的""加油"。
+9. 不客套、不夸奖、不总结。学生要的是下一步，不是评价。
+10. 长度：L0–L2 控制在 40~100 字；L3 可以到 150 字。
+
+【循循善诱的两种句式（优先使用）】
+· 先承接、再指向缺口：
+  "你先把电流算出来了，这一步没问题。接下来要判断的是：这个电流在磁场里会受到什么？"
+· 把结论变成可回答的问题：
+  "题目特意说明'匀速'——它在受力上对应什么条件？"
 
 【层级定义 —— 你本轮被指定了唯一层级，越级即失败】
 L0 结构化澄清：学生还没形成思路。你只能帮他把已知/目标/困惑说清楚，或反问一个开放式问题。不得含任何物理方向。
@@ -136,9 +158,13 @@ L3 降级示范：示范一个"动作"——选研究对象、写守恒式左边
 2. 不许给出待求量的完整表达式（如 v_max = F(R+r)/(B²L²)）。
 3. 不许列出完整解题步骤序列（超过 2 步就违规）。
 4. 不许出现"所以答案就是""最终结果""因此可得…"这类收口句式。
+5. 不许把"这个量扮演什么角色"直接说破（如"导体棒是电源，r 是内阻"）——
+   这是 L0–L2 最常见、也最难被察觉的泄题方式。要问，不要答：
+   ✅ "谁是提供电动势的那一部分？它自身有没有电阻？"
+   ❌ "导体棒相当于电源，它的电阻就是内阻。"
 
 【输出格式】只输出一个 JSON：
-{ "text": "提示正文（1~2 句，口语化，用'你'称呼学生）", "nextAsk": "建议学生接着做什么（一句话，必须是让他自己做的动作）", "concepts": ["用到的概念名"] }`;
+{ "text": "你要说的那一句（40~100 字，一次只问一个问题）", "nextAsk": "建议学生接着做的一个具体动作（一句话，必须是他自己能做的）", "concepts": ["用到的概念名"] }`;
 
 export function buildDraftUserPrompt({ problem, diagnosis, level, allowedConcepts, forbidden, strategy }) {
   const step = findStep(problem, diagnosis.position);
@@ -167,6 +193,174 @@ function findStep(problem, position) {
   if (!position.graphId || position.stepIndex == null) return null;
   const g = problem.solutionGraphs.find((x) => x.id === position.graphId);
   return g?.steps.find((s) => s.index === position.stepIndex) ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// 读题提示词（第三种"只让模型做它擅长的事"）
+// ---------------------------------------------------------------------------
+
+/**
+ * 读题阶段的系统提示：题干 → 结构化题目。
+ *
+ * 它与 observe / draft 的分工：
+ *   intake   读懂**题目**（这道题在问什么、有哪几条路、路上哪里容易掉坑）
+ *   observe  听懂**学生**（他说了什么、落在哪一步、像哪类错因）
+ *   draft    说好**一句话**（在当前层级上给一句恰好够用的提示）
+ *
+ * 为什么读题也要结构化、也要产出"指纹"：
+ *   守卫是拿 Problem 当基准做比对的。题目是现场生成的，
+ *   如果这道题没有指纹，守卫对它就等于不存在 ——
+ *   那样"任意新题目"这条路会变成整个系统唯一的泄题缺口。
+ *   所以读题的输出里，answerFingerprints / formulaFingerprints /
+ *   solutionInsights 是**必填**，不是可选。
+ */
+export const INTAKE_SYSTEM_PROMPT = `你是中学理科教研员，任务是**读题建档**：把一道题目转写成结构化的"解题路径图谱"，供后续的引导引擎使用。
+
+【你的产出会怎么被使用】
+1. 学生看到的只有题干原文，**不会**看到你写的路径。路径是给引擎判断"学生走到哪一步"用的。
+2. 引擎会拿你写的 steps[].cues 去匹配学生的话，所以 cues 必须是**学生会真的说出口的词**。
+3. 引擎会拿 answerFingerprints / formulaFingerprints / solutionInsights 当"不许说出口"的黑名单。
+   这三项写漏了 = 守卫对这道题失效 = 可能泄题。**这是本任务最容易被低估的一项。**
+
+【读题要求】
+- 先自己想清楚这道题怎么解，再写路径。路径要写成"动作"，不要写成"公式抄写"。
+  好的步骤标题："判断摩擦力方向并说明理由"
+  坏的步骤标题："f = μN = 4 N"
+- 一题允许多解。如果存在两条以上明显不同的解法（例如牛顿定律路径 / 能量路径），就给出两条路径。
+  如果只有一条，就给一条，不要硬凑。
+- 每一步的 kind 只能从这七个里选：setup / identify / precondition / apply / derive / interpret / conclude
+    setup        建立模型、画图、选研究对象、明确回路
+    identify     判断该用哪个规律
+    precondition 检查某个规律成立的前提是否满足   ← 引导的主战场，宁多勿少
+    apply        把规律写成关系式
+    derive       代数变形与计算
+    interpret    解释物理意义、讨论
+    conclude     得出最终结果（每一步都会是"最后一步"）
+- cues 每步给 3~6 个，每个 2~8 个字，是**学生口语**里会出现的说法。
+  例如某一步在算电流，cues 可以是 ["欧姆定律","电流","代入","算出来","分母"]。
+
+【指纹（必填，写错等于守卫失效）】
+- answerFingerprints：最终答案的**数值+单位**，写成 JS 正则字符串（小数点要转义）。
+  例：答案是 6.3 m/s 与 2 m/s²，则 ["6\\\\.3\\\\s*m/s","2\\\\s*m/s²"]。
+  同一答案的常见等价写法要给全（如 "0.4 V" 与 "0.4 伏"）。
+  **不要把题干已给的已知量写进来** —— 那会让引擎连"引用题干"都拦掉。
+- formulaFingerprints：本题**核心解法公式**的完整表达式（正则），
+  例：["BLv","E\\\\s*/\\\\s*\\\\(\\\\s*R\\\\s*\\\\+\\\\s*r\\\\s*\\\\)","\\\\d?\\\\d\\\\s*=\\\\s*\\\\d"]。
+  只放"写出来就等于告诉学生怎么算"的式子，不要把普通概念名放进来。
+- solutionInsights：**一句话说破就毁掉整道题的结论**（正则或短语），
+  例：["内阻","合力为零","导体棒是电源","支持力等于重力分量"]。
+  判据是"指派"而非"提及"：说"这个量扮演什么角色"要拦，问"它扮演什么角色"不拦。
+
+【绝对禁止】
+1. 不要输出任何面向学生的讲解、鼓励、评语。你只建档。
+2. referenceAnswer 里要写完整解法（它会留在服务端，绝不发给学生），
+   但**不许**把这些内容顺手写进 topics / analysis / step 标题里。
+3. 题干（stem）不要改写，原样保留。
+
+【输出规模上限 —— 必须遵守，超了会被截断，等于这道题白读】
+实测：一道六问的带电微粒综合题，按"每问一个步骤"的写法会把输出撑到 8000 tokens
+（模型上限）而被截断，半截 JSON 解析失败 ⇒ 整题降级成通用骨架，
+连带丢掉知识点、错因、参考答案与**全部防泄题指纹**。
+所以规模必须压住：
+
+- solutionGraphs **最多 2 条路径**，所有路径的 steps **合计不超过 10 步**
+- 一道多问的题**不要每一问都单独成步** —— 把同类的问合并成一步
+  （例如四问都是"代入同一个关系式求不同量"，就写成一步"代入求各问结果"）
+- 每步 cues **3~4 个**（不是越多越好），concepts **1~3 个**
+- misconceptions **最多 3 条**，每条的 signature **最多 4 条**
+- answerFingerprints **最多 8 条**，formulaFingerprints **最多 6 条**，solutionInsights **最多 6 条**
+- referenceAnswer **控制在 200 字以内**：只写关键式子与最终结果，不要写讲解段落
+- title / intent / meaning 都写成**一句话**，不要展开成段落
+
+宁可精炼，不要写长：一个能解析的短图谱，比一个被截断的长图谱有用得多。
+【输出格式】只输出一个 JSON 对象，不要 markdown 代码块、不要多余文字：
+{
+  "subject": "physics | math | chemistry",
+  "topics": ["知识点，3~6 个，用中学教材里的标准名称"],
+  "difficulty": 1到5的整数,
+  "summary": "这道题在问什么（一句话，教师可见）",
+  "givens": ["已知量，如 'm = 2 kg'，用题干原话"],
+  "asked": ["待求量，如 '底端速度 v'"],
+  "keyConditions": [
+    {
+      "text": "题干里那句话（原样摘出来，如 '以恒定速度 v = 2 m/s 向右运动'）",
+      "label": "给它一个短标签，如 '匀速（速度不变）'",
+      "kind": "boundary | qualitative | constraint | geometry | task | domain",
+      "meaning": "它在解题上意味着什么（一句话）",
+      "ask": "如果这句话直接说破答案，就改成一句让学生自己翻译的提问"
+    }
+  ],
+  "knowledgeGraph": {
+    "nodes": [
+      {
+        "id": "英文短横线 id",
+        "name": "知识点名称（教材标准叫法）",
+        "role": "core（本题核心考点）| support（需要用到的前置知识）",
+        "level": "1=本题核心 2=直接前置 3=更基础",
+        "note": "这个知识点在本题里负责什么（一句话）"
+      }
+    ],
+    "edges": [
+      { "from": "节点id", "to": "节点id", "relation": "prereq（前置）| includes（包含）| applies（应用）| related（相关）" }
+    ]
+  },
+  "referenceAnswer": "完整解法与最终结果（服务端内部，学生看不到）",
+  "solutionGraphs": [
+    {
+      "id": "路径id，英文短横线，如 g1",
+      "name": "路径名，如 '牛顿第二定律路径'",
+      "preconditions": ["这条路径成立需要的前提，写成完整句子"],
+      "steps": [
+        {
+          "index": 1,
+          "title": "这一步在做什么（动作，不含数值结果）",
+          "kind": "setup | identify | precondition | apply | derive | interpret | conclude",
+          "intent": "内部说明：学生该产出什么（可以含答案）",
+          "concepts": ["这一步涉及的概念名"],
+          "cues": ["学生会说出口的关键词", "3~6 个"]
+        }
+      ]
+    }
+  ],
+  "misconceptions": [
+    {
+      "id": "m-英文短横线",
+      "label": "错因标签（教研可读，如'把匀速当成速度不变，没用上合力为零'）",
+      "signature": ["学生典型说法，3~6 条，要像学生真的会说的话"],
+      "rootCause": "背后的认知缺口是什么（一句话）",
+      "hintSeeds": ["只指方向、不含结论的问句，1~2 条"]
+    }
+  ],
+  "answerFingerprints": ["答案数值+单位的正则"],
+  "formulaFingerprints": ["核心解法公式的正则"],
+  "solutionInsights": ["说破就毁掉这道题的结论（正则或短语）"]
+}
+
+【keyConditions 与 knowledgeGraph 的额外要求 —— 它们是给学生看的，标准更高】
+- keyConditions 里必须有一条是"最容易被学生忽略但最关键"的那个条件（通常是定性描述：
+  '匀速''由静止''光滑''恰好''足够长'）。meaning 要写清"它在解题上意味着什么"。
+  如果 meaning 会直接把答案说破（例如它就是本题的解题关节），
+  那就在 ask 里写成一句让学生自己翻译的提问，别把结论写在 meaning 里。
+- knowledgeGraph 只放**章节级知识点**，不要把解题步骤里的概念（如"电源与内阻""合力为零"）
+  放进来 —— 那些属于解法，不是知识点。role=core 最多 2 个。
+- edges 要能画出"从更基础的知识走到本题考点"的方向，不要所有边都写 related。
+
+【质量自检（输出前在心里过一遍）】
+- 每条路径的步骤是 3~8 步吗？步数太少说明拆得不够，太多说明把一次计算拆碎了。
+- 错因里是否至少有一条是"知道用哪个规律，但漏了它的前提"？这类最有教学价值。
+- answerFingerprints 里有没有混进题干已知量？有就删掉。
+- solutionInsights 里有没有把答案本身写进去？那里只放"结论性说法"，不放数值。`;
+
+export function buildIntakeUserPrompt({ rawText, subjectHint }) {
+  return `【题目原文】（学生粘贴的，可能有换行错乱、缺少图片信息）
+${rawText}
+
+【学科提示】${subjectHint ? `出题人认为是 ${subjectHint}` : '未指定，请自行判断'}
+
+请按系统提示输出 JSON 建档结果。再次强调三件事：
+① cues 必须是学生会说出口的口语词；
+② answerFingerprints 里不要放题干已知量；
+③ 题干原文不要改写。`;
 }
 
 // ---------------------------------------------------------------------------
@@ -211,6 +405,15 @@ export function createOpenAIAdapter(config = readLLMConfig()) {
     throw new Error('createOpenAIAdapter 需要 apiKey；无 Key 时请使用 createOfflineAdapter()');
   }
 
+  /**
+   * 调一次 chat completions。
+   *
+   * `finishReason` 一定要带出来 —— 这是踩过坑之后加的：
+   * 长题目的图谱（六问、多路径、错因 + 三组指纹）会顶到 max_tokens，
+   * 输出被截断成半截 JSON，解析失败。
+   * 而当时的报错是"读题阶段无法解析 JSON"，看起来像模型不听话，
+   * 实际原因是**输出被截断** —— 错误信息指错了方向，排查会白走很远。
+   */
   async function chat(system, user, { temperature = 0.2, maxTokens = 900 } = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), config.timeoutMs);
@@ -238,10 +441,23 @@ export function createOpenAIAdapter(config = readLLMConfig()) {
         throw new Error(`LLM 请求失败 ${res.status}: ${clip(body, 300)}`);
       }
       const data = await res.json();
-      return data?.choices?.[0]?.message?.content ?? '';
+      const choice = data?.choices?.[0];
+      return {
+        content: choice?.message?.content ?? '',
+        finishReason: choice?.finish_reason ?? null,
+        usage: data?.usage ?? null,
+      };
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  /** 截断错误单独一类 —— 调用方据此给出"输出太长"而不是"格式不对"的提示 */
+  function truncatedError(label, content) {
+    const err = new Error(`${label}：模型输出被截断（max_tokens 用尽）`);
+    err.truncated = true;
+    err.partial = content;
+    return err;
   }
 
   return {
@@ -250,17 +466,67 @@ export function createOpenAIAdapter(config = readLLMConfig()) {
     config,
 
     async observeStudent(input) {
-      const raw = await chat(OBSERVE_SYSTEM_PROMPT, buildObserveUserPrompt(input));
+      const { content: raw } = await chat(OBSERVE_SYSTEM_PROMPT, buildObserveUserPrompt(input));
       const parsed = extractJson(raw);
       if (!parsed) throw new Error(`observe 阶段无法解析 JSON：${clip(raw, 200)}`);
       return normalizeObservation(parsed, input);
     },
 
     async draftHint(input) {
-      const raw = await chat(DRAFT_SYSTEM_PROMPT, buildDraftUserPrompt(input), { temperature: 0.5 });
+      const { content: raw, finishReason } = await chat(DRAFT_SYSTEM_PROMPT, buildDraftUserPrompt(input), {
+        temperature: 0.5,
+      });
       const parsed = extractJson(raw);
-      if (!parsed) throw new Error(`draft 阶段无法解析 JSON：${clip(raw, 200)}`);
-      return typeof parsed === 'string' ? parsed : String(parsed.text ?? '');
+      if (!parsed) {
+        if (finishReason === 'length') throw truncatedError('draft 阶段', raw);
+        throw new Error(`draft 阶段无法解析 JSON：${clip(raw, 200)}`);
+      }
+      /**
+       * 必须回传 **JSON 字符串**，而不是 parsed.text。
+       *
+       * 为什么：engine 的 draftWithMeta 要的是 { text, nextAsk, concepts } 三件套，
+       * 它按"字符串 ⇒ 尝试 JSON.parse"的约定解析（离线桩也是这个约定）。
+       * 早期这里只返回 parsed.text，导致真模型路径下 nextAsk 与 concepts **永远是空的**——
+       * 学生会看到"【下一步】检查这个规律的前提"这种通用收尾句，
+       * 而模型其实已经给了更贴合的那一句。这个 bug 不会报错，只会让提示变差。
+       */
+      return JSON.stringify({
+        text: String(parsed.text ?? ''),
+        nextAsk: parsed.nextAsk != null ? String(parsed.nextAsk) : null,
+        concepts: Array.isArray(parsed.concepts) ? parsed.concepts.map(String) : [],
+      });
+    },
+
+    /**
+     * 读题：题干 → 结构化题目。
+     *
+     * 为什么 maxTokens 开到 4000：一道题的完整图谱（路径 + 步骤 + cues +
+     * 错因 + 三组指纹）本身就长；截断了模型会给出半截 JSON，
+     * 那样反而比"读不懂"更糟 —— 会静默产出一个缺指纹的题目。
+     */
+    async understandProblem({ rawText, subjectHint }) {
+      const { content: raw, finishReason } = await chat(
+        INTAKE_SYSTEM_PROMPT,
+        buildIntakeUserPrompt({ rawText, subjectHint }),
+        {
+          temperature: 0.2,
+          /**
+           * 8000 而不是 4000。
+           *
+           * 实测：一道六问的带电微粒综合题，图谱（6 步 + 多路径 + 错因 + 三组指纹）
+           * 在 4000 tokens 处被截断，输出半截 JSON ⇒ 解析失败 ⇒ 整题降级成通用骨架，
+           * 连带丢掉知识点、错因、参考答案与**全部防泄题指纹**。
+           * 也就是说：题目越长，"守卫对这道题失效"的概率越高 —— 这是必须堵上的。
+           */
+          maxTokens: 8000,
+        },
+      );
+      const parsed = extractJson(raw);
+      if (!parsed) {
+        if (finishReason === 'length') throw truncatedError('读题阶段', raw);
+        throw new Error(`读题阶段无法解析 JSON：${clip(raw, 200)}`);
+      }
+      return parsed;
     },
   };
 }
@@ -473,13 +739,18 @@ export function createOfflineAdapter() {
         payload = rotate(
           [
             {
-              text: '我先确认一下：你现在手上有哪些已知条件？要求的是什么？把这两点说出来，我们就知道该往哪想了。',
-              nextAsk: '把题目给的已知量和你要求的目标各说一遍。',
+              text: '先不用急着算。你能用一句话说说：这道题给了哪些条件？说完我们再定方向。',
+              nextAsk: '把题干里的已知条件用自己的话列一遍。',
               concepts: [],
             },
             {
-              text: '不用急着算。你先用一句话告诉我：这道题在问什么？你觉得它和哪个物理过程有关？',
-              nextAsk: '用一句话说明这道题在问什么。',
+              text: '我们先把问题说清楚：这道题最后要你求的是哪个量？',
+              nextAsk: '用一句话说明这道题要求什么。',
+              concepts: [],
+            },
+            {
+              text: '你先说说，这道题让你觉得眼熟的地方是什么？',
+              nextAsk: '指出题目里让你想起某个学过内容的地方。',
               concepts: [],
             },
           ],
@@ -488,8 +759,8 @@ export function createOfflineAdapter() {
       } else if (level === 1) {
         const variants = [
           {
-            text: seeds[0] ?? '你说的这个规律，它成立需要满足什么前提？题目里的条件都满足了吗？',
-            nextAsk: '检查一下这个规律的前提条件，然后告诉我哪一条最值得怀疑。',
+            text: seeds[0] ?? '你打算用的这个规律，它成立需要满足什么前提？',
+            nextAsk: '只检查前提，先别往下算 —— 说出一条你认为最可能不满足的条件。',
             concepts: allowedConcepts.slice(0, 2),
           },
           {
@@ -497,13 +768,13 @@ export function createOfflineAdapter() {
               seeds[1] ??
               (preconditions.length
                 ? `这一步用的关系要成立，前提里有一条是「${preconditions[0]}」。题目给的条件满足它吗？`
-                : '题目里给的条件，你都用上了吗？有没有哪一条看起来"用不上"、其实正好是某个规律的前提？'),
-            nextAsk: '把题干条件逐条列出，标出哪一条还没用上。',
+                : '题干里的条件你都用上了吗？有没有哪一条看起来"用不上"，其实正是某个规律的前提？'),
+            nextAsk: '把题干条件逐条列出来，标出哪一条还没用上。',
             concepts: allowedConcepts.slice(0, 2),
           },
           {
-            text: `你先别写式子。你打算用的这个规律，在这个题目的情境里，它成立吗？先说"成立"或"不成立"，再说理由。`,
-            nextAsk: '判断这个规律在本题是否成立，并给出理由。',
+            text: `先别写式子。你打算用的这个规律，在你面前的这个情境里成立吗？`,
+            nextAsk: '先说"成立"或"不成立"，再说一句理由。',
             concepts: allowedConcepts.slice(0, 2),
           },
         ];
@@ -520,17 +791,17 @@ export function createOfflineAdapter() {
          */
         const other = openConcepts[0] ?? '题目里的另一个条件';
         const switchToolVariant = {
-          text: `换个角度看：你现在这条路上的未知量，靠你已经选的那个规律能全部定下来吗？如果定不下来，说明缺的是一个"能建立新关系"的工具，而不是算术。想想哪个定理天生适合处理"一段时间内累积的量"。`,
-          nextAsk: '判断当前规律能否定下所有未知量；不能的话，说出缺的是哪一类工具。',
+          text: `换个角度：你现在这条路上的未知量，靠已经选的那个规律能全部定下来吗？如果定不下来，缺的就不是算术，而是另一个能建立新关系的工具。`,
+          nextAsk: '数一数你现在有几个未知量、几个方程，把这两个数说出来。',
           concepts: allowedConcepts.slice(0, 3),
         };
         const connectVariant = {
-          text: `方向给你一点：这一步的关键不在${concept}本身，而在${concept}和「${other}」之间是怎么互相影响的。先把这条影响链说清楚，不要急着代公式。`,
+          text: `方向给你一点：这一步的关键不在${concept}本身，而在它和「${other}」之间是怎么互相影响的。先把这条影响链说清楚，不要急着代公式。`,
           nextAsk: `用一句话说出「${concept}」与「${other}」之间的联系。`,
           concepts: allowedConcepts.slice(0, 3),
         };
         const considerVariant = {
-          text: `换个角度看：你把「${other}」也一起考虑进来了吗？这一步之所以卡住，往往是因为只盯着${concept}，而忽略了它对${other}的影响。`,
+          text: `换个角度：你把「${other}」也一起考虑进来了吗？这一步卡住，往往是因为只盯着${concept}，忽略了它对${other}的影响。`,
           nextAsk: `说明「${other}」在这一步起了什么作用。`,
           concepts: allowedConcepts.slice(0, 3),
         };

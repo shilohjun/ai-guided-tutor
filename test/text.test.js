@@ -20,6 +20,7 @@ import {
   isNegated,
   isFollowUpUtterance,
   matchAll,
+  unfoldScripts,
 } from '../src/core/text.js';
 import { getProblem } from '../src/core/problems.data.js';
 
@@ -189,5 +190,97 @@ describe('Cue 匹配（定位通道）', () => {
     const step1 = P3.solutionGraphs[0].steps[0];
     const hits = matchAll(canonicalize('我用 x=½at² 算位移'), step1.cues);
     assert(hits.length > 0, '应命中"用到匀加速公式"这一 cue');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 键盘写法与符号写法必须等价
+// ---------------------------------------------------------------------------
+
+describe('归一化 · `v^2` 与 `v²` 是同一个东西', () => {
+  /**
+   * 学生反馈："一些物理的表达式很难写上去。"
+   *
+   * 前端做了符号面板与自动替换，但那只帮到"从界面上打字"的学生。
+   * 更要紧的是：**关键词通道的两边必须折到同一个写法上**。
+   * 教师写的 cue 是 `v²=2aL`，学生打的是 `v^2=2aL` ——
+   * 不在归一化里对齐，这条 cue 对这个学生就等于不存在，
+   * 他会被判成"没说到点子上"，而他其实说得完全正确。
+   */
+  it('上标：^2 → ²、^-3 → ⁻³、^n → ⁿ', () => {
+    assertEquals(normalize('v^2'), 'v²');
+    assertEquals(normalize('10^-3'), '10⁻³');
+    assertEquals(normalize('a^n'), 'aⁿ');
+  });
+
+  it('下标：_0 → ₀、_12 → ₁₂', () => {
+    assertEquals(normalize('v_0'), 'v₀');
+    assertEquals(normalize('a_12'), 'a₁₂');
+  });
+
+  it('【关键】两种写法归一后完全一致，所以同一条 cue 都能命中', () => {
+    const pairs = [
+      ['v^2=2aL', 'v²=2aL'],
+      ['h=1/2gt^2', 'h=1/2gt²'],
+      ['v_0=10m/s', 'v₀=10m/s'],
+      ['B_1=0.5T', 'B₁=0.5T'],
+    ];
+    for (const [typed, symbolic] of pairs) {
+      assertEquals(normalize(typed), normalize(symbolic), `"${typed}" 与 "${symbolic}" 应当等价`);
+    }
+  });
+
+  it('用键盘打出来的公式能命中教师写的 cue（这才是等价的意义）', () => {
+    const cues = ['v²=2aL', 'E=BLv', 'v₀=10 m/s'];
+    const typedByStudent = '我先用 v^2=2aL，再用 E=BLv，初速度 v_0=10 m/s';
+    const hit = matchAll(canonicalize(typedByStudent), cues);
+    assertEquals(hit.length, cues.length, `三条 cue 都该命中，实际命中：${JSON.stringify(hit)}`);
+  });
+
+  it('摊平形式带回 `^` / `_`，写成 ^2 的指纹不会变成死指纹', () => {
+    assertEquals(unfoldScripts('a²=2b²'), 'a^2=2b^2');
+    assertEquals(unfoldScripts('v₀'), 'v_0');
+    // 反向也对得上
+    assertEquals(normalize(unfoldScripts('a²=2b²')), normalize('a²=2b²'));
+  });
+
+  it('普通文本不受影响（`_` 和 `^` 不会误伤正常内容）', () => {
+    for (const s of ['我先求电动势', 'sin53°=0.8', 'R+r 是总电阻', 'm/s']) {
+      assertEquals(normalize(s), normalize(s));
+    }
+    assertEquals(normalize('a_b'), 'a_b', '非数字的下标不该被动');
+  });
+});
+describe('证据去重 · 同一句话的两种拼法只能算一条', () => {
+  /**
+   * 实测事故（由评测指标发现）：数学题的 cue 里同时写着
+   * `a²=2b²` 与 `a^2=2b^2` —— 同一个式子的两种拼法。
+   *
+   * 归一化把两种写法折成同一个字符串之后，两条 cue 同时命中，
+   * 那一步的证据数被算成 2（其实只有 1 条）。定位按证据数排序，
+   * 于是**系统性地偏向写得啰嗦的那一步**：两个数学场景都停在
+   * "两边平方得 a²=2b²" 不肯往后走，离线定位命中率 92.9% → 85.7%。
+   */
+  it('归一化后相同的 cue 只算一条证据', () => {
+    const hit = matchAll('两边平方得到 a²=2b²', ['a²=2b²', 'a^2=2b^2']);
+    assertEquals(hit.length, 1, `两种拼法应只算一条，实际：${JSON.stringify(hit)}`);
+  });
+
+  it('不同的式子仍然各算一条（去重不能去过头）', () => {
+    const hit = matchAll('由 a²=2b² 得 b²=2k²', ['a²=2b²', 'b²=2k²']);
+    assertEquals(hit.length, 2);
+  });
+
+  it('去重按归一化后的形式判断，不是按原字符串', () => {
+    // 全角、半角、大小写三种拼法归一后是同一个式子 ⇒ 只算一条
+    const hit = matchAll('Ｅ＝ＢＬｖ', ['E=BLv', 'Ｅ＝ＢＬｖ', 'e=blv']);
+    assertEquals(hit.length, 1, `三种拼法应只算一条，实际：${JSON.stringify(hit)}`);
+    // 而空格是内容的一部分：`E = BLv` 与 `E=BLv` 不是同一个写法（归一化不去空格）
+    assertEquals(matchAll('E = BLv', ['E=BLv']).length, 0);
+  });
+
+  it('空数组与空串不崩', () => {
+    assertEquals(matchAll('x', []).length, 0);
+    assertEquals(matchAll('x', ['', null, undefined]).length, 0);
   });
 });

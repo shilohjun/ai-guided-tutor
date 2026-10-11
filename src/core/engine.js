@@ -15,10 +15,17 @@
  */
 
 import { createAdapter } from './llm.js';
-import { buildDiagnosis, describePosition, findStepByPosition } from './locate.js';
+import { buildDiagnosis, describePosition, findStepByPosition, totalSteps } from './locate.js';
 import { route } from './route.js';
-import { guard } from './guard.js';
-import { composeStudentMessage } from './prompt.js';
+import { guard, safeFallbackHint } from './guard.js';
+import {
+  buildStudentEnginePath,
+  composeStudentMessage,
+  composeConfirmation,
+  confirmationNextAsk,
+  confirmationStrengths,
+} from './prompt.js';
+import { verifyAnswer, findUnstatedAnswers } from './verify.js';
 import { isFollowUpUtterance } from './text.js';
 
 /**
@@ -142,6 +149,12 @@ export function createEngine({ adapter, problem, logger } = {}) {
     const trace = [];
     const sessionKey = request.sessionId ?? 'default';
     const history = request.history ?? [];
+    /**
+     * 这道题是不是"现场读出来的"（intake 导入）。
+     * 用途只有一个：学生版判断链路里要不要加一句"读题"。
+     * 注意它**不参与任何教学决策** —— 导入题的每一句话术走的是与题库题完全相同的 route + guard。
+     */
+    const imported = problem.source === 'imported';
 
     trace.push({
       stage: 'understand',
@@ -185,6 +198,7 @@ export function createEngine({ adapter, problem, logger } = {}) {
         guardHistory: guardResult.passed ? [] : [guardResult],
         allowedNextLevel: 1,
         refusal: { count: n, kind: 'answer_solicitation' },
+        enginePath: buildStudentEnginePath({ imported, refusal: true, level: 1 }),
       });
     }
 
@@ -194,6 +208,26 @@ export function createEngine({ adapter, problem, logger } = {}) {
         message: '识别为"学生给出候选答案希望验证"⇒ 不判对错，转为检查前提的引导',
       });
     }
+
+    // ---------------- 0.5 答案判定（只判定，不决定路径） ----------------
+    /**
+     * 先算一次确定性判定，但**不在这里返回** —— 关键设计。
+     *
+     * 第一版实现是把确认路径放在最前面、直接 return，跳过了 observe 与定位。
+     * 后果被评测指标当场抓到：定位命中率与错因命中率同时下降 ——
+     * 因为"学生报出答案"的那一轮不再产生任何诊断信息。
+     *
+     * 而那恰好是最不该丢信息的一轮：学生说"E = 0.4 V"时，
+     *   · E 这个结果**确实是对的**（E = BLv 与内阻无关）⇒ 该确认
+     *   · 但他可能同时漏了内阻（下一步算电流才会踩到）⇒ 该记下来
+     * 两件事并不冲突。所以结论是：
+     *   **确认只替代"提示"，不替代"观察"。**
+     *
+     * 代价是确认轮也会调一次 observe（一次 LLM 调用）。这个代价换来的，
+     * 是教师视图里"学生答对了那一轮他在第几步、有没有错因"仍然看得到。
+     */
+    const verdict = verifyAnswer(problem, request.utterance ?? '');
+    const isConfirmation = verdict.matched.length > 0 || verdict.complete;
 
     // ---------------- 1. observe ----------------
     let observation;
@@ -223,6 +257,17 @@ export function createEngine({ adapter, problem, logger } = {}) {
       priorPosition,
       allowCarryover: isFollowUpUtterance(request.utterance),
     });
+
+    // ---------------- 2.5 确认路径（在定位之后、决策之前） ----------------
+    if (isConfirmation) {
+      trace.push({
+        stage: 'route',
+        message: verdict.complete
+          ? `答案判定：学生自己给出了全部 ${verdict.expectedCount} 个待求量 ⇒ 宣布完成，不给提示`
+          : `答案判定：学生答对了 ${verdict.matched.length}/${verdict.expectedCount} ⇒ 先确认，不给提示`,
+      });
+      return assembleConfirmation({ problem, trace, startedAt, llm, verdict, diagnosis, imported });
+    }
 
     // ---------------- 3. route ----------------
     const routing = route({
@@ -263,6 +308,14 @@ export function createEngine({ adapter, problem, logger } = {}) {
         guardHistory: [],
         allowedNextLevel: 1,
         suppressed: true,
+        enginePath: buildStudentEnginePath({
+          imported,
+          suppressed: true,
+          stepIndex: diagnosis.position.stepIndex,
+          stepCount: totalSteps(problem, diagnosis.position.graphId),
+          confidence: diagnosis.position.confidence,
+          level: 0,
+        }),
       });
     }
 
@@ -309,17 +362,45 @@ export function createEngine({ adapter, problem, logger } = {}) {
           finalGuard = g;
           break;
         }
-        // 未通过：若重写结果也干净，直接用重写结果（避免无谓多调一次模型）
+
+        /** 守卫给出的降级重写结果（可能是"只删掉越界片段"，也可能是"整句换成模板"） */
         const rewritten = g.repairedText;
         const recheck = rewritten
           ? guard(rewritten, problem, routing.level, { step, conceptWhitelist: routing.allowedConcepts })
           : null;
-        if (rewritten && recheck?.passed) {
+
+        /**
+         * 被拦下之后走哪条路 —— 这里分两类，不能一视同仁。
+         *
+         *   strip-equation / truncate：守卫只删掉了越界的那一小段，
+         *     模型自己的说法还在，直接采用（比再调一次模型更快、也更贴学生）。
+         *   safe-template：守卫把整句换成了通用模板。
+         *     这时候立刻采用是**错的** —— 学生会收到一句"万金油"，
+         *     而且他无从知道你其实读懂了这道题。
+         *     正确动作是把拦截原因带回给模型，让它换个说法再试一次；
+         *     两次都过不了，才轮到这个模板兜底。
+         *
+         * 这也是 README 里写的"模型最多重试一次；两次都不过就用安全兜底模板" ——
+         * 早期实现图省事，在第一次被拦时就直接采用了模板，
+         * 于是"重试"这条路径几乎从不发生，提示质量被静默拉低。
+         */
+        const keepModelVoice = recheck?.passed && ['strip-equation', 'truncate'].includes(g.repairStrategy);
+        if (keepModelVoice) {
           finalText = rewritten;
           finalGuard = recheck;
           trace.push({
             stage: 'guard',
-            message: `采用守卫重写结果（策略 ${g.repairStrategy}）`,
+            message: `采用守卫重写结果（策略 ${g.repairStrategy}，保留了模型的原始说法）`,
+          });
+          break;
+        }
+        // 最后一次机会仍只拿到模板句 ⇒ 用它（仍比无信息的兜底模板更贴近本题）
+        if (recheck?.passed && attempt === 1) {
+          finalText = rewritten;
+          finalGuard = recheck;
+          trace.push({
+            stage: 'guard',
+            message: `第二次生成仍越界，采用守卫重写结果（策略 ${g.repairStrategy}）`,
           });
           break;
         }
@@ -383,6 +464,17 @@ export function createEngine({ adapter, problem, logger } = {}) {
       guardResult: finalGuard,
       guardHistory,
       allowedNextLevel: Math.min(3, (routing.level ?? 1) + 1),
+      enginePath: buildStudentEnginePath({
+        imported,
+        observationLaws: observation.laws ?? [],
+        observationKnowns: observation.knowns ?? [],
+        stepIndex: diagnosis.position.stepIndex,
+        stepCount: totalSteps(problem, diagnosis.position.graphId),
+        confidence: diagnosis.position.confidence,
+        level: routing.level,
+        /** 真实发生过"被拦下并重写"时，学生版只说"换了一种问法"，不暴露违规类型 */
+        repaired: guardHistory.some((g) => !g.passed),
+      }),
     });
   }
 
@@ -391,6 +483,113 @@ export function createEngine({ adapter, problem, logger } = {}) {
   }
 
   return { handleTurn, resetSession, adapter: llm, problem };
+}
+
+// ---------------------------------------------------------------------------
+// 确认路径的组装
+// ---------------------------------------------------------------------------
+
+/**
+ * 确认轮的响应。
+ *
+ * 与提示路径的三个关键差别：
+ *   ① `hint.form = 'confirm'` —— 它不是提示，不能混进层级统计
+ *      （否则报告里"L0 澄清 N 次"会掺进一堆确认轮，教研看到的分布就是错的）。
+ *   ② `hint.text` 不过守卫的"答案泄漏"检查 —— 因为它按构造就不可能含未说出的答案
+ *      （`findUnstatedAnswers` 是比守卫更紧的判据）。但仍留一道断言。
+ *   ③ **带上真实诊断**。确认只替代提示，不替代观察：
+ *      学生答对了这一问，同时"他在第几步""有没有错因"仍然要记下来 ——
+ *      教师视图要看，报告也要用。所以这里接收的是真正的 diagnosis，
+ *      只把 restatement 清掉（学生刚给了结果，再复述一遍是啰嗦）。
+ */
+function assembleConfirmation({ problem, trace, startedAt, llm, verdict, diagnosis, imported }) {
+  const text = composeConfirmation({ verdict, problem });
+
+  // 断言：确认文本里不许出现学生还没说出的答案。
+  // 失败说明模板写错了 —— 这是比守卫更紧的一条，必须显式暴露而不是静默放过。
+  const leaked = findUnstatedAnswers(text, problem, verdict);
+  if (leaked.length) {
+    const err = new Error(`引擎内部错误：确认文本泄漏了学生未说出的答案 —— ${leaked.join('、')}`);
+    trace.push({ stage: 'guard', message: err.message });
+    throw err;
+  }
+
+  const total = totalSteps(problem, diagnosis.position.graphId);
+  const position = verdict.complete
+    ? {
+        ...diagnosis.position,
+        stepIndex: total,
+        completedSteps: range(1, total - 1),
+        confidence: 0.95,
+        divergedAt: [],
+      }
+    : diagnosis.position;
+
+  const hint = {
+    level: 0,
+    form: 'confirm',
+    text,
+    concepts: [],
+    touchesFinalAnswer: false,
+    rationale: verdict.complete
+      ? `答案判定：学生自己给出了全部 ${verdict.expectedCount} 个待求量`
+      : `答案判定：学生答对 ${verdict.matched.length}/${verdict.expectedCount}，先确认再继续`,
+    nextAsk: confirmationNextAsk(verdict),
+  };
+
+  const confirmedDiagnosis = {
+    ...diagnosis,
+    position,
+    /**
+     * 卡点性质：全部答完 ⇒ finished（学生会看到"收尾交给你自己"以外的正常反馈）。
+     * 部分答对时**保留真实判定** —— 不要为了配合"确认"这个动作去改诊断结论，
+     * 那会让报告失去意义（学生答对了第一问，但他可能确实漏了内阻）。
+     */
+    stuckKind: verdict.complete ? 'finished' : diagnosis.stuckKind,
+    /** 结果性肯定（"你自己算出了 X"）与过程性肯定（"选对了规律"）合并 */
+    strengths: [...confirmationStrengths(verdict), ...(diagnosis.strengths ?? [])].slice(0, 4),
+    /** 证据：学生这一轮说出的答案原话，放在最前面 */
+    evidenceQuotes: [...verdict.matched.map((m) => m.quote).filter(Boolean), ...(diagnosis.evidenceQuotes ?? [])].slice(0, 4),
+    /** 确认轮不复述 —— 学生刚给了结果 */
+    restatement: '',
+  };
+
+  trace.push({
+    stage: 'generate',
+    message: `最终交付：确认（${verdict.complete ? '全部完成' : `部分正确 ${verdict.matched.length}/${verdict.expectedCount}`}），定位 ${describePosition(problem, position)}`,
+  });
+
+  return {
+    diagnosis: confirmedDiagnosis,
+    hint,
+    message: text,
+    enginePath: buildStudentEnginePath({
+      imported,
+      observationLaws: [],
+      observationKnowns: verdict.matched.map((m) => m.raw),
+      stepIndex: position.stepIndex,
+      stepCount: total,
+      confidence: position.confidence,
+      level: 0,
+    }),
+    allowedNextLevel: verdict.complete ? 3 : 1,
+    suppressed: false,
+    refusal: undefined,
+    completion: {
+      complete: verdict.complete,
+      matched: verdict.matched.map((m) => ({ value: m.value, unit: m.unit, raw: m.raw, quote: m.quote })),
+      remainingCount: verdict.remaining.length,
+      expectedCount: verdict.expectedCount,
+    },
+    meta: {
+      engine: llm.kind,
+      model: llm.model,
+      latencyMs: Date.now() - startedAt,
+      /** 没有经过 generate → guard 这条路，所以守卫结果显式标为"未参与" */
+      guard: { passed: true, violations: [], skipped: 'confirmation' },
+      guardHistory: [],
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -410,6 +609,7 @@ function assemble({
   suppressed = false,
   refusal,
   restatementOverride,
+  enginePath = [],
 }) {
   trace.push({
     stage: 'generate',
@@ -424,6 +624,11 @@ function assemble({
     hint,
     /** 面向学生的完整消息（含复述 + 提示 + 下一步动作） */
     message: composeStudentMessage(visibleDiagnosis, hint),
+    /**
+     * 引擎判断链路的学生版投影（见 prompt.js 的 buildStudentEnginePath）。
+     * 教师版不等价于它 —— 教师版是 diagnosis.trace 的完整内容，由教师端点单独返回。
+     */
+    enginePath,
     allowedNextLevel,
     suppressed,
     refusal,
@@ -485,16 +690,27 @@ function routingNextAsk(level) {
   }[level];
 }
 
+/**
+ * 引擎层的安全兜底。
+ *
+ * 为什么不在这里另写一套文案：guard 的 safeFallbackHint 已经是
+ * "不依赖题目数值、按 step.kind 分派 L3"的兜底模板，两处各写一套必然漂移 ——
+ * 漂移的表现是"守卫重写出来的话"和"引擎兜底的话"风格不一致，
+ * 而这两句对学生的可见度完全一样。所以这里只补上 nextAsk，文案一律复用。
+ */
 function composeSafeFallback({ problem, level, step, allowedConcepts }) {
-  const concept = allowedConcepts?.[0] ?? step?.concepts?.[0] ?? '这一步';
-  const texts = {
-    0: '先别急着算。你能把题目给了什么、要求什么各说一遍吗？说完我们再定方向。',
-    1: `你先看看：你打算用的这个规律，它成立需要满足什么前提？题目里的条件都满足了吗？`,
-    2: `方向提示：这一步的关键在于${concept}和运动状态之间的联系。先想清楚这个联系是怎么建立的，再找式子。`,
-    3: `我示范一个动作，你接着做：先把研究对象单独拎出来，按方向逐一列出它受到的各个力（只写方向和名字，不写数值）。列完之后告诉我哪一个力会随速度变化。`,
-  };
-  void problem;
-  return { text: texts[level] ?? texts[1], nextAsk: routingNextAsk(level) };
+  const text = safeFallbackHint(problem, level, {
+    step,
+    conceptWhitelist: allowedConcepts,
+    other: (step?.concepts ?? []).find((c) => c !== allowedConcepts?.[0]),
+  });
+  return { text, nextAsk: routingNextAsk(level) };
+}
+
+function range(from, to) {
+  const out = [];
+  for (let i = from; i <= to; i += 1) out.push(i);
+  return out;
 }
 
 function composeSilentMessage(diagnosis, reason) {

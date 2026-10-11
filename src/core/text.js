@@ -10,18 +10,62 @@
  */
 
 /** 全角 → 半角，去除零宽字符，压缩空白。中文场景必须做这一步。 */
+/** 上标/下标字符 → ASCII 数字（`²` → `2`），见 normalize 里的说明 */
+const SUPER_TO_ASCII = { '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4', '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9', '⁻': '-', '⁺': '+' };
+const SUB_TO_ASCII = { '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4', '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9', '₋': '-', '₊': '+' };
+const ASCII_TO_SUPER = { 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹', '-': '⁻', '+': '⁺' };
+const ASCII_TO_SUB = { 0: '₀', 1: '₁', 2: '₂', 3: '₃', 4: '₄', 5: '₅', 6: '₆', 7: '₇', 8: '₈', 9: '₉', '-': '₋', '+': '₊' };
+
+/**
+ * 把"用键盘打出来的幂/下标写法"折成符号写法。
+ *
+ * `^2` → `²`、`_0` → `₀`
+ *
+ * 为什么这件事必须在**归一化层**做，而不是只在输入框里做：
+ *   输入框的自动替换只帮到"从界面上打字"的学生。而学生的话还有别的来源 ——
+ *   语音输入（转写出来是"v 的平方"，另一回事）、粘贴、以及以后可能的对接。
+ *   更要紧的是：**关键词通道的两边必须折到同一个写法上**。
+ *   教师写的 cue 是 `v²=2aL`，学生打的是 `v^2=2aL` ——
+ *   不在归一化里对齐，这条 cue 对这个学生就等于不存在，
+ *   他会被系统判成"没有说到点子上"，而他其实说得完全正确。
+ *
+ * 方向选择 `^2` → `²`（而不是反过来）：因为 cue 与题干里写的是 `²`，
+ * 而且符号写法更短，反过来的话每个上标都要展开成两个字符。
+ */
+export function foldSuperscripts(text) {
+  return String(text ?? '')
+    .replace(/\^([+-]?\d{1,2})/g, (_, d) => [...d].map((c) => ASCII_TO_SUPER[c] ?? c).join(''))
+    .replace(/\^n/g, 'ⁿ')
+    .replace(/_([+-]?\d{1,2})/g, (_, d) => [...d].map((c) => ASCII_TO_SUB[c] ?? c).join(''));
+}
+
+/**
+ * 反向：把符号写法摊回 ASCII 的 `^2` / `_0`（而不是摊成 `2`）。
+ *
+ * 为什么要带 `^` / `_`：指纹是**正则**，教研或模型写的可能是 `a\^2=2b\^2`。
+ * 归一化把文本折成 `a²=2b²` 之后，那条指纹就永远匹配不上了 ——
+ * 又是一次"守卫悄悄变瞎"。留下摊平形式，让两种写法都能命中同一批指纹。
+ */
+export function unfoldScripts(text) {
+  return String(text ?? '')
+    .replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻⁺]+/g, (m) => `^${[...m].map((c) => SUPER_TO_ASCII[c] ?? c).join('')}`)
+    .replace(/[₀₁₂₃₄₅₆₇₈₉₋₊]+/g, (m) => `_${[...m].map((c) => SUB_TO_ASCII[c] ?? c).join('')}`);
+}
+
 export function normalize(input) {
   if (typeof input !== 'string') return '';
-  return input
-    .replace(/[\u200B-\u200D\uFEFF]/g, '')
-    .replace(/[\uFF01-\uFF5E]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
-    .replace(/\u3000/g, ' ')
-    .replace(/[，、]/g, ',')
-    .replace(/[。；]/g, '.')
-    .replace(/[（]/g, '(')
-    .replace(/[）]/g, ')')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return foldSuperscripts(
+    input
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/[\uFF01-\uFF5E]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+      .replace(/\u3000/g, ' ')
+      .replace(/[，、]/g, ',')
+      .replace(/[。；]/g, '.')
+      .replace(/[（]/g, '(')
+      .replace(/[）]/g, ')')
+      .replace(/\s+/g, ' ')
+      .trim(),
+  );
 }
 
 /** 判断文本是否包含任一关键词（大小写不敏感的归一化匹配） */
@@ -30,10 +74,54 @@ export function containsAny(text, needles) {
   return needles.some((n) => t.includes(normalize(n).toLowerCase()));
 }
 
+/**
+ * 去掉题目里的"小问编号"，避免它们被当成数值条件。
+ *
+ * 为什么需要这一步（实测踩到）：
+ *   题干"求：(1) 落地速度；(2) 最后 1 s 内的高度"里的那个 "2"，
+ *   会被"从题干抽出所有数字"的逻辑当成一个已知量。
+ *   后果之一是答案指纹里"2 s"这类中间量被误判为"题干已给"，于是不再拦截 ——
+ *   守卫少了一条最有效的指纹。
+ *
+ * 注意必须放过小数：`0.5` 不能被当成编号 `0.` 吃掉。
+ * 所以限定 1~2 位数字，且后面不能紧跟数字。
+ */
+export function stripEnumerators(text) {
+  return normalize(text)
+    .replace(/[(（]\s*\d{1,2}\s*[)）]/g, ' ')
+    .replace(/(^|[\s,;、])\d{1,2}\s*[、.．)）](?!\d)\s*/g, '$1');
+}
+
 /** 返回命中的关键词列表 */
+/**
+ * 返回文本里命中的那些关键词（大小写不敏感的归一化匹配）。
+ *
+ * ============================================================================
+ * 按归一化后的形式去重：同一个意思只算一条证据
+ * ============================================================================
+ * 这是被评测抓出来的：数学题的 cue 里同时写着 `a²=2b²` 与 `a^2=2b^2`
+ * —— 同一个式子的两种拼法，本来是"哪种写法都能命中"的冗余设计。
+ *
+ * 归一化把两种写法折成同一个字符串之后，两条 cue 会**同时命中**，
+ * 那一步的证据数就被算成 2，而它其实只有 1 条。
+ * 定位是按证据数排序的，重复计分会让定位**系统性地偏向写得啰嗦的那一步** ——
+ * 表现就是 sc-16/sc-17 两个场景都停在"两边平方得 a²=2b²"不肯往后走
+ * （离线定位命中率 92.9% → 85.7%，是评测把它揪出来的）。
+ *
+ * 去重口径必须是"归一化之后"：`a²=2b²` 与 `a^2=2b^2` 是同一个东西，
+ * 而 `a²=2b²` 与 `b²=2k²` 不是。
+ */
 export function matchAll(text, needles) {
   const t = normalize(text).toLowerCase();
-  return needles.filter((n) => t.includes(normalize(n).toLowerCase()));
+  const seen = new Set();
+  const out = [];
+  for (const n of needles ?? []) {
+    const key = normalize(n).toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    if (t.includes(key)) out.push(n);
+  }
+  return out;
 }
 
 /** 安全构造正则：题库存的是字符串，避免在热路径里反复编译 */

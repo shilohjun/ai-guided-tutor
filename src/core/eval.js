@@ -277,7 +277,7 @@ export function detectActionable(text) {
   const t = normalize(text);
   return (
     /(?:接着|先|然后|试着|检查|说出|写出|列出|回答|告诉我|想一下|想清楚|复述)/.test(t) ||
-    /👉\s*\S{6,}/.test(t)
+    /【下一步】\s*\S{6,}/.test(t)
   );
 }
 

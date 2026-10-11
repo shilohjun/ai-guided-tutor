@@ -13,10 +13,24 @@
  */
 
 import { findStepByPosition, findGraph, totalSteps } from './locate.js';
+import { inspectVoice } from './prompt.js';
+import { safeStepRef } from './guard.js';
 
-/** 从引擎响应累积一条会话记录（服务端维护） */
-export function appendTurn(record, { utterance, response }) {
+/**
+ * 从引擎响应累积一条会话记录（服务端维护）。
+ *
+ * 这里存的东西比"生成报告所需"更多 —— 因为教师视图要用同一份记录
+ * 复盘引擎的完整判断过程（trace、被拦下的原文、重写策略、voice 体检）。
+ * 为什么不做两套记录：两套记录一定会漂移，最后"报告里的数字"和
+ * "教师看到的数字"对不上，那是最伤可信度的一类 bug。
+ */
+export function appendTurn(record, { utterance, response, problem }) {
   const now = new Date().toISOString();
+  const blocked = (response.meta.guardHistory ?? []).filter((g) => !g.passed);
+  const lastBlocked = blocked[blocked.length - 1] ?? null;
+  const position = response.diagnosis.position;
+  const step = problem ? findStepByPosition(problem, position) : null;
+
   record.turns.push({ role: 'student', text: utterance, at: now });
   record.turns.push({
     role: 'ai',
@@ -29,6 +43,7 @@ export function appendTurn(record, { utterance, response }) {
 
   record.hintLog.push({
     at: now,
+    utterance,
     requestedLevel: response.hint.level,
     deliveredLevel: response.hint.level,
     stuckKind: response.diagnosis.stuckKind,
@@ -37,6 +52,28 @@ export function appendTurn(record, { utterance, response }) {
     violationKinds: (response.meta.guardHistory ?? []).flatMap((g) => g.violations.map((v) => v.kind)),
     stepIndex: response.diagnosis.position.stepIndex,
     graphId: response.diagnosis.position.graphId,
+    /**
+     * 本轮是"确认学生答对了"还是"给了提示"。
+     * 报告统计与教师复盘都要区分这两者（见下面 byLevel 的注释）。
+     */
+    form: response.hint.form,
+    completed: Boolean(response.completion?.complete),
+    // ---- 教研复盘用（只在教师视图端点返回） ----
+    hintText: response.hint.text,
+    message: response.message,
+    stepTitle: step?.title ?? null,
+    stepKind: step?.kind ?? null,
+    rationale: response.hint.rationale,
+    evidenceQuotes: response.diagnosis.evidenceQuotes ?? [],
+    repairStrategy: lastBlocked?.repairStrategy ?? null,
+    guardViolations: lastBlocked?.violations ?? [],
+    /**
+     * voice 体检：这句话有没有空话、有没有一次问两个问题。
+     * 这是"引导语言质量"唯一可被统计的抓手 —— 没有它，
+     * "提示写得好不好"就只能靠读，无法回归测试。
+     */
+    voice: inspectVoice(response.message),
+    trace: response.diagnosis.trace ?? [],
   });
   return record;
 }
@@ -60,9 +97,19 @@ export function buildReport(problem, record, meta) {
   const graph = findGraph(problem, record.hintLog[0]?.graphId ?? problem.solutionGraphs[0]?.id);
   const stepTotal = totalSteps(problem, graph?.id);
 
+  /**
+   * 后面所有"教学统计"都只看**引导轮**，把确认轮排除掉。
+   *
+   * 这是同一个 bug 的第二次：第一次只修了 byLevel，结果卡点清单里
+   * 冒出了"确认轮也算一次引导、也有一条卡点性质"的记录 ——
+   * 学生会看到"第 8 步 · 引导 1 轮 · 已接近完成"这种莫名其妙的条目。
+   * 确认轮的学生可见语义是"你答对了"，它不该出现在任何"卡在哪"的统计里。
+   */
+  const guidedLogs = record.hintLog.filter((l) => l.form !== 'confirm');
+
   // ---- 1. 卡点聚合：按 (步骤, 卡点性质) 归并 ----
   const stuckMap = new Map();
-  for (const log of record.hintLog) {
+  for (const log of guidedLogs) {
     const key = `${log.stepIndex ?? 'na'}::${log.stuckKind}`;
     if (!stuckMap.has(key)) {
       stuckMap.set(key, {
@@ -87,12 +134,24 @@ export function buildReport(problem, record, meta) {
   const stuckPoints = [...stuckMap.values()].sort((a, b) => (a.stepIndex ?? 99) - (b.stepIndex ?? 99));
 
   // ---- 2. 引导轮次统计 ----
+  /**
+   * 确认轮（学生自己答对了）**不计入**层级分布。
+   *
+   * 它的 form 是 'confirm'、level 记 0，但那不是"给了一次 L0 澄清"——
+   * 混进来会让教研看到的帮助强度分布失真：
+   * "L0 澄清 N 次"里掺进一堆"学生答对了"，读起来就完全不是那回事了。
+   * 单独统计，反而是一个有价值的指标：学生自己走通了几次。
+   */
+  const confirmations = record.hintLog.filter((l) => l.form === 'confirm');
   const byLevel = { 0: 0, 1: 0, 2: 0, 3: 0 };
-  for (const log of record.hintLog) byLevel[log.deliveredLevel] = (byLevel[log.deliveredLevel] ?? 0) + 1;
+  for (const log of guidedLogs) byLevel[log.deliveredLevel] = (byLevel[log.deliveredLevel] ?? 0) + 1;
   const hintStats = {
-    total: record.hintLog.length,
+    total: guidedLogs.length,
     byLevel,
-    guardBlocked: record.hintLog.filter((l) => !l.guardPassed).length,
+    guardBlocked: guidedLogs.filter((l) => !l.guardPassed).length,
+    /** 学生自己给出正确答案的轮次（越多越好，与 byLevel 相反） */
+    confirmed: confirmations.length,
+    confirmedComplete: confirmations.filter((l) => l.completed).length,
   };
 
   // ---- 3. 独立完成度 ----
@@ -126,10 +185,21 @@ export function buildReport(problem, record, meta) {
 
 // ---------------------------------------------------------------------------
 
+/**
+ * 报告里的"卡在哪一步"。
+ *
+ * 走 safeStepRef 而不是直接给标题 —— 报告是**学生看的**，
+ * 而步骤标题是教研语言，有些标题本身就是结论
+ * （实测："因此 a、b 有公因数 2，与'互质'矛盾"）。
+ * 教师视图拿的是 hintLog.stepTitle（原始标题），不受这里影响：
+ * 同一份数据、两个投影，与其它地方的切法一致。
+ */
 function stepTitle(problem, graphId, stepIndex) {
   if (stepIndex == null) return '尚未定位到具体步骤';
   const step = findStepByPosition(problem, { graphId, stepIndex });
-  return step?.title ?? `第 ${stepIndex} 步`;
+  if (!step) return `第 ${stepIndex} 步`;
+  const ref = safeStepRef(problem, step);
+  return ref ? ref.replace(/^「|」$/g, '') : `第 ${stepIndex} 步`;
 }
 
 /**
