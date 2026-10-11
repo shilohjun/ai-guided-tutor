@@ -16,6 +16,11 @@
  *
  * ③ **静态文件由 Vercel 直接托管 public/**（见 vercel.json），不经本函数。
  *    这样前端资源走 CDN，只有 /api/* 才唤醒函数。
+ *
+ * ④ **教师视图在公网一律锁死。**
+ *    本地不配 TEACHER_KEY 时教师视图是开放的（自己看得方便），
+ *    但那个默认值不能上公网 —— 教师接口返回完整解题路径与参考答案。
+ *    所以这里在没有口令时强制置位，让 router 走 'off' 分支。
  */
 
 import { handleApi } from '../src/server/router.js';
@@ -32,7 +37,17 @@ export default async function handler(req, res) {
     delete process.env.OPENAI_API_KEY;
   }
 
+  // ---- 决定 ④：公开部署一律锁死教师视图 ----
+  // 教师接口返回完整解题路径与参考答案。本地默认"无口令可进"是为了自己看得方便，
+  // 但那个默认值绝不能跟着代码上公网 —— 否则这份公开链接就等于把答案挂在网上。
+  // 同一条原则：默认值由部署形态决定，而不是靠部署时"记得配"。
+  // 确实要在公网开教师视图，就配 TEACHER_KEY（配了之后本行不再生效）。
+  if (!String(process.env.TEACHER_KEY ?? '').trim()) {
+    process.env.DSH_FORCE_TEACHER_LOCK = '1';
+  }
+
   const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`);
+
 
   if (!url.pathname.startsWith('/api/')) {
     res.statusCode = 404;

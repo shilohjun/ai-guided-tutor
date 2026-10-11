@@ -15,10 +15,9 @@ import { existsSync } from 'node:fs';
 import { extname, join, resolve, dirname, normalize as pathNormalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { handleApi } from '../src/server/router.js';
+import { handleApi, getAdapter } from '../src/server/router.js';
 import { readLLMConfig } from '../src/core/llm.js';
 import { maskSecret } from '../src/core/env.js';
-import { getAdapter } from '../src/server/router.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC_DIR = join(ROOT, 'public');
@@ -51,6 +50,7 @@ const server = createServer(async (req, res) => {
       }
       return;
     }
+
     await serveStatic(res, path);
   } catch (err) {
     console.error('[server] 未捕获错误：', err);
@@ -99,7 +99,21 @@ server.listen(PORT, HOST, () => {
     console.log('  ▸ 模型接入：未配置 .env —— 当前用离线规则桩，全流程可跑');
     console.log('    要接真模型：复制 .env.example 为 .env，填入 LLM_API_KEY / LLM_BASE_URL / LLM_MODEL');
   }
+  console.log(
+    `  ▸ 读题能力：${typeof adapter.understandProblem === 'function' ? '可用（可导入任意新题目）' : '不可用（导入题目走通用骨架）'}`,
+  );
+  const teacherKey = String(process.env.TEACHER_KEY ?? '').trim();
+  console.log(
+    `  ▸ 教师视图：${
+      teacherKey
+        ? `需要口令（${maskSecret(teacherKey)}）`
+        : String(process.env.DSH_FORCE_TEACHER_LOCK ?? '') === '1'
+          ? '已关闭（本部署形态锁死了教师视图）'
+          : '无需口令 · 本地模式，点一下直接进'
+    }`,
+  );
   console.log('');
   console.log('  ▸ 核心承诺：只给提示，不给答案（出口由 guard 强制校验）');
+  console.log('  ▸ 视图隔离：学生视图拿不到解题路径 / 答案指纹 / 错因标签 —— 由服务端分流');
   console.log('');
 });

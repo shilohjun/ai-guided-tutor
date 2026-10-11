@@ -76,6 +76,18 @@ export interface Problem {
   /** 知识点标签，用于知识图谱映射（proposal 里需要企业知识库对齐） */
   topics: string[];
   difficulty: 1 | 2 | 3 | 4 | 5;
+  /**
+   * 题目来源。
+   *   'library'  教研维护的题库（图谱质量最高，指纹最全）
+   *   'imported' 运行时导入的任意新题目（由 intake 从题干现场生成）
+   *
+   * 为什么要在数据里显式区分：两者的可信度不同。
+   * 导入题的图谱是模型生成的，**必须**在教师视图里标出来，
+   * 否则教研会把"模型猜的路径"当成"教研审过的路径"——那是排期判断失真。
+   */
+  source?: 'library' | 'imported';
+  /** 导入时间（仅 source='imported'） */
+  createdAt?: string;
   /** 题干 */
   stem: string;
   /** 已知量（结构化，便于提示时引用而不算结果） */
@@ -101,6 +113,12 @@ export interface Problem {
    * 否则守卫会被迫过度激进，连"列一下受力"都拦掉。
    */
   formulaFingerprints?: string[];
+  /**
+   * 解法要点指纹 —— "说出这个量扮演什么角色"就等于把答案递过去了。
+   * 与 formulaFingerprints 的区别：那是给表达式，这是给结论（如"r 是内阻"）。
+   * 只在 L0–L2 生效（L3 是降级示范，允许说到这个颗粒度）。
+   */
+  solutionInsights?: string[];
   /** 参考答案（仅服务端内部持有，绝不下发前端；guard 用它做二次比对） */
   referenceAnswer: string;
 }
@@ -229,8 +247,16 @@ export type HintLevel = 0 | 1 | 2 | 3;
 
 export interface Hint {
   level: HintLevel;
-  /** 提示形态 */
-  form: 'clarify' | 'condition_question' | 'direction' | 'worked_step';
+  /**
+   * 提示形态。
+   *
+   * 注意 `confirm` 不是提示 —— 它是"确认学生自己答对了"。
+   * 单独列出来而不是塞进 clarify，是因为两者的**语义与约束完全不同**：
+   *   提示：引擎在引导学生，绝不许出现答案（由 guard 强制）
+   *   确认：引擎在回应学生已经说出来的答案，不许出现学生没说的答案
+   * 把它混进提示层级里，报告统计与守卫口径都会被污染。
+   */
+  form: 'clarify' | 'condition_question' | 'direction' | 'worked_step' | 'confirm';
   /** 面向学生的提示正文（已过守卫） */
   text: string;
   /** 本轮引用的概念（让 UI 可以高亮知识点） */
@@ -338,6 +364,332 @@ export interface SessionRecord {
 }
 
 // ---------------------------------------------------------------------------
+// 新题目导入（"任意题目文字 → 结构化题目"的契约）
+// ---------------------------------------------------------------------------
+
+/**
+ * 导入阶段模型被允许做的事，被刻意限制在"读题"上：
+ *   它产出 givens/asked/topics/解题路径/错因/参考答案，
+ *   但**不产出任何面向学生的话术**，也不参与层级决策。
+ *
+ * 这样切的原因与 observe/draft 同一套逻辑：
+ *   模型擅长"读懂题目"，不擅长"守住分寸"。
+ * 因此导入题目的每一句话术仍然要经过 route + guard，
+ * 与题库题走完全相同的出口。
+ */
+export interface IntakeResult {
+  problem: Problem;
+  /** 读题产出的分析摘要（教师视图可见，学生视图不可见） */
+  analysis: {
+    /** 题目在问什么（一句话） */
+    summary: string;
+    /** 知识点（= problem.topics，显式再列一次便于前端展示） */
+    topics: string[];
+    /** 解题路径概览：每条路径的名字 + 步数 */
+    paths: { id: string; name: string; stepCount: number; preconditions: string[] }[];
+    /** 本题的关键关节（教研视角：哪一步最容易卡） */
+    keySteps: { index: number; title: string; kind: StepKind }[];
+  };
+  /** 生成过程中的告警（模型输出被修正/降级的地方，教师视图可见） */
+  warnings: string[];
+  /** 是否走了模型；false 表示已降级为通用骨架 */
+  usedModel: boolean;
+  latencyMs: number;
+}
+
+/** 导入请求 */
+export interface IntakeRequest {
+  /** 题干原文（学生粘贴的题目文字） */
+  rawText: string;
+  /** 可选：学生/老师指定的学科提示 */
+  subjectHint?: 'physics' | 'math' | 'chemistry' | null;
+}
+
+// ---------------------------------------------------------------------------
+// 题目解析（"原题 ⇄ 解析"里"解析"那一半的契约）
+// ---------------------------------------------------------------------------
+
+/**
+ * 一道题的解析。学生看的和教师看得的是**两次投影**，不是同一份数据加打码。
+ *
+ * 这个结构里最要紧的是 `KeyCondition.reveals`：
+ *   有些条件的"含义"本身就是答案（"匀速 ⇒ 合力为零"就是那道题的 solutionInsight）。
+ *   所以每条条件都要先过一道判据，把"会剧透"的挑出来 ——
+ *   学生看到的是提问，教师看到的是完整含义 + 剧透标记。
+ */
+export interface ProblemAnalysis {
+  /** 这道题在问什么（一句话） */
+  summary: string;
+  variables: {
+    /** 已知量，拆到"符号 / 值 / 单位 / 它是什么" */
+    given: AnalysisVariable[];
+    /** 待求量 */
+    asked: AnalysisVariable[];
+    /** 定性条件（"匀速运动""不计摩擦"）—— 它们不是数值，单列更好读 */
+    qualitative: string[];
+  };
+  keyConditions: KeyCondition[];
+  knowledgeGraph: KnowledgeGraphPair;
+}
+
+export interface AnalysisVariable {
+  id: string;
+  kind: 'given' | 'asked';
+  /** 题干原话 */
+  raw: string;
+  /** 符号，取不到为空串 */
+  symbol: string;
+  /** 数值（字符串，保留题干精度），非数值量为 null */
+  value: string | null;
+  unit: string;
+  /** 中文说明（"长度 / 距离"）；已知量里若与原文相同则为空，避免印两遍 */
+  note: string;
+}
+
+export interface KeyCondition {
+  /** 题干原话里的一小段（关键词前后各 12 字），不是整句 */
+  text: string;
+  /** 短标签："匀速（速度不变）" */
+  label: string;
+  kind: 'boundary' | 'qualitative' | 'constraint' | 'geometry' | 'task' | 'domain';
+  /** 它在解题上意味着什么（教师可见；会剧透时学生拿不到） */
+  meaning: string;
+  /** 不剧透版本：把它变成一句让学生自己翻译的提问 */
+  ask: string;
+  /**
+   * 这条条件的含义会不会说漏答案。
+   *
+   * 两条判据（见 analysis.js 的 doesReveal）：
+   *   ① 结论型 —— 命中 solutionInsights / formulaFingerprints（与守卫同一套指纹）
+   *   ② 前提型 —— 命中只存在于解题步骤里的说法（步骤标题 / 定位关键词 / 路径前提）
+   *
+   * ② 是测试逼出来的：只做 ① 时，"切割式要求 B、L、v 两两垂直"这种
+   * "把该检查什么前提说出来"的泄漏完全抓不到。
+   */
+  reveals: boolean;
+}
+
+/**
+ * 知识图谱的两层。
+ *
+ * 学生层只有 topics（章节级知识点）；教师层多一层 steps[].concepts。
+ * 为什么必须分开：concepts 就是解法本身 ——
+ * 实测漏过一次，把 concepts 汇总发给学生，而里面有「电源与内阻」
+ * 和「匀速直线运动合力为零」，恰好是那道题的两个 solutionInsight。
+ */
+export interface KnowledgeGraphPair {
+  student: KnowledgeGraph;
+  teacher: KnowledgeGraph;
+}
+
+export interface KnowledgeGraph {
+  nodes: KnowledgeNode[];
+  edges: KnowledgeEdge[];
+  /**
+   * 关系从哪来：
+   *   'model'   读题时由模型判断的（导入题目）
+   *   'derived' 按"文本包含 + 同层共现"派生的（题库题目，或模型漏给时）
+   * 这个字段会显示在界面上 —— 让"这张关系图不是教研标注的"这件事可见。
+   */
+  edgeSource: 'model' | 'derived';
+  /** 图的覆盖范围，如实告诉 UI 这是设计而不是缺失 */
+  scope: 'topics-only' | 'topics+concepts+steps';
+}
+
+export interface KnowledgeNode {
+  id: string;
+  name: string;
+  /**
+   * core    本题核心考点
+   * support 需要用到的基础
+   * concept 解法步骤里出现的概念（**只在教师图谱里**）
+   */
+  role: 'core' | 'support' | 'concept';
+  /** 1=本题核心 2=直接前置 3=更基础；渲染时大的在上 */
+  level: 1 | 2 | 3;
+  note: string;
+  /** 仅教师图谱：这个概念出现在解题路径的第几步 */
+  steps?: number[];
+}
+
+export interface KnowledgeEdge {
+  from: string;
+  to: string;
+  relation: 'prereq' | 'includes' | 'applies' | 'related';
+  /** 边上显示的中文标签（前置 / 包含 / 应用 / 相关） */
+  label: string;
+}
+
+/** 学生可见的解析：会剧透的条件只剩提问 */
+export interface StudentProblemAnalysis {
+  summary: string;
+  variables: ProblemAnalysis['variables'];
+  keyConditions: {
+    text: string;
+    kind: KeyCondition['kind'];
+    label: string;
+    /** 会剧透时为 null */
+    meaning: string | null;
+    /** 会剧透时才有的提问 */
+    question: string | null;
+    revealsInsight: boolean;
+  }[];
+  knowledgeGraph: KnowledgeGraph;
+  asked: string[];
+}
+
+// ---------------------------------------------------------------------------
+// 答案判定（"学生自己答对了"）
+// ---------------------------------------------------------------------------
+
+/**
+ * 一轮发言的答案判定结果。
+ *
+ * 设计原点是一个试用反馈：**"我直接把正确答案说出来了，它还在引导我。"**
+ *
+ * 原引擎刻意"不判对错"（怕变成对学生的评价）。但学生自己走通了一步时，
+ * 最该发生的动作是**确认**，然后跳过那一问继续往下 —— 而不是接着追问。
+ * 于是这里做了一个**不对称**的设计：
+ *   说对了 ⇒ 确认（甚至庆祝）
+ *   说错了 ⇒ 什么都不说，走原来的引导路径
+ * 这个不对称是刻意的：这个产品不做判卷，只做"陪你想"。
+ */
+export interface AnswerVerdict {
+  /** 这道题有没有数值型答案（证明题这类没有） */
+  numeric: boolean;
+  expectedCount: number;
+  /** 学生这一轮说对的那些答案（含学生原话片段，UI 直接回显） */
+  matched: { value: string; unit: string; raw: string; quote: string }[];
+  /** 还没答出来的（引擎**不许**把它们说出来） */
+  remaining: { value: string; unit: string; raw: string }[];
+  /** 结论型题目命中的结论指纹 */
+  conclusions: string[];
+  /** 全部待求量都齐了才算完成 —— 四问只答对一问不是"做完了" */
+  complete: boolean;
+}
+
+/**
+ * 学生可见的完成信息。
+ *
+ * `matched` 里的每一个数字都来自**学生本人这一轮的原话**，
+ * 引擎只负责把它取出来放大。这条不是风格问题，是可测试的约束：
+ * `findUnstatedAnswers()` 会检查确认文本里没有出现学生尚未说出的答案。
+ */
+export interface CompletionPayload {
+  complete: boolean;
+  /** 学生自己说出的答案（UI 回显"你说的"）；raw 是"值 + 单位"的展示形式 */
+  matched: { value: string; unit: string; raw?: string; quote: string }[];
+  remainingCount: number;
+  expectedCount: number;
+}
+
+// ---------------------------------------------------------------------------
+// 引擎判断链路（可视化用）
+// ---------------------------------------------------------------------------
+
+/**
+ * 引擎判断链路的一步 —— 给学生看的那一版。
+ *
+ * 关键设计：**同一条链路的"学生版"和"教师版"是两次不同的投影，不是一次投影加打码。**
+ *   学生版：只说"我做了什么判断"（读懂了你的思路 / 定位到你在哪一步 / 决定给几级提示）
+ *          绝不含错因标签、置信度、守卫违规类型、答案指纹。
+ *   教师版：完整 trace + 内部字段 + 教程标签（见 TeacherPayload）。
+ *
+ * 为什么不做"打码"：打码依赖"记得打哪里"，漏一处就是泄题。
+ * 白名单投影只依赖"允许说什么"，漏一处只是少说一句话。
+ */
+export interface EnginePathEntry {
+  /** 阶段：读题 / 理解 / 定位 / 决策 / 成文 / 把关 */
+  stage: 'intake' | 'understand' | 'locate' | 'route' | 'generate' | 'guard';
+  /** 面向学生的说明（已过白名单） */
+  label: string;
+  /** 一个可选的状态点：ok / info / hold */
+  tone: 'ok' | 'info' | 'hold';
+}
+
+// ---------------------------------------------------------------------------
+// 学生视图 / 教师视图载荷（服务端分流）
+// ---------------------------------------------------------------------------
+
+/** 学生在对话中能拿到的一切。注意这里没有任何教研字段。 */
+export interface StudentTurnPayload {
+  message: string;
+  hint: {
+    level: HintLevel;
+    levelName: string;
+    form: Hint['form'];
+    text: string;
+    concepts: string[];
+    nextAsk: string;
+    /** 面向学生的层级说明（不是 rationale —— rationale 是内部依据） */
+    levelNote: string;
+  };
+  /** 学生在图谱里的位置 —— 只给"第几步 / 共几步"，不给步骤内容 */
+  progress: {
+    stepIndex: number | null;
+    stepCount: number;
+    graphName: string | null;
+    confidenceLabel: '高' | '中' | '低';
+  };
+  /** 引擎判断链路（学生版投影） */
+  enginePath: EnginePathEntry[];
+  /** 学生已被读懂的部分（正面反馈 → 学习动机） */
+  understood: string[];
+  /** 学生应接着做的一个动作 */
+  nextStep: string | null;
+  /** 陪伴模式行为 */
+  mode: 'self_training' | 'ai_companion';
+  /** 本轮是否有内容被守住（学生版只显示"复习了一遍"，不显示违规类型） */
+  reviewed: boolean;
+}
+
+/**
+ * 教师视图载荷 —— 只在带对 TEACHER_KEY 时返回。
+ * 包含：知识点、完整路径图谱、错因统计、引擎完整 trace、答案指纹命中记录。
+ */
+export interface TeacherPayload {
+  sessionId: string;
+  problem: {
+    id: string;
+    source: 'library' | 'imported';
+    subject: string;
+    topics: string[];
+    difficulty: number;
+    stem: string;
+    givens: string[];
+    asked: string[];
+    /** 完整解题路径（学生视图永远拿不到） */
+    solutionGraphs: SolutionGraph[];
+    misconceptions: { id: string; label: string; rootCause: string; hitCount: number }[];
+    /** 仅在教师视图返回：用于教研核对提示是否贴近参考答案 */
+    referenceAnswer: string;
+    answerFingerprints: string[];
+    formulaFingerprints: string[];
+    solutionInsights: string[];
+  };
+  /** 逐轮统计 */
+  turns: {
+    index: number;
+    utterance: string;
+    deliveredLevel: HintLevel;
+    stuckKind: StuckKind;
+    stepIndex: number | null;
+    misconceptionIds: string[];
+    guardPassed: boolean;
+    violationKinds: string[];
+    evidenceQuotes: string[];
+  }[];
+  /** 引擎完整判断链路（每一轮的 trace 合并） */
+  trace: { turn: number; entries: TraceEntry[] }[];
+  summary: {
+    totalTurns: number;
+    byLevel: Record<HintLevel, number>;
+    guardBlocked: number;
+    locateAccuracyNote: string;
+  };
+}
+
+// ---------------------------------------------------------------------------
 // LLM 适配层契约
 // ---------------------------------------------------------------------------
 
@@ -352,6 +704,20 @@ export interface LLMAdapter {
   observeStudent(input: ObserveInput): Promise<Observation>;
   /** 在受限上下文下生成提示候选文本（受 template 约束） */
   draftHint(input: DraftInput): Promise<string>;
+  /**
+   * 读一道**新题目**：题干 → 结构化题目（知识点 / 解题路径 / 错因 / 参考答案）。
+   *
+   * 为什么把它放在适配器层而不是单独一个"导入服务"：
+   *   它本质上是第三次"让模型只做它擅长的事"——
+   *   observe 负责"听懂学生"，draft 负责"说一句提示"，
+   *   understandProblem 负责"读懂题目"。三者共享同一套降级与容错。
+   * 离线桩实现同一接口：没有 Key 时用启发式规则抽已知量/待求量，
+   * 产出**单路径通用骨架**。功能弱，但保证"没 Key 也能走完整流程"。
+   *
+   * 声明为可选：intake 在缺失时会直接走启发式骨架，
+   * 这样测试里的极简 mock 适配器（只实现 observe/draft）不必跟着改。
+   */
+  understandProblem?(input: IntakeRequest): Promise<unknown>;
 }
 
 export interface ObserveInput {
