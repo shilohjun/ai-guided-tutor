@@ -17,6 +17,21 @@ export function it(name, fn) {
   tests.push({ suite: currentSuite, name, fn });
 }
 
+/**
+ * 已注册的用例总数。
+ *
+ * 为什么需要它：文档里写着"跑 N 个用例"，而 N 会随着新套件增长 ——
+ * 靠人记得改，就一定会忘（实测：README 里留着 182，而实际已经 214）。
+ * 有了这个函数，`test/docs.test.js` 可以直接拿真实数量去核对文档，
+ * 数字对不上就失败。
+ *
+ * 注意：run.js 会先把所有套件 import 完再调用 run()，
+ * 所以在用例回调里读到的就是全部数量（与最后打印的分母一致）。
+ */
+export function totalRegistered() {
+  return tests.length;
+}
+
 export async function run() {
   let passed = 0;
   const failures = [];
