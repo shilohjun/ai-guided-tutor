@@ -18,7 +18,7 @@ node server/server.js
 ```
 
 ```bash
-# 跑测试（219 个用例）
+# 跑测试（273 个用例）
 node test/run.js
 
 # 跑离线评测（19 个典型学生场景：15 物理 + 4 数学）
@@ -210,7 +210,7 @@ LLM（观察员）              规则代码（决策者）          守卫（�
 ├── src/server/router.js       API 路由 + **学生/教师载荷分流**（教师端点需 TEACHER_KEY）
 ├── server/server.js           HTTP 服务（零依赖）
 ├── public/                    Demo 前端（学生 3 页 + 教师 1 页，零依赖 ES module）
-├── test/                      219 个测试（含读题、答案判定、前端契约、密钥不外泄）
+├── test/                      273 个测试（含读题、答案判定、拍照识题、前端契约、密钥不外泄）
 ├── scripts/eval.js            评测入口
 └── docs/                      接口契约 / Prompt 规范 / 评测标准 / **读题与视图隔离**
 ```

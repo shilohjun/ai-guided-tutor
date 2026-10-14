@@ -36,6 +36,7 @@
 
 import { loadEnvFile, maskSecret } from '../core/env.js';
 import { createAdapter, readLLMConfig } from '../core/llm.js';
+import { readOcrConfig, recognizeProblemImage, ocrStatus } from '../core/ocr.js';
 import { createEngine } from '../core/engine.js';
 import { totalSteps } from '../core/locate.js';
 import { understandProblem } from '../core/intake.js';
@@ -62,6 +63,24 @@ const MAX_SESSIONS = 500;
 
 const sessions = new Map();
 let adapterInstance = null;
+
+/**
+ * 拍照识题的"已验证调用形状"缓存：{ url, imageField }。
+ *
+ * 为什么要单独一个进程级缓存：云市场商品的接口地址与传图字段名在首次调用前是未知的
+ * （商品页的接口文档是前端渲染的图片，抓不到正文），而**每试一个候选就是一次计费调用**。
+ * 缓存之后一个进程只探索一次，之后每张图都走已验证的形状。
+ * 它是纯优化：丢了只会让下一个进程再探索一次，不影响正确性。
+ */
+let ocrShape = null;
+
+function resolveCachedShape() {
+  return ocrShape;
+}
+
+function rememberShape(shape) {
+  if (shape?.url && shape?.imageField) ocrShape = shape;
+}
 
 function getAdapter() {
   if (!adapterInstance) adapterInstance = createAdapter();
@@ -198,11 +217,41 @@ function readJson(req) {
     }
     const chunks = [];
     let size = 0;
+    let aborted = false;
     req.on('data', (c) => {
+      if (aborted) return;
       size += c.length;
-      if (size > 1_000_000) {
-        reject(new Error('请求体过大'));
-        req.destroy();
+      /**
+       * 体积上限按**路由**分档，而不是全局一个数。
+       *
+       * 为什么：拍照识题要把图片 base64 塞进 JSON body，base64 比原图大约 1.33 倍，
+       * 一张 640KB 的压缩图约 850KB —— 卡在原来的 1MB 上会随机失败，
+       * 而失败信息是"请求体过大"，看起来像网络问题。
+       * 但也不能全局放宽：文字类接口（chat/import）本来就不该收到大 body，
+       * 放宽等于给所有人一个免费的放大攻击面。
+       *
+       * 2_600_000 的来由：base64 后 ~1.95MB 图片 ⇒ 原图约 1.46MB，
+       * 覆盖"前端压缩到长边 1600px"的正常产出，同时离 Vercel serverless
+       * 请求体上限（约 4.5MB）还有安全距离。
+       */
+      const limit = String(req.url ?? '').startsWith('/api/ocr') ? 2_600_000 : 1_000_000;
+      if (size > limit) {
+        aborted = true;
+        /**
+         * 超限之后：**既不 destroy，也不 pause，只是停止累积**。
+         *
+         * 这两个坑都是实测踩出来的（路由层测试抓到的）：
+         *   · req.destroy() —— 会在响应写出去之前掐断 socket，
+         *     客户端看到的是一句 "fetch failed / connection reset"，
+         *     而不是我们精心写的 413 + "图片太大"。学生会以为网络不好，反复重试，
+         *     而每次重试都在烧调用次数。
+         *   · req.pause() —— 客户端在等响应、服务端在等 body，直接死锁（测试挂住）。
+         *
+         * 正确做法：让请求体继续流完但**一个字节都不再存**（chunks 不再 push，
+         * 内存占用封顶在 limit 附近，不会随上传大小增长），
+         * 由调用方立刻写出 413。客户端收到响应即停止上传。
+         */
+        reject(new Error(limit > 1_000_000 ? '图片太大，请压缩后重试' : '请求体过大'));
         return;
       }
       chunks.push(c);
@@ -393,9 +442,16 @@ export async function handleApi(req, res, url) {
        * 'off'  = 公网部署下强制关闭
        */
       teacherView: teacherMode(),
+      /**
+       * 拍照识题状态：只报"配没配 / 走哪个通道"，**绝不回传 AppCode**。
+       * 与 llmConfigured 同一口径 —— 健康检查是用来判断可用性的，不是用来泄密的。
+       */
+      ocr: ocrStatus(),
       capabilities: {
         intake: typeof adapter.understandProblem === 'function',
         intakeFallback: true,
+        /** 拍图识题：配了凭据才为 true；前端据此决定是否显示拍照入口 */
+        ocr: readOcrConfig().available,
       },
       hintPolicy: {
         levels: ['L0 结构化澄清', 'L1 条件追问', 'L2 方向提示', 'L3 降级示范'],
@@ -433,9 +489,110 @@ export async function handleApi(req, res, url) {
     return true;
   }
 
+  // ---- POST /api/ocr（题目照片 → 题干文本） ----
+  /**
+   * 这一环**只做一件事**：把图变成文字。它不导入题目。
+   *
+   * 为什么故意不在这里顺手调 /api/problem/import：
+   *   OCR 约 0.083 元/次，而识别错了会导致读题链路生成一张错图谱 ——
+   *   而那张错图谱不会报错，只会让后面的提示全都跑偏。
+   *   所以识别结果先回填到输入框，**由学生看一眼、改掉错字，再点"读懂这道题"**。
+   *   这一步把 OCR 错误从"故障"降级成"可修正的输入"，是整个接入里最划算的设计。
+   */
+  if (path === '/api/ocr' && req.method === 'POST') {
+    const body = await readJson(req).catch((err) => ({ __error: err.message }));
+    if (body?.__error) {
+      sendJson(res, 413, { error: body.__error });
+      return true;
+    }
+
+    const image = typeof body?.image === 'string' ? body.image : '';
+    if (!image) {
+      sendJson(res, 400, { error: '缺少图片数据（image 字段需要是 dataURL 或 base64 字符串）' });
+      return true;
+    }
+    /**
+     * 前置体积校验：**在调用之前**拦掉过大的图。
+     * 为什么重要：这类接口对"图片过大"是**返回业务错误码并计费**的，
+     * 也就是说学生上传一张 5MB 原图，我们会为一个必然失败的请求付钱。
+     */
+    const approxBytes = Math.floor((image.length - (image.indexOf(',') + 1)) * 0.75);
+    if (approxBytes > 1_500_000) {
+      sendJson(res, 413, {
+        error: `图片约 ${(approxBytes / 1024 / 1024).toFixed(1)} MB，超过识别上限（约 1.5 MB）。前端应压缩到长边 1600 像素后再上传。`,
+      });
+      return true;
+    }
+
+    const config = readOcrConfig();
+    if (!config.available) {
+      sendJson(res, 503, {
+        error: ocrStatus().hint,
+        hint: '拍照识题是可选能力：未配置时请使用左侧的「粘贴题目文字」入口，那条链路完全可用。',
+      });
+      return true;
+    }
+
+    /**
+     * 命中过的调用形状缓存在进程里。
+     *
+     * 为什么要缓存：候选形状（地址 + 传图字段名）在首次调用前是未知的，
+     * 每换一个候选就是一次计费调用。缓存之后，**一个进程只探索一次**，
+     * 之后每张图都走已验证的形状。
+     */
+    const cached = resolveCachedShape();
+    const result = await recognizeProblemImage(image, {
+      /** shape 优先级最高：命中过就直接用它，不再走候选轮换（轮换是要花钱的） */
+      config: cached ? { ...config, shape: cached } : config,
+    });
+
+    if (result.ok && result.shape) rememberShape(result.shape);
+
+    if (!result.ok) {
+      /**
+       * 失败也要给学生**可操作**的话，而不是一个原始错误码。
+       * 并且明确区分"没扣费"（网络层失败）与"可能已扣费"——
+       * 前者可以放心重试，后者重试就是再花钱。
+       */
+      sendJson(res, result.reason === 'not_configured' ? 503 : 502, {
+        error: result.message,
+        reason: result.reason,
+        code: result.code ?? null,
+        detail: result.detail ?? null,
+        charged: result.charged,
+        hint: result.charged
+          ? '这次调用可能已经计费，建议先确认照片是否清晰、是否确实是题目，再决定要不要重试。'
+          : '这次请求没有到达识别服务（未计费），可以直接重试。',
+      });
+      return true;
+    }
+
+    sendJson(res, 200, {
+      rawText: result.rawText,
+      /** 有配图时提醒：题干文本里可能缺图形信息（坐标给不出"图里画了什么"） */
+      figureCount: Array.isArray(result.figures) ? result.figures.length : 0,
+      latencyMs: result.latencyMs,
+      provider: result.provider,
+      /** 首次探索花的候选次数（1 = 一次命中）；正常稳定后恒为 1 */
+      attempts: result.attempts,
+      /** 明确告诉前端：这一步只是拿到了文字，**还没有导入** */
+      nextStep: 'edit_then_import',
+    });
+    return true;
+  }
+
   // ---- POST /api/problem/import（新题目文字 → 结构化题目） ----
   if (path === '/api/problem/import' && req.method === 'POST') {
-    const body = await readJson(req).catch(() => ({}));
+    /**
+     * body 解析失败要自己接住并回 413/400。
+     * 不接的话会冒泡到 server 的最外层 catch 变成 500 "内部错误" ——
+     * 而"题干太长"本来是用户能自己解决的事，报 500 等于把责任推给系统。
+     */
+    const body = await readJson(req).catch((err) => ({ __error: err.message }));
+    if (body?.__error) {
+      sendJson(res, 413, { error: body.__error });
+      return true;
+    }
     const rawText = String(body?.rawText ?? '').trim();
     if (rawText.length < 8) {
       sendJson(res, 400, { error: '题干太短，至少需要 8 个字。请把完整题目文字粘贴进来。' });

@@ -102,37 +102,75 @@
         </div>
 
         <div class="grid-2">
-          <!-- 文字导入：主入口 -->
+          <!-- 交题目：拍照是第一入口，文字是等价备选 -->
           <div class="card">
             <div class="panel-head">
-              <span class="ph-icon">✍️</span>
-              <h3>粘贴题目文字</h3>
-              <div class="ph-actions"><span class="pill pill-live">真模型读题</span></div>
+              <span class="ph-icon">📷</span>
+              <h3>拍张照片交题目</h3>
+              <div class="ph-actions"><span class="pill" id="ocr-pill">…</span></div>
             </div>
-            <p class="muted small">
-              不用管格式，把题干整段贴进来就行。我会抽出已知条件与待求量、标出知识点、
-              逐条解释关键条件，并生成一条只给我自己看的解题路径。
-            </p>
-            <textarea
-              id="stem-input"
-              class="stem-input"
-              rows="6"
-              placeholder="例：质量为 0.5 kg 的小球从高 h = 20 m 处由静止开始自由下落，不计空气阻力，g 取 10 m/s²。求小球落地时的速度大小……"
-            ></textarea>
-            <div class="row-between">
-              <label class="checkbox small">
-                <input type="checkbox" id="no-image-ack" checked />
-                <span>这是纯文字题（本 Demo 未接图像识别）</span>
-              </label>
+
+            <!--
+              拍照是学生最自然的交题方式，所以放在最上面、且**默认展开**。
+              曾经把它放在二级卡片的折叠块里，结果自己都找不到 ——
+              一个入口藏起来就等于没有。
+            -->
+            <label class="dropzone" id="dropzone">
+              <input type="file" id="file-input" accept="image/*" hidden />
+              <div class="dropzone-inner">
+                <span class="dropzone-icon">📷</span>
+                <strong>点击选择照片，或把图片拖进来</strong>
+                <span class="muted small" id="dropzone-hint">支持 JPG / PNG；会自动压缩后识别</span>
+              </div>
+            </label>
+            <img id="preview" class="preview" alt="题目预览" hidden />
+            <div class="row-between" id="ocr-actions" hidden>
+              <span class="muted small" id="ocr-status">已选择照片</span>
               <div class="row-right">
-                <button class="btn btn-ghost btn-sm" id="btn-sample">填个示例</button>
-                <button class="btn btn-primary" id="btn-import">读懂这道题</button>
+                <button class="btn btn-ghost btn-sm" id="btn-ocr-clear">重新选择</button>
+                <button class="btn btn-primary btn-sm" id="btn-ocr">识别成题干</button>
               </div>
             </div>
-            <div class="notice" id="import-notice" hidden></div>
+            <div class="notice" id="ocr-notice" hidden></div>
+            <div class="notice notice-warn" id="ocr-off" hidden>
+              <strong>拍照识题当前未启用。</strong>
+              识别需要服务端配置识别凭据（管理员在部署环境里设置，浏览器不接触凭据）。
+              在配好之前，请用下面的文字入口 —— 那条链路是真的。
+              <div class="notice-actions">
+                <button class="btn btn-ghost btn-sm" id="ocr-explain">看这条链路是怎么接的</button>
+              </div>
+              <pre class="code" id="ocr-plan" hidden></pre>
+            </div>
+
+            <p class="muted small" id="ocr-figure-note">
+              识别的只是文字。题目里的图形（受力图、电路图、几何图）「画了什么」不会进题干 ——
+              如果这道题依赖图形，请在下面补一句图里的关键信息。
+            </p>
+
+            <details class="fold" id="text-entry-fold">
+              <summary>✍️ 或者直接粘贴题目文字</summary>
+              <p class="muted small">
+                不用管格式，把题干整段贴进来就行。我会抽出已知条件与待求量、标出知识点、
+                逐条解释关键条件，并生成一条只给我自己看的解题路径。
+              </p>
+              <textarea
+                id="stem-input"
+                class="stem-input"
+                rows="6"
+                placeholder="例：质量为 0.5 kg 的小球从高 h = 20 m 处由静止开始自由下落，不计空气阻力，g 取 10 m/s²。求小球落地时的速度大小……"
+              ></textarea>
+              <div class="row-between">
+                <span class="muted small">粘贴的题和拍的照片，走的是同一条读题链路。</span>
+                <div class="row-right">
+                  <button class="btn btn-ghost btn-sm" id="btn-sample">填个示例</button>
+                  <button class="btn btn-primary" id="btn-import">读懂这道题</button>
+                </div>
+              </div>
+              <div class="notice" id="import-notice" hidden></div>
+            </details>
           </div>
 
-          <!-- 题库 + 拍照 -->
+          <!-- 题库 -->
           <div class="card">
             <div class="panel-head">
               <span class="ph-icon">📚</span>
@@ -144,28 +182,6 @@
               <div class="skeleton" style="height: 62px"></div>
               <div class="skeleton" style="height: 62px"></div>
             </div>
-
-            <details class="fold">
-              <summary>📷 拍照上传（这一环还没接）</summary>
-              <label class="dropzone" id="dropzone">
-                <input type="file" id="file-input" accept="image/*" hidden />
-                <div class="dropzone-inner">
-                  <span class="dropzone-icon">📷</span>
-                  <strong>点击选择照片，或把图片拖进来</strong>
-                  <span class="muted small">支持 JPG / PNG / HEIC 截图</span>
-                </div>
-              </label>
-              <img id="preview" class="preview" alt="题目预览" hidden />
-              <div class="notice notice-warn" id="ocr-notice" hidden>
-                <strong>图像 → 题干 这一环没有接，我也没有伪造它的结果。</strong>
-                把照片变成题干需要视觉模型（如 <code>qwen-vl-max</code> / <code>glm-4v</code>）。
-                在接上它之前，请用左边的文字入口 —— 那条链路是真的。
-                <div class="notice-actions">
-                  <button class="btn btn-ghost btn-sm" id="ocr-explain">看这条链路怎么补</button>
-                </div>
-                <pre class="code" id="ocr-plan" hidden></pre>
-              </div>
-            </details>
           </div>
         </div>
 

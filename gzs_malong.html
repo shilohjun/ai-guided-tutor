@@ -1,0 +1,2000 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>码隆 AI 学伴 · 拍照解题训练</title>
+<style>
+  :root{
+    --bg:#f4f5fa; --surface:#fff; --ink:#1c2130; --ink-2:#4a5268; --ink-3:#8a92a6;
+    --line:#e6e9f2; --brand:#4f46e5; --brand-2:#7c3aed;
+    --brand-grad:linear-gradient(135deg,#4f46e5,#7c3aed);
+    --student:#2563eb; --student-bg:#eff4ff;
+    --ai:#7c3aed; --ai-bg:#f5f0ff;
+    --ok:#059669; --ok-bg:#ecfdf5;
+    --warn:#d97706; --warn-bg:#fff7e8;
+    --risk:#dc2626; --risk-bg:#fef2f2;
+    --shadow:0 8px 24px rgba(28,33,48,.07); --shadow-lg:0 24px 60px rgba(28,33,48,.16);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    font-family:"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.65;-webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:rgba(79,70,229,.15);}
+  button{font-family:inherit;cursor:pointer;}
+
+  /* ============ 顶栏 ============ */
+  .nav{
+    position:sticky;top:0;z-index:50;background:rgba(255,255,255,.85);backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--line);
+  }
+  .nav-inner{max-width:1320px;margin:0 auto;padding:0 20px;height:60px;display:flex;align-items:center;gap:18px;}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:17px;flex:none;}
+  .logo-mark{width:30px;height:30px;border-radius:9px;background:var(--brand-grad);display:grid;place-items:center;color:#fff;font-size:14px;box-shadow:0 4px 12px rgba(79,70,229,.35);}
+  .logo small{font-weight:500;color:var(--ink-3);font-size:12px;}
+  .seg{display:flex;background:#eef0f7;border-radius:11px;padding:4px;gap:4px;margin:0 auto;}
+  .seg button{
+    border:none;background:transparent;padding:7px 18px;border-radius:8px;font-size:13.5px;
+    font-weight:600;color:var(--ink-3);transition:.2s;display:flex;align-items:center;gap:6px;
+  }
+  .seg button.on{background:#fff;color:var(--brand);box-shadow:0 2px 8px rgba(28,33,48,.1);}
+  .nav-right{display:flex;gap:10px;align-items:center;flex:none;}
+  .nav-link{font-size:13px;color:var(--ink-3);padding:7px 12px;border-radius:9px;}
+  .nav-link:hover{background:var(--student-bg);color:var(--brand);}
+  .btn-report{
+    border:none;border-radius:10px;padding:9px 18px;font-size:13.5px;font-weight:700;color:#fff;
+    background:var(--brand-grad);box-shadow:0 4px 14px rgba(79,70,229,.3);transition:.2s;
+  }
+  .btn-report:hover:not(:disabled){transform:translateY(-1px);}
+  .btn-report:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;}
+
+  /* ============ 六阶段进度 ============ */
+  .stages-bar{max-width:1320px;margin:14px auto 0;padding:0 20px;display:flex;gap:8px;overflow-x:auto;}
+  .pill{
+    flex:none;display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;
+    padding:7px 14px;border-radius:999px;background:#fff;border:1px solid var(--line);color:var(--ink-3);
+    transition:.25s;white-space:nowrap;
+  }
+  .pill .pn{width:20px;height:20px;border-radius:50%;background:#e9ecf5;display:grid;place-items:center;font-size:11px;transition:.25s;}
+  .pill.done{color:var(--ok);border-color:#bfe8d8;background:var(--ok-bg);}
+  .pill.done .pn{background:var(--ok);color:#fff;}
+  .pill.active{color:var(--brand);border-color:#c9c5f7;background:var(--ai-bg);box-shadow:0 0 0 3px rgba(79,70,229,.1);}
+  .pill.active .pn{background:var(--brand-grad);color:#fff;animation:pillPulse 1.6s infinite;}
+  @keyframes pillPulse{0%,100%{box-shadow:0 0 0 0 rgba(79,70,229,.4);}50%{box-shadow:0 0 0 5px rgba(79,70,229,0);}}
+
+  /* ============ 主体布局 ============ */
+  .app{max-width:1320px;margin:16px auto 40px;padding:0 20px;display:grid;grid-template-columns:410px 1fr;gap:20px;align-items:start;}
+  .col-left{display:flex;flex-direction:column;gap:16px;}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);}
+  .card-h{display:flex;align-items:center;gap:9px;padding:15px 20px;border-bottom:1px solid var(--line);font-weight:800;font-size:15px;}
+  .card-h .tag{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--ink-3);background:#f4f5fa;padding:3px 10px;border-radius:999px;}
+  .card-b{padding:18px 20px;}
+
+  /* 上传区 */
+  .drop{
+    border:2px dashed #cdd3e4;border-radius:14px;padding:26px 16px;text-align:center;cursor:pointer;
+    transition:.2s;background:#fafbfe;
+  }
+  .drop:hover,.drop.over{border-color:var(--brand);background:var(--ai-bg);}
+  .drop .di{font-size:34px;line-height:1;}
+  .drop h4{font-size:15px;margin-top:8px;}
+  .drop p{font-size:12.5px;color:var(--ink-3);margin-top:4px;}
+  .preview{display:none;margin-top:14px;}
+  .preview.show{display:block;}
+  .preview img,.preview .fake-paper{
+    width:100%;max-height:220px;object-fit:contain;border-radius:12px;border:1px solid var(--line);background:#fff;
+  }
+  .fake-paper{padding:22px;font-size:14.5px;line-height:1.9;color:var(--ink);}
+  .fake-paper b{display:block;margin-bottom:6px;}
+  .btn{
+    border:none;border-radius:11px;padding:11px 20px;font-size:14px;font-weight:700;transition:.2s;
+    display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  }
+  .btn-primary{background:var(--brand-grad);color:#fff;box-shadow:0 6px 16px rgba(79,70,229,.3);}
+  .btn-primary:hover:not(:disabled){transform:translateY(-1px);}
+  .btn-primary:disabled{opacity:.45;cursor:not-allowed;box-shadow:none;}
+  .btn-ghost{background:#eef0f7;color:var(--ink-2);}
+  .btn-ghost:hover{background:#e3e6f2;}
+  .btn-row{display:flex;gap:10px;margin-top:14px;}
+  .btn-row .btn{flex:1;}
+
+  /* 分析结果 */
+  #resultCard{display:none;}
+  #resultCard.show{display:block;animation:fadeUp .4s ease;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+  .ana-steps{list-style:none;margin-bottom:14px;}
+  .ana-steps li{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--ink-3);padding:5px 0;}
+  .ana-steps li .sp{
+    width:16px;height:16px;border-radius:50%;border:2px solid #d6dae8;border-top-color:var(--brand);
+    animation:spin .7s linear infinite;flex:none;
+  }
+  .ana-steps li.ok{color:var(--ink);}
+  .ana-steps li.ok .sp{border:none;animation:none;background:var(--ok);content:"";position:relative;}
+  .ana-steps li.ok .sp::after{content:"✓";color:#fff;font-size:10px;position:absolute;inset:0;display:grid;place-items:center;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .prob-title{font-weight:800;font-size:15px;margin-bottom:8px;}
+  .prob-text{font-size:14px;color:var(--ink-2);background:#fafbfe;border:1px solid var(--line);border-radius:11px;padding:13px 15px;}
+  .cond-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px;}
+  .cond{font-size:12.5px;background:var(--student-bg);color:var(--student);font-weight:600;padding:4px 11px;border-radius:8px;}
+  .cond.goal{background:var(--warn-bg);color:var(--warn);}
+  .know{background:var(--ai-bg);color:var(--ai);}
+  .demo-note{margin-top:12px;font-size:12px;color:var(--ink-3);background:#fafbfe;border-radius:9px;padding:8px 12px;display:flex;gap:6px;align-items:flex-start;}
+
+  /* 路径图谱 */
+  #graphCard{display:none;}
+  #graphCard.show{display:block;animation:fadeUp .4s ease;}
+  .graph-wrap{padding:10px 8px 4px;}
+  .graph-svg{width:100%;height:auto;display:block;}
+  .g-node{fill:#fff;stroke:#c9cfdf;stroke-width:1.6;}
+  .g-node.dim{opacity:.45;}
+  .g-node.done{stroke:var(--ok);fill:var(--ok-bg);}
+  .g-node.active{stroke:var(--brand);fill:var(--ai-bg);}
+  .g-node.stuck{stroke:var(--risk);fill:var(--risk-bg);}
+  .g-node.root{fill:#f4f5ff;stroke:var(--brand);}
+  .g-text{font-size:11.5px;fill:var(--ink-2);font-weight:600;}
+  .g-text.dim{opacity:.4;}
+  .g-text.done{fill:var(--ok);}
+  .g-text.active{fill:var(--brand);}
+  .g-text.stuck{fill:var(--risk);}
+  .g-pathlabel{font-size:11px;font-weight:700;}
+  .g-edge{stroke:#cdd3e4;stroke-width:1.6;fill:none;}
+  .g-edge.active{stroke:var(--brand);stroke-width:2;stroke-dasharray:5 4;animation:dash 1.2s linear infinite;}
+  .g-edge.done{stroke:var(--ok);stroke-width:2;}
+  @keyframes dash{to{stroke-dashoffset:-18;}}
+  .graph-legend{display:flex;gap:14px;font-size:11.5px;color:var(--ink-3);padding:8px 20px 14px;border-top:1px solid var(--line);}
+  .graph-legend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;}
+
+  /* ============ 对话区 ============ */
+  .chat{display:flex;flex-direction:column;height:calc(100vh - 150px);min-height:520px;position:sticky;top:76px;}
+  .chat-head{
+    display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--line);
+  }
+  .ai-avatar{width:36px;height:36px;border-radius:11px;background:var(--brand-grad);display:grid;place-items:center;color:#fff;font-size:15px;font-weight:800;flex:none;}
+  .chat-head .t{font-weight:800;font-size:15px;}
+  .chat-head .s{font-size:12px;color:var(--ink-3);}
+  .chat-head .live{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-3);}
+  .chat-head .live i{width:8px;height:8px;border-radius:50%;background:var(--ok);animation:pillPulse 2s infinite;}
+  .chat-log{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;background:#fafbfe;}
+  .chat-log::-webkit-scrollbar{width:6px;}
+  .chat-log::-webkit-scrollbar-thumb{background:#d9dde9;border-radius:3px;}
+  .msg{display:flex;gap:10px;max-width:86%;animation:fadeUp .3s ease;}
+  .msg .mav{width:30px;height:30px;border-radius:9px;flex:none;display:grid;place-items:center;font-size:12px;font-weight:800;color:#fff;margin-top:2px;}
+  .msg.ai .mav{background:var(--brand-grad);}
+  .msg .bub{padding:11px 15px;border-radius:14px;font-size:14px;position:relative;}
+  .msg.ai .bub{background:#fff;border:1px solid var(--line);border-top-left-radius:4px;color:var(--ink);}
+  .msg.ai .bub b{color:var(--ai);}
+  .msg.user{align-self:flex-end;flex-direction:row-reverse;}
+  .msg.user .mav{background:var(--student);}
+  .msg.user .bub{background:var(--brand-grad);color:#fff;border-top-right-radius:4px;}
+  .msg.user .bub b{color:#fde68a;}
+  .msg-badge{
+    display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;
+    padding:2px 9px;border-radius:999px;margin-bottom:6px;vertical-align:middle;
+  }
+  .msg-badge::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;}
+  .mb-ok{background:var(--ok-bg);color:var(--ok);}
+  .mb-fork{background:var(--ai-bg);color:var(--ai);}
+  .mb-stuck{background:var(--risk-bg);color:var(--risk);}
+  .mb-multi{background:var(--warn-bg);color:var(--warn);}
+  .mb-judge-ok{background:var(--ok-bg);color:var(--ok);}
+  .mb-judge-part{background:var(--warn-bg);color:var(--warn);}
+  .mb-judge-no{background:var(--risk-bg);color:var(--risk);}
+  .mb-guide{background:var(--ai-bg);color:var(--ai);}
+  .mb-sys{background:#eef0f7;color:var(--ink-3);}
+  .msg.user .msg-badge{background:rgba(255,255,255,.18);color:#fff;}
+  .typing{display:inline-flex;gap:4px;padding:6px 2px;}
+  .typing i{width:6px;height:6px;border-radius:50%;background:#b1a8ee;animation:tp 1s infinite;}
+  .typing i:nth-child(2){animation-delay:.15s;}
+  .typing i:nth-child(3){animation-delay:.3s;}
+  @keyframes tp{0%,100%{opacity:.3;transform:translateY(0);}50%{opacity:1;transform:translateY(-3px);}}
+  .sys-hint{align-self:center;font-size:12px;color:var(--ink-3);background:#eef0f7;padding:5px 14px;border-radius:999px;}
+
+  /* 输入区 */
+  .chat-foot{border-top:1px solid var(--line);padding:12px 16px 14px;background:#fff;border-radius:0 0 18px 18px;}
+  .quick{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+  .quick button{
+    border:1px solid var(--line);background:#fafbfe;border-radius:999px;padding:6px 14px;
+    font-size:12.5px;color:var(--ink-2);transition:.2s;font-weight:600;
+  }
+  .quick button:hover{border-color:var(--brand);color:var(--brand);background:var(--ai-bg);}
+  .quick button:disabled{opacity:.4;cursor:not-allowed;}
+  .input-row{display:flex;gap:10px;align-items:flex-end;}
+  .input-wrap{
+    flex:1;border:1.5px solid var(--line);border-radius:13px;padding:9px 13px;background:#fafbfe;
+    transition:.2s;display:flex;align-items:flex-end;gap:8px;
+  }
+  .input-wrap:focus-within{border-color:var(--brand);background:#fff;box-shadow:0 0 0 3px rgba(79,70,229,.08);}
+  #input{
+    flex:1;border:none;outline:none;background:transparent;resize:none;font-family:inherit;
+    font-size:14px;line-height:1.55;max-height:110px;color:var(--ink);
+  }
+  .mic-btn{border:none;background:transparent;font-size:17px;cursor:pointer;padding:2px 4px;border-radius:7px;flex:none;display:none;}
+  .mic-btn.rec{background:var(--risk-bg);animation:pillPulse 1.2s infinite;}
+  .send-btn{
+    border:none;border-radius:12px;width:46px;height:46px;flex:none;display:grid;place-items:center;
+    background:var(--brand-grad);color:#fff;box-shadow:0 4px 14px rgba(79,70,229,.3);transition:.2s;
+  }
+  .send-btn:hover:not(:disabled){transform:translateY(-1px);}
+  .send-btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none;}
+  .send-btn svg{width:19px;height:19px;}
+
+  /* ============ 报告弹窗 ============ */
+  .overlay{
+    position:fixed;inset:0;background:rgba(15,18,34,.55);backdrop-filter:blur(4px);z-index:100;
+    display:none;align-items:center;justify-content:center;padding:20px;
+  }
+  .overlay.show{display:flex;animation:fadeIn .25s;}
+  @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+  .report-modal{
+    background:#fff;border-radius:22px;max-width:520px;width:100%;max-height:88vh;overflow-y:auto;
+    padding:28px;box-shadow:var(--shadow-lg);position:relative;animation:fadeUp .35s ease;
+  }
+  .rm-close{position:absolute;top:16px;right:16px;border:none;background:#f4f5fa;width:34px;height:34px;border-radius:10px;font-size:15px;color:var(--ink-3);}
+  .rm-close:hover{background:#e9ecf5;color:var(--ink);}
+  .rm-title{font-size:19px;font-weight:800;}
+  .rm-sub{font-size:12.5px;color:var(--ink-3);margin-top:2px;margin-bottom:20px;}
+  .rm-ring{display:flex;align-items:center;gap:16px;padding:16px 18px;border-radius:14px;background:#fafbfe;border:1px solid var(--line);margin-bottom:14px;}
+  .rm-ring svg{width:84px;height:84px;flex:none;}
+  .ring-bg{fill:none;stroke:#e9ecf5;stroke-width:9;}
+  .ring-fg{fill:none;stroke:url(#rg);stroke-width:9;stroke-linecap:round;transform:rotate(-90deg);transform-origin:center;}
+  .rm-ring h5{font-size:13.5px;color:var(--ink-2);font-weight:600;}
+  .rm-ring .big{font-size:23px;font-weight:800;color:var(--brand);}
+  .rm-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 15px;border-radius:11px;background:#fafbfe;border:1px solid var(--line);font-size:13.5px;margin-bottom:9px;}
+  .rm-row .k{color:var(--ink-2);flex:none;}
+  .rm-row .v{font-weight:700;text-align:right;}
+  .rm-tags{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+  .rm-tag{font-size:12px;padding:3px 10px;border-radius:7px;font-weight:600;}
+  .rm-rec{margin-top:16px;}
+  .rm-rec h6{font-size:12.5px;color:var(--ink-3);font-weight:600;margin-bottom:10px;letter-spacing:1px;}
+  .rm-recs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .rm-recs .it{border:1px solid var(--line);border-radius:12px;padding:13px 10px;text-align:center;transition:.2s;cursor:pointer;}
+  .rm-recs .it:hover{border-color:var(--brand);transform:translateY(-2px);box-shadow:var(--shadow);}
+  .rm-recs .n{font-size:19px;font-weight:800;color:var(--brand);}
+  .rm-recs .t{font-size:12px;color:var(--ink-2);}
+
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);z-index:200;
+    background:#1c2130;color:#fff;font-size:13.5px;padding:11px 22px;border-radius:12px;
+    box-shadow:var(--shadow-lg);opacity:0;transition:.35s;pointer-events:none;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  @media (max-width:1080px){
+    .app{grid-template-columns:1fr;}
+    .chat{position:static;height:auto;min-height:0;}
+    .chat-log{height:46vh;}
+  }
+  @media (max-width:640px){
+    .logo small,.nav-link{display:none;}
+    .seg button{padding:7px 10px;font-size:12.5px;}
+    .msg{max-width:96%;}
+    .rm-recs{grid-template-columns:1fr;}
+  }
+
+  /* ============ 流程说明全屏视图（内嵌） ============ */
+  #flowOverlay{padding:0;}
+  #flowFrame{width:min(1180px,96vw);height:94vh;border:none;border-radius:16px;background:#fff;box-shadow:var(--shadow-lg);}
+  .flow-close{
+    position:fixed;top:12px;right:18px;z-index:101;border:none;border-radius:10px;
+    padding:9px 16px;font-size:13px;font-weight:700;color:#fff;background:var(--brand-grad);
+    box-shadow:0 6px 18px rgba(0,0,0,.35);
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ 顶栏 ============ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <span class="logo"><span class="logo-mark">码</span>码隆 AI 学伴<small>拍照解题训练</small></span>
+    <div class="seg" id="seg">
+      <button data-m="autonomous">🧍 自主训练</button>
+      <button data-m="companion" class="on">🤖 AI 陪伴</button>
+    </div>
+    <div class="nav-right">
+      <a class="nav-link" href="javascript:void(0)" id="flowLink">产品流程说明</a>
+      <button class="btn-report" id="btnReport" disabled>生成学习报告</button>
+    </div>
+  </div>
+</nav>
+
+<!-- 六阶段进度 -->
+<div class="stages-bar" id="stagesBar"></div>
+
+<!-- ============ 主体 ============ -->
+<main class="app">
+  <!-- 左列 -->
+  <div class="col-left">
+    <!-- 上传卡 -->
+    <div class="card" id="uploadCard">
+      <div class="card-h">📷 题目上传<span class="tag">阶段 ① 题目理解</span></div>
+      <div class="card-b">
+        <div class="drop" id="drop">
+          <div class="di">🖼️</div>
+          <h4>拖拽 / 点击上传题目照片</h4>
+          <p>支持 jpg / png · 拍照或截图均可</p>
+        </div>
+        <input type="file" id="file" accept="image/*" hidden>
+        <div class="preview" id="preview"></div>
+        <div class="btn-row" id="uploadBtns" style="display:none;">
+          <button class="btn btn-primary" id="btnAnalyze">⚡ 开始 AI 分析</button>
+          <button class="btn btn-ghost" id="btnSample">示例题目</button>
+        </div>
+        <div class="btn-row" id="resetRow" style="display:none;">
+          <button class="btn btn-ghost" id="btnReset">⟲ 重新上传 / 重置训练</button>
+        </div>
+        <div style="margin-top:14px;border-top:1px dashed var(--line);padding-top:12px;">
+          <div style="font-size:12.5px;color:var(--ink-3);margin-bottom:6px;">或直接粘贴题目文字（DeepSeek 只能读文字、不能看图）</div>
+          <textarea id="probInput" rows="2" placeholder="把题目文字粘贴到这里…" style="width:100%;resize:vertical;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font-family:inherit;font-size:13.5px;background:#fafbfe;outline:none;"></textarea>
+          <div class="btn-row" style="margin-top:8px;">
+            <button class="btn btn-primary" id="btnTextAnalyze">⚡ 分析该题目并开聊</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 分析结果卡 -->
+    <div class="card" id="resultCard">
+      <div class="card-h">🧠 AI 识别结果<span class="tag" id="resTag">分析中…</span></div>
+      <div class="card-b">
+        <ul class="ana-steps" id="anaSteps"></ul>
+        <div id="probInfo" style="display:none;">
+          <div class="prob-title">识别题干</div>
+          <div class="prob-text" id="probText"></div>
+          <div class="cond-list" id="condList"></div>
+          <div class="demo-note">💡 演示环境：当前为内置示例题脚本，真实部署时此模块由 OCR + 题库 / 大模型接口返回。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 路径图谱卡 -->
+    <div class="card" id="graphCard">
+      <div class="card-h">🗺️ 解题路径图谱<span class="tag">多解支持 · 实时比对基准</span></div>
+      <div class="graph-wrap"><svg class="graph-svg" id="graphSvg" viewBox="0 0 360 336"></svg></div>
+      <div class="graph-legend">
+        <span><i style="background:#059669"></i>已走对</span>
+        <span><i style="background:#4f46e5"></i>当前节点</span>
+        <span><i style="background:#dc2626"></i>疑似卡点</span>
+        <span><i style="background:#c9cfdf"></i>未到达</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右列：对话 -->
+  <div class="card chat">
+    <div class="chat-head">
+      <span class="ai-avatar">AI</span>
+      <div>
+        <div class="t" id="chatTitle">AI 学伴</div>
+        <div class="s" id="chatStatus">等待上传题目…</div>
+      </div>
+      <span class="live"><i></i><span id="liveTxt">静默待命</span></span>
+    </div>
+    <div class="chat-log" id="log"></div>
+    <div class="chat-foot">
+      <div class="quick">
+        <button id="qHelp">🆘 我卡住了 / 求助</button>
+        <button id="qHint">💡 查看提示</button>
+        <button id="qAlt">🔄 换一种方法</button>
+        <button id="qDone" disabled>✅ 完成作答</button>
+      </div>
+      <div class="input-row">
+        <div class="input-wrap">
+          <textarea id="input" rows="1" placeholder="说出你的解题想法，或输入步骤…（Enter 发送）"></textarea>
+          <button class="mic-btn" id="mic" title="语音输入">🎙️</button>
+        </div>
+        <button class="send-btn" id="send" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ============ 学习报告弹窗 ============ -->
+<div class="overlay" id="overlay">
+  <div class="report-modal">
+    <button class="rm-close" id="rmClose">✕</button>
+    <div class="rm-title">📋 本题学习报告</div>
+    <div class="rm-sub" id="rmSub">牛顿第二定律 · 斜面滑块问题</div>
+    <div class="rm-ring">
+      <svg viewBox="0 0 100 100">
+        <defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f46e5"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs>
+        <circle class="ring-bg" cx="50" cy="50" r="41"/>
+        <circle class="ring-fg" id="ringFg" cx="50" cy="50" r="41" stroke-dasharray="0 258"/>
+      </svg>
+      <div>
+        <h5>独立完成度</h5>
+        <div class="big" id="rmScore">--</div>
+        <div style="font-size:12px;color:var(--ink-3);" id="rmMeta"></div>
+      </div>
+    </div>
+    <div class="rm-row"><span class="k">主要卡点</span><span class="rm-tags" id="rmStuck"></span></div>
+    <div class="rm-row"><span class="k">引导轮次</span><span class="v" id="rmGuide">--</span></div>
+    <div class="rm-row"><span class="k">采用的路径</span><span class="v" id="rmPath">--</span></div>
+    <div class="rm-row"><span class="k">深层问题</span><span class="rm-tags"><span class="rm-tag" style="background:var(--warn-bg);color:var(--warn);" id="rmDeep">--</span></span></div>
+    <div class="rm-rec">
+      <h6>个性化推荐</h6>
+      <div class="rm-recs">
+        <div class="it"><div class="n">×2</div><div class="t">举一反三</div></div>
+        <div class="it"><div class="n">×3</div><div class="t">变式训练</div></div>
+        <div class="it"><div class="n">×1</div><div class="t">迁移应用</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="flowOverlay">
+  <button class="flow-close" id="flowClose">✕ 关闭流程说明</button>
+  <iframe id="flowFrame" title="产品流程说明"></iframe>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================
+ * 演示版 AI 引擎：以一道内置示例题驱动完整产品流程。
+ * 真实部署时，analyze() 与 botReply() 可替换为
+ * OCR/题库/大模型接口，前端结构无需改动。
+ * ===================================================== */
+
+/* ---------- 示例题数据 ---------- */
+const PROBLEM = {
+  title: "物理 · 牛顿第二定律（斜面模型）",
+  text: "质量 m = 2 kg 的滑块，从倾角 θ = 37° 的斜面顶端由静止释放，沿斜面下滑。斜面长 L = 5 m，滑块与斜面间动摩擦因数 μ = 0.25（sin37° = 0.6, cos37° = 0.8, g = 10 m/s²）。求滑块滑到斜面底端时的速度大小。",
+  conds: [
+    {t:"m = 2 kg",c:""},{t:"θ = 37°",c:""},{t:"L = 5 m",c:""},
+    {t:"μ = 0.25",c:""},{t:"由静止释放",c:""},{t:"求底端速度 v",c:"goal"},
+    {t:"知识点：受力分析 · 正交分解",c:"know"},{t:"牛顿运动定律 / 动能定理",c:"know"}
+  ]
+};
+const PATHS = {
+  A:{label:"路径A · 牛顿第二定律",steps:["受力分析","正交分解","求 a = 4 m/s²","运动学求 v"]},
+  B:{label:"路径B · 动能定理",steps:["确定初末态","合外力做功","动能定理列式","求出 v"]}
+};
+const STAGES = ["① 题目理解","② 思路诊断","③ 实时观测","④ 卡点引导","⑤ 深度追问","⑥ 总结报告"];
+
+/* ---------- AI 接入配置 ---------- */
+/* 默认走 Pollinations（免密钥、开箱即用）；填入 DeepSeek Key 后自动切换为 DeepSeek（更稳定） */
+const DS_KEY = "";   // ← 可选：填入 DeepSeek API Key（sk- 开头）即切换，留空用免费引擎
+const DS_URL = "https://api.deepseek.com/chat/completions";
+const FREE_URL = "https://text.pollinations.ai/openai";   // 免密钥公益接口
+const AI_ON  = true;                                        // 始终有真 AI 可用
+const AI_NAME = DS_KEY.startsWith("sk-") ? "DeepSeek" : "AI（免费引擎）";
+let   PROBLEM_TEXT = PROBLEM.text;   // 当前题目文本（支持手动粘贴替换）
+const chatHistory = [];              // 对话上下文 {role, content}
+
+function sysPrompt(){
+  const modeDesc = S.mode==="companion"
+    ? "当前为「AI 陪伴」模式：实时观测学生作答，在关键决策点给出反馈，但不要每一步都打断。"
+    : "当前为「自主训练」模式：保持静默观测，只在学生主动求助或出现明显卡点时介入，回复更简短克制。";
+  return "你是一名 AI 解题学伴，正在辅导学生解这道题：\n【题目】"+PROBLEM_TEXT+"\n\n辅导原则：\n"
+    +"1. 不直接给完整答案，采用分层引导：先追问条件与前提，再给方向提示，最后才降级示范一步。\n"
+    +"2. 学生说出解题思路时，先判断可行性（可行/部分可行/不可行）并简述理由。\n"
+    +"3. 学生展示步骤时，指出哪里走对了、哪里分叉或卡住。\n"
+    +"4. 始终把关键一步留给学生自己完成。\n"
+    +modeDesc+"\n回复用简体中文、口语化、150 字以内，可用少量 emoji；公式一律用纯文本写法（如 v = gt），不要用 LaTeX 语法。";
+}
+
+async function askAI(userText){
+  chatHistory.push({role:"user", content:userText});
+  const useDS = DS_KEY.startsWith("sk-");
+  const resp = await fetch(useDS ? DS_URL : FREE_URL, {
+    method:"POST",
+    headers: Object.assign({"Content-Type":"application/json"}, useDS ? {"Authorization":"Bearer "+DS_KEY} : {}),
+    body: JSON.stringify({
+      model: useDS ? "deepseek-chat" : "openai",
+      messages:[{role:"system",content:sysPrompt()}, ...chatHistory],
+      temperature:0.7
+    })
+  });
+  if(!resp.ok) throw new Error((useDS?"DeepSeek":"免费引擎")+" 接口返回 "+resp.status);
+  const data = await resp.json();
+  const text = data.choices[0].message.content.trim();
+  chatHistory.push({role:"assistant", content:text});
+  return text;
+}
+
+/* ---------- 全局状态 ---------- */
+const S = {
+  mode:"companion",        // autonomous | companion
+  stage:1,                 // 1~6
+  path:null, step:0,       // 当前路径与步骤
+  guide:0,                 // 引导轮次（L1/L2/L3 总轮数）
+  hints:{l1:0,l2:0,l3:0},
+  wrong:0,                 // 可行性误判次数
+  stuck:[],                // 卡点清单
+  solved:false, ideaOK:false, busy:false,
+  demoScript:false           // true = 内置示例题走写死脚本（图谱/引导动画最完整）
+};
+
+/* ---------- DOM 快捷 ---------- */
+const $ = id => document.getElementById(id);
+const log = $("log"), input = $("input"), send = $("send");
+
+/* ---------- 工具 ---------- */
+function toast(t){ const el=$("toast"); el.textContent=t; el.classList.add("show"); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove("show"),2200); }
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function scrollLog(){ log.scrollTop = log.scrollHeight; }
+
+/* ---------- 模式切换 ---------- */
+function setMode(m){
+  S.mode = m;
+  document.querySelectorAll("#seg button").forEach(b=>b.classList.toggle("on", b.dataset.m===m));
+  $("liveTxt").textContent = m==="companion" ? "实时观测中" : "静默观测中";
+  if(S.stage>=2) toast(m==="companion" ? "已切换：AI 陪伴 · 关键决策点主动反馈" : "已切换：自主训练 · 仅求助/高置信卡点时介入");
+}
+document.querySelectorAll("#seg button").forEach(b=>b.addEventListener("click",()=>setMode(b.dataset.m)));
+
+/* ---------- 六阶段进度条 ---------- */
+function renderPills(){
+  $("stagesBar").innerHTML = STAGES.map((s,i)=>{
+    const n=i+1, cls = n<S.stage?"done":n===S.stage?"active":"";
+    return '<span class="pill '+cls+'"><span class="pn">'+(n<S.stage?"✓":n)+'</span>'+s+'</span>';
+  }).join("");
+}
+
+/* ---------- 对话渲染 ---------- */
+function addMsg(role, html, badge){
+  const div=document.createElement("div");
+  div.className="msg "+role;
+  const av = role==="ai" ? "AI" : "我";
+  const badgeHtml = badge ? '<span class="msg-badge '+badge.cls+'">'+badge.t+'</span>' : "";
+  div.innerHTML = '<span class="mav">'+av+'</span><div class="bub">'+badgeHtml+html+'</div>';
+  log.appendChild(div); scrollLog();
+}
+function addSys(t){ const d=document.createElement("div"); d.className="sys-hint"; d.textContent=t; log.appendChild(d); scrollLog(); }
+function botSay(html,badge,delay){
+  S.busy=true;
+  const tp=document.createElement("div");
+  tp.className="msg ai"; tp.id="tp";
+  tp.innerHTML='<span class="mav">AI</span><div class="bub"><span class="typing"><i></i><i></i><i></i></span></div>';
+  log.appendChild(tp); scrollLog();
+  return new Promise(r=>setTimeout(()=>{
+    tp.remove(); addMsg("ai",html,badge); S.busy=false; r();
+  }, delay||700));
+}
+
+/* ---------- 路径图谱 ---------- */
+function renderGraph(stuckNode){
+  const svg=$("graphSvg"); let h="";
+  const xA=100,xB=260,y0=96,dy=54,rx=180;
+  // 根节点
+  h+='<circle class="g-node root" cx="'+rx+'" cy="34" r="21"/><text class="g-text" x="'+rx+'" y="38" text-anchor="middle">题目</text>';
+  const nodeState=(path,i)=>{
+    if(S.path!==path) return "dim";
+    if(i<S.step) return "done";
+    if(i===S.step) return stuckNode?"stuck":"active";
+    return "dim";
+  };
+  const P=(px,label,steps)=>{
+    // 边 根→第一步
+    const st0=nodeState(px,0);
+    h+='<path class="g-edge '+(st0==="dim"?"":st0)+'" d="M'+(rx-14)+' 48 L'+(px+8)+' '+(y0-16)+'"/>';
+    steps.forEach((s,i)=>{
+      const y=y0+i*dy, st=nodeState(px,i);
+      const cls = px===S.path && i===S.step && stuckNode ? "stuck" : st;
+      h+='<circle class="g-node '+cls+'" cx="'+px+'" cy="'+y+'" r="20"/>';
+      h+='<text class="g-text '+cls+'" x="'+px+'" y="'+(y+4)+'" text-anchor="middle">'+s.slice(0,4)+'</text>';
+      if(i<steps.length-1){
+        const ns=nodeState(px,i+1);
+        h+='<path class="g-edge '+(ns==="dim"?"":ns)+'" d="M'+px+' '+(y+20)+' L'+px+' '+(y+dy-20)+'"/>';
+      }
+    });
+    const yEnd=y0+(steps.length-1)*dy;
+    h+='<text class="g-pathlabel" x="'+px+'" y="'+(y0-34)+'" text-anchor="middle" fill="'+(S.path===px?"#4f46e5":"#8a92a6")+'">'+label+'</text>';
+    // 边 末步→答案
+    const stE=nodeState(px,steps.length-1);
+    h+='<path class="g-edge '+(stE==="dim"?"":stE)+'" d="M'+(px+14)+' '+(yEnd+14)+' L'+(rx+12)+' 312"/>';
+  };
+  P(xA,"路径A · 牛顿第二定律",PATHS.A.steps);
+  P(xB,"路径B · 动能定理",PATHS.B.steps);
+  h+='<circle class="g-node '+(S.solved?"done":"dim")+'" cx="'+rx+'" cy="316" r="18"/><text class="g-text '+(S.solved?"done":"dim")+'" x="'+rx+'" y="320" text-anchor="middle">答案</text>';
+  svg.innerHTML=h;
+}
+
+/* ---------- 上传与分析 ---------- */
+const drop=$("drop"), file=$("file"), preview=$("preview");
+drop.addEventListener("click",()=>file.click());
+["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");}));
+drop.addEventListener("drop",e=>{ if(e.dataTransfer.files[0]) loadImage(e.dataTransfer.files[0]); });
+file.addEventListener("change",()=>{ if(file.files[0]) loadImage(file.files[0]); });
+
+function loadImage(f){
+  if(!f.type.startsWith("image/")){ toast("请上传图片文件"); return; }
+  const rd=new FileReader();
+  rd.onload=()=>{
+    preview.innerHTML='<img src="'+rd.result+'" alt="题目照片">';
+    preview.classList.add("show");
+    $("uploadBtns").style.display="flex";
+  };
+  rd.readAsDataURL(f);
+}
+
+/* 生成示例题"照片"（canvas 绘制） */
+$("btnSample").addEventListener("click",()=>{
+  const cv=document.createElement("canvas"); cv.width=800; cv.height=430;
+  const c=cv.getContext("2d");
+  c.fillStyle="#fdfdf8"; c.fillRect(0,0,800,430);
+  c.fillStyle="#1c2130"; c.font="bold 26px sans-serif";
+  c.fillText("【例题】斜面上的滑块",60,70);
+  c.font="22px sans-serif";
+  const lines=[
+    "质量 m = 2 kg 的滑块，从倾角 θ = 37° 的斜面顶端",
+    "由静止释放，沿斜面下滑。斜面长 L = 5 m，动摩擦",
+    "因数 μ = 0.25（sin37° = 0.6, cos37° = 0.8,",
+    "g = 10 m/s²）。",
+    "求：滑块滑到斜面底端时的速度大小。"
+  ];
+  lines.forEach((t,i)=>c.fillText(t,60,130+i*44));
+  c.strokeStyle="#1c2130"; c.lineWidth=2.5;
+  c.beginPath(); c.moveTo(560,300); c.lineTo(720,390); c.lineTo(560,390); c.closePath(); c.stroke();
+  c.font="18px sans-serif"; c.fillText("37°",585,385); c.fillText("m",650,355);
+  preview.innerHTML='<img src="'+cv.toDataURL("image/png")+'" alt="示例题目">';
+  preview.classList.add("show");
+  $("uploadBtns").style.display="flex";
+  toast("已载入示例题目照片");
+});
+
+/* 分析流程（模拟 OCR + 路径生成） */
+$("btnAnalyze").addEventListener("click",async ()=>{
+  $("btnAnalyze").disabled=true;
+  S.demoScript = !DS_KEY.startsWith("sk-");   // 无 Key 时示例题走完整演示脚本；有 Key 走真 AI
+  $("resultCard").classList.add("show");
+  $("resultCard").scrollIntoView({behavior:"smooth",block:"nearest"});
+  const steps=["识别题干与图形","提取已知条件与求解目标","匹配题库 · 结合参考答案","生成解题路径图谱（多解）"];
+  const ul=$("anaSteps"); ul.innerHTML="";
+  for(const s of steps){
+    const li=document.createElement("li");
+    li.innerHTML='<span class="sp"></span>'+s;
+    ul.appendChild(li);
+    await new Promise(r=>setTimeout(r,650));
+    li.classList.add("ok"); li.innerHTML="✓ "+s;
+  }
+  // 展示结果
+  $("resTag").textContent="识别完成";
+  $("probText").textContent=PROBLEM.text;
+  $("condList").innerHTML=PROBLEM.conds.map(c=>'<span class="cond '+c.c+'">'+c.t+'</span>').join("");
+  $("probInfo").style.display="block";
+  $("graphCard").classList.add("show");
+  renderGraph();
+  // 状态推进
+  S.stage=2; renderPills();
+  $("uploadBtns").style.display="none";
+  $("resetRow").style.display="flex";
+  $("chatStatus").textContent="题目已就绪 · 等待你说出思路";
+  send.disabled=false;
+  // AI 开场（按模式差异化）
+  if(S.mode==="companion"){
+    await botSay('我已经看完题目啦：<b>斜面滑块 + 摩擦力</b>模型。图谱里生成了 <b>2 条候选路径</b>（牛顿第二定律 / 动能定理）。<br><br>先用语音或文字，<b>说说你的原始想法</b>——不用严谨，想到什么说什么 👌');
+  }else{
+    await botSay('题目已就绪，图谱已生成。请开始你的解答，<b>需要时随时求助</b>，我会保持静默观测。');
+  }
+});
+
+$("btnReset").addEventListener("click",()=>location.reload());
+
+/* 手动粘贴题目文字：DeepSeek 无法看图时的真实题目入口 */
+$("btnTextAnalyze").addEventListener("click",async ()=>{
+  const t=$("probInput").value.trim();
+  if(t.length<10){ toast("请粘贴完整题目文字（至少 10 个字）"); return; }
+  PROBLEM_TEXT=t;
+  S.demoScript = false;   // 粘贴的题目走真实 AI
+  $("resultCard").classList.add("show");
+  $("resultCard").scrollIntoView({behavior:"smooth",block:"nearest"});
+  const ul=$("anaSteps"); ul.innerHTML="";
+  for(const s of ["读取题目文字","提取已知条件与求解目标","构建解题上下文"]){
+    const li=document.createElement("li"); li.innerHTML='<span class="sp"></span>'+s; ul.appendChild(li);
+    await new Promise(r=>setTimeout(r,500));
+    li.classList.add("ok"); li.innerHTML="✓ "+s;
+  }
+  $("resTag").textContent="已就绪（"+AI_NAME+"）";
+  $("probText").textContent=t;
+  $("condList").innerHTML="";
+  document.querySelector(".demo-note").style.display="none";
+  $("probInfo").style.display="block";
+  // 状态推进
+  S.stage=2; renderPills();
+  $("resetRow").style.display="flex";
+  $("chatStatus").textContent="题目已就绪 · 等待你说出思路";
+  send.disabled=false;
+  await botSay("题目我已经读完了 ✅ <br><br>先别急着算——用语音或文字<b>说说你的原始思路</b>，我来帮你判断可行性。", {cls:"mb-guide",t:AI_NAME+" 已接入"});
+});
+
+/* ---------- 可行性判断 ---------- */
+function judgeIdea(t){
+  if(/摩擦力.*(正功|向下)|支持力.*做功/.test(t))
+    return {type:"no", badge:{cls:"mb-judge-no",t:"思路可行性：不可行"}};
+  if(/牛顿|F\s*=?\s*ma|\bma\b|受力/.test(t))
+    return {type:"ok", path:"A", badge:{cls:"mb-judge-ok",t:"思路可行性：可行"}};
+  if(/动能定理|能量|做功|守恒/.test(t))
+    return {type:"ok", path:"B", badge:{cls:"mb-judge-ok",t:"思路可行性：可行"}};
+  return {type:"part", badge:{cls:"mb-judge-part",t:"思路可行性：部分可行"}};
+}
+
+/* ---------- 步骤识别（阶段③④） ---------- */
+function classifyStep(t){
+  if(/摩擦力.*(正功|向下)/.test(t)) return {badge:{cls:"mb-stuck",t:"⚠ 疑似卡点"},stuck:"摩擦力方向判断"};
+  if(S.path==="A" && /a\s*=\s*4|4\s*m\/s|加速度.*4/.test(t)) return {badge:{cls:"mb-ok",t:"✓ 走对"},advance:true};
+  if(/6\.3|6\.32|√40|根号40|2√10|2\s*√\s*10/.test(t)) return {badge:{cls:"mb-ok",t:"✓ 走对"},solved:true};
+  if(S.path==="B" && /(合外力|总功).*功|W\s*=/i.test(t)) return {badge:{cls:"mb-ok",t:"✓ 走对"},advance:true};
+  if(/动能定理/.test(t)) return {badge:{cls:"mb-multi",t:"≠ 多解路径"},path:"B"};
+  if(/受力|摩擦|支持力|重力/.test(t)) return {badge:{cls:"mb-ok",t:"✓ 走对"},advance:true};
+  if(/分解|正交|分量/.test(t)) return {badge:{cls:"mb-ok",t:"✓ 走对"},advance:true};
+  if(/卡|不会|不懂|不知道|帮|求助|不明白/.test(t)) return {badge:{cls:"mb-stuck",t:"⚠ 疑似卡点"},help:true};
+  if(/换|另一种|别的|其他/.test(t)) return {badge:{cls:"mb-fork",t:"⑂ 分叉"},alt:true};
+  if(t.length>=8) return {badge:{cls:"mb-ok",t:"✓ 走对"}};
+  return {};
+}
+
+/* ---------- 三层递进引导 ---------- */
+const GUIDE = [
+  {lv:"L1 · 条件追问", cls:"mb-guide",
+   txt:"先别急着算，我们<b>检查一下前提</b>：摩擦力的方向由什么决定？滑块相对斜面往哪个方向滑动，摩擦力就朝哪边——那么它做正功还是负功？"},
+  {lv:"L2 · 方向提示", cls:"mb-guide",
+   txt:"给你一个方向：沿斜面建立 x 轴做<b>正交分解</b>——重力分解为沿斜面向下的 <b>mgsinθ</b> 和垂直斜面的 <b>mgcosθ</b>；滑动摩擦力 <b>f = μmgcosθ</b>，方向沿斜面向上。现在试着列出牛顿第二定律方程？"},
+  {lv:"L3 · 降级示范", cls:"mb-guide",
+   txt:"我示范一步，你接着做：沿斜面方向 <b>mgsinθ − μmgcosθ = ma</b>，代入数据：10×0.6 − 0.25×10×0.8 = <b>4 m/s²</b>。<br><br>接下来请你用 <b>v² = 2aL</b> 算出底端速度 👇"}
+];
+async function guidance(){
+  const lv=Math.min(S.guide,2);
+  const g=GUIDE[lv];
+  S.guide++; S.hints["l"+(lv+1)]++;
+  if(S.stage<4){ S.stage=4; renderPills(); $("chatStatus").textContent="分层引导中 · "+g.lv; }
+  if(!S.stuck.includes("摩擦力方向与正交分解")) S.stuck.push("摩擦力方向与正交分解");
+  renderGraph(true);
+  await botSay("("+g.lv+") "+g.txt, {cls:g.cls,t:"第 "+S.guide+" 轮引导"});
+  if(lv===2){ S.stage=5; renderPills(); $("chatStatus").textContent="深度追问 · 理解验证"; }
+}
+
+/* ---------- 主对话逻辑 ---------- */
+async function handleUser(t){
+  const raw=t.trim(); if(!raw||S.busy) return;
+  if(S.stage===1){ toast("请先上传题目照片并完成 AI 分析"); return; }
+
+  const j=judgeIdea(raw);
+  const c=classifyStep(raw);
+
+  // 学生消息渲染（附加状态标记）
+  const userBadge = S.stage>=3 ? (c.badge||null) : null;
+  addMsg("user", esc(raw), userBadge);
+  input.value=""; input.style.height="auto";
+
+  /* --- 真实 AI 辅导（粘贴的题目，或填了 DeepSeek Key 的示例题） --- */
+  if(AI_ON && !S.demoScript){ await handleUserAI(raw); return; }
+
+  /* --- 阶段②：思路预诊断 --- */
+  if(S.stage===2 && !S.ideaOK){
+    if(j.type==="no"){
+      S.wrong++; if(!S.stuck.includes("摩擦力方向判断")) S.stuck.push("摩擦力方向判断");
+      await botSay("先停一下 ⚠️ —— 滑块相对斜面<b>向下</b>滑动，摩擦力方向与相对滑动方向相反，应该<b>沿斜面向上</b>，所以它做的是<b>负功</b>。带着这个结论，再说说你的思路？", j.badge);
+      return;
+    }
+    if(j.type==="part"){
+      await botSay("想法有合理的部分，但还缺两块：① <b>滑动摩擦力</b>的大小和方向怎么定？② 斜面上的力怎么处理？<br>试着用一句话说清：<b>已知什么 → 求什么 → 打算用什么规律</b>？", j.badge);
+      return;
+    }
+    S.ideaOK=true; S.path=j.path; S.step=1;
+    S.stage=3; renderPills(); renderGraph();
+    $("chatStatus").textContent="实时观测中 · 与路径图谱比对";
+    $("qDone").disabled=false;
+    if(S.path==="A"){
+      await botSay("方向很清晰 👍 走<b>路径A</b>：受力分析 → 正交分解 → 牛顿第二定律求 a → 运动学求 v。<br><br>现在开始在草稿上作答吧，我会把你的步骤和图谱逐一比对。"+(S.mode==="companion"?"在关键决策点我会提醒你，不会每步都打扰。":""), j.badge);
+    }else{
+      await botSay("不错的选择 👍 走<b>路径B</b>：确定初末态 → 求合外力做功 → 动能定理列式求 v。这条路径跳过中间过程，很优雅。<br><br>开始作答吧，我会实时比对图谱。", j.badge);
+    }
+    return;
+  }
+
+  /* --- 求助 / 引导 --- */
+  if(c.help || /提示|指引/.test(raw)){
+    await guidance(); return;
+  }
+
+  /* --- 误判摩擦力方向 --- */
+  if(j.type==="no"){
+    S.wrong++; if(!S.stuck.includes("摩擦力方向判断")) S.stuck.push("摩擦力方向判断");
+    renderGraph(true);
+    await botSay("这里有个概念要修正 ⚠️：摩擦力方向与<b>相对滑动方向</b>相反，滑块往下滑，摩擦力<b>沿斜面向上</b>，做<b>负功</b>。修正后继续？", {cls:"mb-stuck",t:"⚠ 疑似卡点"});
+    return;
+  }
+
+  /* --- 解出加速度（路径A） --- */
+  if(c.advance){
+    if(S.step<3){ S.step=Math.min(S.step+1,3); renderGraph(); }
+    if(S.mode==="companion"){
+      await botSay("对！这一步和图谱完全吻合。继续推进下一步——别忘了把<b>所有步骤写清楚</b>，我会持续比对。", c.badge, 550);
+    }else{
+      await botSay("（静默观测中 · 已记录，与图谱一致）", {cls:"mb-sys",t:"静默记录"}, 400);
+    }
+    return;
+  }
+
+  /* --- 换一种方法 --- */
+  if(c.alt || /换.*方法|另一种/.test(raw)){
+    if(S.path==="A"){
+      S.path="B"; S.step=2; renderGraph();
+      await botSay("可以试试<b>路径B · 动能定理</b>（多解路径）：合外力做的功 = 动能变化量，即 <b>(mgsinθ − μmgcosθ)·L = ½mv²</b>，一步到位，不需要先求 a 和时间。", {cls:"mb-multi",t:"≠ 多解路径"});
+    }else{
+      S.path="A"; S.step=2; renderGraph();
+      await botSay("也可以回到<b>路径A · 牛顿第二定律</b>：先求 a = 4 m/s²，再用 v² = 2aL 求速度，过程更基础扎实。", {cls:"mb-multi",t:"≠ 多解路径"});
+    }
+    return;
+  }
+
+  /* --- 解出最终答案 --- */
+  if(c.solved || /v\s*=\s*6/.test(raw)){
+    S.solved=true; S.step=4; S.stage=6; renderPills(); renderGraph();
+    $("qDone").disabled=false; $("btnReport").disabled=false;
+    $("chatStatus").textContent="已完成 · 可生成学习报告";
+    await botSay("漂亮 🎉 <b>v = √40 ≈ 6.3 m/s</b>，与图谱终点一致，问题解决！<br><br>点击右上角或下方 <b>「完成作答」</b> 生成学习报告，看看你的卡点与推荐练习。", {cls:"mb-ok",t:"✓ 解答完成"});
+    return;
+  }
+
+  /* --- 深度追问关键词（阶段⑤） --- */
+  if(/为什么|什么意思|原理|怎么来|为啥/.test(raw)){
+    if(S.stage<5){ S.stage=5; renderPills(); $("chatStatus").textContent="深度追问 · 理解验证"; }
+    await botSay("好问题，我们验证一下理解：为什么摩擦力是 <b>μmgcosθ</b>？因为正交分解后，斜面对滑块的支持力 <b>N = mgcosθ</b>（垂直斜面方向平衡），而滑动摩擦力 <b>f = μN</b>。<br><br>那再追问一句：如果斜面<b>光滑</b>（μ=0），底端速度会变大还是变小？为什么？", {cls:"mb-guide",t:"深度追问"});
+    return;
+  }
+
+  /* --- 默认回复（按模式差异化） --- */
+  if(S.mode==="companion"){
+    await botSay("已记录你的步骤并和图谱比对 ✍️。如果你想推进，可以说说：<b>沿斜面方向</b>的合力怎么表示？或者随时说「我卡住了」获取分层引导。", {cls:"mb-sys",t:"实时观测"}, 500);
+  }else{
+    await botSay("（静默观测中 · 已记录。遇到卡点随时告诉我。）", {cls:"mb-sys",t:"静默记录"}, 400);
+  }
+}
+
+/* ---------- DeepSeek 真实辅导逻辑（配置 Key 后走这里） ---------- */
+async function handleUserAI(raw){
+  S.busy=true;
+  const tp=document.createElement("div"); tp.className="msg ai"; tp.id="tp";
+  tp.innerHTML='<span class="mav">AI</span><div class="bub"><span class="typing"><i></i><i></i><i></i></span></div>';
+  log.appendChild(tp); scrollLog();
+  try{
+    const reply = await askAI(raw);
+    tp.remove();
+    addMsg("ai", esc(reply).replace(/\n/g,"<br>"), {cls:"mb-guide",t:AI_NAME+" 实时辅导"});
+  }catch(e){
+    tp.remove();
+    addMsg("ai","⚠️ "+AI_NAME+" 调用失败："+esc(e.message)+"。请检查网络，稍后再试（免费引擎偶尔限流）。", {cls:"mb-stuck",t:"接口异常"});
+  }
+  S.busy=false;
+  // 轻量状态推进（供六阶段进度与报告统计；不再依赖写死的题目脚本）
+  if(S.stage===2 && raw.length>=6 && !S.ideaOK){
+    S.ideaOK=true; S.stage=3; renderPills();
+    $("chatStatus").textContent=AI_NAME+" 实时观测中";
+    $("qDone").disabled=false; $("btnReport").disabled=false;
+  }
+  if(/卡|不会|不懂|求助|提示|不明白/.test(raw)){
+    S.guide++; S.hints.l1++;
+    if(S.stage<4){ S.stage=4; renderPills(); }
+  }
+  if(/为什么|为啥|原理|怎么来/.test(raw) && S.stage<5){ S.stage=5; renderPills(); }
+}
+
+/* ---------- 快捷按钮 ---------- */
+$("qHelp").addEventListener("click",async ()=>{
+  if(S.stage<2){ toast("请先上传题目并完成分析"); return; }
+  addMsg("user","我卡住了，需要帮助 🆘",{cls:"mb-stuck",t:"⚠ 求助信号"});
+  if(AI_ON && !S.demoScript){ await handleUserAI("我卡住了，请按分层引导帮我（先不要直接给答案）"); return; }
+  await guidance();
+});
+$("qHint").addEventListener("click",async ()=>{
+  if(S.stage<2){ toast("请先上传题目并完成分析"); return; }
+  addMsg("user","给我一点提示吧 💡",null);
+  if(AI_ON && !S.demoScript){ await handleUserAI("请给我一个方向性提示（不要直接给答案）"); return; }
+  await guidance();
+});
+$("qAlt").addEventListener("click",()=>{
+  if(S.stage<2){ toast("请先上传题目并完成分析"); return; }
+  handleUser("我想换一种方法");
+});
+$("qDone").addEventListener("click",()=>{ if(!$("qDone").disabled) showReport(); });
+$("btnReport").addEventListener("click",showReport);
+
+/* ---------- 输入框 ---------- */
+send.addEventListener("click",()=>handleUser(input.value));
+input.addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); handleUser(input.value); }
+});
+input.addEventListener("input",()=>{
+  input.style.height="auto"; input.style.height=Math.min(input.scrollHeight,110)+"px";
+});
+
+/* ---------- 语音输入（Web Speech API，可用时显示） ---------- */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(SR){
+  const mic=$("mic"); mic.style.display="block";
+  let rec=null, recing=false;
+  mic.addEventListener("click",()=>{
+    if(recing){ rec.stop(); return; }
+    rec=new SR(); rec.lang="zh-CN"; rec.interimResults=false;
+    rec.onresult=e=>{ input.value+=e.results[0][0].transcript; input.dispatchEvent(new Event("input")); };
+    rec.onend=()=>{ recing=false; mic.classList.remove("rec"); };
+    rec.start(); recing=true; mic.classList.add("rec"); toast("正在聆听…再说一遍你的思路");
+  });
+}
+
+/* ---------- 学习报告 ---------- */
+function showReport(){
+  const score=Math.max(40,Math.min(100, 100 - S.hints.l1*8 - S.hints.l2*12 - S.hints.l3*20 - S.wrong*10));
+  $("rmScore").textContent=score+"%";
+  $("ringFg").setAttribute("stroke-dasharray", (2.58*score)+" 258");
+  $("rmMeta").textContent="引导介入 "+S.guide+" 轮 · 观测步骤 "+(S.step+3)+" 步";
+  const st=S.stuck.length?S.stuck:["（无 · 独立完成）"];
+  $("rmStuck").innerHTML=st.map(s=>'<span class="rm-tag" style="background:var(--risk-bg);color:var(--risk);">'+s+'</span>').join("");
+  $("rmGuide").textContent="L1 ×"+S.hints.l1+" · L2 ×"+S.hints.l2+" · L3 ×"+S.hints.l3;
+  $("rmPath").textContent=S.path==="A"?"路径A · 牛顿第二定律":S.path==="B"?"路径B · 动能定理":"--";
+  $("rmDeep").textContent=S.hints.l3>0?"规律适用条件理解不牢，需巩固":S.wrong>0?"摩擦力做功方向存在偏差":"基础扎实，可加快度提升";
+  $("overlay").classList.add("show");
+  S.stage=6; renderPills();
+}
+$("rmClose").addEventListener("click",()=>$("overlay").classList.remove("show"));
+$("overlay").addEventListener("click",e=>{ if(e.target===e.currentTarget) $("overlay").classList.remove("show"); });
+
+
+  /* ============ 产品流程说明（完整页面内嵌，单文件分发，无外部依赖） ============ */
+  const FLOW_HTML = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>码隆 AI 学伴 · 核心产品流程</title>
+<style>
+  /* ============ 基础与变量 ============ */
+  :root{
+    --bg: #f6f7fb;
+    --surface: #ffffff;
+    --ink: #1c2130;
+    --ink-2: #4a5268;
+    --ink-3: #8a92a6;
+    --line: #e6e9f2;
+    --brand: #4f46e5;
+    --brand-2: #7c3aed;
+    --brand-grad: linear-gradient(135deg,#4f46e5,#7c3aed);
+    --student: #2563eb;
+    --student-bg: #eff4ff;
+    --ai: #7c3aed;
+    --ai-bg: #f5f0ff;
+    --ok: #059669;
+    --ok-bg: #ecfdf5;
+    --warn: #d97706;
+    --warn-bg: #fff7e8;
+    --risk: #dc2626;
+    --risk-bg: #fef2f2;
+    --radius: 16px;
+    --shadow: 0 10px 30px rgba(28,33,48,.07);
+    --shadow-lg: 0 24px 60px rgba(28,33,48,.12);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,-apple-system,sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:rgba(79,70,229,.18);}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 24px;}
+  a{text-decoration:none;color:inherit;}
+
+  /* ============ 顶部导航 ============ */
+  .nav{
+    position:sticky;top:0;z-index:100;
+    background:rgba(255,255,255,.82);backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--line);
+  }
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:64px;}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;}
+  .logo-mark{
+    width:32px;height:32px;border-radius:9px;background:var(--brand-grad);
+    display:grid;place-items:center;color:#fff;font-size:15px;font-weight:800;
+    box-shadow:0 4px 12px rgba(79,70,229,.35);
+  }
+  .logo small{font-weight:500;color:var(--ink-3);font-size:12px;margin-left:2px;}
+  .nav-links{display:flex;gap:4px;}
+  .nav-links a{
+    padding:8px 14px;border-radius:10px;font-size:14px;color:var(--ink-2);
+    transition:.2s;
+  }
+  .nav-links a:hover{background:var(--student-bg);color:var(--brand);}
+
+  /* ============ Hero ============ */
+  .hero{
+    background:
+      radial-gradient(1000px 460px at 85% -10%, rgba(124,58,237,.16), transparent 60%),
+      radial-gradient(800px 420px at 10% 0%, rgba(37,99,235,.12), transparent 60%),
+      linear-gradient(180deg,#0f1222 0%,#171b30 100%);
+    color:#fff;overflow:hidden;
+  }
+  .hero-inner{
+    display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center;
+    padding:84px 0 92px;
+  }
+  .hero-tag{
+    display:inline-flex;align-items:center;gap:8px;
+    font-size:13px;letter-spacing:1px;color:#c7bfff;
+    border:1px solid rgba(199,191,255,.3);border-radius:999px;
+    padding:6px 14px;margin-bottom:22px;background:rgba(124,58,237,.12);
+  }
+  .hero-tag .dot{width:7px;height:7px;border-radius:50%;background:#a5b4fc;animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(1.4);}}
+  .hero h1{font-size:44px;line-height:1.25;font-weight:800;letter-spacing:.5px;}
+  .hero h1 .grad{
+    background:linear-gradient(120deg,#a5b4fc,#c4b5fd,#f0abfc);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .hero p.lead{margin-top:18px;font-size:17px;color:#b8bdd1;max-width:560px;}
+  .hero-cta{margin-top:32px;display:flex;gap:14px;flex-wrap:wrap;}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:13px 26px;border-radius:12px;font-size:15px;font-weight:600;
+    transition:.25s;cursor:pointer;border:none;
+  }
+  .btn-primary{background:var(--brand-grad);color:#fff;box-shadow:0 10px 26px rgba(99,60,238,.45);}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 32px rgba(99,60,238,.55);}
+  .btn-ghost{background:rgba(255,255,255,.08);color:#e2e4ef;border:1px solid rgba(255,255,255,.18);}
+  .btn-ghost:hover{background:rgba(255,255,255,.14);}
+
+  /* Hero 右侧：解题路径图谱示意 */
+  .hero-visual{
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);
+    border-radius:20px;padding:22px;backdrop-filter:blur(6px);
+    box-shadow:0 30px 80px rgba(0,0,0,.4);
+  }
+  .hv-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .hv-title{font-size:13px;color:#aeb3c9;letter-spacing:1px;}
+  .hv-legend{display:flex;gap:12px;font-size:11px;color:#8b90a7;}
+  .hv-legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;}
+  .hv-svg{width:100%;height:auto;display:block;}
+  .flow-line{stroke-dasharray:6 6;animation:dashmove 1.6s linear infinite;}
+  @keyframes dashmove{to{stroke-dashoffset:-24;}}
+  .node-pulse{animation:npulse 2.4s ease-in-out infinite;transform-origin:center;transform-box:fill-box;}
+  @keyframes npulse{0%,100%{opacity:.35;transform:scale(1);}50%{opacity:.05;transform:scale(1.9);}}
+  .hv-foot{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+  .hv-chip{
+    font-size:12px;padding:5px 12px;border-radius:999px;
+    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);color:#c9cde0;
+  }
+
+  /* ============ 通用 section 头部 ============ */
+  section{padding:88px 0;}
+  .sec-head{text-align:center;max-width:720px;margin:0 auto 52px;}
+  .sec-kicker{
+    display:inline-block;font-size:13px;font-weight:700;letter-spacing:3px;
+    color:var(--brand);margin-bottom:12px;text-transform:uppercase;
+  }
+  .sec-head h2{font-size:34px;font-weight:800;line-height:1.3;}
+  .sec-head p{margin-top:14px;color:var(--ink-2);font-size:16px;}
+
+  /* ============ 模式选择 ============ */
+  .mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:920px;margin:0 auto;}
+  .mode-card{
+    background:var(--surface);border-radius:20px;padding:34px 32px;cursor:pointer;
+    border:2px solid var(--line);transition:.28s;position:relative;overflow:hidden;
+  }
+  .mode-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);}
+  .mode-card.active{border-color:var(--brand);box-shadow:0 18px 44px rgba(79,70,229,.18);}
+  .mode-card.active::after{
+    content:"✓ 当前模式";position:absolute;top:18px;right:-44px;transform:rotate(45deg);
+    background:var(--brand-grad);color:#fff;font-size:12px;font-weight:700;
+    padding:4px 48px;letter-spacing:2px;
+  }
+  .mode-icon{
+    width:52px;height:52px;border-radius:14px;display:grid;place-items:center;margin-bottom:18px;
+  }
+  .mode-icon svg{width:26px;height:26px;}
+  .mode-card h3{font-size:21px;font-weight:800;margin-bottom:4px;}
+  .mode-card .mode-en{font-size:12px;color:var(--ink-3);letter-spacing:2px;text-transform:uppercase;}
+  .mode-card .desc{margin-top:14px;color:var(--ink-2);font-size:14.5px;min-height:72px;}
+  .mode-feats{margin-top:16px;display:flex;flex-direction:column;gap:9px;}
+  .mode-feats li{list-style:none;display:flex;gap:9px;align-items:flex-start;font-size:13.5px;color:var(--ink-2);}
+  .mode-feats svg{width:16px;height:16px;flex:none;margin-top:3px;color:var(--ok);}
+  .mode-card.m1 .mode-icon{background:var(--student-bg);color:var(--student);}
+  .mode-card.m2 .mode-icon{background:var(--ai-bg);color:var(--ai);}
+
+  /* 对比表 */
+  .compare{
+    max-width:920px;margin:36px auto 0;background:var(--surface);border-radius:18px;
+    border:1px solid var(--line);overflow:hidden;box-shadow:var(--shadow);
+  }
+  .compare table{width:100%;border-collapse:collapse;font-size:14.5px;}
+  .compare th,.compare td{padding:15px 22px;text-align:left;border-bottom:1px solid var(--line);}
+  .compare tr:last-child td{border-bottom:none;}
+  .compare thead th{
+    background:#fafbfe;font-size:13px;letter-spacing:1px;color:var(--ink-3);font-weight:600;
+  }
+  .compare thead th.hl1{color:var(--student);}
+  .compare thead th.hl2{color:var(--ai);}
+  .compare td:first-child{color:var(--ink-3);font-size:13.5px;width:130px;}
+  .compare .cell1{color:var(--ink);}
+  .compare .cell2{color:var(--ink);}
+
+  /* ============ 流程区 ============ */
+  #flow{background:linear-gradient(180deg,#fff 0%,#f6f7fb 100%);}
+  .mode-banner{
+    display:flex;align-items:center;gap:14px;justify-content:center;flex-wrap:wrap;
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:14px 22px;max-width:860px;margin:0 auto 56px;box-shadow:var(--shadow);
+  }
+  .mode-banner .mb-label{font-size:13px;color:var(--ink-3);}
+  .mode-banner .mb-mode{
+    font-weight:800;font-size:15px;padding:3px 14px;border-radius:999px;color:#fff;
+    background:var(--brand-grad);
+  }
+  .mode-banner .mb-desc{font-size:14px;color:var(--ink-2);}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;font-size:12.5px;color:var(--ink-3);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .legend i{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .lv-silent{background:#b6bccd;}
+  .lv-feedback{background:var(--ai);}
+  .lv-trigger{background:var(--warn);}
+  .lv-report{background:var(--ok);}
+
+  .flow-layout{display:grid;grid-template-columns:230px 1fr;gap:40px;align-items:start;}
+  .stage-nav{position:sticky;top:92px;display:flex;flex-direction:column;gap:2px;}
+  .stage-nav a{
+    display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:12px;
+    font-size:14px;color:var(--ink-2);transition:.2s;border-left:3px solid transparent;
+  }
+  .stage-nav a:hover{background:#fff;}
+  .stage-nav a.on{background:#fff;color:var(--brand);font-weight:700;box-shadow:var(--shadow);}
+  .stage-nav .num{
+    width:26px;height:26px;border-radius:50%;display:grid;place-items:center;flex:none;
+    background:#e9ecf5;color:var(--ink-3);font-size:12.5px;font-weight:700;transition:.2s;
+  }
+  .stage-nav a.on .num{background:var(--brand-grad);color:#fff;}
+
+  /* 阶段卡片 */
+  .stage{
+    position:relative;background:var(--surface);border:1px solid var(--line);
+    border-radius:20px;padding:30px 32px;margin-bottom:34px;box-shadow:var(--shadow);
+    scroll-margin-top:96px;transition:.3s;
+  }
+  .stage:hover{box-shadow:var(--shadow-lg);}
+  .stage-head{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px;}
+  .stage-num{
+    width:46px;height:46px;border-radius:14px;background:var(--brand-grad);color:#fff;
+    display:grid;place-items:center;font-size:19px;font-weight:800;flex:none;
+    box-shadow:0 8px 18px rgba(79,70,229,.3);
+  }
+  .stage-title h3{font-size:20px;font-weight:800;}
+  .stage-title p{font-size:13px;color:var(--ink-3);margin-top:2px;}
+  .stage-intv{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;}
+  .intv-badge{
+    display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
+    padding:5px 13px;border-radius:999px;transition:.25s;opacity:0;transform:scale(.9);
+  }
+  .intv-badge.show{opacity:1;transform:scale(1);}
+  .intv-badge::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;}
+  .ib-silent{background:#f0f2f7;color:#7c849a;}
+  .ib-feedback{background:var(--ai-bg);color:var(--ai);}
+  .ib-trigger{background:var(--warn-bg);color:var(--warn);}
+  .ib-report{background:var(--ok-bg);color:var(--ok);}
+
+  /* 双泳道 */
+  .lanes{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  .lane{border-radius:14px;padding:20px 22px;position:relative;}
+  .lane-student{background:var(--student-bg);border:1px solid #dbe6ff;}
+  .lane-ai{background:var(--ai-bg);border:1px solid #e8ddff;}
+  .lane-tag{
+    display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;
+    margin-bottom:12px;padding:3px 12px;border-radius:999px;background:#fff;
+  }
+  .lane-student .lane-tag{color:var(--student);}
+  .lane-ai .lane-tag{color:var(--ai);}
+  .lane-tag svg{width:14px;height:14px;}
+  .lane p{font-size:14.5px;color:var(--ink);}
+  .lane-ai p b{color:var(--ai);}
+  .lane-student p b{color:var(--student);}
+
+  .stage-output{
+    margin-top:18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    background:#fafbfe;border:1px dashed #d7dbe8;border-radius:12px;padding:13px 18px;
+  }
+  .stage-output .out-label{font-size:12.5px;color:var(--ink-3);font-weight:600;letter-spacing:1px;flex:none;}
+  .out-chip{
+    display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:700;
+    color:var(--ok);background:var(--ok-bg);padding:5px 14px;border-radius:999px;
+  }
+  .out-chip svg{width:14px;height:14px;}
+
+  /* 步骤状态小标（阶段③专用） */
+  .step-marks{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+  .mark{font-size:12px;padding:4px 11px;border-radius:8px;font-weight:600;}
+  .mk-ok{background:var(--ok-bg);color:var(--ok);}
+  .mk-fork{background:var(--ai-bg);color:var(--ai);}
+  .mk-stuck{background:var(--risk-bg);color:var(--risk);}
+  .mk-multi{background:var(--warn-bg);color:var(--warn);}
+
+  /* ============ 三层引导 ============ */
+  #guide{background:linear-gradient(180deg,#171b30,#1d2138);color:#fff;}
+  #guide .sec-head h2{color:#fff;}
+  #guide .sec-head p{color:#aab0c5;}
+  #guide .sec-kicker{color:#a5b4fc;}
+  .guide-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;}
+  .g-card{
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);
+    border-radius:18px;padding:28px 26px;position:relative;transition:.3s;
+  }
+  .g-card:hover{transform:translateY(-5px);background:rgba(255,255,255,.08);}
+  .g-level{
+    display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;
+    letter-spacing:2px;padding:4px 14px;border-radius:999px;margin-bottom:18px;
+  }
+  .g1 .g-level{background:rgba(96,165,250,.15);color:#93c5fd;}
+  .g2 .g-level{background:rgba(167,139,250,.15);color:#c4b5fd;}
+  .g3 .g-level{background:rgba(251,146,60,.15);color:#fdba74;}
+  .g-card h4{font-size:19px;font-weight:800;margin-bottom:10px;}
+  .g-when{font-size:12.5px;color:#8b90a7;margin-bottom:14px;}
+  .g-quote{
+    font-size:14.5px;line-height:1.7;padding:14px 16px;border-radius:12px;color:#dfe2ee;
+    background:rgba(255,255,255,.06);border-left:3px solid;position:relative;
+  }
+  .g1 .g-quote{border-color:#60a5fa;}
+  .g2 .g-quote{border-color:#a78bfa;}
+  .g3 .g-quote{border-color:#fb923c;}
+  .g-quote::before{content:"AI";position:absolute;right:12px;top:10px;font-size:10px;letter-spacing:1px;color:#6b7190;}
+  .g-arrow{
+    position:absolute;right:-19px;top:50%;transform:translateY(-50%);z-index:2;
+    color:#5b6180;font-size:22px;
+  }
+  .guide-note{
+    text-align:center;margin-top:34px;font-size:13.5px;color:#8b90a7;
+  }
+  .guide-note b{color:#c4b5fd;}
+
+  /* ============ 报告与闭环 ============ */
+  .report-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:44px;align-items:center;}
+  .report-card{
+    background:var(--surface);border:1px solid var(--line);border-radius:22px;
+    padding:30px;box-shadow:var(--shadow-lg);
+  }
+  .rc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;}
+  .rc-title{font-weight:800;font-size:17px;}
+  .rc-sub{font-size:12px;color:var(--ink-3);}
+  .rc-ring{
+    display:flex;align-items:center;gap:18px;padding:16px 18px;border-radius:14px;
+    background:#fafbfe;border:1px solid var(--line);margin-bottom:16px;
+  }
+  .rc-ring svg{width:86px;height:86px;flex:none;}
+  .ring-bg{fill:none;stroke:#e9ecf5;stroke-width:9;}
+  .ring-fg{fill:none;stroke:url(#ringGrad);stroke-width:9;stroke-linecap:round;transform:rotate(-90deg);transform-origin:center;}
+  .rc-ring h5{font-size:14px;color:var(--ink-2);font-weight:600;}
+  .rc-ring .big{font-size:24px;font-weight:800;color:var(--brand);}
+  .rc-rows{display:flex;flex-direction:column;gap:10px;}
+  .rc-row{
+    display:flex;justify-content:space-between;align-items:center;gap:12px;
+    padding:11px 16px;border-radius:11px;background:#fafbfe;border:1px solid var(--line);
+    font-size:13.5px;
+  }
+  .rc-row .k{color:var(--ink-2);}
+  .rc-row .v{font-weight:700;}
+  .rc-tags{display:flex;gap:7px;flex-wrap:wrap;}
+  .rc-tag{font-size:12px;padding:3px 10px;border-radius:7px;font-weight:600;}
+  .tag-risk{background:var(--risk-bg);color:var(--risk);}
+  .tag-warn{background:var(--warn-bg);color:var(--warn);}
+  .rc-rec{margin-top:16px;}
+  .rc-rec h6{font-size:13px;color:var(--ink-3);font-weight:600;margin-bottom:10px;letter-spacing:1px;}
+  .rec-list{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .rec-item{
+    border-radius:12px;padding:13px 14px;text-align:center;border:1px solid var(--line);
+    background:#fff;transition:.2s;cursor:pointer;
+  }
+  .rec-item:hover{border-color:var(--brand);transform:translateY(-2px);box-shadow:var(--shadow);}
+  .rec-item .n{font-size:20px;font-weight:800;color:var(--brand);}
+  .rec-item .t{font-size:12.5px;color:var(--ink-2);margin-top:2px;}
+
+  /* 产出闭环链 */
+  .loop-box{margin-top:74px;}
+  .loop-title{text-align:center;font-size:15px;font-weight:700;color:var(--ink-2);margin-bottom:26px;letter-spacing:1px;}
+  .loop-chain{display:flex;align-items:stretch;justify-content:center;gap:0;flex-wrap:wrap;}
+  .loop-item{
+    display:flex;align-items:center;gap:10px;background:var(--surface);
+    border:1px solid var(--line);border-radius:999px;padding:11px 20px;
+    font-size:13.5px;font-weight:600;color:var(--ink-2);white-space:nowrap;
+    box-shadow:var(--shadow);transition:.25s;position:relative;
+  }
+  .loop-item:hover{color:var(--brand);border-color:var(--brand);}
+  .loop-item .idx{
+    width:22px;height:22px;border-radius:50%;background:var(--brand-grad);color:#fff;
+    display:grid;place-items:center;font-size:11px;flex:none;
+  }
+  .loop-sep{display:flex;align-items:center;padding:0 8px;color:#c3c9d9;font-size:16px;}
+  .loop-back{
+    display:flex;justify-content:center;margin-top:20px;
+  }
+  .loop-back span{
+    display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--ok);
+    background:var(--ok-bg);border:1px dashed #a7e3cd;border-radius:999px;padding:8px 20px;
+  }
+
+  footer{background:#0f1222;color:#8b90a7;padding:40px 0;font-size:13.5px;text-align:center;}
+  footer b{color:#e2e4ef;}
+
+  /* ============ 动画 ============ */
+  .reveal{opacity:0;transform:translateY(26px);transition:opacity .7s ease,transform .7s ease;}
+  .reveal.in{opacity:1;transform:none;}
+
+  /* ============ 响应式 ============ */
+  @media (max-width:1024px){
+    .hero-inner{grid-template-columns:1fr;padding:60px 0;}
+    .flow-layout{grid-template-columns:1fr;}
+    .stage-nav{display:none;}
+    .report-grid{grid-template-columns:1fr;}
+  }
+  @media (max-width:768px){
+    .nav-links{display:none;}
+    .hero h1{font-size:32px;}
+    section{padding:64px 0;}
+    .mode-grid,.lanes,.guide-grid{grid-template-columns:1fr;}
+    .g-arrow{display:none;}
+    .stage{padding:24px 20px;}
+    .stage-intv{margin-left:0;width:100%;}
+    .loop-sep{display:none;}
+    .loop-chain{flex-direction:column;align-items:stretch;gap:10px;}
+    .loop-item{justify-content:flex-start;}
+    .rec-list{grid-template-columns:1fr;}
+    .compare th,.compare td{padding:11px 14px;font-size:13px;}
+    .compare td:first-child{width:auto;}
+  }
+</style>
+</head>
+<body data-mode="companion">
+
+  <!-- ============ 导航 ============ -->
+  <nav class="nav">
+    <div class="wrap nav-inner">
+      <a class="logo" href="#">
+        <span class="logo-mark">码</span>
+        码隆 AI 学伴<small>核心产品流程</small>
+      </a>
+      <div class="nav-links">
+        <a href="#modes">陪伴模式</a>
+        <a href="#flow">六阶段流程</a>
+        <a href="#guide">引导体系</a>
+        <a href="#report">学习报告</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ============ Hero ============ -->
+  <header class="hero">
+    <div class="wrap hero-inner">
+      <div>
+        <span class="hero-tag"><span class="dot"></span>AI 陪伴式解题训练 · 核心产品流程</span>
+        <h1>让 AI 看见<span class="grad">思考的过程</span><br>而不是只看答案</h1>
+        <p class="lead">
+          从题目理解到个性化训练，AI 全程观测学生解题过程，在正确的时机以正确的深度介入——
+          不代替思考，只点亮卡点。
+        </p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="#modes">了解两种陪伴模式</a>
+          <a class="btn btn-ghost" href="#flow">查看六阶段流程 ↓</a>
+        </div>
+      </div>
+
+      <!-- 解题路径图谱示意 -->
+      <div class="hero-visual">
+        <div class="hv-head">
+          <span class="hv-title">解题路径图谱 · 多解支持</span>
+          <span class="hv-legend">
+            <span><i style="background:#34d399"></i>走对</span>
+            <span><i style="background:#a78bfa"></i>分叉</span>
+            <span><i style="background:#f87171"></i>疑似卡点</span>
+          </span>
+        </div>
+        <svg class="hv-svg" viewBox="0 0 520 300" fill="none">
+          <defs>
+            <linearGradient id="edge" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/>
+            </linearGradient>
+          </defs>
+          <!-- 连线 -->
+          <path class="flow-line" d="M90 150 L190 88" stroke="url(#edge)" stroke-width="2"/>
+          <path class="flow-line" d="M90 150 L190 150" stroke="url(#edge)" stroke-width="2"/>
+          <path class="flow-line" d="M90 150 L190 218" stroke="url(#edge)" stroke-width="2"/>
+          <path class="flow-line" d="M250 88 L360 110" stroke="url(#edge)" stroke-width="2"/>
+          <path class="flow-line" d="M250 150 L360 110" stroke="url(#edge)" stroke-width="2"/>
+          <path class="flow-line" d="M250 218 L360 150" stroke="url(#edge)" stroke-width="2"/>
+          <path class="flow-line" d="M250 150 L360 200" stroke="#f87171" stroke-width="2"/>
+          <path class="flow-line" d="M420 110 L470 155" stroke="url(#edge)" stroke-width="2"/>
+          <!-- 节点 -->
+          <g font-size="12" fill="#c9cde0" text-anchor="middle" font-weight="600">
+            <circle cx="90" cy="150" r="30" fill="#1f2440" stroke="#6366f1" stroke-width="2"/>
+            <circle cx="90" cy="150" r="30" class="node-pulse" stroke="#6366f1"/>
+            <text x="90" y="155">题目</text>
+
+            <circle cx="220" cy="88" r="26" fill="#1f2440" stroke="#34d399" stroke-width="2"/>
+            <text x="220" y="93">条件</text>
+            <circle cx="220" cy="150" r="26" fill="#1f2440" stroke="#a78bfa" stroke-width="2"/>
+            <text x="220" y="155">分叉</text>
+            <circle cx="220" cy="218" r="26" fill="#1f2440" stroke="#34d399" stroke-width="2"/>
+            <text x="220" y="223">规律</text>
+
+            <circle cx="390" cy="110" r="26" fill="#1f2440" stroke="#34d399" stroke-width="2"/>
+            <text x="390" y="115">推演</text>
+            <circle cx="390" cy="200" r="26" fill="#2a1a20" stroke="#f87171" stroke-width="2"/>
+            <circle cx="390" cy="200" r="26" class="node-pulse" stroke="#f87171"/>
+            <text x="390" y="205" fill="#fca5a5">卡点</text>
+
+            <circle cx="475" cy="155" r="24" fill="#1f2440" stroke="#fbbf24" stroke-width="2"/>
+            <text x="475" y="160">解答</text>
+          </g>
+          <!-- 标注 -->
+          <g font-size="11" text-anchor="middle">
+            <text x="390" y="248" fill="#f87171">停顿 12s · 涂改 2 次</text>
+          </g>
+        </svg>
+        <div class="hv-foot">
+          <span class="hv-chip">识别题干与图形</span>
+          <span class="hv-chip">生成 2 条候选路径</span>
+          <span class="hv-chip">实时步骤比对</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ 陪伴模式 ============ -->
+  <section id="modes">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="sec-kicker">Two Companion Modes</span>
+        <h2>两种陪伴模式，可选可切换</h2>
+        <p>同一套观测与引导引擎，不同的介入策略——按学生的独立性与训练目标自由选择。</p>
+      </div>
+
+      <div class="mode-grid reveal">
+        <!-- 模式一：自主训练 -->
+        <div class="mode-card m1" data-mode-btn="autonomous" role="button" tabindex="0">
+          <div class="mode-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/>
+            </svg>
+          </div>
+          <h3>自主训练</h3>
+          <span class="mode-en">Independent Practice</span>
+          <p class="desc">AI 静默观测全程，仅在<b>学生主动求助</b>或出现<b>高置信卡点</b>时才介入。最大程度保留独立思考空间。</p>
+          <ul class="mode-feats">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>静默观测，不打断作答节奏</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>求助信号 / 高置信卡点触发介入</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>适合考前冲刺与独立能力训练</li>
+          </ul>
+        </div>
+        <!-- 模式二：AI 陪伴 -->
+        <div class="mode-card m2 active" data-mode-btn="companion" role="button" tabindex="0">
+          <div class="mode-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 11.5a8.38 8.38 0 01-8.4 8.4c-1.5 0-2.9-.4-4.1-1L3 20l1.1-5.5a8.38 8.38 0 1116.9-3z"/>
+            </svg>
+          </div>
+          <h3>AI 陪伴</h3>
+          <span class="mode-en">AI Companion</span>
+          <p class="desc">AI 实时观测作答过程，在<b>关键决策点</b>给出反馈——抓大放小，<b>不每步打断</b>。</p>
+          <ul class="mode-feats">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>实时观测，关键决策点即时反馈</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>反馈有节制，避免每步打断</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>适合新知识学习与方法养成</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 对比表 -->
+      <div class="compare reveal">
+        <table>
+          <thead>
+            <tr>
+              <th>维度</th>
+              <th class="hl1">自主训练</th>
+              <th class="hl2">AI 陪伴</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>观测方式</td><td class="cell1">AI 静默观测</td><td class="cell2">AI 实时观测</td></tr>
+            <tr><td>介入时机</td><td class="cell1">仅在学生求助或出现高置信卡点时</td><td class="cell2">在关键决策点给出反馈</td></tr>
+            <tr><td>反馈密度</td><td class="cell1">低 · 按需介入</td><td class="cell2">中 · 有节制、不每步打断</td></tr>
+            <tr><td>引导深度</td><td class="cell1">三层递进引导（触发后进入）</td><td class="cell2">决策点反馈 + 三层递进引导</td></tr>
+            <tr><td>适合场景</td><td class="cell1">考前冲刺、检验独立解题能力</td><td class="cell2">新知识学习、解题习惯养成</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 六阶段核心流程 ============ -->
+  <section id="flow">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="sec-kicker">Core Workflow</span>
+        <h2>六阶段核心流程</h2>
+        <p>学生行为与 AI 行为双轨并行，每一阶段沉淀一份关键产出，作为下一阶段的比对基准。</p>
+      </div>
+
+      <!-- 当前模式提示条 -->
+      <div class="mode-banner reveal">
+        <span class="mb-label">当前模式</span>
+        <span class="mb-mode" id="mbMode">AI 陪伴</span>
+        <span class="mb-desc" id="mbDesc">AI 实时观测，在关键决策点给出反馈，不每步打断</span>
+      </div>
+      <div class="legend reveal" style="margin:-34px 0 44px;">
+        <span><i class="lv-silent"></i>静默观测 · 不介入</span>
+        <span><i class="lv-feedback"></i>关键点反馈</span>
+        <span><i class="lv-trigger"></i>信号触发介入</span>
+        <span><i class="lv-report"></i>报告输出</span>
+      </div>
+
+      <div class="flow-layout">
+        <!-- 左侧阶段导航 -->
+        <aside class="stage-nav" id="stageNav">
+          <a href="#st1" class="on"><span class="num">①</span>题目理解与路径构建</a>
+          <a href="#st2"><span class="num">②</span>解题思路预诊断</a>
+          <a href="#st3"><span class="num">③</span>解题过程实时观测</a>
+          <a href="#st4"><span class="num">④</span>卡点识别与分层引导</a>
+          <a href="#st5"><span class="num">⑤</span>深度追问与理解验证</a>
+          <a href="#st6"><span class="num">⑥</span>总结与个性化训练</a>
+        </aside>
+
+        <!-- 右侧阶段卡片 -->
+        <div class="stages">
+
+          <!-- 阶段 ① -->
+          <article class="stage reveal" id="st1" data-stage="1">
+            <div class="stage-head">
+              <div class="stage-num">①</div>
+              <div class="stage-title">
+                <h3>题目理解与路径构建</h3>
+                <p>Problem Understanding &amp; Path Building</p>
+              </div>
+              <div class="stage-intv">
+                <span class="intv-badge ib-silent" data-mode="autonomous">静默观测 · 后台构建图谱</span>
+                <span class="intv-badge ib-feedback" data-mode="companion">关键点反馈 · 确认路径图谱</span>
+              </div>
+            </div>
+            <div class="lanes">
+              <div class="lane lane-student">
+                <span class="lane-tag">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>
+                  学生行为
+                </span>
+                <p>从练习册、拍照或题库中<b>上传 / 选择题目</b>，进入训练。</p>
+              </div>
+              <div class="lane lane-ai">
+                <span class="lane-tag">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 7V4M8 13h.01M16 13h.01"/></svg>
+                  AI 行为
+                </span>
+                <p><b>识别题干、图形与条件</b>；结合参考答案，调用题库 / 大模型生成<b>解题路径图谱（支持多解）</b>。</p>
+              </div>
+            </div>
+            <div class="stage-output">
+              <span class="out-label">关键产出</span>
+              <span class="out-chip">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                解题路径图谱（作为后续比对的基准）
+              </span>
+            </div>
+          </article>
+
+          <!-- 阶段 ② -->
+          <article class="stage reveal" id="st2" data-stage="2">
+            <div class="stage-head">
+              <div class="stage-num">②</div>
+              <div class="stage-title">
+                <h3>解题思路预诊断</h3>
+                <p>Pre-diagnosis of Solving Strategy</p>
+              </div>
+              <div class="stage-intv">
+                <span class="intv-badge ib-silent" data-mode="autonomous">静默观测 · 仅采集思路</span>
+                <span class="intv-badge ib-feedback" data-mode="companion">关键点反馈 · 可行性预判</span>
+              </div>
+            </div>
+            <div class="lanes">
+              <div class="lane lane-student">
+                <span class="lane-tag">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0014 0M12 17v4"/></svg>
+                  学生行为
+                </span>
+                <p>用<b>语音或文字说出原始想法</b>，不用先追求严谨。</p>
+              </div>
+              <div class="lane lane-ai">
+                <span class="lane-tag">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 7V4M8 13h.01M16 13h.01"/></svg>
+                  AI 行为
+                </span>
+                <p><b>引导学生说出想法</b>；提取已知、目标、拟用规律、大致步骤与不确定处；判断<b>可行 / 部分可行 / 不可行</b>。</p>
+              </div>
+            </div>
+            <div class="stage-output">
+              <span class="out-label">关键产出</span>
+              <span class="out-chip">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                思路可行性判断
+              </span>
+            </div>
+          </article>
+
+          <!-- 阶段 ③ -->
+          <article class="stage reveal" id="st3" data-stage="3">
+            <div class="stage-head">
+              <div class="stage-num">③</div>
+              <div class="stage-title">
+                <h3>解题过程实时观测</h3>
+                <p>Real-time Observation</p>
+              </div>
+              <div class="stage-intv">
+                <span class="intv-badge ib-silent" data-mode="autonomous">静默观测 · 仅记录标记</span>
+                <span class="intv-badge ib-feedback" data-mode="companion">实时观测 · 决策点反馈</span>
+              </div>
+            </div>
+            <div class="lanes">
+              <div class="lane lane-student">
+                <span class="lane-tag">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+                  学生行为
+                </span>
+                <p>在<b>草稿纸 / 答卷上正常作答</b>，保持自然书写习惯。</p>
+              </div>
+              <div class="lane lane-ai">
+                <span class="lane-tag">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 7V4M8 13h.01M16 13h.01"/></svg>
+                  AI 行为
+                </span>
+                <p>摄像头 / 手写笔采集草稿与答卷 → <b>转成步骤序列</b> → 与路径图谱比对，标记状态；<b>按所选模式决定介入频率</b>。</p>
+                <div class="step-marks">
+                  <span class="mark mk-ok">✓ 走对</span>
+                  <span class="mark mk-fork">⑂ 分叉</span>
+                  <span class="mark mk-stuck">⚠ 疑似卡点</span>
+                  <span class="mark mk-multi">≠ 多解路径</span>
+                </div>
+              </div>
+            </div>
+            <div class="stage-output">
+              <span class="out-label">关键产出</span>
+              <span class="out-chip">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                实时步骤状态标记
+              </span>
+            </div>
+          </article>
+
+          <!-- 阶段 ④ -->
+          <article class="stage reveal" id="st4" data-stage="4">
+            <div class="stage-head">
+              <div class="stage-num">④</div>
+              <div class="stage-title">
+                <h3>卡点识别与分层引导</h3>
+                <p>Bottleneck Detection &amp; Layered Guidance</p>
+              </div>
+              <div class="stage-intv">
+                <span class="intv-badge ib-trigger" data-mode="autonomous">求助 / 高置信卡点时介入</span>
+                <span class="intv-badge ib-trigger" data-mode="companion">卡点信号触发即时引导</span>
+              </div>
+            </div>
+            <div class="lanes">
+              <div class="lane lane-student">
+                <span class="lane-tag">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 113.7 2.2c-.7.4-1.2 1-1.2 1.8M12 17h.01"/></svg>
+                  学生行为
+                </span>
+                <p><b>主动求助</b>；或出现<b>停顿、涂改、步骤分叉</b>等信号被 AI 捕捉。</p>
+              </div>
+              <div class="lane lane-ai">
+                <span class="lane-tag">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 7V4M8 13h.01M16 13h.01"/></svg>
+                  AI 行为
+                </span>
+                <p>执行<b>三层递进引导</b>：条件追问 → 方向提示 → 降级示范（详见下方引导体系）。</p>
+              </div>
+            </div>
+            <div class="stage-output">
+              <span class="out-label">关键产出</span>
+              <span class="out-chip">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                卡点清单与引导轮次记录
+              </span>
+            </div>
+          </article>
+
+          <!-- 阶段 ⑤ -->
+          <article class="stage reveal" id="st5" data-stage="5">
+            <div class="stage-head">
+              <div class="stage-num">⑤</div>
+              <div class="stage-title">
+                <h3>深度追问与理解验证</h3>
+                <p>Deep Inquiry &amp; Understanding Verification</p>
+              </div>
+              <div class="stage-intv">
+                <span class="intv-badge ib-trigger" data-mode="autonomous">学生追问时响应</span>
+                <span class="intv-badge ib-feedback" data-mode="companion">关键点反馈 · 可视化讲解</span>
+              </div>
+            </div>
+            <div class="lanes">
+              <div class="lane lane-student">
+                <span class="lane-tag">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>
+                  学生行为
+                </span>
+                <p>根据 AI 引导<b>继续追问</b>，暴露更深层的理解偏差。</p>
+              </div>
+              <div class="lane lane-ai">
+                <span class="lane-tag">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 7V4M8 13h.01M16 13h.01"/></svg>
+                  AI 行为
+                </span>
+                <p><b>回答学生追问</b>；按需调用可视化——<b>受力分析图、动态物理模型</b>等，验证真实理解。</p>
+              </div>
+            </div>
+            <div class="stage-output">
+              <span class="out-label">关键产出</span>
+              <span class="out-chip">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                深层卡点记录与可视化图
+              </span>
+            </div>
+          </article>
+
+          <!-- 阶段 ⑥ -->
+          <article class="stage reveal" id="st6" data-stage="6">
+            <div class="stage-head">
+              <div class="stage-num">⑥</div>
+              <div class="stage-title">
+                <h3>总结与个性化训练</h3>
+                <p>Summary &amp; Personalized Practice</p>
+              </div>
+              <div class="stage-intv">
+                <span class="intv-badge ib-report" data-mode="autonomous">报告输出 · 推荐题目</span>
+                <span class="intv-badge ib-report" data-mode="companion">报告输出 · 推荐题目</span>
+              </div>
+            </div>
+            <div class="lanes">
+              <div class="lane lane-student">
+                <span class="lane-tag">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M9 15h6M9 11h3"/></svg>
+                  学生行为
+                </span>
+                <p>完成作答后<b>查看学习报告</b>，从推荐题中选择继续训练。</p>
+              </div>
+              <div class="lane lane-ai">
+                <span class="lane-tag">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 7V4M8 13h.01M16 13h.01"/></svg>
+                  AI 行为
+                </span>
+                <p>生成<b>学习报告</b>（卡点、引导轮次、独立完成度、深层问题）；推荐<b>举一反三、变式与迁移题</b>。</p>
+              </div>
+            </div>
+            <div class="stage-output">
+              <span class="out-label">关键产出</span>
+              <span class="out-chip">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                学习报告与个性化题目
+              </span>
+            </div>
+          </article>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 三层引导体系 ============ -->
+  <section id="guide">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="sec-kicker">Layered Guidance</span>
+        <h2>三层递进引导体系</h2>
+        <p>对应阶段④：AI 从不直接给答案，而是逐层降低脚手架高度，把"想通"的权利留给学生。</p>
+      </div>
+      <div class="guide-grid">
+        <div class="g-card g1 reveal">
+          <span class="g-level">L1 · 条件追问</span>
+          <h4>先检查前提</h4>
+          <p class="g-when">触发：首次出现停顿 / 方向存疑</p>
+          <div class="g-quote">"这个规律的前提是什么？现在的情境满足吗？"</div>
+          <span class="g-arrow">➜</span>
+        </div>
+        <div class="g-card g2 reveal">
+          <span class="g-level">L2 · 方向提示</span>
+          <h4>再拓宽路径</h4>
+          <p class="g-when">触发：L1 追问后仍分叉或停滞</p>
+          <div class="g-quote">"如果不满足，有没有别的守恒量可以试试？"</div>
+          <span class="g-arrow">➜</span>
+        </div>
+        <div class="g-card g3 reveal">
+          <span class="g-level">L3 · 降级示范</span>
+          <h4>最后搭台阶</h4>
+          <p class="g-when">触发：多轮引导仍无法推进</p>
+          <div class="g-quote">"我示范这一步，剩下的你接着做。"</div>
+        </div>
+      </div>
+      <p class="guide-note reveal">
+        每一轮引导都会记录进<b>卡点清单与引导轮次</b>，成为学习报告与个性化推荐的核心依据。
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ 学习报告与产出闭环 ============ -->
+  <section id="report">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="sec-kicker">Learning Report</span>
+        <h2>学习报告与产出闭环</h2>
+        <p>六个阶段的关键产出最终汇聚为一份学习报告，并驱动个性化题目推荐，形成训练闭环。</p>
+      </div>
+
+      <div class="report-grid">
+        <!-- 报告 Mock 卡片 -->
+        <div class="report-card reveal">
+          <div class="rc-head">
+            <div>
+              <div class="rc-title">本题学习报告 · 例</div>
+              <div class="rc-sub">牛顿第二定律 · 斜面滑块问题</div>
+            </div>
+            <span class="out-chip" style="margin-left:auto;">报告已生成</span>
+          </div>
+          <div class="rc-ring">
+            <svg viewBox="0 0 100 100">
+              <defs>
+                <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#4f46e5"/><stop offset="1" stop-color="#7c3aed"/>
+                </linearGradient>
+              </defs>
+              <circle class="ring-bg" cx="50" cy="50" r="41"/>
+              <circle class="ring-fg" cx="50" cy="50" r="41" stroke-dasharray="182 258"/>
+              <text x="50" y="57" text-anchor="middle" font-size="20" font-weight="800" fill="#4f46e5">82%</text>
+            </svg>
+            <div>
+              <h5>独立完成度</h5>
+              <div class="big">82%</div>
+              <div style="font-size:12.5px;color:var(--ink-3);">引导介入 3 轮 · 自主推进 11 步</div>
+            </div>
+          </div>
+          <div class="rc-rows">
+            <div class="rc-row">
+              <span class="k">主要卡点</span>
+              <span class="rc-tags">
+                <span class="rc-tag tag-risk">摩擦力方向判断</span>
+                <span class="rc-tag tag-warn">正交分解遗漏</span>
+              </span>
+            </div>
+            <div class="rc-row">
+              <span class="k">引导轮次</span>
+              <span class="v">L1 ×2 · L2 ×1 · L3 ×0</span>
+            </div>
+            <div class="rc-row">
+              <span class="k">深层问题</span>
+              <span class="rc-tags">
+                <span class="rc-tag tag-warn">对"平衡态"适用条件的理解不牢</span>
+              </span>
+            </div>
+          </div>
+          <div class="rc-rec">
+            <h6>个性化推荐</h6>
+            <div class="rec-list">
+              <div class="rec-item"><div class="n">×2</div><div class="t">举一反三</div></div>
+              <div class="rec-item"><div class="n">×3</div><div class="t">变式训练</div></div>
+              <div class="rec-item"><div class="n">×1</div><div class="t">迁移应用</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右侧说明 -->
+        <div class="reveal">
+          <h3 style="font-size:24px;font-weight:800;margin-bottom:16px;">报告不是终点，而是下一轮训练的起点</h3>
+          <p style="color:var(--ink-2);margin-bottom:28px;">
+            学习报告汇总四个核心维度——<b>卡点分布、引导轮次、独立完成度、深层问题</b>，
+            AI 据此在题库中匹配<b>举一反三、变式、迁移</b>三类题目，精准针对薄弱环节强化。
+          </p>
+          <div class="loop-box">
+            <div class="loop-title">— 关键产出闭环 —</div>
+            <div class="loop-chain">
+              <span class="loop-item"><span class="idx">①</span>解题路径图谱</span>
+              <span class="loop-sep">→</span>
+              <span class="loop-item"><span class="idx">②</span>思路可行性判断</span>
+              <span class="loop-sep">→</span>
+              <span class="loop-item"><span class="idx">③</span>实时步骤状态标记</span>
+            </div>
+            <div class="loop-chain" style="margin-top:12px;">
+              <span class="loop-item"><span class="idx">④</span>卡点清单与引导轮次</span>
+              <span class="loop-sep">→</span>
+              <span class="loop-item"><span class="idx">⑤</span>深层卡点与可视化</span>
+              <span class="loop-sep">→</span>
+              <span class="loop-item"><span class="idx">⑥</span>学习报告与个性化题目</span>
+            </div>
+            <div class="loop-back">
+              <span>⟲ 推荐题进入新一轮训练，回到阶段① · 闭环进化</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">
+      <p><b>码隆 AI 学伴</b> · 核心产品流程 — 不代替思考，只点亮卡点</p>
+    </div>
+  </footer>
+
+<script>
+  /* ============ 模式切换 ============ */
+  const body = document.body;
+  const mbMode = document.getElementById('mbMode');
+  const mbDesc = document.getElementById('mbDesc');
+  const MODES = {
+    autonomous: {
+      name: '自主训练',
+      desc: 'AI 静默观测，仅在学生求助或出现高置信卡点时才介入'
+    },
+    companion: {
+      name: 'AI 陪伴',
+      desc: 'AI 实时观测，在关键决策点给出反馈，不每步打断'
+    }
+  };
+
+  function setMode(mode){
+    body.dataset.mode = mode;
+    mbMode.textContent = MODES[mode].name;
+    mbDesc.textContent = MODES[mode].desc;
+    // 模式卡片选中态
+    document.querySelectorAll('.mode-card').forEach(c=>{
+      c.classList.toggle('active', c.dataset.modeBtn === mode);
+    });
+    // 介入点徽章显隐
+    document.querySelectorAll('.intv-badge').forEach(b=>{
+      const show = b.dataset.mode === mode;
+      b.classList.toggle('show', show);
+    });
+  }
+
+  document.querySelectorAll('.mode-card').forEach(card=>{
+    card.addEventListener('click', ()=> setMode(card.dataset.modeBtn));
+    card.addEventListener('keydown', e=>{
+      if(e.key==='Enter' || e.key===' '){
+        e.preventDefault();
+        setMode(card.dataset.modeBtn);
+      }
+    });
+  });
+
+  setMode('companion'); // 默认模式
+
+  /* ============ 滚动渐入动画 ============ */
+  const io = new IntersectionObserver(entries=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        e.target.classList.add('in');
+        io.unobserve(e.target);
+      }
+    });
+  }, {threshold:.12});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+  /* ============ 阶段导航高亮 ============ */
+  const stageLinks = document.querySelectorAll('#stageNav a');
+  const stages = document.querySelectorAll('.stage');
+  const navIO = new IntersectionObserver(entries=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        stageLinks.forEach(a=>a.classList.toggle('on', a.getAttribute('href') === '#'+e.target.id));
+      }
+    });
+  }, {rootMargin:'-30% 0px -55% 0px'});
+  stages.forEach(s=>navIO.observe(s));
+<\/script>
+</body>
+</html>
+`;
+  $('flowLink').addEventListener('click', () => {
+    if (!$('flowFrame').srcdoc) $('flowFrame').srcdoc = FLOW_HTML;
+    $('flowOverlay').classList.add('show');
+  });
+  $('flowClose').addEventListener('click', () => $('flowOverlay').classList.remove('show'));
+
+  /* ---------- 初始化 ---------- */
+renderPills(); renderGraph();
+addSys("🟢 真 AI 已就绪（"+AI_NAME+"）· 粘贴题目文字即可开始真实辅导；点「示例题目」可看完整演示流程");
+</script>
+</body>
+</html>

@@ -13,6 +13,7 @@
     "test": "node test/run.js",
     "eval": "node scripts/eval.js",
     "eval:llm": "node scripts/eval.js --adapter llm",
+    "ocr:path": "node scripts/ocr-path-probe.js",
     "all": "node test/run.js && node scripts/eval.js"
   },
   "keywords": [

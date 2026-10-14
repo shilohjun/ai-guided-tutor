@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 import { handleApi, getAdapter } from '../src/server/router.js';
 import { readLLMConfig } from '../src/core/llm.js';
+import { ocrStatus } from '../src/core/ocr.js';
 import { maskSecret } from '../src/core/env.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -102,6 +103,14 @@ server.listen(PORT, HOST, () => {
   console.log(
     `  ▸ 读题能力：${typeof adapter.understandProblem === 'function' ? '可用（可导入任意新题目）' : '不可用（导入题目走通用骨架）'}`,
   );
+  const ocr = ocrStatus();
+  console.log(
+    `  ▸ 拍照识题：${ocr.configured ? `可用 · ${ocr.providerLabel}` : `未启用（${ocr.hint}）`}`,
+  );
+  if (ocr.configured && !ocr.endpoint) {
+    // 明说"地址还没确认"：否则第一次调用会静默多花几次候选调用的钱，而日志里看不出来
+    console.log('    （接口地址未指定，首次识别会自动探索候选地址并缓存；确认后建议写进 ALIYUN_OCR_ENDPOINT）');
+  }
   const teacherKey = String(process.env.TEACHER_KEY ?? '').trim();
   console.log(
     `  ▸ 教师视图：${

@@ -21,3 +21,8 @@ Thumbs.db
 # 评测输出
 eval-output/
 trajectory/
+
+# 拍照识题联调用的临时题图（随手生成的，不该进版本库）
+test-stem.png
+test-stem.jpg
+

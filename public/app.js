@@ -74,6 +74,16 @@ async function api(path, options = {}) {
     const err = new Error(data.error || `请求失败（${res.status}）`);
     err.status = res.status;
     err.hint = data.hint ?? null;
+    /**
+     * 拍照识题要用的两个字段：
+     *   charged —— 这次调用有没有（可能）计费。按次计费的服务里，
+     *              "没计费可以重试"和"已计费别乱点"是两种相反的动作，
+     *              前端必须能区分，所以从响应里带出来。
+     *   code    —— 业务错误码，用于把失败原因说得更具体。
+     */
+    err.charged = typeof data.charged === 'boolean' ? data.charged : undefined;
+    err.code = data.code ?? null;
+    err.reason = data.reason ?? null;
     throw err;
   }
   return data;
@@ -1359,31 +1369,205 @@ function updateLadder(currentLevel) {
 }
 
 // ---------------------------------------------------------------------------
-// 拍照上传（当前仅占位，但把缺口说清楚）
+// 拍照识题（图像 → 题干）
 // ---------------------------------------------------------------------------
 
-const OCR_PLAN = `图像 → 题干 的补法（约 0.5 天，视模型而定）
+/**
+ * 这一环怎么接的（点「看这条链路怎么补」时显示）。
+ *
+ * 与 src/core/ocr.js 的实现保持一致 —— 文案写的是代码真正在做的事，
+ * 不写"计划做什么"。这是本项目一直守的一条：不伪造进度。
+ */
+const OCR_PLAN = `拍照识题（图像 → 题干）已经接上了，走的是服务端 OCR，不是视觉模型。
 
-1) 取图：前端 FileReader 读为 dataURL（已实现，见下方预览）
-2) 调用：把 dataURL 作为 image_url 传给视觉模型
+1) 取图 + 压缩：前端 FileReader 读为 dataURL → canvas 压到长边 1600 像素、JPEG 0.85
+   为什么要压：识别接口按「成功调用次数」计费，图片过大既会失败又要计费；
+   压到长边 1600 像素同时兼顾公式清晰度与体积。
+2) 识别：POST /api/ocr，服务端带 AppCode 调 OCR（AppCode 不下发到浏览器）
+3) 回填：识别出的题干文字写进下面的输入框，「不会自动导入」
+   —— 请你先看一眼、改掉识别错的字，再点「读懂这道题」。
+   为什么留这一步：识别错一个数值，后面的已知量、图谱、提示会整条偏掉，而且不会报错。
+   让你过一眼是最省事也最可靠的一道防线。
+4) 成本：题目识别按次计费（官方标价约 0.083 元/次），所以同一张图不要反复点。
 
-   POST {LLM_BASE_URL}/chat/completions
-   {
-     "model": "qwen-vl-max",           // 或 glm-4v / gpt-4o
-     "messages": [{
-       "role": "user",
-       "content": [
-         { "type": "text", "text": "把这张题的题干完整转录为纯文本，保留所有数值与单位，不要解答。" },
-         { "type": "image_url", "image_url": { "url": "<dataURL>" } }
-       ]
-     }]
-   }
+当前状态：识别可用与否由服务端决定（有没有配置识别凭据）。
+没配的时候，这个入口会照实显示"未启用"，而不是假装能用 —— 用下面的文字入口即可。`;
 
-3) 落库：转录文本 → 直接走已经做好的 /api/problem/import
-   （读题链路已经通了，所以这一步接上视觉模型后是真正的"端到端可用"）
-4) 兜底：若模型置信度低，让用户手动修正题干后再进入引导流程
+/** 压缩目标：长边像素。1600 是"公式还能看清"与"体积够小"之间的折中。 */
+const OCR_MAX_EDGE = 1600;
+/** 压缩后仍超过这个字节数就拒绝上传 —— 在调用之前拦掉，避免为必然失败的请求付费 */
+const OCR_MAX_BYTES = 1_500_000;
 
-当前 Demo 的做法：不伪造 OCR 结果，明确标出这是未完成的一环。`;
+/**
+ * 图片压缩。
+ *
+ * 为什么必须有这一步（不是可选优化）：
+ *   ① 手机原图常见 3~8MB，直接 base64 后更大，识别接口会因体积失败**并且计费**；
+ *   ② 服务端 JSON 读体上限是 2.6MB，base64 后超了会被拦在路由层。
+ *
+ * 失败时返回 null，由调用方回退到原图（宁可试一次，也不让学生卡住无反馈）。
+ */
+function compressImage(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onerror = () => resolve(null);
+    reader.onload = () => {
+      const dataUrl = String(reader.result ?? '');
+      const img = new Image();
+      img.onerror = () => resolve(null);
+      img.onload = () => {
+        try {
+          const scale = Math.min(1, OCR_MAX_EDGE / Math.max(img.width, img.height));
+          const w = Math.max(1, Math.round(img.width * scale));
+          const h = Math.max(1, Math.round(img.height * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          // JPEG 没有透明通道；先铺白底，否则透明 PNG 会变成黑底、公式直接消失
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve({ dataUrl: canvas.toDataURL('image/jpeg', 0.85), width: w, height: h, scaled: scale < 1 });
+        } catch {
+          resolve(null);
+        }
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function base64Bytes(dataUrl) {
+  const i = dataUrl.indexOf(',');
+  return Math.floor((dataUrl.length - (i + 1)) * 0.75);
+}
+
+let pendingImage = null;
+
+async function handleImage(file) {
+  if (!file.type.startsWith('image/')) {
+    toast('请选择图片文件');
+    return;
+  }
+  const preview = $('#preview');
+  const status = $('#ocr-status');
+
+  // 先给即时反馈：压缩大图要几百毫秒，什么都不显示会让人以为没反应
+  status.textContent = '正在处理图片…';
+  $('#ocr-actions').hidden = false;
+  $('#ocr-notice').hidden = true;
+
+  const compressed = await compressImage(file);
+  const dataUrl = compressed?.dataUrl ?? null;
+
+  if (dataUrl) {
+    preview.src = dataUrl;
+    pendingImage = dataUrl;
+    const kb = Math.round(base64Bytes(dataUrl) / 1024);
+    status.textContent = compressed.scaled
+      ? `已压缩到 ${compressed.width}×${compressed.height}（${kb} KB）`
+      : `图片 ${compressed.width}×${compressed.height}（${kb} KB）`;
+  } else {
+    /**
+     * 压缩失败（浏览器不支持 canvas / 读了异常文件）。
+     * 这里**不静默吞掉**：告诉学生没法处理，并让他改用文字入口。
+     * 不退回原图 —— 原图几乎一定会因体积失败，那是一次白花的计费调用。
+     */
+    pendingImage = null;
+    status.textContent = '这张图片没法处理';
+    showOcrNotice('warn', '浏览器无法读取或压缩这张图片。请换一张 JPG/PNG，或直接把题目文字粘贴到下面的输入框里。');
+    return;
+  }
+
+  preview.hidden = false;
+  $('#dropzone').hidden = true;
+}
+
+function showOcrNotice(kind, html) {
+  const el = $('#ocr-notice');
+  el.hidden = false;
+  el.className = kind === 'warn' ? 'notice notice-warn' : 'notice';
+  el.innerHTML = html;
+}
+
+/**
+ * 调服务端识别。
+ *
+ * 关键：**识别成功也不自动导入**，只回填输入框（见 OCR_PLAN 的第 3 条理由）。
+ */
+async function runOcr() {
+  if (!pendingImage) {
+    toast('请先选一张题目照片');
+    return;
+  }
+  const bytes = base64Bytes(pendingImage);
+  if (bytes > OCR_MAX_BYTES) {
+    showOcrNotice('warn', `图片约 ${(bytes / 1024 / 1024).toFixed(1)} MB，超过识别上限。请换一张更小的照片，或把题目文字粘贴到下面的输入框里。`);
+    return;
+  }
+
+  const btn = $('#btn-ocr');
+  btn.disabled = true;
+  btn.textContent = '识别中…';
+  showOcrNotice('', '<strong>正在识别题目文字</strong> —— 大约 2~8 秒。识别结果会填到下面的输入框，请你确认后再读题。');
+
+  try {
+    const res = await api('/api/ocr', { method: 'POST', body: JSON.stringify({ image: pendingImage }) });
+    const text = String(res.rawText ?? '').trim();
+
+    // 回填：**追加**而不是覆盖（学生可能已经手打了一半，与语音输入同一口径）
+    const input = $('#stem-input');
+    input.value = input.value.trim() ? `${input.value.trim()}\n${text}` : text;
+    input.scrollTop = input.scrollHeight;
+    /**
+     * 把文字入口展开。
+     *
+     * 为什么必须做这一步：填充目标是折叠区里的 textarea，
+     * 不展开的话学生看到的是"识别完成"但**看不到识别结果在哪** ——
+     * 而核对识别结果是这一步的全部意义。折叠状态下的填充等于没填。
+     */
+    const fold = $('#text-entry-fold');
+    if (fold) fold.open = true;
+
+    const figureNote = res.figureCount > 0
+      ? `，并检测到 ${res.figureCount} 处配图（图形内容没有进题干，如果题目依赖图形，请补一句图里画了什么）`
+      : '';
+    showOcrNotice(
+      '',
+      `<strong>识别完成</strong>（${res.latencyMs} ms${figureNote}）。` +
+        '文字已填到下面的输入框 —— <strong>请先核对一遍</strong>（尤其数值、上下标、单位），改好再点「读懂这道题」。',
+    );
+    toast('已填入下方输入框，请核对后读题');
+  } catch (err) {
+    /**
+     * 失败提示必须带上"这次有没有计费"。
+     * 因为按次计费：未计费时可以放心重试，已计费时重试就是再花钱 ——
+     * 这两种情况的正确动作完全相反，混在一起说会误导学生反复点。
+     */
+    const charged = err.charged === true;
+    const line = charged
+      ? '<br><span class="muted small">这次调用可能已经计费，建议先确认照片是否清晰、是否确实是题目，再决定要不要重试。</span>'
+      : err.charged === false
+        ? '<br><span class="muted small">这次请求没有到达识别服务（未计费），可以直接重试。</span>'
+        : '';
+    showOcrNotice('warn', `<strong>识别失败</strong>：${esc(err.message)}${line}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '识别成题干';
+  }
+}
+
+function resetOcrPick() {
+  pendingImage = null;
+  $('#preview').hidden = true;
+  $('#preview').removeAttribute('src');
+  $('#ocr-actions').hidden = true;
+  $('#ocr-notice').hidden = true;
+  $('#dropzone').hidden = false;
+  $('#file-input').value = '';
+}
 
 // ---------------------------------------------------------------------------
 // 语音输入（Web Speech API）
@@ -1462,6 +1646,36 @@ function bindVoiceInput() {
 function bindUpload() {
   const fileInput = $('#file-input');
   const dropzone = $('#dropzone');
+
+  /**
+   * 拍照入口是否可用，由**服务端**说了算（它才知道有没有配凭据）。
+   * 不在这里写死 —— 写死会在两种部署形态下都错：
+   * 配了却显示"未启用"（让人以为没接），没配却显示"可用"（点了才发现不行）。
+   */
+  api('/api/health')
+    .then((h) => {
+      const on = Boolean(h?.capabilities?.ocr);
+      $('#ocr-off').hidden = on;
+      $('#dropzone').classList.toggle('disabled', !on);
+      $('#dropzone-hint').textContent = on
+        ? '支持 JPG / PNG；会自动压缩后识别'
+        : '拍照识题未启用 —— 请用下面的文字入口';
+      // 卡片右上角的状态标签：一眼能看出这条路通不通
+      const pill = $('#ocr-pill');
+      pill.textContent = on ? '识别可用' : '未启用';
+      pill.className = on ? 'pill pill-live' : 'pill pill-muted';
+      // 图形提示只在真的能识别时才说 —— 否则是噪音
+      $('#ocr-figure-note').hidden = !on;
+    })
+    .catch(() => {
+      // 拿不到健康状态时不谎报可用：保持"未启用"的说明可见
+      $('#ocr-off').hidden = false;
+      $('#ocr-figure-note').hidden = true;
+      const pill = $('#ocr-pill');
+      pill.textContent = '状态未知';
+      pill.className = 'pill pill-muted';
+    });
+
   dropzone.addEventListener('dragover', (e) => {
     e.preventDefault();
     dropzone.classList.add('dragover');
@@ -1478,26 +1692,14 @@ function bindUpload() {
     if (file) handleImage(file);
   });
 
+  $('#btn-ocr')?.addEventListener('click', runOcr);
+  $('#btn-ocr-clear')?.addEventListener('click', resetOcrPick);
+
   $('#ocr-explain').addEventListener('click', () => {
     const pre = $('#ocr-plan');
     pre.hidden = !pre.hidden;
     if (!pre.textContent) pre.textContent = OCR_PLAN;
   });
-}
-
-function handleImage(file) {
-  if (!file.type.startsWith('image/')) {
-    toast('请选择图片文件');
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = () => {
-    const img = $('#preview');
-    img.src = String(reader.result);
-    img.hidden = false;
-  };
-  reader.readAsDataURL(file);
-  $('#ocr-notice').hidden = false;
 }
 
 // ---------------------------------------------------------------------------

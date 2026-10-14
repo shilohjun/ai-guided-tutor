@@ -255,6 +255,15 @@ describe('前端 · 密钥与口令不外泄', () => {
     loadEnvFile();
     const apiKey = String(process.env.LLM_API_KEY ?? '').trim();
     const teacherKey = String(process.env.TEACHER_KEY ?? '').trim();
+    /**
+     * 拍照识题的 AppCode 也在这条防线里。
+     *
+     * 为什么必须加进来：它是本轮新增的第三份凭据，而"新增凭据时忘了加进这条检查"
+     * 恰恰是这类防线失效的典型方式 —— 防线本身没问题，只是没人记得更新它。
+     * 注意它**不能**用 sk- 那个模式兜住：AppCode 是 32 位十六进制，
+     * 长得跟 git 短哈希一模一样，只能靠"与 .env 里的真实值逐字比对"来判断。
+     */
+    const ocrAppCode = String(process.env.ALIYUN_OCR_APPCODE ?? '').trim();
 
     const files = collectDeliverableFiles(ROOT);
     const hits = [];
@@ -267,11 +276,39 @@ describe('前端 · 密钥与口令不外泄', () => {
       }
       if (apiKey && content.includes(apiKey)) hits.push(`${relative(ROOT, file)} 含 LLM_API_KEY`);
       if (teacherKey && content.includes(teacherKey)) hits.push(`${relative(ROOT, file)} 含 TEACHER_KEY`);
+      if (ocrAppCode && content.includes(ocrAppCode)) hits.push(`${relative(ROOT, file)} 含 ALIYUN_OCR_APPCODE`);
       // 兜底：任何形如 sk-xxxxx（20 位以上）的字面量都不该出现在源码里
       const m = content.match(/sk-[A-Za-z0-9]{20,}/);
       if (m && !file.endsWith('.env')) hits.push(`${relative(ROOT, file)} 含疑似 API Key 字面量 ${m[0].slice(0, 7)}…`);
     }
     assert(hits.length === 0, `密钥/口令出现在不该出现的地方：\n  ${hits.join('\n  ')}`);
+  });
+
+  it('阿里云 AccessKey / AppSecret 这类凭据不该出现在仓库里', () => {
+    /**
+     * 这三类模式的共同点：一旦出现就**几乎一定是真的泄露**，没有良性误报。
+     * （32 位十六进制不能这样查 —— 它和 git 短哈希撞脸，会天天误报，
+     *   所以 AppCode 走上面那条"与 .env 实际值比对"的路子。）
+     */
+    const files = collectDeliverableFiles(ROOT);
+    const patterns = [
+      [/LTAI[0-9A-Za-z]{12,}/, '阿里云 AccessKey ID'],
+      [/["']U2[A-Za-z0-9+/=]{28,}["']/, '疑似阿里云 AppSecret'],
+    ];
+    const hits = [];
+    for (const file of files) {
+      let content;
+      try {
+        content = readFileSync(file, 'utf8');
+      } catch {
+        continue;
+      }
+      for (const [re, label] of patterns) {
+        const m = content.match(re);
+        if (m) hits.push(`${relative(ROOT, file)} 含${label}：${m[0].slice(0, 10)}…`);
+      }
+    }
+    assert(hits.length === 0, `疑似云凭据：\n  ${hits.join('\n  ')}`);
   });
 
   it('.env 本身在 .gitignore 里（否则密钥会被提交）', () => {
