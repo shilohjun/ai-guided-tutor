@@ -470,14 +470,18 @@ export function buildRestatement(problem, observation, position, stuckKind, opts
 
   const parts = [];
   if (observation.goal) parts.push(`你要求的是「${clip(observation.goal, 40)}」`);
-  if (observation.laws.length) parts.push(`你打算用「${observation.laws.join('、')}」`);
 
   // 复述推理链时，必须过滤掉"然后呢""还是不会"这类纯追问 ——
   // 否则会出现"我理解你的意思是：你的推理走到了「还是不会,再给一点提示」"这种废话复述。
   const substantive = (observation.reasoningChain ?? []).filter(isSubstantiveReasoning);
-  if (substantive.length) {
-    parts.push(`你的推理走到了「${clip(substantive[substantive.length - 1], 50)}」`);
-  }
+  const chainText = substantive.length ? clip(substantive[substantive.length - 1], 50) : null;
+
+  // 推理链里已经点到某个规律时，不再把规律单独列一遍。
+  // 否则复述会变成"你打算用「欧姆定律」，你的推理走到了「我用欧姆定律算电流…」"——
+  // 同一件事说两遍，是学生眼里最刺眼的"AI 味"。
+  const lawsNotInChain = observation.laws.filter((l) => !chainText || !chainText.includes(l));
+  if (lawsNotInChain.length) parts.push(`你打算用「${lawsNotInChain.join('、')}」`);
+  if (chainText) parts.push(`你的推理走到了「${chainText}」`);
 
   // 没有任何实质信息可复述时不要硬凑 —— 宁可不说，也不要复读学生的废话
   if (parts.length === 0) {
@@ -507,7 +511,7 @@ export function buildRestatement(problem, observation, position, stuckKind, opts
 
   const misNote =
     stuckKind === 'precondition_gap'
-      ? '我感觉问题可能不在算，而在某个规律的前提条件上。'
+      ? '问题多半不在算，而在某个规律的前提条件上。'
       : '';
 
   return `${head}${strengthText}${posText}${misNote}如果我说错了，你直接纠正我。`;
@@ -561,7 +565,10 @@ function buildStrengths(problem, observation, position) {
  */
 function buildProbeQuestion(observation, position) {
   if ((observation.knowns ?? []).length === 0 && (observation.goal ?? null) === null) {
-    return '我还没听出你的具体想法。你能先说一下：这道题给了哪些量、要求的是什么吗？说完我们再决定往哪个方向想。';
+    // 刻意不写"说完我们再决定往哪个方向想"——
+    // 反问段与提示段会拼在同一条消息里，一旦本轮已经给出了方向提示，
+    // 这句承诺就和下面的方向自相矛盾（学生看到的是"你还没说清楚"+"给你一个方向"）。
+    return '我还没听出你的具体想法。你能先说一下：这道题给了哪些量、要求的是什么吗？';
   }
   if ((observation.laws ?? []).length === 0) {
     return '你能说一下你打算用哪个规律或哪个公式来入手吗？只说出名字就行，不用写式子。';

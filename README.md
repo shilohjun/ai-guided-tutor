@@ -25,7 +25,8 @@
 ## 目录
 
 - [它解决什么问题](#它解决什么问题)
-- [核心机制](#核心机制)
+- [AI 如何回答学生（一次对话的完整链路）](#ai-如何回答学生一次对话的完整链路)
+- [核心机制：三根支柱](#核心机制三根支柱)
 - [快速开始](#快速开始)
 - [配置](#配置)
 - [可用脚本](#可用脚本)
@@ -54,11 +55,44 @@
 | 衡量标准 | 答对没有 | 卡在哪、为什么卡、下一步做什么 |
 
 方向一变，技术难题也随之而来：**怎么保证 AI 在"帮"学生的同时，绝不把答案给出去？**
-这是本项目的核心工作，也是下面三根支柱要解决的问题。
+这是本项目的核心工作，也是下面"三根支柱"要解决的问题。
 
 ---
 
-## 核心机制
+## AI 如何回答学生（一次对话的完整链路）
+
+一条核心原则贯穿全程：**模型负责"懂"，代码负责"分寸"。**
+模型只做语言理解，凡是"错了会很严重"的判断（给几级提示、什么算泄题），一律由确定性代码决定。
+
+学生发来一句话后，引擎按顺序执行六步（`src/core/engine.js` 的 `handleTurn()`）：
+
+```
+学生输入
+  ├─ 0. 需求识别   索要答案 / 验证答案 / 元问题 → 确定性拒绝或转引导，不进入生成
+  ├─ 1. observe    学生思路 → 结构化观察（LLM 或离线规则桩）
+  ├─ 2. understand 双通道定位 + 可行性 + 卡点性质 → Diagnosis
+  ├─ 3. route      层级决策 + 策略 + 概念白名单 + 禁止项（确定性）
+  ├─ 4. generate   在指定层级内受限起草（越界则带着原因重试一次）
+  └─ 5. guard      出口把关：7 类检查；拦截则重写，两次不过则用安全兜底模板
+```
+
+几个关键设计：
+
+- **模型只做两件事**：把学生的话解成结构化观察（observe）、在指定层级内把话写好（draft）。
+  它不决定层级、不决定是否放行、不判断什么算答案（`src/core/llm.js`）。
+- **双通道定位**（`src/core/locate.js`）：关键词通道（确定性、可复现）+ 语义通道（覆盖改写、可能幻觉）。
+  两者一致 ⇒ 高置信；冲突 ⇒ 采信学生原话；单靠语义 ⇒ 必须有学生原话证据，否则不采信。
+- **决策与守卫都是确定性的**：层级递进、概念白名单、7 类防泄题检查全部是代码，
+  与模型能力、模型随机性无关。换模型只会影响"理解准确率"，不会影响"会不会泄题"。
+- **出口强断言**：任何交付给学生的文本都必然通过了守卫，否则引擎直接抛错
+  （让"守卫失效"立刻可见，而不是静默泄题）。
+
+> 详细链路见 [`docs/01-hint-ontology-and-contract.md`](docs/01-hint-ontology-and-contract.md)；
+> 各阶段提示词与修改指引见 [`docs/02-prompt-spec.md`](docs/02-prompt-spec.md)。
+
+---
+
+## 核心机制：三根支柱
 
 ### 一、卡点分类体系
 
@@ -89,7 +123,7 @@
 | `L2` | 方向提示 | 指出该看哪个量、哪个关系，但不给表达式 |
 | `L3` | 降级示范 | 示范一步"动作"，不给数值结果 |
 
-层级由两条硬护栏约束，它们不依赖模型自觉，而是在决策层强制生效：
+层级由两条硬护栏约束，它们不依赖模型自觉，而是在决策层（`src/core/route.js`）强制生效：
 
 - **禁止跳级** —— 按历史"连续前缀"判断可达层级，L3 要求历史里出现过 L2，L2 要求出现过 L1。
 - **禁止原地打转** —— 同一层级在同一卡点已给过 2 次时，允许升一级；
@@ -99,15 +133,15 @@
 
 交付给学生的每一句话，都要先过七类确定性检查：
 
-| # | 拦截内容 | 生效层级 |
-|---|---|---|
-| 1 | 数值答案（含"一库仑"这类中文数字说法） | 全部 |
-| 2 | 解法性公式的完整表达式 | 全部（L3 允许"半边"） |
-| 3 | 超出声明层级的内容（L1/L2 出现公式形态） | L0–L2 |
-| 4 | 解法倾倒：编号步骤 > 2 个，或推导箭头 > 2 个 | 全部 |
-| 5 | 收口句式："所以答案是 / 最终结果 / 因此可得" | 全部 |
-| 6 | 跑题：引用了本题不存在的概念 | 全部 |
-| 7 | **说出解题核心结论**（如"导体棒是电源，r 是内阻"） | L0–L2 |
+| # | 检查函数 | 违规 `kind` | 拦截内容 | 生效层级 |
+|---|---|---|---|---|
+| 1 | `checkAnswerLeak` | `answer_in_text` | 数值答案（含"一库仑"这类中文数字说法） | 全部 |
+| 2 | `checkFormulaLeak` | `formula_leak` | 解法性公式的完整表达式 | 全部（L3 允许"半边"） |
+| 3 | `checkLevelOverflow` | `level_overflow` | 超出声明层级的内容（L1/L2 出现公式形态） | L0–L2 |
+| 4 | `checkSolutionDump` | `solution_dump` | 解法倾倒：编号步骤 > 2 个，或推导箭头 > 2 个 | 全部 |
+| 5 | `checkConclusion` | `final_conclusion` | 收口句式："所以答案是 / 最终结果 / 因此可得" | 全部 |
+| 6 | `checkConceptDomain` | `concept_out_of_domain` | 跑题：引用了本题不存在的概念 | 全部 |
+| 7 | `checkSolutionInsight` | `solution_insight` | 说出解题核心结论（如"导体棒是电源，r 是内阻"） | L0–L2 |
 
 第 7 类的判据是「**指派**」而不是「提及」：
 
@@ -117,17 +151,9 @@
 它来自一次真模型实测：那句回复没有公式、没有数值，形式上完全合规，
 但学生漏的正是"导体棒有内阻"—— 前六类检查全都拦不住。
 
-七类检查在 `src/core/guard.js` 中的实现，以及它们各自产出的违规类型：
-
-| 检查函数 | 违规 `kind` | 拦截内容 |
-|---|---|---|
-| `checkAnswerLeak` | `answer_in_text` | 数值答案 |
-| `checkFormulaLeak` | `formula_leak` | 解法性公式表达式 |
-| `checkLevelOverflow` | `level_overflow` | 超出声明层级的内容 |
-| `checkSolutionDump` | `solution_dump` | 解法倾倒 |
-| `checkConclusion` | `final_conclusion` | 收口句式 |
-| `checkConceptDomain` | `concept_out_of_domain` | 跑题概念 |
-| `checkSolutionInsight` | `solution_insight` | 解题核心结论 |
+七类检查在 `src/core/guard.js` 中实现。拦截不是简单丢弃，而是**降级重写**：
+按违规严重度选择最保守的策略（剥离公式 / 截断 / 换成安全兜底模板），
+并把拦截原因回流到下一轮提示词（`必须回避的内容`），形成闭环。
 
 > 详细契约见 [`docs/01-hint-ontology-and-contract.md`](docs/01-hint-ontology-and-contract.md)
 > 与 [`docs/02-prompt-spec.md`](docs/02-prompt-spec.md)。
@@ -244,7 +270,8 @@ npm run eval:llm
 `test/docs.test.js` 会从源码里**实际数出**卡点种类、守卫类别与用例总数，
 再回头核对本文档。以后谁加了第 8 类守卫或第 8 种卡点，测试会先失败，逼着文档同步。
 
-> 评测口径与指标定义见 [`docs/03-evaluation-spec.md`](docs/03-evaluation-spec.md)。
+> 评测口径、指标定义与"如何验证 AI 回答的准确性"见
+> [`docs/03-evaluation-spec.md`](docs/03-evaluation-spec.md)。
 
 ---
 
@@ -268,6 +295,7 @@ test/           自动化测试（自研极简运行器，零依赖）
 scripts/        评测与 OCR 探测脚本
 docs/           设计文档与截图
 showcase/       项目成果展示页（可独立发布）
+gzs_malong.html 单文件产品演示页（拍照解题训练）
 ```
 
 ---
@@ -280,6 +308,7 @@ showcase/       项目成果展示页（可独立发布）
 |---|---|---|
 | `GET` | `/api/health` | 健康检查与当前运行模式 |
 | `GET` | `/api/problems` | 内置题目列表 |
+| `GET` | `/api/demo-scripts` | 演示剧本（首页/对话页的示例对话） |
 | `GET` | `/api/problem?id=` | 单个题目（学生可见版本） |
 | `POST` | `/api/problem/import` | 题目文字 → 结构化题目 |
 | `POST` | `/api/ocr` | 题目照片 → 题干文本 |
@@ -338,12 +367,14 @@ showcase/       项目成果展示页（可独立发布）
 | 文档 | 内容 |
 |---|---|
 | [`01-hint-ontology-and-contract.md`](docs/01-hint-ontology-and-contract.md) | 提示本体与接口契约 |
-| [`02-prompt-spec.md`](docs/02-prompt-spec.md) | Prompt 规范 |
-| [`03-evaluation-spec.md`](docs/03-evaluation-spec.md) | 评测标准与方法 |
+| [`02-prompt-spec.md`](docs/02-prompt-spec.md) | Prompt 规范、提取与修改指引 |
+| [`03-evaluation-spec.md`](docs/03-evaluation-spec.md) | 评测标准与准确性验证方法 |
 | [`04-intake-and-views.md`](docs/04-intake-and-views.md) | 读题链路与视图隔离 |
 | [`05-ocr-feasibility.md`](docs/05-ocr-feasibility.md) | 图片识别可行性评估 |
 | [`06-marketplace-ocr-integration.md`](docs/06-marketplace-ocr-integration.md) | 云市场题目 OCR 接入研究 |
-| [`周报.md`](docs/周报.md) | 工作周报 |
+| [`07-离线话术去AI味-前后对比.md`](docs/07-离线话术去AI味-前后对比.md) | 离线话术（学生可见）改动前后对比 |
+| [`08-系统提示词去AI味-前后对比.md`](docs/08-系统提示词去AI味-前后对比.md) | 三条系统提示词改动前后对比 |
+| [`周报.md`](docs/周报.md) | 项目周报与成果汇总 |
 | [`showcase/`](showcase/) | 项目成果演示页 |
 
 ---

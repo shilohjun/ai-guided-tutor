@@ -39,7 +39,14 @@ const state = {
   teacherSessionId: null,
   /** 学生自己算出来的答案（跨轮累计，仅用于完成界面的回显） */
   confirmed: [],
+  /** 本地学习快照：每轮对话按步骤保存，避免依赖服务端内存会话。 */
+  learningSteps: [],
+  reviewStepId: null,
+  currentStepId: null,
 };
+
+const LEARNING_STORAGE_KEY = 'dsh-learning-history:v1';
+const MAX_SAVED_SESSIONS = 20;
 
 const MODE_HINT = {
   self_training: '自主训练：我先不说话，只在你说"卡住了"或者思路明显走岔时出声。',
@@ -113,6 +120,252 @@ function newSessionId(problemId) {
   return `demo-${problemId}-${Date.now()}`;
 }
 
+function readLearningStore() {
+  try {
+    const value = JSON.parse(localStorage.getItem(LEARNING_STORAGE_KEY) || '{"version":1,"sessions":[]}');
+    return value?.version === 1 && Array.isArray(value.sessions) ? value : { version: 1, sessions: [] };
+  } catch {
+    return { version: 1, sessions: [] };
+  }
+}
+
+function persistLearningState() {
+  if (!state.sessionId || !state.currentProblem) return;
+  const store = readLearningStore();
+  const snapshot = {
+    sessionId: state.sessionId,
+    problemId: state.currentProblem.id,
+    problem: state.currentProblem,
+    steps: state.learningSteps,
+    metadata: {
+      mode: state.mode,
+      turns: state.turns,
+      reachedLevels: [...state.reachedLevels],
+      currentLevel: state.currentLevel,
+      confirmed: state.confirmed,
+      problemView: state.problemView,
+      page: $$('.page.active')[0]?.id ?? 'page-chat',
+      draft: $('#input')?.value ?? '',
+      updatedAt: new Date().toISOString(),
+    },
+  };
+  store.sessions = [snapshot, ...store.sessions.filter((item) => item.sessionId !== snapshot.sessionId)]
+    .slice(0, MAX_SAVED_SESSIONS);
+  let saved = false;
+  while (!saved) {
+    try {
+      localStorage.setItem(LEARNING_STORAGE_KEY, JSON.stringify(store));
+      saved = true;
+    } catch {
+      // 空间紧张时先清理最久未更新的其他会话，当前会话始终排在首位。
+      if (store.sessions.length <= 1) break;
+      store.sessions.pop();
+    }
+  }
+  if (!saved) toast('本地存储空间不足，最近的对话可能无法保存');
+  renderLearningTimeline();
+}
+
+function logLearningAction(action, detail = '') {
+  if (!state.currentProblem || !state.sessionId) return;
+  const stepId = state.reviewStepId || `step-${String(state.turns + (state.busy ? 1 : 0)).padStart(3, '0')}`;
+  let step = state.learningSteps.find((item) => item.stepId === stepId);
+  if (!step) {
+    step = {
+      stepId,
+      title: `第 ${state.turns + (state.busy ? 1 : 0)} 轮对话`,
+      input: '',
+      output: '',
+      timestamp: new Date().toISOString(),
+      status: 'in_progress',
+      actions: [],
+    };
+    state.learningSteps.push(step);
+  }
+  step.actions.push({ action, detail, timestamp: new Date().toISOString() });
+  step.timestamp = new Date().toISOString();
+  persistLearningState();
+}
+
+function appendLearningStep(kind, value, response = null) {
+  const stepId = state.currentStepId || `step-${String(state.turns).padStart(3, '0')}`;
+  let step = state.learningSteps.find((item) => item.stepId === stepId);
+  if (!step) {
+    step = {
+      stepId,
+      title: `第 ${Number(stepId.split('-')[1]) || state.turns} 轮对话`,
+      input: '',
+      output: '',
+      timestamp: new Date().toISOString(),
+      status: 'in_progress',
+      actions: [],
+    };
+    state.learningSteps.push(step);
+  }
+  if (kind === 'user') step.input = value;
+  if (kind === 'assistant') {
+    step.output = typeof value === 'string' ? value : value?.message ?? '';
+    step.response = response ?? (typeof value === 'object' ? value : null);
+    step.status = 'completed';
+  }
+  if (kind === 'error') {
+    step.output = value;
+    step.status = 'error';
+  }
+  step.actions.push({
+    action: kind === 'user' ? '提交思路' : kind === 'assistant' ? '收到学伴回复' : '请求失败',
+    timestamp: new Date().toISOString(),
+  });
+  step.timestamp = new Date().toISOString();
+  persistLearningState();
+}
+
+function renderLearningTimeline(query = $('#history-search')?.value ?? '') {
+  const list = $('#history-list');
+  if (!list) return;
+  const normalized = String(query).trim().toLocaleLowerCase();
+  const snapshots = readLearningStore().sessions;
+  const current = snapshots.find((item) => item.sessionId === state.sessionId);
+  const sessions = current
+    ? [
+        { ...current, steps: state.learningSteps },
+        ...snapshots.filter((item) => item.sessionId !== state.sessionId),
+      ]
+    : snapshots;
+  const items = sessions.flatMap((session) => (session.steps ?? []).map((step, index) => ({
+    session,
+    step,
+    index,
+    problemTitle: (session.problem?.topics ?? []).slice(0, 2).join(' / ') || session.problemId,
+  })));
+  const matched = items.filter(({ session, step, index, problemTitle }) => {
+    if (!normalized) return true;
+    const date = new Date(step.timestamp).toLocaleString();
+    const haystack = `${index + 1} 第 ${index + 1} 步 第${index + 1}步 ${step.stepId} ${step.title} ${step.input} ${step.output} ${date} ${step.timestamp} ${problemTitle} ${session.problemId}`.toLocaleLowerCase();
+    return haystack.includes(normalized);
+  });
+  list.innerHTML = matched.length
+    ? matched.map(({ session, step, index, problemTitle }) => {
+        const date = new Date(step.timestamp);
+        const stamp = Number.isNaN(date.getTime()) ? '' : date.toLocaleString();
+        const isCurrent = session.sessionId === state.sessionId;
+        return `<li><button type="button" class="history-item ${isCurrent && state.reviewStepId === step.stepId ? 'active' : ''}" data-history-session="${esc(session.sessionId)}" data-history-step="${esc(step.stepId)}">
+          <span class="history-step-no">${index + 1}</span><span class="history-item-copy"><strong>${esc(problemTitle)} · ${esc(step.title)}</strong><small>${esc(clip(step.input || step.output || '进行中', 48))}</small><time>${esc(stamp)}</time></span>
+        </button></li>`;
+      }).join('')
+    : '<li class="muted small">没有匹配的学习步骤。</li>';
+  $$('#history-list [data-history-step]').forEach((button) =>
+    button.addEventListener('click', () => reviewLearningStep(button.dataset.historyStep, button.dataset.historySession)),
+  );
+  $('#history-latest').hidden = !state.reviewStepId;
+}
+
+function renderSavedSteps(steps) {
+  $('#messages').innerHTML = '';
+  for (const step of steps) {
+    if (step.input) appendStudentBubble(step.input);
+    if (step.response) appendAiBubble(step.response);
+    else if (step.status === 'error' && step.output) appendSystemBubble(step.output);
+  }
+  if (!steps.length) renderEmptyState();
+}
+
+function renderLearningContext(response) {
+  renderProgress(response?.progress ?? null, state.currentProblem);
+  renderUnderstood(response?.understood ?? []);
+  renderEnginePath(response);
+  const hint = response?.hint;
+  $('#status-level').textContent = !response
+    ? '—'
+    : response.completion
+      ? (response.completion.complete ? '全部完成' : `答对 ${response.completion.matched?.length ?? 0} 处`)
+      : response.suppressed
+        ? '静默观测'
+        : hint?.level != null
+          ? `${String(hint.levelName ?? '').replace(/^L\d\s*/, '')}（${LEVEL_SHORT[hint.level] ?? ''}）`
+          : '—';
+  updateLadder(hint?.level ?? null);
+}
+
+async function reviewLearningStep(stepId, sessionId = state.sessionId) {
+  if (sessionId !== state.sessionId) {
+    const snapshot = readLearningStore().sessions.find((item) => item.sessionId === sessionId);
+    if (!snapshot) return;
+    try {
+      const problem = snapshot.problem ?? (await api(`/api/problem?id=${encodeURIComponent(snapshot.problemId)}`)).problem;
+      restoreSnapshot(snapshot, problem);
+    } catch {
+      toast('这道题暂时无法载入，学习记录仍保存在本地');
+      return;
+    }
+  }
+  const index = state.learningSteps.findIndex((step) => step.stepId === stepId);
+  if (index < 0) return;
+  state.reviewStepId = stepId;
+  renderSavedSteps(state.learningSteps.slice(0, index + 1));
+  renderLearningContext(state.learningSteps[index].response ?? null);
+  $('#input').disabled = true;
+  $('#btn-send').disabled = true;
+  $('#history-latest').hidden = false;
+  renderLearningTimeline();
+  showPage('page-chat');
+  toast(`正在回看第 ${index + 1} 步`);
+}
+
+function returnToLatestLearningStep() {
+  state.reviewStepId = null;
+  renderSavedSteps(state.learningSteps);
+  renderLearningContext(state.learningSteps[state.learningSteps.length - 1]?.response ?? null);
+  $('#input').disabled = false;
+  $('#btn-send').disabled = !state.currentProblem;
+  renderLearningTimeline();
+  scrollToBottom();
+}
+
+async function restoreLearningState() {
+  const snapshot = readLearningStore().sessions[0];
+  if (!snapshot?.problemId) return false;
+  try {
+    const { problem } = await api(`/api/problem?id=${encodeURIComponent(snapshot.problemId)}`);
+    restoreSnapshot(snapshot, problem);
+    return true;
+  } catch {
+    // 本地记录保留；题目接口失效时给用户保留正常首页入口。
+    if (snapshot.problem?.id === snapshot.problemId) {
+      restoreSnapshot(snapshot, snapshot.problem);
+      return true;
+    }
+    return false;
+  }
+}
+
+function restoreSnapshot(snapshot, problem) {
+  state.currentProblem = problem;
+  state.currentAnalysis = problem.analysis ?? null;
+  state.sessionId = snapshot.sessionId;
+  state.learningSteps = Array.isArray(snapshot.steps) ? snapshot.steps : [];
+  state.currentStepId = null;
+  state.reviewStepId = null;
+  const meta = snapshot.metadata ?? {};
+  state.mode = meta.mode === 'self_training' ? 'self_training' : 'ai_companion';
+  state.turns = Number(meta.turns) || state.learningSteps.filter((item) => item.input).length;
+  state.reachedLevels = new Set(Array.isArray(meta.reachedLevels) ? meta.reachedLevels : []);
+  state.currentLevel = meta.currentLevel ?? null;
+  state.confirmed = Array.isArray(meta.confirmed) ? meta.confirmed : [];
+  state.hasMessages = state.learningSteps.length > 0;
+  applyProblemToChat(problem);
+  renderSavedSteps(state.learningSteps);
+  renderLearningContext(state.learningSteps[state.learningSteps.length - 1]?.response ?? null);
+  renderProblemList();
+  renderScripts();
+  setMode(state.mode);
+  if (meta.problemView) setProblemView(meta.problemView);
+  if (typeof meta.draft === 'string') $('#input').value = meta.draft;
+  renderLearningTimeline();
+  const restoredPage = ['page-start', 'page-chat', 'page-report'].includes(meta.page) ? meta.page : 'page-chat';
+  showPage(restoredPage === 'page-report' && !state.hasMessages ? 'page-chat' : restoredPage);
+}
+
 // ---------------------------------------------------------------------------
 // 页面导航
 // ---------------------------------------------------------------------------
@@ -137,6 +390,7 @@ function showPage(pageId) {
   if (pageId === 'page-chat') {
     requestAnimationFrame(() => enhanceStemBoxes($('#pane-original')));
   }
+  persistLearningState();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -165,6 +419,7 @@ function setMode(mode, opts = {}) {
   $$('#mode-switch .seg-btn').forEach((b) => b.classList.toggle('on', b.dataset.mode === mode));
   $$('#mode-cards .mode-card').forEach((b) => b.classList.toggle('on', b.dataset.mode === mode));
   $('#mode-hint').textContent = MODE_HINT[mode];
+  persistLearningState();
   if (opts.announce) toast(mode === 'self_training' ? '已切换：自主训练 · 我不再主动开口' : '已切换：学伴陪伴 · 关键处我会提醒你');
 }
 
@@ -180,6 +435,7 @@ function setProblemView(view) {
   if (view === 'original') enhanceStemBoxes($('#pane-original'));
   // 解析里的知识图谱需要更宽的位置
   $('#workbench').classList.toggle('wide-left', view === 'parsed');
+  persistLearningState();
 }
 
 // ---------------------------------------------------------------------------
@@ -193,7 +449,9 @@ async function init() {
   updateLadder(null);
   await Promise.all([loadHealth(), loadProblems(), loadScripts()]);
   showPage('page-start');
+  const restored = await restoreLearningState();
   await applyDeepLink();
+  if (restored) toast('已恢复上次的学习进度');
 }
 
 /**
@@ -421,6 +679,9 @@ async function applyImportedProblem(res) {
   state.currentLevel = null;
   state.hasMessages = false;
   state.confirmed = [];
+  state.learningSteps = [];
+  state.reviewStepId = null;
+  state.currentStepId = null;
 
   $('#intake-result').hidden = false;
   $('#intake-topics').innerHTML = (res.intake.topics ?? [])
@@ -470,6 +731,14 @@ function conditionHtml(c, i) {
 
 async function selectProblem(problemId) {
   const { problem } = await api(`/api/problem?id=${encodeURIComponent(problemId)}`);
+  const saved = readLearningStore().sessions.find((item) => item.problemId === problemId);
+  if (saved) {
+    restoreSnapshot(saved, problem);
+    showPage('page-chat');
+    $('#input').focus();
+    toast('已恢复这道题的学习进度');
+    return;
+  }
   state.currentProblem = problem;
   state.currentAnalysis = problem.analysis ?? null;
   state.sessionId = newSessionId(problemId);
@@ -478,6 +747,9 @@ async function selectProblem(problemId) {
   state.currentLevel = null;
   state.hasMessages = false;
   state.confirmed = [];
+  state.learningSteps = [];
+  state.reviewStepId = null;
+  state.currentStepId = null;
 
   applyProblemToChat(problem);
   renderProblemList();
@@ -501,6 +773,7 @@ function applyProblemToChat(problem) {
   renderProgress(null, problem);
   renderUnderstood([]);
   renderEnginePath(null);
+  renderLearningTimeline();
   $('#status-level').textContent = '—';
   updateLadder(null);
   setProblemView('original');
@@ -811,7 +1084,12 @@ function clip(s, n) {
 
 function bindEvents() {
   $('#composer').addEventListener('submit', onSubmit);
-  $('#input').addEventListener('input', (e) => autoGrow(e.target));
+  $('#input').addEventListener('input', (e) => {
+    autoGrow(e.target);
+    persistLearningState();
+  });
+  $('#history-search').addEventListener('input', (e) => renderLearningTimeline(e.target.value));
+  $('#history-latest').addEventListener('click', returnToLatestLearningStep);
   $('#input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -904,9 +1182,13 @@ async function onSubmit(e) {
   input.value = '';
   autoGrow(input);
 
+  // 新输入构成一个可独立回看的学习步骤；用户消息与 AI 回复归入同一步。
+  state.currentStepId = `step-${String(state.turns + 1).padStart(3, '0')}`;
+
   $('#chat-empty')?.remove();
   state.hasMessages = true;
   appendStudentBubble(utterance);
+  appendLearningStep('user', utterance);
 
   const thinking = document.createElement('div');
   thinking.className = 'thinking';
@@ -933,6 +1215,7 @@ async function onSubmit(e) {
       state.currentLevel = res.hint.level;
     }
     appendAiBubble(res);
+    appendLearningStep('assistant', res, res);
     renderProgress(res.progress, state.currentProblem);
     $('#status-level').textContent = res.completion
       ? (res.completion.complete ? '全部完成' : `答对 ${res.completion.matched.length} 处`)
@@ -957,8 +1240,11 @@ async function onSubmit(e) {
     thinking.remove();
     const extra = err.status === 404 ? '\n（导入的题目在服务重启后会失效，请重新粘贴一次题目。）' : '';
     appendSystemBubble(`出错了：${err.message}${extra}`);
+    appendLearningStep('error', `出错了：${err.message}${extra}`);
   } finally {
     state.busy = false;
+    state.currentStepId = null;
+    persistLearningState();
     $('#btn-send').disabled = false;
     input.focus();
   }

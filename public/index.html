@@ -361,6 +361,17 @@
 
           <!-- ---------- 右：我的状态 ---------- -->
           <aside class="side-panel">
+            <div class="card card-tight history-card">
+              <div class="panel-head">
+                <span class="ph-icon">🕘</span>
+                <h3>学习时间线</h3>
+              </div>
+              <label class="history-search-label" for="history-search">按步骤、关键词或时间搜索</label>
+              <input id="history-search" class="history-search" type="search" placeholder="如：第 2 步 / 公式 / 14:30" />
+              <button type="button" class="btn btn-ghost btn-sm history-latest" id="history-latest" hidden>返回最新对话</button>
+              <ol class="history-list" id="history-list"><li class="muted small">完成一轮对话后会记录在这里。</li></ol>
+            </div>
+
             <div class="card card-tight">
               <div class="panel-head">
                 <span class="ph-icon">✅</span>

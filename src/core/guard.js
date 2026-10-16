@@ -533,7 +533,12 @@ export function safeFallbackHint(problem, level, opts = {}) {
     case 1:
       return '你提到的这个规律，它成立需要的前提条件，题目里的条件满足了吗？先只检查前提，不用往下算。';
     case 2:
-      return `方向提示：这一步的关键是${concept}与题目里另一个量之间的联系。先想清楚这个联系是怎么建立的，再考虑用什么式子。`;
+      // concept 在没有白名单时会退化成占位值「这一步」，
+      // 直接套模板会写出"这一步的关键是这一步和另一个量之间的关系"这种病句。
+      // 另外刻意去掉"方向提示："这个前缀 —— 那是教研侧的说法，学生看到会意识到"系统在给我分类"。
+      return opts.conceptWhitelist?.length || step?.concepts?.length
+        ? `这一步的关键是${concept}与题目里另一个量之间的关系。先想清楚这个关系是怎么建立的，再考虑用什么式子。`
+        : '这一步的关键，是题目里那几个量之间的关系。先想清楚这个关系是怎么建立起来的，再考虑用什么式子。';
     default:
       return kindActionFallback(kind, concept, opts.other);
   }

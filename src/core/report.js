@@ -17,6 +17,14 @@ import { inspectVoice } from './prompt.js';
 import { safeStepRef } from './guard.js';
 
 /**
+ * 学科中文名。
+ * 报告标题原来是 `subject === 'physics' ? '物理' : ''` ——
+ * 数学题于是得到" · 反证法/数论（难度 3/5）"，前面挂一个空学科加一个孤立的分隔点。
+ * 统一查表，任何学科都能得到像样的标题。
+ */
+const SUBJECT_LABEL = { physics: '物理', math: '数学', chemistry: '化学' };
+
+/**
  * 从引擎响应累积一条会话记录（服务端维护）。
  *
  * 这里存的东西比"生成报告所需"更多 —— 因为教师视图要用同一份记录
@@ -168,7 +176,7 @@ export function buildReport(problem, record, meta) {
 
   return {
     problemId: problem.id,
-    problemTitle: `${problem.subject === 'physics' ? '物理' : ''} · ${problem.topics.slice(0, 2).join('/')}（难度 ${problem.difficulty}/5）`,
+    problemTitle: `${SUBJECT_LABEL[problem.subject] ?? '本题'} · ${problem.topics.slice(0, 2).join('/')}（难度 ${problem.difficulty}/5）`,
     stuckPoints,
     hintStats,
     independence,
@@ -257,7 +265,7 @@ const DEEPER_PATTERNS = [
     test: (labels, kinds) =>
       kinds.includes('precondition_gap') && labels.some((l) => /平衡|匀速|受力|运动/.test(l)),
     issue: '运动学信息向动力学条件的翻译还不熟练（例如"匀速"没有立刻翻译成"合力为零"）。',
-    drill: '练习"信息翻译"：拿到题先把每个形容词翻译成物理条件，写成一列。',
+    drill: '练习"信息翻译"：拿到题先把每个形容词翻译成一条明确的条件，写成一列。',
   },
   {
     id: 'tool-selection',
