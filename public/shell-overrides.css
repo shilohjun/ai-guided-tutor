@@ -1,0 +1,803 @@
+/* =========================================================================
+   v3 学术皮肤 · 本地应用适配层
+   -------------------------------------------------------------------------
+   只做四类覆盖，不改 v3 的 token / 主题 / 版式：
+   1. 品牌标记：本地 🧭（v3 的 Φ 是物理专属）
+   2. 对话：v2 的左右气泡结构，颜色/字体继续用 v3
+   3. 写作区：常驻符号面板 + 公式卡
+   4. 折叠入口：历史、解析、条件等低频内容
+   ========================================================================= */
+
+/* ---------- 品牌：本地 🧭 ---------- */
+.brand-mark {
+  font-family: var(--font-sans);
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.brand-mark::after { opacity: calc(var(--logo-tint-alpha) * 0.55); }
+.brand-text small {
+  font-family: var(--font-sans);
+  font-size: .6875rem;
+  letter-spacing: .04em;
+}
+.demo-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: .2rem .5rem;
+  border: 1px solid var(--accent-amber-border);
+  border-radius: 2px;
+  background: var(--accent-amber-tint);
+  color: var(--accent-amber-ink);
+  font-family: var(--font-mono);
+  font-size: .625rem;
+  letter-spacing: .12em;
+  white-space: nowrap;
+}
+.demo-pill::before { content: "●"; margin-right: .35rem; font-size: .55rem; }
+.demo-pill[hidden] { display: none !important; }
+
+/* ---------- 对话：气泡结构（v2） + v3 token ---------- */
+.messages { padding-top: .9rem; }
+
+.message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0;
+  margin: 0 0 1.15rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.message.ai,
+.message.user { border-left: 0; background: transparent; }
+.message.user { align-items: flex-end; }
+
+.message > span {
+  margin-bottom: .3rem;
+  font-family: var(--font-mono);
+  font-size: .625rem;
+  letter-spacing: .12em;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+.message.user > span { color: var(--text-secondary); }
+
+.bubble {
+  max-width: min(88%, 62ch);
+  padding: .8rem 1rem;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.78;
+}
+.message.user .bubble {
+  background: var(--bg-selected);
+  border-color: var(--border);
+}
+.bubble img {
+  display: block;
+  max-width: 100%;
+  max-height: 11.25rem;
+  margin-bottom: .5rem;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+
+.waiting {
+  margin: .2rem 0 .9rem;
+  padding: .5rem .8rem;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: .8125rem;
+}
+.waiting::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: var(--accent-amber);
+}
+
+/* ---------- 对话页头部：两个长动作按钮 ---------- */
+.chat-actions { max-width: 25rem; }
+.chat-actions > div { flex-wrap: wrap; }
+.chat-actions .chat-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: .4rem;
+  margin-top: 0;
+}
+.chat-actions .chat-actions-row button {
+  padding: .32rem .55rem;
+  font-size: .75rem;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+/* ---------- 题目卡：换一题 + 解析折叠 ---------- */
+.card-headline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: .65rem;
+}
+.card-headline h2 { margin: 0; }
+.link-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--brand);
+  font-size: .8125rem;
+  line-height: 1.6;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.link-button:hover { background: transparent; color: var(--brand-hover); }
+
+/* ---------- 折叠入口：历史 / 解析 / 条件 ---------- */
+details.fold {
+  margin-top: .9rem;
+  padding-top: .65rem;
+  border-top: 1px solid var(--border-subtle);
+}
+details.fold > summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: .8125rem;
+  line-height: 1.6;
+  list-style: none;
+}
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary::before {
+  content: "＋";
+  display: inline-block;
+  width: 1.1em;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+details.fold[open] > summary::before { content: "－"; }
+details.fold > summary:hover { color: var(--text-primary); }
+details.fold .fold-body { padding-top: .65rem; }
+
+/* ---------- 学习进度里的历史搜索 ---------- */
+.history-search {
+  width: 100%;
+  margin: .55rem 0 .7rem;
+  padding: .45rem .6rem;
+  font-size: .8125rem;
+}
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: .45rem;
+}
+.history-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .5rem;
+  padding: .45rem .55rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  font-size: .75rem;
+  color: var(--text-secondary);
+}
+.history-list li strong {
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-list li span { flex: 0 0 auto; color: var(--text-muted); }
+.history-list li[data-history] { cursor: pointer; }
+.history-list li[data-history]:hover {
+  border-color: var(--border-control);
+  background: var(--bg-hover);
+}
+
+/* ---------- 写作区：常驻符号面板 ---------- */
+.mathbar {
+  margin-bottom: .65rem;
+  padding: .5rem .65rem .6rem;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+}
+.mathbar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: .4rem;
+}
+.mathbar-title {
+  font-family: var(--font-mono);
+  font-size: .625rem;
+  letter-spacing: .14em;
+  color: var(--text-muted);
+}
+.mathbar-auto {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  font-size: .75rem;
+  color: var(--text-secondary);
+}
+.mathbar-auto input { accent-color: var(--brand); }
+.mathbar-grid { display: flex; flex-wrap: wrap; gap: .28rem; }
+.mathbar-grid button {
+  min-width: 2rem;
+  padding: .22rem .42rem;
+  font-family: var(--font-mono);
+  font-size: .8125rem;
+  line-height: 1.4;
+  border-radius: 2px;
+}
+
+/* ---------- 公式卡：L3 之后才出现，来自题库，不是模型生成 ---------- */
+.formula-card {
+  margin-top: .8rem;
+  padding: .7rem .85rem;
+  white-space: normal;
+  background: var(--accent-teal-tint);
+  border: 1px solid var(--accent-teal-border);
+  border-left: 2px solid var(--accent-teal);
+  border-radius: var(--radius);
+}
+.formula-card .formula {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: .9375rem;
+}
+.formula-card .formula-note {
+  margin: .35rem 0 0;
+  color: var(--text-secondary);
+  font-size: .75rem;
+  line-height: 1.7;
+}
+.formula-card .formula-source {
+  display: block;
+  margin-top: .4rem;
+  font-family: var(--font-mono);
+  font-size: .625rem;
+  letter-spacing: .1em;
+  color: var(--text-muted);
+}
+.formula-trigger {
+  margin-top: .7rem;
+  padding: .35rem .6rem;
+  font-size: .75rem;
+}
+.demo-trigger-row { margin-top: .15rem; }
+
+/* ---------- 演示答案卡：明确不是 AI 气泡 ---------- */
+.demo-answer-card {
+  margin: 0 0 1.15rem;
+  padding: .75rem .9rem;
+  background: var(--accent-amber-tint);
+  border: 1px solid var(--accent-amber-border);
+  border-left: 2px solid var(--accent-amber);
+  border-radius: var(--radius);
+  white-space: normal;
+}
+.demo-answer-card .formula-label { color: var(--accent-amber-ink); }
+.demo-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  margin: .45rem 0;
+}
+.demo-values span {
+  padding: .25rem .5rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--accent-amber-border);
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: .8125rem;
+  color: var(--text-primary);
+}
+.demo-answer-card .formula-note { margin-bottom: .55rem; }
+
+/* ---------- 读题结果：第 2 页的模式卡上方一行 ---------- */
+.intake-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  padding: .85rem 1.1rem;
+  background: var(--bg-sunken);
+  border: 1px dashed var(--border-control);
+  border-radius: var(--radius);
+}
+.intake-summary p { margin: 0; font-size: .875rem; color: var(--text-secondary); }
+.intake-summary strong { color: var(--text-primary); font-weight: 600; }
+
+/* ---------- 报告：真实明细的轻量条目 ---------- */
+.stuck-item {
+  padding: .7rem 0;
+  border-top: 1px solid var(--border-subtle);
+}
+.stuck-item:first-of-type { border-top: 0; padding-top: 0; }
+.stuck-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .45rem;
+  margin-bottom: .25rem;
+}
+.stuck-head strong { font-size: .9375rem; }
+.stuck-item p { margin: 0; color: var(--text-secondary); font-size: .8125rem; }
+.action-list { margin: 0; padding-left: 1.2rem; color: var(--text-secondary); }
+.action-list li { margin: .35rem 0; line-height: 1.7; }
+
+/* ---------- 题目卡：原题 / 解析 小切换 ---------- */
+.problem-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.problem-toggle button {
+  padding: .18rem .5rem;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: .6875rem;
+  line-height: 1.6;
+}
+.problem-toggle button:hover { background: var(--bg-hover); border-color: transparent; color: var(--text-primary); }
+.problem-toggle button.on {
+  background: var(--bg-surface);
+  border-color: var(--border-control);
+  color: var(--brand);
+  font-weight: 600;
+  box-shadow: var(--shadow-card);
+}
+
+/* ---------- 进度卡：当前步骤 ---------- */
+.steps .step-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: .7rem;
+  width: 100%;
+  text-align: left;
+  font-size: .875rem;
+  color: var(--text-secondary);
+}
+.steps li.is-current .step-row { color: var(--text-primary); font-weight: 600; }
+.steps li.is-current span {
+  background: var(--bg-surface);
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+/* ---------- 公式卡入口 ---------- */
+.formula-trigger-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .55rem;
+  margin: -.3rem 0 1.1rem;
+  padding-left: .1rem;
+}
+.formula-trigger-row .small { font-size: .75rem; }
+
+/* ---------- 读题摘要里的折叠 ---------- */
+.intake-summary details.fold { margin: 0; padding: 0; border: 0; }
+.intake-summary details.fold > summary { color: var(--brand); }
+.intake-summary .fold-body { max-width: 38rem; }
+
+/* ---------- 报告里的知识点标签 ---------- */
+.report-tags { display: flex; flex-wrap: wrap; gap: .4rem; padding-top: .9rem; }
+.report-tags .tag { margin: 0; }
+
+/* ---------- 报告：帮助强度统计 / 推荐 / 卡点 ---------- */
+.report-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .9rem 1.25rem;
+  padding-top: .35rem;
+}
+.report-stats > div { display: flex; flex-direction: column; gap: .2rem; }
+.report-stats strong {
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  font-weight: 400;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+.report-stats span { font-size: .75rem; color: var(--text-muted); }
+.rec-item {
+  padding: .7rem 0;
+  border-top: 1px solid var(--border-subtle);
+}
+.rec-item:first-of-type { border-top: 0; padding-top: 0; }
+.rec-item strong { font-size: .9375rem; }
+.rec-item p { margin: .2rem 0 .4rem; color: var(--text-secondary); font-size: .8125rem; line-height: 1.7; }
+.rec-item .tag { margin: 0; }
+
+/* ---------- 题目解析：变量 / 条件 / 图谱 ---------- */
+.analysis-mini p { color: var(--text-secondary); font-size: .875rem; line-height: 1.75; }
+.analysis-mini h3 { margin-bottom: .45rem; }
+.analysis-mini .action-list { margin-top: 0; }
+.kg-layers { display: flex; flex-direction: column; gap: .55rem; }
+.kg-layer { display: flex; flex-direction: column; gap: .3rem; }
+.kg-layer-head {
+  font-family: var(--font-mono);
+  font-size: .625rem;
+  letter-spacing: .12em;
+  color: var(--text-muted);
+}
+.kg-nodes { display: flex; flex-wrap: wrap; gap: .3rem; }
+.kg-nodes .tag { margin: 0; }
+
+/* ---------- 迁移练习：重做卡不跟着右列拉高 ---------- */
+.practice-grid { align-items: start; }
+
+/* ---------- 第一页：演示模式开关 ---------- */
+.demo-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  padding: .7rem 1rem;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.demo-toggle-copy strong {
+  display: block;
+  font-size: .875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.demo-toggle-copy p {
+  margin: .15rem 0 0;
+  font-size: .75rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+.switch {
+  position: relative;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border-control);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  transition: background-color .16s ease, border-color .16s ease;
+}
+.switch span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform .16s ease, background-color .16s ease;
+}
+.switch[aria-checked="true"] {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.switch[aria-checked="true"] span {
+  background: var(--text-on-brand);
+  transform: translateX(20px);
+}
+
+/* ---------- 对话页：更宽的壳 + 可收起侧栏 ---------- */
+body[data-step="3"] .frame,
+body[data-step="3"] #app { max-width: 1440px; }
+.chat-layout { grid-template-columns: 300px minmax(0, 1fr); }
+.chat-layout.is-collapsed { grid-template-columns: 36px minmax(0, 1fr); }
+.chat-aside { position: relative; min-height: 0; gap: .4rem; }
+.chat-aside .aside-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-height: 0;
+}
+.aside-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  min-height: 1.6rem;
+}
+.aside-kicker {
+  font-family: var(--font-mono);
+  font-size: .625rem;
+  letter-spacing: .14em;
+  color: var(--text-muted);
+}
+.aside-toggle {
+  width: auto;
+  height: 1.6rem;
+  padding: 0 .35rem;
+  border-color: transparent;
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: .6875rem;
+  line-height: 1;
+  color: var(--text-muted);
+}
+.aside-toggle:hover { color: var(--text-primary); border-color: var(--border); }
+.chat-layout.is-collapsed .aside-head { justify-content: center; }
+.chat-layout.is-collapsed .aside-kicker { display: none; }
+.chat-layout.is-collapsed .aside-toggle {
+  width: 100%;
+  height: 2rem;
+  margin-bottom: .3rem;
+}
+.aside-rail { display: none; }
+.chat-layout.is-collapsed .aside-rail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 7rem;
+  font-family: var(--font-mono);
+  font-size: .625rem;
+  letter-spacing: .18em;
+  line-height: 1.9;
+  color: var(--text-muted);
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+}
+.chat-layout.is-collapsed .aside-body { display: none; }
+
+/* ---------- 符号面板：输入区右侧浮层 ---------- */
+.composer { position: relative; }
+.symbol-trigger {
+  font-family: var(--font-mono);
+  font-size: .8125rem;
+}
+.symbol-popover {
+  position: absolute;
+  right: 1.1rem;
+  bottom: 4.25rem;
+  z-index: 6;
+  width: min(30rem, calc(100% - 2rem));
+  padding: .75rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+.symbol-popover .mathbar { margin: 0; border: 0; background: transparent; padding: 0; }
+.symbol-popover .mathbar-head { margin-bottom: .45rem; }
+
+/* ---------- 报告：三卡两列 ---------- */
+.report-dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.5rem;
+}
+.report-summary { grid-column: 1 / -1; }
+.report-dashboard h3 {
+  margin-top: 1.1rem;
+  margin-bottom: .45rem;
+  font-family: var(--font-mono);
+  font-size: .625rem;
+  letter-spacing: .14em;
+  color: var(--text-muted);
+}
+.report-dashboard h3:first-of-type { margin-top: 0; }
+.report-duration {
+  margin: 1rem 0 0;
+  text-align: right;
+  font-size: .8125rem;
+  color: var(--text-muted);
+}
+
+/* ---------- 题目列表：银行变长时在卡片内滚，主按钮不被挤下去 ---------- */
+.page-shell[data-page="1"] .question-list {
+  max-height: 22rem;
+  overflow: auto;
+  padding-right: .2rem;
+}
+.page-shell[data-page="1"] .problem-input { min-height: 15rem; }
+
+/* ---------- 100vh 应用壳：页面不动，内容在各自区域里滚 ---------- */
+html, body { height: 100%; }
+body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.masthead, .colophon { flex: 0 0 auto; }
+#app {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-top: 1.35rem;
+  padding-bottom: 1rem;
+}
+.page-shell {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+.page-shell > footer { margin-top: auto; }
+.page-shell[data-page="3"] { overflow: hidden; }
+.page-shell[data-page="3"] .chat-layout {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+}
+.page-shell[data-page="3"] .chat-card {
+  height: 100%;
+  max-height: none;
+  min-height: 0;
+}
+.page-shell[data-page="3"] .messages { min-height: 0; }
+.page-shell[data-page="3"] aside {
+  min-height: 0;
+  overflow: auto;
+  padding-right: .15rem;
+}
+
+/* ---------- 图片识别动作 ---------- */
+.ocr-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-top: .75rem;
+  flex-wrap: wrap;
+}
+.ocr-actions > div {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  flex-wrap: wrap;
+}
+.ocr-actions .primary { min-width: 7rem; }
+
+/* ---------- 低高度 / 窄屏：退回自然滚动，避免裁内容 ---------- */
+@media (max-height: 900px) {
+  body { overflow: auto; }
+  #app { flex: 0 0 auto; min-height: auto; overflow: visible; }
+  .page-shell { display: block; overflow: visible; }
+  .page-shell > footer { margin-top: 1.75rem; }
+  .page-shell[data-page="3"] { overflow: visible; }
+  .page-shell[data-page="3"] .chat-layout { height: auto; }
+  .page-shell[data-page="3"] .chat-card { height: calc(100vh - 15rem); min-height: 32rem; }
+}
+
+@media (max-width: 900px) {
+  body { overflow: auto; }
+  #app { flex: 0 0 auto; min-height: auto; overflow: visible; }
+  .page-shell { display: block; overflow: visible; }
+  .page-shell > footer { margin-top: 1.75rem; }
+  .page-shell[data-page="3"] { overflow: visible; }
+  .page-shell[data-page="3"] .chat-layout { height: auto; }
+  .page-shell[data-page="3"] .chat-card { height: 48rem; min-height: 40rem; }
+}
+
+/* ---------- 完成恭喜页（全屏 surface） ---------- */
+.done-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgba(17, 22, 29, .48);
+  backdrop-filter: blur(4px);
+}
+.done-overlay[hidden] { display: none; }
+.done-card {
+  width: min(44rem, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  padding: clamp(1.5rem, 3vw, 2.5rem);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+.done-kicker {
+  display: block;
+  margin-bottom: .65rem;
+  font-family: var(--font-mono);
+  font-size: .6875rem;
+  letter-spacing: .18em;
+  color: var(--accent-teal);
+}
+.done-card h1 {
+  max-width: 24ch;
+  margin-bottom: .65rem;
+}
+.done-sub {
+  color: var(--text-secondary);
+  font-size: .9375rem;
+  line-height: 1.75;
+}
+.done-answers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+  margin: 1.15rem 0 .9rem;
+}
+.done-answers span {
+  padding: .3rem .55rem;
+  background: var(--accent-teal-tint);
+  border: 1px solid var(--accent-teal-border);
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: .8125rem;
+  color: var(--text-primary);
+}
+.done-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .75rem;
+  margin: 1rem 0 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-subtle);
+}
+.done-stats div {
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+}
+.done-stats strong {
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  font-weight: 400;
+  color: var(--text-heading);
+}
+.done-stats span { font-size: .75rem; color: var(--text-muted); }
+.done-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: .6rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 900px) {
+  .report-dashboard { grid-template-columns: 1fr; }
+  .chat-layout,
+  .chat-layout.is-collapsed { grid-template-columns: 1fr !important; }
+  .aside-toggle,
+  .aside-rail { display: none !important; }
+  .chat-layout.is-collapsed .aside-body { display: flex; }
+  .symbol-popover { right: .75rem; left: .75rem; width: auto; bottom: 5rem; }
+}
+
+/* ---------- 移动端 ---------- */
+@media (max-width: 720px) {
+  .bubble { max-width: 95%; }
+  .chat-actions { max-width: none; width: 100%; align-items: stretch; }
+  .chat-actions > div { justify-content: flex-start; }
+  .chat-actions .chat-actions-row { justify-content: flex-start; }
+  .chat-head { flex-direction: column; align-items: stretch; }
+  .intake-summary { flex-direction: column; align-items: flex-start; }
+}

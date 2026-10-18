@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "面向中学生重难题的 AI 引导解题助手 —— 「看懂学生思路 + 只给提示不给答案」提示引擎 PoC（物理·电磁感应）",
+  "description": "步步解 —— 面向中学生重难题的 AI 引导解题助手：看懂学生思路，只给提示不给答案；另有现场演示模式",
   "engines": {
     "node": ">=20"
   },
