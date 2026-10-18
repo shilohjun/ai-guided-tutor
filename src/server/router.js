@@ -43,6 +43,8 @@ import { understandProblem } from '../core/intake.js';
 import { getProblemById, listProblems, getImportMeta, getProblemAnalysis, registerImportedProblem, registryStats } from '../core/registry.js';
 import { toStudentAnalysis, toTeacherAnalysis } from '../core/analysis.js';
 import { createSessionRecord, appendTurn, buildReport } from '../core/report.js';
+import { formulaCardFor } from '../core/formula-cards.js';
+import { demoAnswerFor } from '../core/demo-answers.js';
 import { runEvaluation, formatEvaluation } from '../core/eval.js';
 import { STUDENT_LEVEL_NOTE, inspectVoice } from '../core/prompt.js';
 import { PROBLEMS } from '../core/problems.data.js';
@@ -699,6 +701,63 @@ export async function handleApi(req, res, url) {
 
     // 学生载荷 —— 只走白名单投影
     sendJson(res, 200, buildStudentTurn({ ...response, stepCount: totalSteps(problem, response.diagnosis.position.graphId) }, normalizedMode));
+    return true;
+  }
+
+  // ---- POST /api/demo/answer ----
+  /**
+   * 演示模式专用：只在演示者点击“我已做出答案（演示）”时返回最终结果。
+   * 不是学生端接口 —— 必须显式带 demo:true，避免被普通页面误用。
+   */
+  if (path === '/api/demo/answer' && req.method === 'POST') {
+    const body = await readJson(req).catch(() => ({}));
+    if (body?.demo !== true) {
+      sendJson(res, 403, { error: '这个接口只用于演示模式。' });
+      return true;
+    }
+    const problemId = String(body?.problemId ?? '');
+    const answer = demoAnswerFor(problemId);
+    if (!answer) {
+      sendJson(res, 404, { error: '这道题暂时没有演示答案。' });
+      return true;
+    }
+    sendJson(res, 200, answer);
+    return true;
+  }
+
+  // ---- POST /api/formula ----
+  /**
+   * 公式卡：只在同一步已经给过 L3 之后开放，内容来自教研维护的知识点表。
+   *
+   * 不把公式放进 /api/problem 的响应里 —— 那样学生打开 F12 就能提前看到；
+   * 也不让模型生成 —— 模型写公式正是防泄题要拦的东西。
+   */
+  if (path === '/api/formula' && req.method === 'POST') {
+    const body = await readJson(req);
+    const sessionId = String(body?.sessionId ?? '');
+    const session = sessions.get(sessionId);
+    if (!session) {
+      sendJson(res, 404, { error: '这个学习会话不存在或已过期，请重新开始一道题。' });
+      return true;
+    }
+    const problem = getProblemById(session.problemId);
+    if (!problem) {
+      sendJson(res, 404, { error: '这道题已不在题库里。' });
+      return true;
+    }
+    const l3 = [...session.record.hintLog].reverse().find((log) => log.deliveredLevel === 3);
+    if (!l3) {
+      sendJson(res, 409, { error: '公式卡要在同一步给过 L3 提示之后才能用。' });
+      return true;
+    }
+    const card = formulaCardFor(problem);
+    if (!card) {
+      sendJson(res, 404, { error: '这道题暂时没有匹配的公式卡。' });
+      return true;
+    }
+    session.record.formulaCards = session.record.formulaCards ?? [];
+    session.record.formulaCards.push({ at: new Date().toISOString(), topic: card.topic, stepIndex: l3.stepIndex ?? null });
+    sendJson(res, 200, { card });
     return true;
   }
 

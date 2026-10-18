@@ -83,6 +83,8 @@ export function createSessionRecord(problemId) {
     problemId,
     turns: [],
     hintLog: [],
+    /** 学生使用过的公式卡（工具卡，不进入 L0–L3 的 byLevel） */
+    formulaCards: [],
     startedAt: new Date().toISOString(),
   };
 }
@@ -171,6 +173,7 @@ export function buildReport(problem, record, meta) {
     problemTitle: `${problem.subject === 'physics' ? '物理' : ''} · ${problem.topics.slice(0, 2).join('/')}（难度 ${problem.difficulty}/5）`,
     stuckPoints,
     hintStats,
+    formulaCards: record.formulaCards?.length ?? 0,
     independence,
     deeperIssues,
     recommendations,
@@ -220,7 +223,8 @@ function computeIndependence(record, stepTotal) {
 
   const l3Count = record.hintLog.filter((l) => l.deliveredLevel === 3).length;
   const l2Count = record.hintLog.filter((l) => l.deliveredLevel === 2).length;
-  const penalty = Math.min(0.4, l3Count * 0.1 + l2Count * 0.04);
+  const formulaCount = record.formulaCards?.length ?? 0;
+  const penalty = Math.min(0.4, l3Count * 0.1 + l2Count * 0.04 + formulaCount * 0.1);
 
   let raw = completedSteps / total - penalty;
   raw = Math.max(0, Math.min(1, raw));
@@ -228,7 +232,8 @@ function computeIndependence(record, stepTotal) {
   const noteParts = [`你独立走过了 ${completedSteps} / ${total} 个关键步骤`];
   if (l3Count > 0) noteParts.push(`其中 ${l3Count} 次用到了"示范一步"`);
   if (l2Count > 0) noteParts.push(`${l2Count} 次用到了方向提示`);
-  if (l3Count === 0 && l2Count === 0 && record.hintLog.length > 0) {
+  if (formulaCount > 0) noteParts.push(`${formulaCount} 次查看了公式卡`);
+  if (l3Count === 0 && l2Count === 0 && formulaCount === 0 && record.hintLog.length > 0) {
     noteParts.push('全程只用到条件追问，说明你自己完成得很扎实');
   }
 

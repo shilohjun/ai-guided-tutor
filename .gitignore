@@ -26,3 +26,7 @@ trajectory/
 test-stem.png
 test-stem.jpg
 
+# 本地截图与 v2 设计迭代稿（最终截图进 docs/screenshots/，v3 参考稿保留在根目录）
+preview/
+v2*.html
+
