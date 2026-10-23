@@ -230,7 +230,7 @@ npm run all        # 测试 + 离线评测
 npm test
 ```
 
-当前注册 **273 个用例**；**266 通过，7 条旧页面契约待迁移**：
+当前注册 **272 个用例**；**265 通过，7 条旧页面契约待迁移**：
 
 - 2 条 OCR 路由契约（旧页面入口位置）；
 - 3 条 DOM 契约（仍按旧 `app.js` 检查）；
@@ -276,7 +276,7 @@ src/core/
   demo-answers.js       演示模式最终答案表
 src/server/             API 路由（本地与 serverless 共用）
 test/                   自动化测试（自研极简运行器，零依赖）
-docs/                   设计文档、周报与截图
+docs/                   设计文档与截图
 api/                    Vercel Serverless API 入口
 showcase/               单文件成果展示页（独立于应用）
 v3.html                  v3 设计参考稿
@@ -361,7 +361,6 @@ DESIGN-TOKENS.md         v3 设计 token 与可访问性说明
 | [`04-intake-and-views.md`](docs/04-intake-and-views.md) | 读题链路与视图隔离 |
 | [`05-ocr-feasibility.md`](docs/05-ocr-feasibility.md) | 图片识别可行性评估 |
 | [`06-marketplace-ocr-integration.md`](docs/06-marketplace-ocr-integration.md) | 云市场题目 OCR 接入研究 |
-| [`周报.md`](docs/周报.md) | 工作周报 |
 | [`DESIGN-TOKENS.md`](DESIGN-TOKENS.md) | v3 设计 token 与可访问性说明 |
 | [`showcase/`](showcase/) | 项目成果展示页 |
 
