@@ -1,0 +1,1552 @@
+/* =========================================================================
+   步步解 · 青春活力皮肤
+   -------------------------------------------------------------------------
+   加载顺序：shell.css → shell-overrides.css → youth.css
+   只覆盖「观感」层（色彩 / 圆角 / 阴影 / 动效），不改页面结构与交互逻辑。
+   色彩仍然成对校验对比度：正文 ≥ 4.5:1，控件描边 ≥ 3:1。
+   ========================================================================= */
+
+/* -------------------------------------------------------------------------
+   1. 设计 token：暖纸底 + 葡萄紫主色 + 珊瑚 / 薄荷 / 蜂蜜三枚点缀
+   ------------------------------------------------------------------------- */
+:root {
+  --font-display: "Nunito", "Quicksand", "Noto Sans SC", "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  --font-sans: "Nunito", "Quicksand", "Noto Sans SC", "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", "SFMono-Regular", Consolas, "Noto Sans Mono", monospace;
+
+  --radius: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --measure: 64ch;
+  --shell: 1220px;
+
+  /* 背景与表面 */
+  --bg-page: #faf7f2;
+  --bg-surface: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-sunken: #f3efe7;
+  --bg-hover: #f7f2e9;
+  --bg-selected: #efedff;
+  --bg-inverse: #262244;
+
+  /* 描边 */
+  --border-subtle: #efeae0;
+  --border: #e6e0d4;
+  --border-strong: #d6cebe;
+  --border-control: #8d8678;
+
+  /* 文字：全部按 WCAG AA 实算过 */
+  --text-heading: #1d1b33;
+  --text-primary: #2b2946;
+  --text-secondary: #55526f;
+  --text-muted: #6b6885;
+  --text-inverse: #fff9f0;
+  --text-on-brand: #ffffff;
+
+  /* 主色：葡萄紫 */
+  --brand: #4f46c8;
+  --brand-hover: #4038ad;
+  --brand-active: #342c92;
+  --brand-tint: #efedff;
+  --brand-tint-border: #d3ceff;
+  --brand-soft: #f7f5ff;
+
+  /* 点缀：薄荷 / 蜂蜜 / 珊瑚 */
+  --accent-teal: #0b7a68;
+  --accent-teal-tint: #e5f7f1;
+  --accent-teal-border: #bee8dc;
+  --accent-amber: #c47a16;
+  --accent-amber-ink: #8a5200;
+  --accent-amber-tint: #fff4de;
+  --accent-amber-border: #f5dca8;
+
+  /* 状态 */
+  --success: #177a4b;
+  --success-ink: #11603a;
+  --success-tint: #e4f7ec;
+  --success-border: #bce7cf;
+  --warning: #c47a16;
+  --warning-ink: #8a5200;
+  --warning-tint: #fff4de;
+  --warning-border: #f5dca8;
+  --danger: #b23a3a;
+  --danger-ink: #942c2c;
+  --danger-tint: #fdecec;
+  --danger-border: #f3c9c9;
+
+  /* 装饰色（只做图形，不承担正文） */
+  --fun-coral: #f2673a;
+  --fun-pink: #e85d9c;
+  --fun-mint: #2bb894;
+  --fun-gold: #f4b740;
+  --fun-violet: #7c4dff;
+  --grad-brand: linear-gradient(135deg, #5b52e0 0%, #7c4dff 100%);
+  --grad-warm: linear-gradient(135deg, #ff9a6b 0%, #f2673a 100%);
+  --grad-mint: linear-gradient(135deg, #38c9a6 0%, #0b7a68 100%);
+  --grad-sun: linear-gradient(135deg, #ffd166 0%, #f4a62a 100%);
+
+  /* 页面光晕 */
+  --glow-a: rgba(124, 77, 255, 0.13);
+  --glow-b: rgba(255, 154, 107, 0.14);
+  --glow-c: rgba(43, 184, 148, 0.11);
+  --dot: rgba(79, 70, 200, 0.055);
+
+  /* 阴影 */
+  --shadow-card: 0 1px 2px rgba(41, 32, 71, 0.04), 0 10px 30px -20px rgba(41, 32, 71, 0.32);
+  --shadow-lift: 0 18px 38px -22px rgba(79, 70, 200, 0.5);
+  --shadow-pop: 0 26px 64px -26px rgba(41, 32, 71, 0.44);
+
+  --focus-ring: #4f46c8;
+  --selection-bg: #ddd8ff;
+  --toast-bg: #262244;
+  --toast-border: #3a3360;
+  --logo-tint-alpha: 0.45;
+}
+
+/* -------------------------------------------------------------------------
+   2. 深色主题：同样保留活泼色相，但提亮降饱和
+   ------------------------------------------------------------------------- */
+html[data-theme="dark"] {
+  --bg-page: #12111d;
+  --bg-surface: #1b1a2b;
+  --bg-elevated: #232139;
+  --bg-sunken: #0d0c16;
+  --bg-hover: #242238;
+  --bg-selected: #282343;
+  --bg-inverse: #2c2850;
+
+  --border-subtle: rgba(176, 166, 255, 0.09);
+  --border: rgba(176, 166, 255, 0.16);
+  --border-strong: rgba(176, 166, 255, 0.3);
+  --border-control: rgba(176, 166, 255, 0.62);
+
+  --text-heading: #f6f4ff;
+  --text-primary: #ece9fb;
+  --text-secondary: #b8b3d4;
+  --text-muted: #9a96b8;
+  --text-inverse: #12111d;
+  --text-on-brand: #ffffff;
+
+  --brand: #b9b2ff;
+  --brand-hover: #d5d0ff;
+  --brand-active: #e7e4ff;
+  --brand-tint: #2a2548;
+  --brand-tint-border: #423a6f;
+  --brand-soft: #201d36;
+
+  --accent-teal: #5cd6be;
+  --accent-teal-tint: #0e2b26;
+  --accent-teal-border: #1c473f;
+  --accent-amber: #f0b455;
+  --accent-amber-ink: #f0b455;
+  --accent-amber-tint: #332614;
+  --accent-amber-border: #4c3a1c;
+
+  --success: #63d69a;
+  --success-ink: #63d69a;
+  --success-tint: #102e22;
+  --success-border: #1e4a36;
+  --warning: #f0b455;
+  --warning-ink: #f0b455;
+  --warning-tint: #332614;
+  --warning-border: #4c3a1c;
+  --danger: #ff8f8f;
+  --danger-ink: #ff8f8f;
+  --danger-tint: #331a1e;
+  --danger-border: #50282e;
+
+  --glow-a: rgba(124, 77, 255, 0.22);
+  --glow-b: rgba(242, 103, 58, 0.13);
+  --glow-c: rgba(43, 184, 148, 0.12);
+  --dot: rgba(185, 178, 255, 0.07);
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.34), 0 14px 34px -22px rgba(0, 0, 0, 0.8);
+  --shadow-lift: 0 22px 46px -24px rgba(0, 0, 0, 0.85);
+  --shadow-pop: 0 28px 70px -26px rgba(0, 0, 0, 0.9);
+
+  --focus-ring: #b9b2ff;
+  --selection-bg: #3a3268;
+  --toast-bg: #2c2850;
+  --toast-border: rgba(176, 166, 255, 0.28);
+  --logo-tint-alpha: 0.22;
+}
+
+/* 无 JS 时也跟随系统深色（与上面完全同值） */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) {
+    --bg-page: #12111d;
+    --bg-surface: #1b1a2b;
+    --bg-elevated: #232139;
+    --bg-sunken: #0d0c16;
+    --bg-hover: #242238;
+    --bg-selected: #282343;
+    --bg-inverse: #2c2850;
+
+    --border-subtle: rgba(176, 166, 255, 0.09);
+    --border: rgba(176, 166, 255, 0.16);
+    --border-strong: rgba(176, 166, 255, 0.3);
+    --border-control: rgba(176, 166, 255, 0.62);
+
+    --text-heading: #f6f4ff;
+    --text-primary: #ece9fb;
+    --text-secondary: #b8b3d4;
+    --text-muted: #9a96b8;
+    --text-inverse: #12111d;
+    --text-on-brand: #ffffff;
+
+    --brand: #b9b2ff;
+    --brand-hover: #d5d0ff;
+    --brand-active: #e7e4ff;
+    --brand-tint: #2a2548;
+    --brand-tint-border: #423a6f;
+    --brand-soft: #201d36;
+
+    --accent-teal: #5cd6be;
+    --accent-teal-tint: #0e2b26;
+    --accent-teal-border: #1c473f;
+    --accent-amber: #f0b455;
+    --accent-amber-ink: #f0b455;
+    --accent-amber-tint: #332614;
+    --accent-amber-border: #4c3a1c;
+
+    --success: #63d69a;
+    --success-ink: #63d69a;
+    --success-tint: #102e22;
+    --success-border: #1e4a36;
+    --warning: #f0b455;
+    --warning-ink: #f0b455;
+    --warning-tint: #332614;
+    --warning-border: #4c3a1c;
+    --danger: #ff8f8f;
+    --danger-ink: #ff8f8f;
+    --danger-tint: #331a1e;
+    --danger-border: #50282e;
+
+    --glow-a: rgba(124, 77, 255, 0.22);
+    --glow-b: rgba(242, 103, 58, 0.13);
+    --glow-c: rgba(43, 184, 148, 0.12);
+    --dot: rgba(185, 178, 255, 0.07);
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.34), 0 14px 34px -22px rgba(0, 0, 0, 0.8);
+    --shadow-lift: 0 22px 46px -24px rgba(0, 0, 0, 0.85);
+    --shadow-pop: 0 28px 70px -26px rgba(0, 0, 0, 0.9);
+
+    --focus-ring: #b9b2ff;
+    --selection-bg: #3a3268;
+    --toast-bg: #2c2850;
+    --toast-border: rgba(176, 166, 255, 0.28);
+    --logo-tint-alpha: 0.22;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   3. 基底：暖纸色 + 三团柔光 + 极淡圆点纹理
+   ------------------------------------------------------------------------- */
+html {
+  background: var(--bg-page);
+}
+
+body {
+  background-color: var(--bg-page);
+  background-image:
+    radial-gradient(760px 420px at 6% -6%, var(--glow-a), transparent 62%),
+    radial-gradient(680px 400px at 102% -8%, var(--glow-b), transparent 60%),
+    radial-gradient(720px 460px at 50% 112%, var(--glow-c), transparent 64%),
+    radial-gradient(var(--dot) 1px, transparent 1.5px);
+  background-size: auto, auto, auto, 24px 24px;
+  background-attachment: fixed;
+  font-family: var(--font-sans);
+  letter-spacing: 0.005em;
+}
+
+/* 标题：从宋体换成圆润的无衬线，字重更足、更轻快 */
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-synthesis-weight: auto;
+  letter-spacing: -0.005em;
+}
+
+h1 {
+  font-size: clamp(1.7rem, 1.35rem + 1.4vw, 2.25rem);
+  line-height: 1.32;
+}
+
+h2 {
+  font-size: 1.3rem;
+  line-height: 1.42;
+}
+
+h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+p {
+  margin: 0.6rem 0;
+}
+
+::selection {
+  background: var(--selection-bg);
+  color: var(--text-heading);
+}
+
+/* 细圆滚动条，避免灰色系统条打断观感 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: var(--border-strong);
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--brand);
+  background-clip: content-box;
+}
+
+/* -------------------------------------------------------------------------
+   4. 报头：漂浮玻璃条 + 渐变 Logo + 今日练习徽章
+   ------------------------------------------------------------------------- */
+.masthead {
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(16px) saturate(1.15);
+  -webkit-backdrop-filter: blur(16px) saturate(1.15);
+}
+
+html[data-theme="dark"] .masthead {
+  background: rgba(18, 17, 29, 0.66);
+}
+
+.masthead-inner {
+  padding-block: 0.9rem;
+}
+
+.brand {
+  gap: 0.8rem;
+}
+
+.brand:hover {
+  background: none;
+}
+
+.brand-mark {
+  flex-basis: 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: var(--grad-brand);
+  box-shadow: 0 10px 20px -10px rgba(91, 82, 224, 0.85);
+  font-size: 1.3rem;
+  transform: rotate(-4deg);
+  transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.3, 1.3), box-shadow 0.25s ease;
+}
+
+.brand-mark::after {
+  background: linear-gradient(145deg, transparent 40%, rgba(255, 255, 255, 0.35) 100%);
+  opacity: 0.6;
+}
+
+.brand:hover .brand-mark {
+  transform: rotate(4deg) scale(1.06);
+  box-shadow: 0 14px 26px -10px rgba(91, 82, 224, 0.95);
+}
+
+.brand-text strong {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.16rem;
+  letter-spacing: 0.04em;
+}
+
+.brand-text small {
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+
+.masthead-tools {
+  gap: 0.45rem;
+}
+
+.demo-pill {
+  border-radius: 999px;
+  padding: 0.28rem 0.65rem;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.tool {
+  border-radius: 999px;
+  padding: 0.34rem 0.72rem;
+  background: var(--bg-surface);
+  border-color: var(--border);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(41, 32, 71, 0.04);
+}
+
+.theme-switch {
+  border-radius: 999px;
+  padding: 3px;
+  background: var(--bg-sunken);
+}
+
+.theme-switch button {
+  border-radius: 999px;
+  padding: 0.28rem 0.6rem;
+  font-weight: 600;
+}
+
+.theme-switch button[aria-checked="true"] {
+  border-color: transparent;
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--brand);
+  box-shadow: 0 4px 12px -6px rgba(41, 32, 71, 0.45);
+}
+
+/* 小尺寸分段控件不做抬升，避免整条控件跟着抖 */
+.theme-switch button:hover,
+.tabs button:hover,
+.problem-toggle button:hover,
+.mathbar-grid button:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* 五步进度：从小刻度变成会“长大”的胶囊 */
+.flow {
+  border-top: 0;
+  padding: 0.2rem 0 0.75rem;
+}
+
+.flow-ticks {
+  gap: 6px;
+}
+
+.flow-tick {
+  width: 16px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: width 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.flow-tick.is-done {
+  background: linear-gradient(90deg, var(--fun-violet), var(--brand));
+  opacity: 0.7;
+}
+
+.flow-tick.is-now {
+  width: 42px;
+  height: 8px;
+  background: var(--grad-brand);
+  box-shadow: 0 0 0 4px var(--brand-tint);
+}
+
+.flow-label {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.flow-label::before {
+  content: "✦ ";
+  color: var(--fun-coral);
+}
+
+/* -------------------------------------------------------------------------
+   5. 页面与卡片
+   ------------------------------------------------------------------------- */
+#app header h1::after {
+  content: "";
+  display: block;
+  width: 54px;
+  height: 6px;
+  margin-top: 0.7rem;
+  border-radius: 999px;
+  background: var(--grad-brand);
+}
+
+.card {
+  border-radius: var(--radius-lg);
+  border-color: var(--border);
+  box-shadow: var(--shadow-card);
+  background: var(--bg-surface);
+}
+
+.card h2 {
+  font-size: 1.2rem;
+}
+
+/* 页面切换时轻轻上浮，只在换页发生，不在每次点按时重播 */
+@keyframes page-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.page-shell.page-enter > * {
+  animation: page-rise 0.42s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+.page-shell.page-enter > *:nth-child(2) { animation-delay: 0.04s; }
+.page-shell.page-enter > *:nth-child(3) { animation-delay: 0.08s; }
+.page-shell.page-enter > *:nth-child(4) { animation-delay: 0.12s; }
+.page-shell.page-enter > *:nth-child(5) { animation-delay: 0.16s; }
+
+/* -------------------------------------------------------------------------
+   6. 按钮：胶囊、渐变主按钮、悬停轻抬
+   ------------------------------------------------------------------------- */
+button,
+.button {
+  border-radius: 999px;
+  border-color: var(--border);
+  font-weight: 600;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+
+button:hover,
+.button:hover {
+  transform: translateY(-1px);
+  border-color: var(--brand);
+  box-shadow: 0 8px 18px -14px rgba(79, 70, 200, 0.7);
+}
+
+button:active,
+.button:active {
+  transform: translateY(0) scale(0.985);
+}
+
+.primary {
+  position: relative;
+  overflow: hidden;
+  border-color: transparent;
+  background: var(--grad-brand);
+  color: var(--text-on-brand);
+  box-shadow: 0 10px 22px -13px rgba(79, 70, 200, 0.9);
+}
+
+.primary::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  bottom: -40%;
+  left: 0;
+  width: 38%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  transform: translateX(-180%) skewX(-18deg);
+  transition: transform 0.55s ease;
+  pointer-events: none;
+}
+
+.primary:hover {
+  background: var(--grad-brand);
+  filter: brightness(1.06);
+  box-shadow: 0 16px 30px -14px rgba(79, 70, 200, 0.95);
+}
+
+.primary:hover::after {
+  transform: translateX(320%) skewX(-18deg);
+}
+
+.primary:active {
+  background: var(--grad-brand);
+  filter: brightness(0.96);
+}
+
+.primary:disabled,
+.primary:disabled:hover {
+  background: var(--bg-sunken);
+  border-color: var(--border);
+  color: var(--text-muted);
+  box-shadow: none;
+  filter: none;
+  transform: none;
+}
+
+.primary:disabled::after {
+  display: none;
+}
+
+.outline {
+  border-color: var(--border-control);
+}
+
+.quiet {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.quiet:hover {
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+footer button {
+  min-width: 9rem;
+  padding: 0.65rem 1.4rem;
+}
+
+/* -------------------------------------------------------------------------
+   7. 标签页 / 输入 / 上传 / 题库
+   ------------------------------------------------------------------------- */
+.tabs {
+  gap: 4px;
+  width: max-content;
+  max-width: 100%;
+  margin-bottom: 1.1rem;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-sunken);
+}
+
+.tabs button {
+  border-radius: 999px;
+  padding: 0.42rem 0.95rem;
+  font-weight: 600;
+}
+
+.tabs button.active {
+  background: var(--bg-surface);
+  color: var(--brand);
+  box-shadow: 0 4px 12px -7px rgba(41, 32, 71, 0.5);
+}
+
+.tabs button.active:hover {
+  background: var(--bg-surface);
+  color: var(--brand);
+}
+
+textarea,
+select {
+  border-radius: 16px;
+  border-color: var(--border);
+  background: var(--bg-surface);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+textarea:hover,
+select:hover {
+  border-color: var(--border-control);
+}
+
+textarea:focus-visible,
+select:focus-visible {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 4px var(--brand-tint);
+  /* 保留 2px 焦点环：浅紫光晕本身对比度不够，不能只靠它 */
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+select {
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-weight: 600;
+}
+
+.problem-input {
+  min-height: 16rem;
+}
+
+.upload-box {
+  border-width: 2px;
+  border-radius: 18px;
+  border-color: var(--border-control);
+  background: var(--brand-soft);
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.upload-box:hover {
+  border-color: var(--brand);
+  background: var(--brand-tint);
+  transform: translateY(-2px);
+}
+
+.upload-box .upload-icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 18px;
+  background: var(--grad-brand);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 1.5rem;
+  box-shadow: 0 12px 24px -12px rgba(91, 82, 224, 0.9);
+}
+
+.question-list {
+  gap: 0.8rem;
+}
+
+.question {
+  border-radius: 16px;
+  padding: 1rem 1.1rem;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.question:hover {
+  transform: translateY(-2px);
+  border-color: var(--brand-tint-border);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-lift);
+}
+
+.question.selected {
+  background: linear-gradient(135deg, var(--brand-soft), var(--bg-selected));
+  border-color: var(--brand);
+  box-shadow: 0 0 0 1px var(--brand), var(--shadow-lift);
+}
+
+.question.selected:hover {
+  background: linear-gradient(135deg, var(--brand-soft), var(--bg-selected));
+  transform: translateY(-1px);
+}
+
+.tag {
+  margin-bottom: 0.45rem;
+  padding: 0.12rem 0.5rem;
+  border: 1px solid var(--brand-tint-border);
+  border-radius: 999px;
+  background: var(--brand-tint);
+  color: var(--brand);
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.7;
+}
+
+/* 题库卡里的标签不必全是主色 */
+.question .tag {
+  border-color: var(--border-subtle);
+  background: var(--bg-sunken);
+  color: var(--text-secondary);
+}
+
+.check {
+  color: var(--success-ink);
+  font-family: var(--font-sans);
+  font-weight: 700;
+}
+
+/* -------------------------------------------------------------------------
+   8. 解题方式：大图标气泡 + 选中光晕
+   ------------------------------------------------------------------------- */
+.mode-grid {
+  gap: 1.35rem;
+}
+
+.mode {
+  overflow: hidden;
+  border-radius: 24px;
+  padding: 1.7rem;
+  min-height: 15.5rem;
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.3, 1), border-color 0.22s ease, box-shadow 0.22s ease;
+}
+
+.mode::after {
+  content: "";
+  position: absolute;
+  right: -54px;
+  bottom: -74px;
+  width: 190px;
+  height: 190px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--brand-tint) 0%, transparent 68%);
+  pointer-events: none;
+}
+
+.mode:hover {
+  border-color: var(--brand-tint-border);
+  box-shadow: var(--shadow-lift);
+  transform: translateY(-3px);
+}
+
+.mode.selected {
+  border-color: var(--brand);
+  background: linear-gradient(180deg, var(--brand-soft), var(--bg-surface) 72%);
+  box-shadow: 0 0 0 2px var(--brand-tint-border), var(--shadow-lift);
+}
+
+.mode.selected:hover {
+  background: linear-gradient(180deg, var(--brand-soft), var(--bg-surface) 72%);
+  transform: translateY(-2px);
+}
+
+.mode-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 0.4rem;
+  border-radius: 18px;
+  background: var(--grad-brand);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 1.45rem;
+  box-shadow: 0 14px 26px -14px rgba(91, 82, 224, 0.95);
+  transform: rotate(-4deg);
+  transition: transform 0.25s ease;
+}
+
+.mode:nth-child(2) .mode-icon {
+  background: var(--grad-warm);
+  box-shadow: 0 14px 26px -14px rgba(242, 103, 58, 0.9);
+  transform: rotate(3deg);
+}
+
+.mode:hover .mode-icon {
+  transform: rotate(0deg) scale(1.06);
+}
+
+.mode h2 {
+  margin-top: 0.9rem;
+}
+
+.mode h3 {
+  color: var(--text-primary);
+}
+
+.mode .check {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 2px solid var(--border-control);
+  background: var(--bg-surface);
+  color: transparent;
+  font-size: 0.72rem;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.mode.selected .check {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: #fff;
+}
+
+.mode-note {
+  margin-top: 1rem;
+}
+
+/* 读题摘要：从虚线框变成一条“已读懂”的进度条 */
+.intake-summary {
+  border: 1px solid var(--brand-tint-border);
+  border-radius: 16px;
+  background: linear-gradient(120deg, var(--brand-tint), var(--bg-surface) 70%);
+  box-shadow: var(--shadow-card);
+}
+
+.intake-summary strong {
+  display: inline-block;
+  margin-right: 0.2rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.intake-summary details.fold > summary {
+  font-weight: 600;
+}
+
+/* 折叠入口 */
+details.fold > summary {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+details.fold > summary::before {
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.link-button {
+  border-radius: 999px;
+  font-weight: 700;
+  text-decoration-thickness: 2px;
+}
+
+/* -------------------------------------------------------------------------
+   9. 对话：圆润气泡 + 彩色身份点
+   ------------------------------------------------------------------------- */
+.chat-card {
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+.chat-head {
+  padding: 1.1rem 1.35rem;
+  background: linear-gradient(180deg, var(--brand-soft), var(--bg-surface));
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.chat-head h2 {
+  font-size: 1.18rem;
+}
+
+.chat-head small {
+  color: var(--text-secondary);
+}
+
+.chat-actions button {
+  border-radius: 999px;
+}
+
+.messages {
+  padding: 1.1rem 1.35rem 1rem;
+}
+
+.message {
+  margin-bottom: 1.2rem;
+}
+
+.message > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  background: var(--accent-teal-tint);
+  color: var(--accent-teal);
+  font-family: var(--font-sans);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.message > span::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-teal);
+}
+
+.message.user > span {
+  background: var(--accent-amber-tint);
+  color: var(--accent-amber-ink);
+}
+
+.message.user > span::before {
+  background: var(--fun-coral);
+}
+
+.bubble {
+  max-width: min(76%, 58ch);
+  padding: 0.9rem 1.05rem;
+  border: 1px solid var(--border);
+  border-radius: 6px 18px 18px 18px;
+  background: var(--bg-surface);
+  box-shadow: 0 10px 24px -22px rgba(41, 32, 71, 0.65);
+  line-height: 1.75;
+}
+
+.message.user .bubble {
+  border-color: transparent;
+  border-radius: 18px 6px 18px 18px;
+  background: var(--grad-brand);
+  color: #fff;
+  box-shadow: 0 12px 26px -16px rgba(79, 70, 200, 0.9);
+}
+
+.message.user .bubble * {
+  color: #fff;
+}
+
+/* AI 等待：跳动的三颗点 */
+.waiting {
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+  background: var(--bg-sunken);
+  color: var(--text-secondary);
+}
+
+.waiting::before {
+  width: 7px;
+  height: 7px;
+  background: var(--fun-coral);
+  box-shadow: 9px 0 0 var(--fun-gold), 18px 0 0 var(--fun-mint);
+  margin-right: 18px;
+  animation: waiting-bounce 1.05s ease-in-out infinite;
+}
+
+@keyframes waiting-bounce {
+  0%, 100% { transform: translateY(0); }
+  45% { transform: translateY(-4px); }
+}
+
+/* 推荐问题：三色胶囊轮换 */
+.suggestions {
+  gap: 0.45rem;
+  padding-bottom: 0.85rem;
+}
+
+.suggestions button {
+  padding: 0.34rem 0.75rem;
+  border-radius: 999px;
+  border-color: var(--brand-tint-border);
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.suggestions button:nth-child(3n + 2) {
+  border-color: var(--accent-amber-border);
+  background: var(--accent-amber-tint);
+  color: var(--accent-amber-ink);
+}
+
+.suggestions button:nth-child(3n) {
+  border-color: var(--accent-teal-border);
+  background: var(--accent-teal-tint);
+  color: var(--accent-teal);
+}
+
+.suggestions button:hover {
+  border-color: currentColor;
+  color: inherit;
+  filter: brightness(0.98);
+}
+
+.composer {
+  padding: 1rem 1.35rem 1.15rem;
+  background: var(--bg-surface);
+}
+
+.composer textarea {
+  min-height: 5.5rem;
+}
+
+.composer-tools > span {
+  color: var(--text-muted);
+}
+
+.symbol-trigger {
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.symbol-popover {
+  border-radius: 18px;
+  border-color: var(--brand-tint-border);
+  box-shadow: var(--shadow-pop);
+}
+
+.mathbar {
+  border-radius: 14px;
+  background: var(--bg-sunken);
+}
+
+.mathbar-grid button {
+  border-radius: 999px;
+  min-width: 2.1rem;
+  font-weight: 600;
+}
+
+/* 公式卡 / 演示答案卡：左侧色条改成圆角描边 */
+.formula-card {
+  border-radius: 14px;
+  border-left-width: 1px;
+  background: var(--accent-teal-tint);
+}
+
+.demo-answer-card {
+  border-radius: 14px;
+  border-left-width: 1px;
+}
+
+.demo-values span {
+  border-radius: 999px;
+}
+
+/* 对话进度 */
+.progress-card .steps span {
+  border-radius: 999px;
+  background: var(--bg-sunken);
+  border-color: var(--border);
+  font-weight: 700;
+}
+
+.steps li.is-current span {
+  border-color: transparent;
+  background: var(--grad-brand);
+  color: #fff;
+  box-shadow: 0 6px 12px -8px rgba(79, 70, 200, 0.9);
+}
+
+.steps li.is-current .step-row {
+  color: var(--text-heading);
+}
+
+.aside-kicker {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+.aside-toggle {
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-weight: 600;
+}
+
+.problem-toggle {
+  border-radius: 999px;
+  background: var(--bg-sunken);
+}
+
+.problem-toggle button {
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.problem-toggle button.on {
+  border-color: transparent;
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--brand);
+}
+
+/* 历史记录 */
+.history-list li {
+  border-radius: 12px;
+  padding: 0.5rem 0.65rem;
+}
+
+/* -------------------------------------------------------------------------
+   10. 报告：指标变成彩色小卡
+   ------------------------------------------------------------------------- */
+.metrics {
+  gap: 0.9rem;
+  padding: 0 0 1.25rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.metrics > div {
+  padding: 0.9rem 1.05rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  background: var(--bg-sunken);
+}
+
+.metrics > div:nth-child(2) {
+  border-color: var(--brand-tint-border);
+  background: var(--brand-tint);
+}
+
+.metrics > div:nth-child(3) {
+  border-color: var(--accent-teal-border);
+  background: var(--accent-teal-tint);
+}
+
+.metrics span {
+  margin-bottom: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.metrics strong {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.85rem;
+  letter-spacing: -0.01em;
+}
+
+.metrics > div:nth-child(2) strong {
+  color: var(--brand);
+}
+
+.metrics > div:nth-child(3) strong {
+  color: var(--accent-teal);
+}
+
+/* 报告里的小标题原来只有 10px 等宽字，青少年阅读吃力；
+   这里只放大字号与字重，不动卡片结构和排布 */
+.report-dashboard h3 {
+  margin-top: 1.15rem;
+  margin-bottom: 0.5rem;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-heading);
+}
+
+.report-stats {
+  gap: 0.6rem 0.75rem;
+  padding-top: 0.9rem;
+}
+
+.report-stats > div {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-surface);
+}
+
+.report-stats strong {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.2rem;
+}
+
+.report-tags {
+  padding-top: 0.8rem;
+}
+
+.report-tags .tag {
+  border-color: var(--brand-tint-border);
+  background: var(--brand-tint);
+  color: var(--brand);
+}
+
+.badge {
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.badge .glyph {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: currentColor;
+  color: var(--bg-surface);
+  font-size: 0.6rem;
+}
+
+.badge.good {
+  background: var(--success-tint);
+  border-color: var(--success-border);
+}
+
+.badge.warn {
+  background: var(--warning-tint);
+  border-color: var(--warning-border);
+}
+
+.badge.bad {
+  background: var(--danger-tint);
+  border-color: var(--danger-border);
+}
+
+.empty {
+  border: 2px dashed var(--border);
+  border-radius: 16px;
+  background: var(--bg-sunken);
+}
+
+.duration strong,
+.done-stats strong {
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+
+.stuck-item {
+  padding: 0.8rem 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.rec-item {
+  padding: 0.8rem 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.action-list {
+  padding-left: 1.1rem;
+}
+
+.action-list li::marker {
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.report-duration {
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  background: var(--bg-sunken);
+  display: inline-block;
+  align-self: flex-end;
+}
+
+/* 骨架屏：带一点流动光 */
+.skeleton div {
+  border-radius: 10px;
+  background: linear-gradient(90deg, var(--bg-sunken) 25%, var(--bg-hover) 50%, var(--bg-sunken) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s linear infinite;
+}
+
+@keyframes skeleton-shimmer {
+  from { background-position: 150% 0; }
+  to { background-position: -50% 0; }
+}
+
+/* -------------------------------------------------------------------------
+   11. 迁移练习
+   ------------------------------------------------------------------------- */
+.redo .mode-icon {
+  margin-bottom: 1rem;
+}
+
+.redo button {
+  border-radius: 999px;
+  margin-top: 1.4rem;
+}
+
+/* -------------------------------------------------------------------------
+   12. Toast / 页脚
+   ------------------------------------------------------------------------- */
+#toast {
+  border-radius: 999px;
+  padding: 0.65rem 1.25rem;
+  background: var(--toast-bg);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: var(--shadow-pop);
+}
+
+.problem-image,
+.question-image,
+.photo-preview img,
+.bubble img,
+.upload-box img {
+  border-radius: 12px;
+}
+
+.colophon {
+  border-top: 1px solid var(--border-subtle);
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+
+/* -------------------------------------------------------------------------
+   13. 恭喜页：彩纸 + 渐变边框
+   ------------------------------------------------------------------------- */
+.done-overlay {
+  background: rgba(24, 20, 46, 0.52);
+  backdrop-filter: blur(10px) saturate(1.1);
+  -webkit-backdrop-filter: blur(10px) saturate(1.1);
+}
+
+.done-card {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 30px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfaff 100%);
+  box-shadow: 0 40px 100px -36px rgba(23, 18, 50, 0.7);
+}
+
+html[data-theme="dark"] .done-card {
+  border-color: rgba(185, 178, 255, 0.28);
+  background: linear-gradient(180deg, #232139 0%, #1b1a2b 100%);
+}
+
+.done-card::before {
+  content: "";
+  position: absolute;
+  inset: -38% -12% auto;
+  height: 62%;
+  background:
+    radial-gradient(closest-side, rgba(124, 77, 255, 0.18), transparent 70%),
+    radial-gradient(closest-side at 30% 60%, rgba(242, 103, 58, 0.14), transparent 72%);
+  pointer-events: none;
+}
+
+.done-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.done-kicker {
+  display: inline-block;
+  padding: 0.22rem 0.7rem;
+  border: 1px solid var(--accent-teal-border);
+  border-radius: 999px;
+  background: var(--accent-teal-tint);
+  color: var(--accent-teal);
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.done-kicker::before {
+  content: "🎉 ";
+}
+
+.done-card h1 {
+  margin-top: 0.55rem;
+  font-size: clamp(1.6rem, 2.6vw, 2.15rem);
+  line-height: 1.35;
+}
+
+.done-sub {
+  color: var(--text-secondary);
+}
+
+.done-answers span {
+  border-radius: 999px;
+  border-color: var(--accent-teal-border);
+  background: var(--accent-teal-tint);
+  font-weight: 600;
+}
+
+.done-stats > div {
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-sunken);
+}
+
+.done-actions .quiet {
+  border-radius: 999px;
+}
+
+/* 彩纸层 */
+.confetti-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.confetti {
+  position: absolute;
+  top: -8%;
+  display: block;
+  opacity: 0;
+  animation: confetti-fall var(--dur, 2.8s) cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translate3d(0, -30px, 0) rotate(0deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--drift, 0px), 92vh, 0) rotate(760deg);
+    opacity: 0;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   14. 小动效
+   ------------------------------------------------------------------------- */
+/* 输入框获得焦点时，符号按钮轻微提亮 */
+.composer:focus-within .symbol-trigger {
+  color: var(--brand);
+}
+
+/* 进入对话页时消息轻轻落下；发送后不重播，避免整段记录闪一下 */
+.page-shell.page-enter .message {
+  animation: message-in 0.28s ease both;
+}
+
+@keyframes message-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* -------------------------------------------------------------------------
+   15. 窄屏适配
+   ------------------------------------------------------------------------- */
+@media (max-width: 620px) {
+  .masthead {
+    background: rgba(255, 255, 255, 0.82);
+  }
+  html[data-theme="dark"] .masthead {
+    background: rgba(18, 17, 29, 0.84);
+  }
+  .brand-mark {
+    flex-basis: 34px;
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+    font-size: 1.1rem;
+  }
+  .flow-tick {
+    width: 12px;
+  }
+  .flow-tick.is-now {
+    width: 30px;
+  }
+  .metrics > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  /* 窄屏时操作行会换成横向排列，select 默认被 stretch 拉成一个大圆；
+     这里只让它回到自身高度，不改变排列顺序 */
+  .chat-actions select {
+    align-self: center;
+  }
+  .done-card {
+    border-radius: 22px;
+  }
+  footer button {
+    min-width: 0;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   16. 尊重系统「减少动态」
+   ------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .page-shell.page-enter > *,
+  .message,
+  .confetti,
+  .skeleton div,
+  .waiting::before {
+    animation: none !important;
+  }
+  .primary::after {
+    display: none;
+  }
+  .question:hover,
+  .mode:hover,
+  button:hover {
+    transform: none;
+  }
+}

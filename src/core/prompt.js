@@ -366,14 +366,6 @@ function safeRestatement(restatement, hint) {
   if (!restatement) return null;
   let r = restatement.trim();
 
-  /**
-   * L0 的提示本身就是"把题目给了什么、要求什么说一遍"这个澄清问题。
-   * 此时任何复述都是同一件事的第二次发问 —— 学生看到的是连着问两遍。
-   * 这里用层级显式判定，而不是依赖下面的字符重合率启发式：
-   * 启发式只能碰巧命中，一旦提示词换了措辞（例如去掉一句结尾承诺）就会漏判。
-   */
-  if (hint?.level === 0) return null;
-
   // 复述与提示高度重合 ⇒ 丢掉复述，避免"问了两次同样的问题"
   if (isRedundant(r, [hint.text])) return null;
 

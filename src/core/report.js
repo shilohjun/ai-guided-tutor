@@ -17,14 +17,6 @@ import { inspectVoice } from './prompt.js';
 import { safeStepRef } from './guard.js';
 
 /**
- * 学科中文名。
- * 报告标题原来是 `subject === 'physics' ? '物理' : ''` ——
- * 数学题于是得到" · 反证法/数论（难度 3/5）"，前面挂一个空学科加一个孤立的分隔点。
- * 统一查表，任何学科都能得到像样的标题。
- */
-const SUBJECT_LABEL = { physics: '物理', math: '数学', chemistry: '化学' };
-
-/**
  * 从引擎响应累积一条会话记录（服务端维护）。
  *
  * 这里存的东西比"生成报告所需"更多 —— 因为教师视图要用同一份记录
@@ -91,6 +83,8 @@ export function createSessionRecord(problemId) {
     problemId,
     turns: [],
     hintLog: [],
+    /** 学生使用过的公式卡（工具卡，不进入 L0–L3 的 byLevel） */
+    formulaCards: [],
     startedAt: new Date().toISOString(),
   };
 }
@@ -176,9 +170,10 @@ export function buildReport(problem, record, meta) {
 
   return {
     problemId: problem.id,
-    problemTitle: `${SUBJECT_LABEL[problem.subject] ?? '本题'} · ${problem.topics.slice(0, 2).join('/')}（难度 ${problem.difficulty}/5）`,
+    problemTitle: `${problem.subject === 'physics' ? '物理' : ''} · ${problem.topics.slice(0, 2).join('/')}（难度 ${problem.difficulty}/5）`,
     stuckPoints,
     hintStats,
+    formulaCards: record.formulaCards?.length ?? 0,
     independence,
     deeperIssues,
     recommendations,
@@ -228,7 +223,8 @@ function computeIndependence(record, stepTotal) {
 
   const l3Count = record.hintLog.filter((l) => l.deliveredLevel === 3).length;
   const l2Count = record.hintLog.filter((l) => l.deliveredLevel === 2).length;
-  const penalty = Math.min(0.4, l3Count * 0.1 + l2Count * 0.04);
+  const formulaCount = record.formulaCards?.length ?? 0;
+  const penalty = Math.min(0.4, l3Count * 0.1 + l2Count * 0.04 + formulaCount * 0.1);
 
   let raw = completedSteps / total - penalty;
   raw = Math.max(0, Math.min(1, raw));
@@ -236,7 +232,8 @@ function computeIndependence(record, stepTotal) {
   const noteParts = [`你独立走过了 ${completedSteps} / ${total} 个关键步骤`];
   if (l3Count > 0) noteParts.push(`其中 ${l3Count} 次用到了"示范一步"`);
   if (l2Count > 0) noteParts.push(`${l2Count} 次用到了方向提示`);
-  if (l3Count === 0 && l2Count === 0 && record.hintLog.length > 0) {
+  if (formulaCount > 0) noteParts.push(`${formulaCount} 次查看了公式卡`);
+  if (l3Count === 0 && l2Count === 0 && formulaCount === 0 && record.hintLog.length > 0) {
     noteParts.push('全程只用到条件追问，说明你自己完成得很扎实');
   }
 
@@ -265,7 +262,7 @@ const DEEPER_PATTERNS = [
     test: (labels, kinds) =>
       kinds.includes('precondition_gap') && labels.some((l) => /平衡|匀速|受力|运动/.test(l)),
     issue: '运动学信息向动力学条件的翻译还不熟练（例如"匀速"没有立刻翻译成"合力为零"）。',
-    drill: '练习"信息翻译"：拿到题先把每个形容词翻译成一条明确的条件，写成一列。',
+    drill: '练习"信息翻译"：拿到题先把每个形容词翻译成物理条件，写成一列。',
   },
   {
     id: 'tool-selection',

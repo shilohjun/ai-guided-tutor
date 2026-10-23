@@ -1,519 +1,114 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AI 重难题引导助手 · 学伴</title>
-    <link rel="stylesheet" href="/styles.css" />
-    <link
-      rel="icon"
-      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>"
-    />
-  </head>
-  <body>
-    <!-- =====================================================================
-         顶栏
-         两个开关刻意分开放，因为它们回答的是两个不同的问题：
-           视图 = 谁在看（学生 / 教师）—— 决定"能拿到什么数据"，由服务端分流
-           模式 = 怎么陪（自主训练 / 学伴陪伴）—— 决定"什么时候介入"，在对话区里
-         ===================================================================== -->
-    <header class="topbar">
-      <div class="brand">
-        <span class="brand-mark">🧭</span>
-        <div class="brand-text">
-          <strong>AI 重难题引导助手</strong>
-          <span class="brand-sub" id="brand-sub">只给提示 · 不给答案</span>
-        </div>
-      </div>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#FAF7F2">
+<title>步步解 · 学习版</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>">
 
-      <nav class="steps" id="nav">
-        <button class="step active" data-page="page-start">
-          <span class="step-no">1</span><span class="step-label">交题目</span>
+<!-- 防 FOUC：上色必须在样式之前同步执行。 -->
+<script>
+(function () {
+  var root = document.documentElement;
+  var KEY = 'dsh-theme', CKEY = 'dsh-contrast';
+  var mqDark = window.matchMedia('(prefers-color-scheme: dark)');
+  var mqMore = window.matchMedia('(prefers-contrast: more)');
+  var read = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  var write = function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} };
+
+  var fromUrl = new URLSearchParams(location.search).get('theme');
+  var valid = function (p) { return p === 'light' || p === 'dark' || p === 'system'; };
+  var pref = valid(fromUrl) ? fromUrl : (valid(read(KEY)) ? read(KEY) : 'system');
+
+  function resolve(p) { return p === 'system' ? (mqDark.matches ? 'dark' : 'light') : p; }
+  function paint(p) {
+    var t = resolve(p);
+    root.setAttribute('data-theme', t);
+    root.setAttribute('data-theme-pref', p);
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', t === 'dark' ? '#12111D' : '#FAF7F2');
+  }
+
+  var cPref = read(CKEY);
+  if (cPref !== 'high' && cPref !== 'normal') cPref = mqMore.matches ? 'high' : 'normal';
+  root.setAttribute('data-contrast', cPref);
+
+  paint(pref);
+  window.Theme = { KEY: KEY, CKEY: CKEY, pref: function () { return pref; }, set: function (p, persist) {
+    if (!valid(p)) return; pref = p; if (persist) write(KEY, p); paint(p);
+  }, repaint: function () { paint(pref); }, mqDark: mqDark, mqMore: mqMore };
+})();
+</script>
+
+<link rel="stylesheet" href="/shell.css?v=20261022-1">
+<link rel="stylesheet" href="/shell-overrides.css?v=20261022-1">
+<link rel="stylesheet" href="/youth.css?v=20261022-1">
+</head>
+<body data-step="1">
+
+<div class="masthead">
+  <div class="frame masthead-inner">
+    <button class="brand" type="button" data-action="home">
+      <span class="brand-mark" aria-hidden="true"><span>🧭</span></span>
+      <span class="brand-text">
+        <strong>步步解</strong>
+        <small>精做一题，胜过滥刷百题</small>
+      </span>
+    </button>
+    <div class="masthead-tools">
+      <span class="demo-pill" id="demo-pill" hidden>演示模式</span>
+      <button class="tool" id="contrast-toggle" type="button" aria-pressed="false">
+        <span class="tool-glyph" aria-hidden="true">◑</span>
+        <span>高对比</span>
+      </button>
+      <div class="theme-switch" role="radiogroup" aria-label="主题">
+        <button type="button" role="radio" aria-checked="false" data-theme-set="light" tabindex="-1" aria-label="浅色主题">
+          <span class="seg-glyph" aria-hidden="true">☀</span><span class="seg-label">浅色</span>
         </button>
-        <button class="step" data-page="page-chat">
-          <span class="step-no">2</span><span class="step-label">一起想</span>
+        <button type="button" role="radio" aria-checked="false" data-theme-set="dark" tabindex="-1" aria-label="深色主题">
+          <span class="seg-glyph" aria-hidden="true">☾</span><span class="seg-label">深色</span>
         </button>
-        <button class="step" data-page="page-report">
-          <span class="step-no">3</span><span class="step-label">学习报告</span>
+        <button type="button" role="radio" aria-checked="false" data-theme-set="system" tabindex="-1" aria-label="跟随系统">
+          <span class="seg-glyph" aria-hidden="true">◐</span><span class="seg-label">跟随</span>
         </button>
-      </nav>
-
-      <div class="topbar-right">
-        <div class="seg" id="view-switch" role="tablist" aria-label="视图切换">
-          <button class="seg-btn on" data-view="student">学生</button>
-          <button class="seg-btn" data-view="teacher">教师</button>
-        </div>
-        <span class="engine-badge" id="engine-badge" title="当前引擎模式">…</span>
-      </div>
-    </header>
-
-    <main>
-      <!-- =====================================================================
-           学生视图 · 页①：交题目
-           ===================================================================== -->
-      <section class="page active" id="page-start">
-        <div class="hero">
-          <h1>把题目交给我，我不会直接告诉你答案</h1>
-          <p class="hero-sub">
-            我会先<strong>读懂这道题</strong>：关键变量、关键条件、涉及的知识点，
-            以及一条<strong>不给你看</strong>的解题路径 —— 然后用它判断你卡在哪一步。
-          </p>
-          <p class="hero-note">🎯 解题路径只用于我的判断。你要走的每一步，还是自己走。</p>
-        </div>
-
-        <!-- =====================================================================
-             陪伴方式：讲清"AI 什么时候会开口"。
-             这几条不是宣传语，是 route.js 里真实的介入规则（见 src/core/route.js:102-115）：
-               · 自主训练 + 未求助 + 无高置信卡点 ⇒ suppressed
-               · 自主训练 + 高置信卡点          ⇒ 允许一次低级别主动介入
-               · 显式求助                        ⇒ 一定介入
-               · 已到路径末段且无错因            ⇒ 两种模式都不打扰
-             ===================================================================== -->
-        <div class="card mode-picker">
-          <div class="panel-head">
-            <span class="ph-icon">🎚️</span>
-            <h3>先选一种陪伴方式</h3>
-            <div class="ph-actions"><span class="pill">对话中随时可切换</span></div>
-          </div>
-          <div class="mode-cards" id="mode-cards">
-            <button type="button" class="mode-card" data-mode="self_training">
-              <div class="mc-head"><span class="mc-emoji">🧘</span><strong>自主训练</strong></div>
-              <div class="mc-desc">我自己做，卡住再叫你</div>
-              <ul class="mc-rules">
-                <li class="yes">你说"卡住了 / 给点提示" → 我出声</li>
-                <li class="no">你只是说出思路 → 我沉默记录</li>
-                <li class="no">你走岔了但没求助 → 我先不说（除非我很确定）</li>
-              </ul>
-            </button>
-            <button type="button" class="mode-card on" data-mode="ai_companion">
-              <div class="mc-head"><span class="mc-emoji">🤝</span><strong>学伴陪伴</strong></div>
-              <div class="mc-desc">关键地方你会提醒我</div>
-              <ul class="mc-rules">
-                <li class="yes">你说出思路 → 我先复述你说了什么，再问一个前提</li>
-                <li class="yes">你思路走岔了 → 我指出来</li>
-                <li class="no">你已经接近完成 → 我不打扰，留给你收尾</li>
-              </ul>
-            </button>
-          </div>
-          <p class="muted small" style="margin-top:10px">
-            两种模式<strong>都不会</strong>给你答案；区别只在"什么时候开口"。
-            你随时可以在对话页右上角切换 —— 切过去之后，我会在下一轮就按新模式来决定要不要出声。
-          </p>
-        </div>
-
-        <div class="grid-2">
-          <!-- 交题目：拍照是第一入口，文字是等价备选 -->
-          <div class="card">
-            <div class="panel-head">
-              <span class="ph-icon">📷</span>
-              <h3>拍张照片交题目</h3>
-              <div class="ph-actions"><span class="pill" id="ocr-pill">…</span></div>
-            </div>
-
-            <!--
-              拍照是学生最自然的交题方式，所以放在最上面、且**默认展开**。
-              曾经把它放在二级卡片的折叠块里，结果自己都找不到 ——
-              一个入口藏起来就等于没有。
-            -->
-            <label class="dropzone" id="dropzone">
-              <input type="file" id="file-input" accept="image/*" hidden />
-              <div class="dropzone-inner">
-                <span class="dropzone-icon">📷</span>
-                <strong>点击选择照片，或把图片拖进来</strong>
-                <span class="muted small" id="dropzone-hint">支持 JPG / PNG；会自动压缩后识别</span>
-              </div>
-            </label>
-            <img id="preview" class="preview" alt="题目预览" hidden />
-            <div class="row-between" id="ocr-actions" hidden>
-              <span class="muted small" id="ocr-status">已选择照片</span>
-              <div class="row-right">
-                <button class="btn btn-ghost btn-sm" id="btn-ocr-clear">重新选择</button>
-                <button class="btn btn-primary btn-sm" id="btn-ocr">识别成题干</button>
-              </div>
-            </div>
-            <div class="notice" id="ocr-notice" hidden></div>
-            <div class="notice notice-warn" id="ocr-off" hidden>
-              <strong>拍照识题当前未启用。</strong>
-              识别需要服务端配置识别凭据（管理员在部署环境里设置，浏览器不接触凭据）。
-              在配好之前，请用下面的文字入口 —— 那条链路是真的。
-              <div class="notice-actions">
-                <button class="btn btn-ghost btn-sm" id="ocr-explain">看这条链路是怎么接的</button>
-              </div>
-              <pre class="code" id="ocr-plan" hidden></pre>
-            </div>
-
-            <p class="muted small" id="ocr-figure-note">
-              识别的只是文字。题目里的图形（受力图、电路图、几何图）「画了什么」不会进题干 ——
-              如果这道题依赖图形，请在下面补一句图里的关键信息。
-            </p>
-
-            <details class="fold" id="text-entry-fold">
-              <summary>✍️ 或者直接粘贴题目文字</summary>
-              <p class="muted small">
-                不用管格式，把题干整段贴进来就行。我会抽出已知条件与待求量、标出知识点、
-                逐条解释关键条件，并生成一条只给我自己看的解题路径。
-              </p>
-              <textarea
-                id="stem-input"
-                class="stem-input"
-                rows="6"
-                placeholder="例：质量为 0.5 kg 的小球从高 h = 20 m 处由静止开始自由下落，不计空气阻力，g 取 10 m/s²。求小球落地时的速度大小……"
-              ></textarea>
-              <div class="row-between">
-                <span class="muted small">粘贴的题和拍的照片，走的是同一条读题链路。</span>
-                <div class="row-right">
-                  <button class="btn btn-ghost btn-sm" id="btn-sample">填个示例</button>
-                  <button class="btn btn-primary" id="btn-import">读懂这道题</button>
-                </div>
-              </div>
-              <div class="notice" id="import-notice" hidden></div>
-            </details>
-          </div>
-
-          <!-- 题库 -->
-          <div class="card">
-            <div class="panel-head">
-              <span class="ph-icon">📚</span>
-              <h3>或者从题库选一题</h3>
-              <div class="ph-actions"><span class="pill" id="problem-count">…</span></div>
-            </div>
-            <div class="problem-list" id="problem-list">
-              <div class="skeleton" style="height: 62px"></div>
-              <div class="skeleton" style="height: 62px"></div>
-              <div class="skeleton" style="height: 62px"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 读题结果：只给"我读懂了什么"，不给路径 -->
-        <div class="card card-ready" id="intake-result" hidden>
-          <div class="panel-head">
-            <span class="ph-icon">✅</span>
-            <h3>我已经读完这道题</h3>
-            <div class="ph-actions"><span class="pill" id="intake-engine">—</span></div>
-          </div>
-          <div class="intake-grid">
-            <div>
-              <h4 class="mini-title">考到的知识点</h4>
-              <div class="tag-row" id="intake-topics"></div>
-              <h4 class="mini-title">解题路径已建档</h4>
-              <p class="muted small" id="intake-pathnote">
-                我生成了一条解题路径（共 <strong id="intake-steps">?</strong> 步）用于判断你的位置。
-                按设计，<strong>它对你不可见</strong> —— 切到「教师视图」可以看到完整图谱。
-              </p>
-              <p class="muted small" id="intake-why"></p>
-            </div>
-            <div>
-              <h4 class="mini-title">关键条件速览</h4>
-              <div class="cond-list" id="intake-conditions"></div>
-            </div>
-          </div>
-          <div class="row-between">
-            <span class="muted small" id="intake-conditions-note"></span>
-            <button class="btn btn-primary" id="btn-start-chat">开始一起想 →</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- =====================================================================
-           学生视图 · 页②：一起想
-           三区：左=题目与解析（数据）｜中=对话（互动）｜右=我的状态（反馈）
-           ===================================================================== -->
-      <section class="page" id="page-chat">
-        <div class="workbench" id="workbench">
-          <!-- ---------- 左：题目与解析 ---------- -->
-          <aside class="study-panel">
-            <div class="panel-head">
-              <span class="ph-icon">📘</span>
-              <h3 id="chat-title">题目</h3>
-              <div class="ph-actions">
-                <button class="btn btn-ghost btn-sm" id="btn-change-problem">换一题</button>
-              </div>
-            </div>
-            <div class="study-body">
-              <!-- 原题 / 解析 开关 -->
-              <div class="seg-view" id="seg-problem-view" data-view="original">
-                <span class="thumb"></span>
-                <button type="button" class="on" data-view="original">原题</button>
-                <button type="button" data-view="parsed">解析</button>
-              </div>
-
-              <div class="view-pane active" id="pane-original" style="margin-top: 14px">
-                <!-- 题干阅读框：超长题目在这里内部滚动，不把整页拉长。
-                     注意与"面板 sticky"是两件事 —— 面板本身仍在普通文档流里（见 styles.css）。 -->
-                <div class="stem-box">
-                  <div class="stem" id="chat-stem">尚未选择题目</div>
-                </div>
-                <p class="stem-hint" hidden></p>
-                <div class="givens" id="chat-givens"></div>
-              </div>
-
-              <div class="view-pane" id="pane-parsed" style="margin-top: 14px">
-                <div id="analysis-body">
-                  <p class="muted small">选一道题之后，这里会显示关键变量、关键条件与知识图谱。</p>
-                </div>
-              </div>
-            </div>
-          </aside>
-
-          <!-- ---------- 中：对话 ---------- -->
-          <div class="chat-column">
-            <div class="statusbar">
-              <div class="sb-block">
-                <span class="sb-label">我的位置</span>
-                <span class="sb-value" id="progress-text">还没有开始</span>
-              </div>
-              <div class="sb-progress">
-                <!-- 路径轨道：走过的点亮、当前的高亮、没到的置灰。
-                     只显示编号 —— 步骤名对学生不可见（那是解法）。 -->
-                <div class="path-track" id="path-track" aria-label="解题路径进度"></div>
-                <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
-              </div>
-              <div class="sb-block">
-                <span class="sb-label">本轮帮助</span>
-                <span class="sb-value" id="status-level">—</span>
-              </div>
-              <!-- 非线性跳转：想直接看报告随时可以，不必等"做完"。
-                   真实的学习过程本来就是跳的，不该由系统规定走完哪几步才放行。 -->
-              <div class="sb-right">
-                <button class="btn btn-ghost btn-sm" id="btn-finish" title="不做了，直接看这道题的学习报告">
-                  我已完成 →
-                </button>
-              </div>
-            </div>
-
-            <div class="card card-chat">
-              <div class="chat-head">
-                <h3>一起想</h3>
-                <div class="chat-head-right">
-                  <div class="seg seg-mode" id="mode-switch" role="group" aria-label="陪伴模式">
-                    <button class="seg-btn" data-mode="self_training">
-                      🧘 自主训练<em>我自己做，卡住再叫你</em>
-                    </button>
-                    <button class="seg-btn on" data-mode="ai_companion">
-                      🤝 学伴陪伴<em>关键地方你会提醒我</em>
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <p class="mode-hint" id="mode-hint">学伴陪伴：我会在你思路出现岔路时出声，但不会每一步都打断你。</p>
-
-              <div class="messages" id="messages">
-                <div class="empty-state" id="chat-empty">
-                  <span class="empty-icon">💬</span>
-                  <strong>先说说你自己的想法</strong>
-                  <p>
-                    不用写得很规范。哪怕是"我只知道要用安培力，但不知道力怎么求"这种半句话都可以 ——
-                    我的任务就是从这种半句话里看出你卡在哪。
-                  </p>
-                </div>
-              </div>
-
-              <form class="composer" id="composer">
-                <!-- 符号面板：物理公式里的 ² μ Ω √ 在普通键盘上打不出来。
-                     收起时只占一行，需要时展开，不抢输入框的位置。 -->
-                <div class="mathbar" id="mathbar">
-                  <button type="button" class="mathbar-toggle" id="mathbar-toggle" aria-expanded="false">
-                    <span class="mb-ico">Ω</span><span>符号面板</span><span class="mb-caret">▾</span>
-                  </button>
-                  <label class="mathbar-auto" title="例如 v^2 自动变成 v²，mu 自动变成 μ，>= 自动变成 ≥">
-                    <input type="checkbox" id="mathbar-auto" checked />
-                    <span>自动替换</span>
-                  </label>
-                  <span class="mathbar-tip">公式写不出来就用文字说，我看得懂</span>
-                  <div class="mathbar-body" id="mathbar-body" hidden></div>
-                </div>
-                <textarea
-                  id="input"
-                  rows="2"
-                  placeholder="例：我打算先用自由落体公式算出落地时间，再用 v = gt 求速度……"
-                  disabled
-                ></textarea>
-                <div class="composer-right">
-                  <label class="checkbox small">
-                    <input type="checkbox" id="help-seeking" checked />
-                    <span>我在求助</span>
-                  </label>
-                  <div class="composer-actions">
-                    <!-- 语音输入：浏览器支持才显示（Web Speech API）。
-                         学生"说思路"比"打字"自然得多，而这条路不需要任何硬件。 -->
-                    <button type="button" class="btn btn-ghost btn-mic" id="btn-mic" hidden title="用语音说你的思路（点一下开始，再点一下结束）">
-                      <span class="mic-dot"></span><span id="mic-label">说思路</span>
-                    </button>
-                    <button class="btn btn-primary" type="submit" id="btn-send" disabled>发送</button>
-                  </div>
-                </div>
-              </form>
-            </div>
-
-            <!-- 引擎判断链路：贴在对话流下方的一张"系统卡片" -->
-            <div class="card card-engine" id="engine-panel">
-              <div class="panel-head" style="margin-bottom: 4px; border-bottom: none">
-                <span class="ph-icon">🔎</span>
-                <h3>我这一轮是怎么想的</h3>
-                <div class="ph-actions"><span class="pill pill-muted" id="engine-latency">—</span></div>
-              </div>
-              <ol class="engine-path" id="engine-path">
-                <li class="muted small">你说一句话，这里会显示我的判断过程。</li>
-              </ol>
-            </div>
-          </div>
-
-          <!-- ---------- 右：我的状态 ---------- -->
-          <aside class="side-panel">
-            <div class="card card-tight history-card">
-              <div class="panel-head">
-                <span class="ph-icon">🕘</span>
-                <h3>学习时间线</h3>
-              </div>
-              <label class="history-search-label" for="history-search">按步骤、关键词或时间搜索</label>
-              <input id="history-search" class="history-search" type="search" placeholder="如：第 2 步 / 公式 / 14:30" />
-              <button type="button" class="btn btn-ghost btn-sm history-latest" id="history-latest" hidden>返回最新对话</button>
-              <ol class="history-list" id="history-list"><li class="muted small">完成一轮对话后会记录在这里。</li></ol>
-            </div>
-
-            <div class="card card-tight">
-              <div class="panel-head">
-                <span class="ph-icon">✅</span>
-                <h3>我读懂了你的这些想法</h3>
-              </div>
-              <ul class="understood-list" id="understood-list">
-                <li class="muted">说一句你的思路，这里会列出我读懂的部分。</li>
-              </ul>
-            </div>
-
-            <div class="card card-tight">
-              <div class="panel-head">
-                <span class="ph-icon">🪜</span>
-                <h3>我会怎么帮你</h3>
-              </div>
-              <p class="muted small" style="margin-bottom: 8px">
-                一次只上一级台阶。到最后一格就不再往上给了 —— 剩下的必须你自己完成。
-              </p>
-              <ol class="ladder" id="ladder">
-                <li data-level="0">
-                  <span class="ladder-dot"></span>
-                  <div><strong>先把问题说清楚</strong><em>你还没开口时，我先帮你分清已知与目标</em></div>
-                </li>
-                <li data-level="1">
-                  <span class="ladder-dot"></span>
-                  <div><strong>问你一个前提</strong><em>只提问，不指方向</em></div>
-                </li>
-                <li data-level="2">
-                  <span class="ladder-dot"></span>
-                  <div><strong>给你一个方向</strong><em>指该看哪两个量的关系，不给式子</em></div>
-                </li>
-                <li data-level="3">
-                  <span class="ladder-dot"></span>
-                  <div><strong>我示范一步动作</strong><em>示范动作，剩下你来</em></div>
-                </li>
-              </ol>
-            </div>
-
-            <div class="card card-tight">
-              <div class="panel-head">
-                <span class="ph-icon">🎬</span>
-                <h3>演示剧本</h3>
-              </div>
-              <p class="muted small" style="margin-bottom: 8px">点一下自动填入「典型学生的说法」。</p>
-              <div class="script-list" id="script-list"></div>
-            </div>
-          </aside>
-        </div>
-      </section>
-
-      <!-- =====================================================================
-           学生视图 · 页③：学习报告
-           ===================================================================== -->
-      <section class="page" id="page-report">
-        <div class="hero hero-slim">
-          <h1>学习报告</h1>
-          <p class="hero-sub">
-            报告不评价你"对了几步"，而是回答三件事：<strong>卡在哪、为什么卡、下一步做什么</strong>。
-          </p>
-        </div>
-        <div id="report-body">
-          <div class="empty-state card">
-            <span class="empty-icon">📄</span>
-            <strong>还没有可以汇总的对话</strong>
-            <p>先去「一起想」页跟学伴聊几轮，再回来生成报告。</p>
-            <button class="btn btn-primary" id="btn-goto-chat">去一起想</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- =====================================================================
-           教师视图 —— 独立页面。
-           这里的一切都来自 /api/teacher/*；学生视图的 /api/chat 不返回这些数据。
-           ===================================================================== -->
-      <section class="page" id="page-teacher">
-        <div id="teacher-gate" class="card teacher-gate">
-          <div class="panel-head">
-            <span class="ph-icon">🧑‍🏫</span>
-            <h3>教师视图</h3>
-            <div class="ph-actions"><span class="pill pill-muted" id="teacher-gate-pill">检查中…</span></div>
-          </div>
-          <p>
-            教师视图包含<strong>完整解题路径、答案指纹、错因标签与引擎判断链路</strong> ——
-            这些内容一旦被学生看到，整套"不给答案"的设计就失效了。
-          </p>
-          <p class="muted small" style="margin-top: 8px">
-            所以它们在<strong>服务端</strong>就被拦住了：学生视图的接口根本不返回这些字段。
-          </p>
-          <p class="muted small" style="margin-top: 8px">
-            <strong>本地开发模式下不需要口令，直接点「进入」即可。</strong>
-            口令来自服务端环境变量 <code>TEACHER_KEY</code>（不写在前端文件里）——
-            配了口令、或部署到公网时，才需要在这里填。
-          </p>
-          <div class="row-between">
-            <input type="password" id="teacher-key" class="key-input" placeholder="口令（本地未配置时可留空，直接点进入）" />
-            <button class="btn btn-primary" id="btn-teacher-login">进入</button>
-          </div>
-          <div class="notice notice-warn" id="teacher-gate-msg" hidden></div>
-        </div>
-
-        <div id="teacher-body" hidden>
-          <div class="hero hero-slim">
-            <h1>教研视角</h1>
-            <p class="hero-sub">
-              这里回答的是另一个问题：<strong>引擎的判断对不对、提示有没有真的帮到学生</strong>。
-            </p>
-          </div>
-          <div class="teacher-toolbar">
-            <div class="seg" id="teacher-tabs">
-              <button class="seg-btn on" data-tab="overview">教学总览</button>
-              <button class="seg-btn" data-tab="session">本次会话复盘</button>
-              <button class="seg-btn" data-tab="problem">题目与路径图谱</button>
-              <button class="seg-btn" data-tab="eval">质量评测</button>
-            </div>
-            <button class="btn btn-ghost btn-sm" id="btn-teacher-refresh">刷新</button>
-          </div>
-          <div id="teacher-content">
-            <div class="card"><div class="skeleton" style="height: 140px"></div></div>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <!-- =====================================================================
-         完成确认（"你答对了"）
-         刻意做成一个覆盖层而不是普通消息：学生自己把题做出来了，
-         这件事值得一个明确的、需要他确认的停顿 —— 而不是又一条滚过去的聊天气泡。
-         ===================================================================== -->
-    <div class="done-overlay" id="done-overlay" hidden>
-      <div class="done-card" role="dialog" aria-modal="true" aria-labelledby="done-title">
-        <div class="done-burst" aria-hidden="true">🎉</div>
-        <h2 id="done-title">这道题你做出来了</h2>
-        <p class="done-sub" id="done-sub">下面这些结果都是你自己算出来的。</p>
-        <div class="done-answers" id="done-answers"></div>
-        <div class="done-stats" id="done-stats"></div>
-        <div class="done-actions">
-          <button class="btn btn-ghost" id="done-stay">再看一会儿</button>
-          <button class="btn btn-primary" id="done-report">看学习报告 →</button>
-        </div>
       </div>
     </div>
+  </div>
+  <div class="frame">
+    <div class="flow">
+      <div class="flow-ticks" aria-hidden="true">
+        <span class="flow-tick is-now"></span><span class="flow-tick"></span><span class="flow-tick"></span><span class="flow-tick"></span><span class="flow-tick"></span>
+      </div>
+      <p class="flow-label" id="flow-label" role="status">01 / 05 · 题目录入</p>
+    </div>
+  </div>
+</div>
 
-    <script type="module" src="/app.js"></script>
-  </body>
+<main id="app"></main>
+
+<div class="colophon">
+  <span>步步解 · 学习版</span>
+</div>
+
+<div class="done-overlay" id="done-overlay" hidden>
+  <div class="confetti-layer" id="confetti-layer" aria-hidden="true"></div>
+  <div class="done-card" role="dialog" aria-modal="true" aria-labelledby="done-title">
+    <span class="done-kicker">CONGRATULATIONS</span>
+    <h1 id="done-title">恭喜你，这道题你自己做出来了</h1>
+    <p class="done-sub" id="done-sub">下面这些结果都是你自己算出来的，我没有替你算。</p>
+    <div class="done-answers" id="done-answers"></div>
+    <div class="done-stats" id="done-stats"></div>
+    <div class="done-actions">
+      <button class="quiet" id="btn-done-close" type="button">再看一会儿</button>
+      <button class="primary" id="btn-done-report" type="button">查看学习报告</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="/shell.js?v=20261018-19"></script>
+</body>
 </html>

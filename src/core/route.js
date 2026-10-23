@@ -259,7 +259,7 @@ const STRATEGY_MATRIX = {
 
 const STRATEGY_INSTRUCTIONS = {
   clarify_goal_and_knowns:
-    '学生还没形成思路。只帮他分清"已知什么/要求什么/哪里不确定"，用开放式提问。不要指向任何具体规律或方向。',
+    '学生还没形成思路。只帮他分清"已知什么/要求什么/哪里不确定"，用开放式提问。不要给出任何物理方向。',
   condition_question:
     '学生用错了规律或漏了前提。只针对该规律的前提条件提出一个追问，逼他自己去检查条件。绝不提示"应该用哪个公式"。',
   self_check_invitation:
