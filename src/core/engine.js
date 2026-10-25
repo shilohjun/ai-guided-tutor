@@ -14,7 +14,6 @@
  * 这一点由 test/engine.test.js 逐一断言，而不是靠代码审阅。
  */
 
-import { checkReplyFormat } from './response-policy.js';
 import { createAdapter } from './llm.js';
 import { buildDiagnosis, describePosition, findStepByPosition, totalSteps } from './locate.js';
 import { route } from './route.js';
@@ -98,9 +97,9 @@ const ASK_FOR_VERIFY = [
  * 否则学生会认为"这个 AI 没用"而离开。拒绝不是终点，是转向。
  */
 const REFUSAL_LADDER = [
-  '我可以帮你拆解当前一步，先保留由你自己求出结果的机会。',
-  '先定位卡住的具体位置，我会按需要逐层增加提示，不一次展开整题。',
-  '我们把任务缩小到当前一步，先补足你缺少的那一条知识或关系。',
+  '答案我先不给。不过我可以保证：只要你自己走通一步，后面的会越来越快。我们先从最小的那一步开始——你说说这道题给了哪些条件？',
+  '我还是不给答案。但如果你愿意把现在想到的写给我（哪怕只写对一个公式名），我能告诉你"卡在哪、该检查什么"。这比我报个数字对你考试有用得多。',
+  '我理解你想要结果，但直接给你答案，下次换一道题你还是会卡。这样吧，我把这一步拆成两个更小的问题，你只要回答其中一个就行——先说题目里"匀速"这个条件在力学上意味着什么？',
 ];
 
 export function classifyRequest(utterance) {
@@ -183,7 +182,7 @@ export function createEngine({ adapter, problem, logger } = {}) {
         diagnosis: makeSoftDiagnosis(problem, 'not_started', '学生直接索要答案，未提供可诊断的思路', trace),
         hint: {
           level: 1,
-          form: 'refusal',
+          form: 'condition_question',
           text: guardResult.passed ? text : guardResult.repairedText,
           concepts: [],
           touchesFinalAnswer: false,
@@ -239,12 +238,9 @@ export function createEngine({ adapter, problem, logger } = {}) {
         history,
       });
     } catch (err) {
+      trace.push({ stage: 'understand', message: `观察阶段失败，降级为"未形成思路"：${err.message}` });
       logger?.(`observe 失败：${err.message}`);
-      const failure = new Error('暂时未能读取你的思路，请重试；已完成的步骤会保留。');
-      failure.code = 'OBSERVATION_UNAVAILABLE';
-      failure.statusCode = 503;
-      failure.cause = err;
-      throw failure;
+      observation = emptyObservation(request.utterance);
     }
 
     trace.push({
@@ -262,14 +258,6 @@ export function createEngine({ adapter, problem, logger } = {}) {
       allowCarryover: isFollowUpUtterance(request.utterance),
     });
 
-    // 简短追问沿用同一位置的卡点类型，不能把“还是不会”重新诊断成新卡点。
-    const priorHint = [...history].reverse().find(t => t.role === 'ai' && !t.suppressed && t.form !== 'confirm' && t.metaStuckKind);
-    if (isFollowUpUtterance(request.utterance) && priorHint &&
-        priorHint.metaStep === diagnosis.position.stepIndex &&
-        priorHint.metaGraphId === diagnosis.position.graphId) {
-      diagnosis.stuckKind = priorHint.metaStuckKind;
-    }
-
     // ---------------- 2.5 确认路径（在定位之后、决策之前） ----------------
     if (isConfirmation) {
       trace.push({
@@ -285,7 +273,7 @@ export function createEngine({ adapter, problem, logger } = {}) {
     const routing = route({
       problem,
       diagnosis,
-      history: [...history, { role: 'student', text: request.utterance ?? '' }],
+      history,
       explicitHelpSeeking: request.explicitHelpSeeking ?? false,
       mode: request.mode,
       pastViolations: [],
@@ -337,7 +325,6 @@ export function createEngine({ adapter, problem, logger } = {}) {
     let draftMeta = null;
     let finalText = null;
     let finalGuard = null;
-    let usedFallback = false;
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const forbidden = attempt === 0 ? routing.forbidden : accumulateForbidden(routing.forbidden, guardHistory);
@@ -352,19 +339,14 @@ export function createEngine({ adapter, problem, logger } = {}) {
           /** 传层级统计给适配器：离线桩用它轮换话术，真模型也可用作 few-shot 选择依据 */
           l3Count: routing.l3Count ?? 0,
           history,
-          utterance: request.utterance,
         });
         draftMeta = drafted.meta;
         const candidate = drafted.text;
 
-        const visible = composeStudentMessage(diagnosis, { text: candidate, nextAsk: drafted.meta.nextAsk });
-        const g = guard(visible, problem, routing.level, {
+        const g = guard(candidate, problem, routing.level, {
           step,
           conceptWhitelist: routing.allowedConcepts,
         });
-        const format = checkReplyFormat(visible);
-        g.violations.push(...format.violations);
-        g.passed = g.passed && format.passed;
         guardHistory.push(g);
 
         trace.push({
@@ -381,7 +363,48 @@ export function createEngine({ adapter, problem, logger } = {}) {
           break;
         }
 
-        // 不采用删公式、截断或模板重写。把完整违规原因带回模型重新生成。
+        /** 守卫给出的降级重写结果（可能是"只删掉越界片段"，也可能是"整句换成模板"） */
+        const rewritten = g.repairedText;
+        const recheck = rewritten
+          ? guard(rewritten, problem, routing.level, { step, conceptWhitelist: routing.allowedConcepts })
+          : null;
+
+        /**
+         * 被拦下之后走哪条路 —— 这里分两类，不能一视同仁。
+         *
+         *   strip-equation / truncate：守卫只删掉了越界的那一小段，
+         *     模型自己的说法还在，直接采用（比再调一次模型更快、也更贴学生）。
+         *   safe-template：守卫把整句换成了通用模板。
+         *     这时候立刻采用是**错的** —— 学生会收到一句"万金油"，
+         *     而且他无从知道你其实读懂了这道题。
+         *     正确动作是把拦截原因带回给模型，让它换个说法再试一次；
+         *     两次都过不了，才轮到这个模板兜底。
+         *
+         * 这也是 README 里写的"模型最多重试一次；两次都不过就用安全兜底模板" ——
+         * 早期实现图省事，在第一次被拦时就直接采用了模板，
+         * 于是"重试"这条路径几乎从不发生，提示质量被静默拉低。
+         */
+        const keepModelVoice = recheck?.passed && ['strip-equation', 'truncate'].includes(g.repairStrategy);
+        if (keepModelVoice) {
+          finalText = rewritten;
+          finalGuard = recheck;
+          trace.push({
+            stage: 'guard',
+            message: `采用守卫重写结果（策略 ${g.repairStrategy}，保留了模型的原始说法）`,
+          });
+          break;
+        }
+        // 最后一次机会仍只拿到模板句 ⇒ 用它（仍比无信息的兜底模板更贴近本题）
+        if (recheck?.passed && attempt === 1) {
+          finalText = rewritten;
+          finalGuard = recheck;
+          trace.push({
+            stage: 'guard',
+            message: `第二次生成仍越界，采用守卫重写结果（策略 ${g.repairStrategy}）`,
+          });
+          break;
+        }
+        // 否则带着违规信息重试下一代
         finalGuard = g;
       } catch (err) {
         trace.push({ stage: 'generate', message: `第 ${attempt + 1} 次起草失败：${err.message}` });
@@ -391,7 +414,6 @@ export function createEngine({ adapter, problem, logger } = {}) {
 
     // 两次都不通过 ⇒ 安全兜底模板（永不泄题优先于文采）
     if (finalText == null) {
-      usedFallback = true;
       const fallbackDraft = {
         text: null,
         nextAsk: null,
@@ -404,21 +426,8 @@ export function createEngine({ adapter, problem, logger } = {}) {
         allowedConcepts: routing.allowedConcepts,
       });
       finalText = safe.text;
-      finalGuard = guard(composeStudentMessage(diagnosis, { text: finalText, nextAsk: null }), problem, routing.level, { step, conceptWhitelist: routing.allowedConcepts });
-      const format = checkReplyFormat(composeStudentMessage(diagnosis, { text: finalText, nextAsk: null }));
-      finalGuard.violations.push(...format.violations);
-      finalGuard.passed = finalGuard.passed && format.passed;
+      finalGuard = guard(finalText, problem, routing.level, { step, conceptWhitelist: routing.allowedConcepts });
       guardHistory.push(finalGuard);
-      // 题目概念也可能误含结果式，不能因模板来源可信就跳过复检。
-      if (!finalGuard.passed) {
-        finalText = '本轮提示暂时无法可靠生成。请指出你看不懂的一个符号，我会从这里重新尝试。';
-        const visible = composeStudentMessage(diagnosis, { text: finalText, nextAsk: null });
-        finalGuard = guard(visible, problem, routing.level, { step, conceptWhitelist: routing.allowedConcepts });
-        const lastFormat = checkReplyFormat(visible);
-        finalGuard.violations.push(...lastFormat.violations);
-        finalGuard.passed = finalGuard.passed && lastFormat.passed;
-        guardHistory.push(finalGuard);
-      }
       draftMeta = fallbackDraft;
       trace.push({
         stage: 'guard',
@@ -437,12 +446,12 @@ export function createEngine({ adapter, problem, logger } = {}) {
 
     const hint = {
       level: routing.level,
-      form: usedFallback ? 'fallback' : formOfLevel(routing.level),
+      form: formOfLevel(routing.level),
       text: finalText,
       concepts: draftMeta?.concepts ?? routing.allowedConcepts,
       touchesFinalAnswer: false,
       rationale: `层级 L${routing.level}（${routing.strategy}）；${routing.reason}`,
-      nextAsk: draftMeta?.nextAsk ?? null,
+      nextAsk: draftMeta?.nextAsk ?? routingNextAsk(routing.level),
     };
 
     return assemble({
@@ -602,23 +611,19 @@ function assemble({
   restatementOverride,
   enginePath = [],
 }) {
-  const message = composeStudentMessage(diagnosis, hint);
-  if (!suppressed && !checkReplyFormat(message).passed) {
-    const error = new Error('暂时未能生成合适的简短提示，请重试；已有步骤会保留。');
-    error.code = 'REPLY_UNAVAILABLE';
-    error.statusCode = 503;
-    throw error;
-  }
   trace.push({
     stage: 'generate',
     message: `最终交付：L${hint.level} ${hint.form} —— ${describePosition(problem, diagnosis.position)}`,
   });
 
+  const visibleDiagnosis =
+    restatementOverride === undefined ? diagnosis : { ...diagnosis, restatement: restatementOverride };
+
   return {
     diagnosis,
     hint,
-    /** 已检查的完整消息（提示 + 一个下一步动作，不拼接诊断复述） */
-    message,
+    /** 面向学生的完整消息（含复述 + 提示 + 下一步动作） */
+    message: composeStudentMessage(visibleDiagnosis, hint),
     /**
      * 引擎判断链路的学生版投影（见 prompt.js 的 buildStudentEnginePath）。
      * 教师版不等价于它 —— 教师版是 diagnosis.trace 的完整内容，由教师端点单独返回。
@@ -639,13 +644,18 @@ function assemble({
 
 async function draftWithMeta(llm, input) {
   const content = await llm.draftHint(input);
-  const parsed = typeof content === 'string' ? safeParse(content) : content;
-  if (!parsed || typeof parsed.text !== 'string' || !parsed.text.trim() ||
-      !(parsed.nextAsk == null || typeof parsed.nextAsk === 'string') || !Array.isArray(parsed.concepts) ||
-      !parsed.concepts.every(value => typeof value === 'string')) {
-    throw new Error('提示输出必须是含text、nextAsk、concepts的有效JSON');
+  if (typeof content === 'string') {
+    // 离线桩返回 JSON 字符串；真模型也返回 JSON 字符串。统一解析。
+    const parsed = safeParse(content);
+    return {
+      text: parsed?.text ?? content,
+      meta: { concepts: parsed?.concepts ?? [], nextAsk: parsed?.nextAsk ?? null },
+    };
   }
-  return { text: parsed.text, meta: { concepts: parsed.concepts, nextAsk: parsed.nextAsk ?? null } };
+  return {
+    text: content?.text ?? '',
+    meta: { concepts: content?.concepts ?? [], nextAsk: content?.nextAsk ?? null },
+  };
 }
 
 function safeParse(raw) {

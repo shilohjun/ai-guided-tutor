@@ -14,10 +14,7 @@
     "eval": "node scripts/eval.js",
     "eval:llm": "node scripts/eval.js --adapter llm",
     "ocr:path": "node scripts/ocr-path-probe.js",
-    "all": "node test/run.js && node scripts/eval.js",
-    "test:reply-policy": "node --test test/reply-policy.test.mjs",
-    "prompts:export": "node scripts/export-prompts.js",
-    "prompts:check": "node scripts/export-prompts.js --check"
+    "all": "node test/run.js && node scripts/eval.js"
   },
   "keywords": [
     "education",

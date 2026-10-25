@@ -95,7 +95,7 @@ const VOICE_HYPE = [
 const VOICE_PARTICLES = ['啦', '呀', '哦', '噢', '嗯', '哈', '诶', '哎', '唉', '咯', '嘛'];
 
 /** 常见 emoji / 颜文字区间（按码点区间删，不逐个列举） */
-const EMOJI_RE = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu;
+const EMOJI_RE = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{2190}-\u{21FF}]/gu;
 
 /**
  * 说话方式把关（确定性）。
@@ -130,7 +130,7 @@ export function polishVoice(text) {
   for (const p of VOICE_PARTICLES) {
     if (!out.includes(p)) continue;
     removed.push(p);
-    out = out.replace(new RegExp(`${p}(?=[，。！？!?\\s]|$)`, 'g'), '');
+    out = out.split(p).join('');
   }
 
   // ---- ③ emoji / 颜文字 ----
@@ -183,12 +183,26 @@ export const STUDENT_LEVEL_NOTE = {
  * @returns {string} 学生可见的完整消息
  */
 export function composeStudentMessage(diagnosis, hint) {
-  // 诊断复述仅供内部使用。公式和限定条件不做截断式压缩。
-  const text = String(hint.text ?? '').trim();
-  const nextAsk = String(hint.nextAsk ?? '').trim();
-  const segments = text ? [`提示：${text}`] : [];
-  if (nextAsk && nextAsk !== text) segments.push(`试一试：${nextAsk}`);
-  return segments.join('\n');
+  const segments = [];
+
+  const restatement = safeRestatement(diagnosis.restatement, hint);
+  if (restatement) segments.push(restatement);
+
+  const polished = polishVoice(hint.text);
+  /**
+   * 整句都是空话时 polishVoice 会返回空串。
+   * 这时**退回原文**而不是丢弃 —— 空话只是不好，丢掉整句话是更严重的问题
+   * （学生会看到一个只有"下一步"三个字的回复，像是系统坏了）。
+   */
+  segments.push(polished.text || hint.text.trim());
+
+  const nextAsk = hint.nextAsk?.trim();
+  if (nextAsk && !isRedundant(nextAsk, segments)) {
+    segments.push(`【下一步】${nextAsk}`);
+  }
+
+  const message = segments.join('\n\n');
+  return sanitizeVisible(message);
 }
 
 /**

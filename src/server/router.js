@@ -678,29 +678,20 @@ export async function handleApi(req, res, url) {
     const session = getSession(sessionId || 'demo', problemId);
     const normalizedMode = mode === 'self_training' ? 'self_training' : 'ai_companion';
 
-    let response;
-    try {
-      response = await session.engine.handleTurn({
-        problemId,
-        utterance,
-        history: session.history,
-        mode: normalizedMode,
-        explicitHelpSeeking: Boolean(explicitHelpSeeking),
-        sessionId: session.id,
-      });
-    } catch (error) {
-      if (!['OBSERVATION_UNAVAILABLE', 'REPLY_UNAVAILABLE'].includes(error.code)) throw error;
-      sendJson(res, 503, { error: error.message, retryable: true });
-      return true; // 系统故障不写入学生学习记录。
-    }
+    const response = await session.engine.handleTurn({
+      problemId,
+      utterance,
+      history: session.history,
+      mode: normalizedMode,
+      explicitHelpSeeking: Boolean(explicitHelpSeeking),
+      sessionId: session.id,
+    });
 
     const now = new Date().toISOString();
     session.history.push({ role: 'student', text: utterance, at: now });
-    if (!response.suppressed) session.history.push({
+    session.history.push({
       role: 'ai',
-      text: response.message,
-      form: response.hint.form,
-      metaStuckKind: response.diagnosis.stuckKind,
+      text: response.hint.text,
       at: now,
       level: response.hint.level,
       metaStep: response.diagnosis.position.stepIndex,

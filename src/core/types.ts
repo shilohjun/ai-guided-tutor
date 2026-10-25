@@ -256,7 +256,7 @@ export interface Hint {
    *   确认：引擎在回应学生已经说出来的答案，不许出现学生没说的答案
    * 把它混进提示层级里，报告统计与守卫口径都会被污染。
    */
-  form: 'clarify' | 'condition_question' | 'direction' | 'worked_step' | 'confirm' | 'refusal' | 'fallback';
+  form: 'clarify' | 'condition_question' | 'direction' | 'worked_step' | 'confirm';
   /** 面向学生的提示正文（已过守卫） */
   text: string;
   /** 本轮引用的概念（让 UI 可以高亮知识点） */
@@ -288,8 +288,7 @@ export interface GuardViolation {
     | 'solution_dump'       // 一口气给出完整步骤序列
     | 'final_conclusion'    // 直接下了结论
     | 'concept_out_of_domain' // 跑题：提示引用了本题不存在的物理概念
-    | 'solution_insight'   // 直接说出了解题核心结论（如"r 是内阻"）
-    | 'reply_format';      // 最终消息超长、过多问句或暴露诊断信息
+    | 'solution_insight';   // 直接说出了解题核心结论（如"r 是内阻"）
   detail: string;
   /** 命中的片段 */
   match?: string;
@@ -313,10 +312,6 @@ export interface Turn {
    */
   metaStep?: number | null;
   metaGraphId?: string | null;
-  /** 仅有效提示参与同一卡点升级；确认、拒绝与兜底不参与。 */
-  form?: Hint['form'];
-  suppressed?: boolean;
-  metaStuckKind?: StuckKind;
 }
 
 export interface HintRequest {

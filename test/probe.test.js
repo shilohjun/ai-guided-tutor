@@ -148,7 +148,7 @@ describe('学生想对了什么 · 先肯定再指出卡点', () => {
     );
   });
 
-  it('保留内部学习证据，但不强制在每条回复中复述或夸奖', async () => {
+  it('正面信息必须出现在学生可见文本里（不能只存在内部字段）', async () => {
     const engine = createEngine({ adapter: createOfflineAdapter(), problem: P1 });
     const res = await engine.handleTurn({
       problemId: P1.id,
@@ -159,8 +159,8 @@ describe('学生想对了什么 · 先肯定再指出卡点', () => {
     });
     const visible = res.message ?? '';
     assert(
-      !/我理解你的意思是|你想对的地方是/.test(visible),
-      `学生可见文本不应强制长篇复述，实际：${visible.slice(0, 200)}`,
+      /想对|已经走到|方向是清楚/.test(visible),
+      `学生可见文本里应体现正面反馈，实际：${visible.slice(0, 200)}`,
     );
   });
 

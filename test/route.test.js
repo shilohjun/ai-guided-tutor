@@ -119,7 +119,7 @@ describe('路由 · 抑制过度帮助', () => {
     assert(d.suppressed, '自主训练模式应保持静默');
   });
 
-  it('自主训练模式 + 高置信卡点但未求助 ⇒ 仍然静默', () => {
+  it('自主训练模式 + 高置信卡点 ⇒ 允许一次介入', () => {
     const d = decideLevel({
       problem: P1,
       diagnosis: diag({
@@ -130,8 +130,8 @@ describe('路由 · 抑制过度帮助', () => {
       explicitHelpSeeking: false,
       mode: 'self_training',
     });
-    assert(d.suppressed, '自主训练必须由学生主动求助触发');
-    assertEquals(d.level, null);
+    assert(!d.suppressed, '高置信卡点应允许介入');
+    assertEquals(d.level, 1);
   });
 
   it('定位置信度过低时退到 L1 以确认位置', () => {

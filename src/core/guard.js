@@ -229,7 +229,6 @@ export function checkLevelOverflow(text, problem, level) {
   const rule = LEVEL_RULES[level];
   const violations = [];
   if (!rule.forbidEquation) return violations;
-  if (level >= 1 && checkFormulaLeak(text, problem, level).length === 0) return violations;
 
   const t = normalize(text);
   const m = t.match(EQUATION_PATTERN);
