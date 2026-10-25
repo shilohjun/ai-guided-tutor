@@ -7,7 +7,7 @@ import { run } from './runner.js';
 
 const filter = process.argv[2];
 
-const suites = ['text', 'guard', 'route', 'engine', 'probe', 'intake', 'analysis', 'verify', 'mathinput', 'ocr', 'demo-gate', 'worker-adapter', 'docs', 'ui'];
+const suites = ['text', 'guard', 'route', 'engine', 'probe', 'intake', 'analysis', 'verify', 'mathinput', 'ocr', 'demo-gate', 'worker-adapter', 'cloudbase-adapter', 'docs', 'ui'];
 
 process.stdout.write('\n▶ 提示引擎测试套件\n\n');
 

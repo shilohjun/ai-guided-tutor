@@ -230,7 +230,7 @@ npm run all        # 测试 + 离线评测
 npm test
 ```
 
-当前注册 **297 个用例**；**290 通过，7 条旧页面契约待迁移**：
+当前注册 **312 个用例**；**305 通过，7 条旧页面契约待迁移**：
 
 - 2 条 OCR 路由契约（旧页面入口位置）；
 - 3 条 DOM 契约（仍按旧 `app.js` 检查）；
@@ -343,30 +343,47 @@ DESIGN-TOKENS.md         v3 设计 token 与可访问性说明
 > 且没有"额度用完自动停"。建议先在阿里云控制台给该 AppCode 设额度上限或告警。
 > 教师视图另由 `TEACHER_KEY` 控制，**口令门不放行它**——那接口返回完整解题路径与参考答案。
 
-### 两个平台的入口
+### 三个平台的入口
 
-同一份业务逻辑与同一份判定，跑在两个 serverless 平台上：
+同一份业务逻辑与同一份判定，跑在三个 serverless 平台上：
 
-| | Vercel | Cloudflare Workers |
-|---|---|---|
-| 入口文件 | `api/index.js`（Node 的 `req`/`res`） | `api/worker.js`（Fetch API） |
-| 配置文件 | `vercel.json` | `wrangler.jsonc` |
-| 静态资源 | `outputDirectory: public` | `assets.directory: ./public` |
-| 凭据来源 | `process.env` | 绑定的 Secret（`wrangler secret put`） |
-| 部署命令 | `npx vercel deploy --prod` | `npx wrangler deploy` |
+| | Vercel | Cloudflare Workers | 腾讯云 CloudBase |
+|---|---|---|---|
+| 入口文件 | `api/index.js`（Node 的 `req`/`res`） | `api/worker.js`（Fetch API） | `src/server/cloudbase-handler.js`（云函数事件） |
+| 配置文件 | `vercel.json` | `wrangler.jsonc` | `cloudbaserc.json` |
+| 静态资源 | `outputDirectory: public` | `assets.directory: ./public` | 静态托管（`staticstore`） |
+| 凭据来源 | `process.env` | 绑定的 Secret（`wrangler secret put`） | 云函数环境变量（`tcb fn config update`） |
+| 部署命令 | `npx vercel deploy --prod` | `npx wrangler deploy` | `tcb hosting deploy ./public` + `tcb fn deploy bubujie-api` |
 
-**为什么需要两份入口**：不是因为技术栈不同，而是因为网络可达性不同。
-`*.vercel.app` 在中国大陆会被 DNS 投毒（解析到 `157.240.x.x` 这类假地址，页面根本打不开），
-换成 Cloudflare 绑定自有域名才有一条能走的路径。
+**为什么需要三份入口**：不是因为技术栈不同，而是因为网络可达性不同。
+`*.vercel.app` 被 DNS 投毒成 `157.240.x.x`（Facebook 的地址段），
+`*.workers.dev` 被投毒成 `128.121.x.x`，两条域在国内都解析不到真地址 ——
+带代理能 curl 通，**不代表用户能打开**。所以最后落在腾讯云：域名解析到 `124.223.146.214`
+这类上海节点，不经代理直连首页约 0.4 秒、`/api/chat` 约 3 秒。
 
-两处刻意的复用，防止两边行为漂移：
+**CloudBase 走的是单域方案**，不是"静态托管 + 跨域接口"：
 
-- **口令门与凭据裁剪** → `src/server/demo-gate.js`，两个入口都只调 `buildRequestContext()`
+```
+同一个域名  xxx.service.tcloudbase.com
+  /      → 静态托管 staticstore      （public/ 里的 8 个文件）
+  /api   → 云函数 bubujie-api        （与本地、Vercel 同一份 router）
+```
+
+踩过的坑写在 `src/server/cloudbase-handler.js` 的注释里，这里记结论：
+把 `/` 也绑到云函数时，HTTP 访问服务对非 `/api` 路径直接回 404（**响应体是 0 字节**，
+看起来像函数里读文件失败，其实是网关自己拒的）。`/` 必须指向 `STATIC_STORE`，
+`/api` 指向 SCF，同域就没有 CORS、前端一行不用改。
+
+三处刻意的复用，防止平台之间行为漂移：
+
+- **口令门与凭据裁剪** → `src/server/demo-gate.js`，三个入口都只调 `buildRequestContext()`
 - **业务逻辑** → `src/server/router.js`，连本地 `server/server.js` 也是同一份
+- **函数打包** → `scripts/build-cloudbase.mjs`，把 CJS 入口、ESM 的 `src/`、`public/` 铺成
+  `dist-cloudbase/bubujie-api/`（根 `package.json` 是 `"type": "module"`，云函数要 CJS，
+  所以入口用动态 `import()` 接，两边都不用改源码）
 
-`api/worker.js` 只做三件事：静态资源交给 Static Assets、把 `Request` 翻译成 router 认识的
-`(req, res)`、再把写出来的响应翻译回 `Response`。翻译层的正确性由
-`test/worker-adapter.test.js` 覆盖（9 条用例，含请求体穿桥与两种形态的判定）。
+翻译层的正确性各有测试：`test/worker-adapter.test.js`（9 条，含请求体穿桥）、
+`test/cloudbase-adapter.test.js`（15 条，含网关两种 path 形态、base64 body、静态资源命中）。
 
 ⚠️ 部署前先把 `compatibility_date` 保持在 `2025-09-01` 或更新：
 `src/core/env.js` 在模块顶层 import 了 `node:fs`（只用来读可选的 `.env`），
