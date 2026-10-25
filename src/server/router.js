@@ -116,10 +116,9 @@ function rememberShape(shape) {
   if (shape?.url && shape?.imageField) ocrShape = shape;
 }
 
-function getAdapter() {
-  const env = envFor();
+function adapterTagFor(env) {
   const apiKey = String(env.LLM_API_KEY ?? '').trim() || String(env.OPENAI_API_KEY ?? '').trim();
-  if (!apiKey) return cachedAdapter('offline', env);
+  if (!apiKey) return 'offline';
 
   /**
    * 缓存键必须带上配置指纹，不能只用 'llm'。
@@ -133,11 +132,12 @@ function getAdapter() {
    * 又不会把完整凭据长期当作字典键留在内存里。
    */
   const fingerprint = `${apiKey.length}:${apiKey.slice(0, 2)}${apiKey.slice(-2)}`;
-  const tag = `llm|${String(env.LLM_BASE_URL ?? '').trim()}|${String(env.LLM_MODEL ?? '').trim()}|${fingerprint}`;
-  return cachedAdapter(tag, env);
+  return `llm|${String(env.LLM_BASE_URL ?? '').trim()}|${String(env.LLM_MODEL ?? '').trim()}|${fingerprint}`;
 }
 
-function cachedAdapter(tag, env) {
+function getAdapter() {
+  const env = envFor();
+  const tag = adapterTagFor(env);
   if (!adapters.has(tag)) adapters.set(tag, createAdapter(env));
   return adapters.get(tag);
 }
@@ -151,17 +151,33 @@ function getSession(sessionId, problemId) {
     }
   }
   let s = sessions.get(sessionId);
+  const adapterTag = adapterTagFor(envFor());
   if (!s || s.problemId !== problemId) {
     s = {
       id: sessionId,
       problemId,
       engine: createEngine({ adapter: getAdapter(), problem: problemId ? getProblemById(problemId) : null }),
+      adapterTag,
       history: [],
       record: createSessionRecord(problemId),
       createdAt: new Date().toISOString(),
       touchedAt: now,
     };
     sessions.set(sessionId, s);
+  } else if (s.adapterTag !== adapterTag) {
+    /**
+     * 会话的"模型形态"变了，必须换引擎。
+     *
+     * 为什么不能沿用：engine 持有创建时那个 adapter，它决定了这一轮是真模型还是规则桩。
+     * 会话是按 sessionId 缓存的，而同一个 sessionId 完全可能先后出现在两种形态下 ——
+     * 比如有人先用公开链接（离线桩）建了会话，之后再带口令进来；
+     * 更危险的是反过来：带口令建的会话被没口令的人接着用，就能白蹭真模型。
+     *
+     * 所以这里以"这一次请求的形态"为准重建引擎，历史对话保留
+     * （history 是引擎的输入而不是引擎的一部分，换引擎不会丢上下文）。
+     */
+    s.engine = createEngine({ adapter: getAdapter(), problem: problemId ? getProblemById(problemId) : null });
+    s.adapterTag = adapterTag;
   }
   s.touchedAt = now;
   return s;
@@ -1095,4 +1111,4 @@ export function buildTeacherOverview() {
   };
 }
 
-export { sessions, SESSION_TTL_MS, MAX_SESSIONS, sendJson, sendText, readJson, getAdapter };
+export { sessions, SESSION_TTL_MS, MAX_SESSIONS, sendJson, sendText, readJson, getAdapter, getSession, adapterTagFor };

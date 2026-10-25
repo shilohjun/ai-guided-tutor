@@ -209,6 +209,63 @@ describe('公网口令门 · 健康检查要能看出形态', () => {
   });
 });
 
+describe('公网口令门 · 会话不能继承上一次的模型形态', () => {
+  /**
+   * 这是实测撞出来的坑，不是假想：
+   *   会话按 sessionId 缓存在进程内存里，而 engine 持有创建它时的 adapter。
+   *   如果不清形态，先用公开链接建会话、再带口令进来，引擎仍然是离线桩；
+   *   反过来更糟 —— 带口令建的会话被没口令的人接着用，就白蹭了真模型。
+   */
+  it('同一 sessionId 在两种形态之间切换时，必须换引擎', async () => {
+    const { getSession, requestEnv } = await import('../src/server/router.js');
+
+    await withEnv({}, async () => {
+      const lockedEnv = { ...process.env };
+      delete lockedEnv.LLM_API_KEY;
+      delete lockedEnv.OPENAI_API_KEY;
+
+      const unlockedEnv = {
+        ...process.env,
+        LLM_API_KEY: FAKE_KEY,
+        LLM_BASE_URL: FAKE_BASE,
+        LLM_MODEL: FAKE_MODEL,
+      };
+
+      const sid = 'gate-session-switch';
+      const locked = requestEnv.run(lockedEnv, () => getSession(sid, 'phy-emi-01'));
+      const engineOffline = locked.engine;
+      assertEquals(locked.adapterTag, 'offline', '无 Key 时应记为 offline 形态');
+
+      const unlocked = requestEnv.run(unlockedEnv, () => getSession(sid, 'phy-emi-01'));
+      /** 必须先取出引用再进下一步：getSession 返回的是同一个会话对象，
+       *  直接写 unlocked.engine 会在第三步之后读到被替换后的新引擎，等于自己跟自己比。 */
+      const engineLlm = unlocked.engine;
+      assert(engineLlm !== engineOffline, '形态变了必须重建引擎，不能沿用旧的离线引擎');
+      assert(unlocked.adapterTag !== 'offline', '带 Key 时形态标签应发生变化');
+
+      const backToLocked = requestEnv.run(lockedEnv, () => getSession(sid, 'phy-emi-01'));
+      assert(backToLocked.engine !== engineLlm, '退回无口令时必须再换回离线引擎');
+      assertEquals(backToLocked.adapterTag, 'offline', '应回到 offline 形态');
+    });
+  });
+
+  it('形态没变时不要重建引擎（否则每轮对话都会丢诊断位置）', async () => {
+    const { getSession, requestEnv } = await import('../src/server/router.js');
+
+    await withEnv({}, async () => {
+      const lockedEnv = { ...process.env };
+      delete lockedEnv.LLM_API_KEY;
+      delete lockedEnv.OPENAI_API_KEY;
+
+      const sid = 'gate-session-stable';
+      const first = requestEnv.run(lockedEnv, () => getSession(sid, 'phy-emi-02'));
+      const engineBefore = first.engine;
+      const second = requestEnv.run(lockedEnv, () => getSession(sid, 'phy-emi-02'));
+      assertEquals(second.engine, engineBefore, '同一形态下应复用同一个引擎');
+    });
+  });
+});
+
 describe('公网口令门 · 显式开关仍然有效', () => {
   it('PUBLIC_DEMO_FORCE_OFFLINE=0 时即使没口令也放行（老行为，不能被口令门破坏）', async () => {
     await withEnv({
