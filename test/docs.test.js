@@ -4,7 +4,7 @@
  * ============================================================================
  * 为什么需要这个
  * ============================================================================
- * 写周报时我把"本周成果全景"列了 11 项新能力 ——
+ * 早期做成果盘点时，我把"本期新能力"列了 11 项 ——
  * 读题链路、视图隔离、解析层、语音、符号输入……
  * **唯独漏掉了产品的三根柱子**：卡点分类体系、分层提示与两条硬护栏、防泄题的 7 类检查。
  *
@@ -13,9 +13,9 @@
  * 而它们是**描述性的事实错误**，不是排版问题。
  *
  * 靠人记得"别忘了写"是不可靠的。所以把这三项的**数量**钉在这里：
- * 从代码里实际数出来，再去文档里核对。
+ * 从代码里实际数出来，再去 README 与契约文档里核对。
  * 以后谁加了第 8 类守卫检查、或者第 8 种卡点，这条测试会先失败，
- * 逼着文档同步 —— 而不是等下一次有人读周报时才发现对不上。
+ * 逼着文档同步 —— 而不是等下一次有人读文档时才发现对不上。
  */
 
 import { readFileSync } from 'node:fs';
@@ -61,25 +61,7 @@ describe('文档一致性 · 三根柱子必须与代码同步', () => {
     assert(counts.hasRailingB, 'route.js 里应当有"禁止原地打转"护栏');
   });
 
-  it('周报的成果全景里必须有这三根柱子，且数量对得上', () => {
-    const report = read('docs/周报.md');
-    assertIncludes(report, '卡点分类体系', '周报漏了卡点分类体系');
-    assertIncludes(report, '分层提示机制', '周报漏了分层提示机制');
-    assertIncludes(report, '防泄题机制', '周报漏了防泄题机制');
-
-    // 每一种卡点在周报里都要出现（否则分类体系被写残了）
-    for (const kind of counts.stuckKinds) {
-      assertIncludes(report, kind, `周报漏了卡点类型 ${kind}`);
-    }
-    // 每一类守卫检查都要出现
-    for (const check of counts.guardChecks) {
-      assertIncludes(report, check, `周报漏了守卫检查 ${check}`);
-    }
-    assertIncludes(report, '禁止跳级', '周报漏了护栏"禁止跳级"');
-    assertIncludes(report, '禁止原地打转', '周报漏了护栏"禁止原地打转"');
-  });
-
-  it('README 也把这三根柱子讲清楚了（它是别人读到的第一份材料）', () => {
+  it('README 把这三根柱子讲清楚了（它是别人读到的第一份材料）', () => {
     const readme = read('README.md');
     for (const kind of counts.stuckKinds) {
       assertIncludes(readme, kind, `README 漏了卡点类型 ${kind}`);
@@ -101,16 +83,13 @@ describe('文档一致性 · 三根柱子必须与代码同步', () => {
      */
     if (process.argv[2]) return;
     const total = totalRegistered();
-    for (const [file, text] of [
-      ['README.md', read('README.md')],
-      ['docs/周报.md', read('docs/周报.md')],
-    ]) {
+    for (const [file, text] of [['README.md', read('README.md')]]) {
       let checked = 0;
       for (const m of text.matchAll(/(\d+)\s*个(?:用例|测试)/g)) {
         /**
          * 两类数字不核对，因为它们在语义上就不是"当前总规模"：
          *
-         * ① **区间里的历史值** —— 周报按轮次追加，像「测试 97 → 123 个用例」
+         * ① **区间里的历史值** —— 像「测试 97 → 123 个用例」
          *    「本轮 152 → 182 个用例」，那是在记录**当时**的规模，本来就该是旧数字。
          * ② **单个套件的用例数** —— 像「`test/intake.test.js` 20 个用例」，
          *    它说的是那个套件有多少例，与总数无关。
