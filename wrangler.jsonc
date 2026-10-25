@@ -1,0 +1,39 @@
+{
+  // ==========================================================================
+  // Cloudflare Workers 部署配置
+  //
+  // 为什么用 Workers 而不是 Pages：
+  //   本项目只需要"静态资源 + 一个 /api/* 函数"，Workers + Static Assets
+  //   就是这两件事的原生组合，且不需要额外的构建步骤（前端本来就是纯静态）。
+  //
+  // 关于 compatibility_date：
+  //   必须 ≥ 2025-09-01。从这天起，nodejs_compat 会默认带上 node:fs 的
+  //   虚拟文件系统实现 —— src/core/env.js 在模块顶层 import 了 node:fs
+  //   （只用来读可选的 .env）。日期再往前会让构建直接失败。
+  //
+  // 关于 vars：
+  //   这两项是当前部署形态（满血公开）。想退回安全的默认形态（只有离线规则桩），
+  //   把 PUBLIC_DEMO_FORCE_OFFLINE / PUBLIC_DEMO_ALLOW_OCR 删掉即可 ——
+  //   判定逻辑见 src/server/demo-gate.js，代码默认是关的。
+  // ==========================================================================
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "bubujie-ai-tutor",
+  "main": "api/worker.js",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // 静态资源：public/ 直接由边缘节点托管，不消耗函数时间
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+
+  "vars": {
+    "PUBLIC_DEMO_FORCE_OFFLINE": "0",
+    "PUBLIC_DEMO_ALLOW_OCR": "1"
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}

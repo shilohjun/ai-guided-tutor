@@ -206,13 +206,22 @@ function getSession(sessionId, problemId) {
  *   这条规则写在代码里，不依赖部署时"记得"。
  */
 function readTeacherKey() {
-  return String(process.env.TEACHER_KEY ?? '').trim();
+  return String(envFor().TEACHER_KEY ?? '').trim();
 }
 
-/** 公网入口会把它设为 '1'，强制锁死教师视图 */
+/**
+ * 公网入口会在请求级 env 里把它设为 '1'，强制锁死教师视图。
+ *
+ * 为什么读 envFor() 而不是 process.env：
+ *   这条锁原来靠 api/index.js 去改 process.env 来置位。加上口令门之后，
+ *   请求级配置已经统一走 AsyncLocalStorage 了 —— 而 Cloudflare Workers 里
+ *   process.env 并不映射到绑定的 Secret，靠改它根本不生效。
+ *   所以这里跟着一起读请求级 env，两个平台才有一致的行为。
+ */
 export function teacherMode() {
-  if (readTeacherKey()) return 'key';
-  if (String(process.env.DSH_FORCE_TEACHER_LOCK ?? '') === '1') return 'off';
+  const env = envFor();
+  if (String(env.TEACHER_KEY ?? '').trim()) return 'key';
+  if (String(env.DSH_FORCE_TEACHER_LOCK ?? '') === '1') return 'off';
   return 'open';
 }
 

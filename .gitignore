@@ -34,3 +34,8 @@ v2*.html
 .env
 .env*.local
 .env.disabled-for-deploy
+
+# Cloudflare Workers 本地状态与本地密钥
+.wrangler/
+.dev.vars
+.dev.vars.*
