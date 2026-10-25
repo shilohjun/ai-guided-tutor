@@ -30,3 +30,5 @@ test-stem.jpg
 preview/
 v2*.html
 
+.vercel
+.env*
