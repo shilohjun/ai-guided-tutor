@@ -9,7 +9,7 @@
 
 [![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](package.json)
 [![依赖](https://img.shields.io/badge/dependencies-0-brightgreen)](package.json)
-[![测试](https://img.shields.io/badge/tests-266%2F273-yellow)](test/run.js)
+[![测试](https://img.shields.io/badge/tests-280%2F287-yellow)](test/run.js)
 [![许可](https://img.shields.io/badge/license-UNLICENSED-lightgrey)](LICENSE)
 
 仓库地址：<https://github.com/shilohjun/ai-guided-tutor>
@@ -215,7 +215,7 @@ OCR 只识别题干文字，**不会自动理解受力图、电路图或几何�
 ```bash
 npm start          # 启动本地服务
 npm run dev        # 监听文件变化并重启
-npm test           # 运行全部单元测试（当前 273 个注册用例）
+npm test           # 运行全部单元测试（当前 287 个注册用例）
 npm run eval       # 离线评测（19 场景，无需 Key）
 npm run eval:llm   # 使用 .env 中配置的模型重跑评测
 npm run ocr:path   # 探测 OCR 链路连通性
@@ -230,7 +230,7 @@ npm run all        # 测试 + 离线评测
 npm test
 ```
 
-当前注册 **273 个用例**；**266 通过，7 条旧页面契约待迁移**：
+当前注册 **287 个用例**；**280 通过，7 条旧页面契约待迁移**：
 
 - 2 条 OCR 路由契约（旧页面入口位置）；
 - 3 条 DOM 契约（仍按旧 `app.js` 检查）；
@@ -339,7 +339,7 @@ DESIGN-TOKENS.md         v3 设计 token 与可访问性说明
 
 | 限制 | 说明 |
 |---|---|
-| 测试状态 | 273 个注册用例中 266 通过；7 条旧页面契约待迁移，新链路无测试覆盖 |
+| 测试状态 | 287 个注册用例中 280 通过；7 条旧页面契约待迁移，新链路无测试覆盖 |
 | 演示答案范围 | 只覆盖 4 道内置物理题；其他题暂无演示答案 |
 | 公式卡范围 | 按知识点表匹配；导入题的知识点不在表内时不发卡 |
 | 场景集规模 | 19 个场景且由人编写，覆盖不了真实学生的表达多样性 |

@@ -525,7 +525,15 @@ describe('拍照识题 · 路由契约', () => {
   it('公网部署默认关闭拍照识题（否则等于把额度挂在公开链接上）', () => {
     const api = readFileSync(join(ROOT, 'api/index.js'), 'utf8');
     assertIncludes(api, 'PUBLIC_DEMO_ALLOW_OCR', '需要一个显式的开关，而不是靠部署时"记得别配"');
-    assert(/delete process\.env\.ALIYUN_OCR_APPCODE/.test(api), '默认必须清除凭据');
+    /**
+     * 默认必须清除凭据。
+     *
+     * 这里断言的是"有删除动作"而不是"删的是 process.env 还是请求级 env"：
+     * 自从加了访问口令门（DEMO_ACCESS_CODE），凭据不再直接改 process.env ——
+     * 那是进程级的，两种形态共存时会串号 —— 而是构造一份请求级 env 再摘掉。
+     * 断言跟着实现走，但守的仍然是同一件事：**默认拿不到凭据**。
+     */
+    assert(/delete env\.ALIYUN_OCR_APPCODE/.test(api), '默认必须清除凭据');
   });
 
   it('仓库里的示例配置不含真实凭据', () => {

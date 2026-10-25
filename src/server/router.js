@@ -34,6 +34,8 @@
  *   导入的题目也一样（见 registry.js：用内容哈希做 id，丢了就重新生成同一个 id）。
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import { loadEnvFile, maskSecret } from '../core/env.js';
 import { createAdapter, readLLMConfig } from '../core/llm.js';
 import { readOcrConfig, recognizeProblemImage, ocrStatus } from '../core/ocr.js';
@@ -51,6 +53,28 @@ import { PROBLEMS } from '../core/problems.data.js';
 
 loadEnvFile();
 
+/**
+ * 请求级配置源 —— 公网口令门能成立的前提。
+ *
+ * 为什么不能直接改 process.env：
+ *   口令门要求「带口令的请求用真模型、不带口令的用离线桩」这两种形态
+ *   在**同一个实例**上共存。而 serverless 的一个实例会连续处理多个请求，
+ *   process.env 又是进程级的 —— 只要靠「进请求时删 Key、出请求时还原」，
+ *   并发一交错就会串号：没带口令的人白捡到上一个请求留下的真模型。
+ *   那等于加了口令和没加一样，而且极难复现。
+ *
+ * AsyncLocalStorage 是 Node 原生的请求作用域存储：每次请求开一份独立配置，
+ * 下游代码通过 envFor() 拿到的永远是「这次请求的」那份。
+ * 本地服务器（server/server.js）不包这一层，envFor() 直接退回 process.env，
+ * 所以本地行为一个字节都不用变。
+ */
+export const requestEnv = new AsyncLocalStorage();
+
+/** 当前请求的配置源；没有请求上下文时退回进程环境（本地开发 / 直接调用测试） */
+export function envFor() {
+  return requestEnv.getStore() ?? process.env;
+}
+
 const LEVEL_NAMES = {
   0: 'L0 结构化澄清',
   1: 'L1 条件追问',
@@ -64,7 +88,15 @@ const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
 const MAX_SESSIONS = 500;
 
 const sessions = new Map();
-let adapterInstance = null;
+/**
+ * adapter 缓存按「形态」分键，而不是单例。
+ *
+ * 单例在口令门下会翻车：同一个实例上，带口令的请求先建了真模型 adapter，
+ * 之后没带口令的请求会直接复用这个缓存 —— 又回到串号。
+ * 键只取「有没有可用 Key」，因为配置的其余部分（baseUrl / model）来自同一份 env 形状，
+ * 同一形态下不会变。
+ */
+const adapters = new Map();
 
 /**
  * 拍照识题的"已验证调用形状"缓存：{ url, imageField }。
@@ -85,8 +117,29 @@ function rememberShape(shape) {
 }
 
 function getAdapter() {
-  if (!adapterInstance) adapterInstance = createAdapter();
-  return adapterInstance;
+  const env = envFor();
+  const apiKey = String(env.LLM_API_KEY ?? '').trim() || String(env.OPENAI_API_KEY ?? '').trim();
+  if (!apiKey) return cachedAdapter('offline', env);
+
+  /**
+   * 缓存键必须带上配置指纹，不能只用 'llm'。
+   *
+   * 只用 'llm' 会有一个隐藏的错配：同一个进程里如果出现过两份不同的模型配置
+   * （例如测试里用假配置、而进程环境里带着真配置），后一份会复用前一份的 adapter ——
+   * 表现是"配了 A 模型，健康检查却报 B 模型"。生产环境配置是固定的所以看不出来，
+   * 但这属于"只在特定顺序下发作"的坑，不值得留。
+   *
+   * 指纹取 Key 的长度与首尾各 2 位，而不是 Key 本身：足够区分不同配置，
+   * 又不会把完整凭据长期当作字典键留在内存里。
+   */
+  const fingerprint = `${apiKey.length}:${apiKey.slice(0, 2)}${apiKey.slice(-2)}`;
+  const tag = `llm|${String(env.LLM_BASE_URL ?? '').trim()}|${String(env.LLM_MODEL ?? '').trim()}|${fingerprint}`;
+  return cachedAdapter(tag, env);
+}
+
+function cachedAdapter(tag, env) {
+  if (!adapters.has(tag)) adapters.set(tag, createAdapter(env));
+  return adapters.get(tag);
 }
 
 /** 取会话；顺带做过期清理 */
@@ -426,10 +479,16 @@ export async function handleApi(req, res, url) {
 
   // ---- GET /api/health ----
   if (path === '/api/health' && req.method === 'GET') {
-    const config = readLLMConfig();
+    const env = envFor();
+    const config = readLLMConfig(env);
     const adapter = getAdapter();
     sendJson(res, 200, {
       ok: true,
+      /**
+       * 口令门形态：'off' 未配置口令 / 'locked' 配了但没带对 / 'unlocked' 已放行。
+       * 只报形态，绝不回传口令本身 —— 健康检查不是用来泄密的。
+       */
+      demoGate: req.__demoGate ?? 'off',
       engine: adapter.kind,
       model: adapter.model ?? null,
       llmConfigured: config.available,
@@ -448,12 +507,12 @@ export async function handleApi(req, res, url) {
        * 拍照识题状态：只报"配没配 / 走哪个通道"，**绝不回传 AppCode**。
        * 与 llmConfigured 同一口径 —— 健康检查是用来判断可用性的，不是用来泄密的。
        */
-      ocr: ocrStatus(),
+      ocr: ocrStatus(env),
       capabilities: {
         intake: typeof adapter.understandProblem === 'function',
         intakeFallback: true,
         /** 拍图识题：配了凭据才为 true；前端据此决定是否显示拍照入口 */
-        ocr: readOcrConfig().available,
+        ocr: readOcrConfig(env).available,
       },
       hintPolicy: {
         levels: ['L0 结构化澄清', 'L1 条件追问', 'L2 方向提示', 'L3 降级示范'],
@@ -526,10 +585,11 @@ export async function handleApi(req, res, url) {
       return true;
     }
 
-    const config = readOcrConfig();
+    const ocrEnv = envFor();
+    const config = readOcrConfig(ocrEnv);
     if (!config.available) {
       sendJson(res, 503, {
-        error: ocrStatus().hint,
+        error: ocrStatus(ocrEnv).hint,
         hint: '拍照识题是可选能力：未配置时请使用左侧的「粘贴题目文字」入口，那条链路完全可用。',
       });
       return true;

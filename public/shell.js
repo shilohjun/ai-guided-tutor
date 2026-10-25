@@ -13,8 +13,40 @@ const $$ = (s) => Array.from(document.querySelectorAll(s));
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+/* =========================================================================
+   访问口令（可选）
+   -------------------------------------------------------------------------
+   公网部署默认只给离线规则桩；只有知道口令的人才会被放行到真模型与拍照识题。
+   口令从 `?code=xxx` 取一次，存进 localStorage，之后每次 /api 请求自动带上。
+
+   为什么取到后要把 code 从地址栏抹掉：
+     地址栏是最容易泄露口令的地方 —— 截图、投屏、转发链接都会把它一起带走。
+     存进 localStorage 之后，口令只存在这台浏览器里。
+   ========================================================================= */
+const DEMO_CODE_KEY = 'dsh-demo-code';
+
+function captureDemoCode() {
+  try {
+    const fromUrl = new URLSearchParams(location.search).get('code');
+    if (fromUrl) {
+      localStorage.setItem(DEMO_CODE_KEY, fromUrl.trim());
+      const u = new URL(location.href);
+      u.searchParams.delete('code');
+      history.replaceState(null, '', `${u.pathname}${u.search}${u.hash}`);
+      return fromUrl.trim();
+    }
+    return (localStorage.getItem(DEMO_CODE_KEY) ?? '').trim();
+  } catch {
+    /* 隐私模式下 localStorage 可能不可用：退化成"这次不带上"，不影响浏览 */
+    return '';
+  }
+}
+
+const DEMO_CODE = captureDemoCode();
+
 async function api(path, options = {}) {
   const headers = { 'content-type': 'application/json', ...(options.headers ?? {}) };
+  if (DEMO_CODE) headers['x-demo-code'] = DEMO_CODE;
   const res = await fetch(path, { ...options, headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
