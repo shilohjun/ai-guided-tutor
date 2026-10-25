@@ -261,6 +261,7 @@ public/
   index.html            v3 五步壳
   shell.css             v3 学术界面样式
   shell-overrides.css   对话/报告/演示模式覆盖
+  youth.css             青春活力皮肤（只覆盖视觉层，不改页面结构与跳转）
   shell.js              真实题库、对话、报告、历史、演示模式
   mathinput.js          符号插入与自动替换
   app.js / styles.css   旧版页面，保留作迁移参考，当前不引用

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#F7F8F5">
+<meta name="theme-color" content="#FAF7F2">
 <title>步步解 · 学习版</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>">
 
@@ -28,7 +28,7 @@
     root.setAttribute('data-theme', t);
     root.setAttribute('data-theme-pref', p);
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', t === 'dark' ? '#0E141B' : '#F7F8F5');
+    if (meta) meta.setAttribute('content', t === 'dark' ? '#12111D' : '#FAF7F2');
   }
 
   var cPref = read(CKEY);
@@ -42,8 +42,9 @@
 })();
 </script>
 
-<link rel="stylesheet" href="/shell.css?v=20261018-19">
-<link rel="stylesheet" href="/shell-overrides.css?v=20261018-19">
+<link rel="stylesheet" href="/shell.css?v=20261022-1">
+<link rel="stylesheet" href="/shell-overrides.css?v=20261022-1">
+<link rel="stylesheet" href="/youth.css?v=20261022-1">
 </head>
 <body data-step="1">
 
@@ -92,6 +93,7 @@
 </div>
 
 <div class="done-overlay" id="done-overlay" hidden>
+  <div class="confetti-layer" id="confetti-layer" aria-hidden="true"></div>
   <div class="done-card" role="dialog" aria-modal="true" aria-labelledby="done-title">
     <span class="done-kicker">CONGRATULATIONS</span>
     <h1 id="done-title">恭喜你，这道题你自己做出来了</h1>

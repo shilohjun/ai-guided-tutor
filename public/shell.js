@@ -184,6 +184,7 @@ const state = {
   reportError: '',
   history: [],
   restored: false,
+  renderedStep: null,
 };
 
 const LEARNING_KEY = 'dsh-v3-learning-history:v1';
@@ -428,7 +429,10 @@ function syncFlow() {
 function render() {
   document.body.dataset.step = String(state.step);
   const pages = { 1: inputPage, 2: modePage, 3: chatPage, 4: reportPage, 5: practicePage };
-  $('#app').innerHTML = `<div class="page-shell" data-page="${state.step}">${pages[state.step]()}</div>`;
+  // 只在「换页」时播放上浮动画，页内点按不重播，避免界面一直抖
+  const pageChanged = state.renderedStep !== state.step;
+  state.renderedStep = state.step;
+  $('#app').innerHTML = `<div class="page-shell${pageChanged ? ' page-enter' : ''}" data-page="${state.step}">${pages[state.step]()}</div>`;
   syncFlow();
   bind();
   if (state.step === 1) {
@@ -1086,6 +1090,32 @@ async function openFormulaCard() {
   render();
 }
 
+const CONFETTI_COLORS = ['#5B52E0', '#7C4DFF', '#F2673A', '#F4B740', '#2BB894', '#E85D9C'];
+
+/* 完成时的彩纸：纯装饰，减少动态时直接跳过 */
+function burstConfetti() {
+  const layer = $('#confetti-layer');
+  if (!layer) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    layer.innerHTML = '';
+    return;
+  }
+  layer.innerHTML = '';
+  for (let i = 0; i < 40; i += 1) {
+    const piece = document.createElement('i');
+    piece.className = 'confetti';
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.background = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+    piece.style.width = `${6 + Math.random() * 7}px`;
+    piece.style.height = `${9 + Math.random() * 11}px`;
+    piece.style.borderRadius = Math.random() > 0.55 ? '50%' : '2px';
+    piece.style.setProperty('--drift', `${(Math.random() * 2 - 1) * 170}px`);
+    piece.style.setProperty('--dur', `${3 + Math.random() * 1.8}s`);
+    piece.style.setProperty('--delay', `${Math.random() * 0.7}s`);
+    layer.appendChild(piece);
+  }
+}
+
 function showCongrats(completion) {
   const answers = (completion.matched ?? [])
     .map((m) => `${m.value ?? ''} ${m.unit ?? ''}`.trim() || m.quote)
@@ -1106,6 +1136,7 @@ function showCongrats(completion) {
   const overlay = $('#done-overlay');
   if (overlay) {
     overlay.hidden = false;
+    burstConfetti();
     $('#btn-done-report')?.focus();
   }
 }

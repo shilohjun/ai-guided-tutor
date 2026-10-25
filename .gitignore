@@ -31,4 +31,6 @@ preview/
 v2*.html
 
 .vercel
-.env*
+.env
+.env*.local
+.env.disabled-for-deploy
