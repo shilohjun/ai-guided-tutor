@@ -60,6 +60,17 @@ const TRYING_SIGNALS = ['我试试', '我想想', '让我想', '等等', '我先
 
 export function decideLevel({ problem, diagnosis, history, explicitHelpSeeking, mode }) {
   const reasons = [];
+  if (mode === 'self_training' && !explicitHelpSeeking) {
+    return { level: null, reason: '自主训练：学生未主动求助，保持静默观测', suppressed: true };
+  }
+  const hasPriorContext = history.some(t => t.role === 'ai' && !t.suppressed && t.metaStep != null);
+  // 仅当前路径、步骤、卡点的已交付提示支撑升级；兼容旧会话缺失的元数据。
+  history = history.filter(t => t.role !== 'ai' || (
+    !t.suppressed && t.form !== 'confirm' && t.form !== 'refusal' && t.form !== 'fallback' &&
+    (t.metaStep == null || t.metaStep === diagnosis.position.stepIndex) &&
+    (t.metaGraphId == null || t.metaGraphId === diagnosis.position.graphId) &&
+    (t.metaStuckKind == null || t.metaStuckKind === diagnosis.stuckKind)
+  ));
 
   if (diagnosis.stuckKind === 'finished') {
     return {
@@ -82,7 +93,6 @@ export function decideLevel({ problem, diagnosis, history, explicitHelpSeeking, 
    * 此时应该继续按原定位升级提示，而不是把他当成"一句话都没说过"从头反问。
    * 这属于"追问继承"的场景，不是"信息不足"。
    */
-  const hasPriorContext = history.some((t) => t.role === 'ai' && t.metaStep != null);
   if (diagnosis.sufficientInfo === false && !hasPriorContext) {
     return {
       level: 0,
@@ -99,21 +109,6 @@ export function decideLevel({ problem, diagnosis, history, explicitHelpSeeking, 
     return { level: 0, reason: '学生还没形成可诊断的思路，先用 L0 结构化澄清', suppressed: false };
   }
 
-  // ---- 自主训练模式下，学生没求助且无高置信卡点 ⇒ 不介入 ----
-  if (mode === 'self_training' && !explicitHelpSeeking) {
-    const highConfidenceStuck =
-      diagnosis.position.confidence >= 0.75 &&
-      diagnosis.misconceptions.some((m) => m.confidence >= 0.8);
-    if (!highConfidenceStuck) {
-      return {
-        level: null,
-        reason: '自主训练模式且学生未求助、无高置信卡点 ⇒ 保持静默观测',
-        suppressed: true,
-      };
-    }
-    reasons.push('自主训练模式下检测到高置信卡点，允许一次主动低级别介入');
-  }
-
   // ---- 从历史推导已给过的层级 ----
   const aiLevels = history.filter((t) => t.role === 'ai' && t.level != null).map((t) => t.level);
   const maxGiven = aiLevels.length ? Math.max(...aiLevels) : null;
@@ -128,7 +123,7 @@ export function decideLevel({ problem, diagnosis, history, explicitHelpSeeking, 
   void givenOnSameStep;
 
   const stillStuck = STILL_STUCK_SIGNALS.some((s) => lastUtterance.includes(s));
-  const trying = TRYING_SIGNALS.some((s) => lastUtterance.includes(s));
+  const trying = !explicitHelpSeeking && !/[？?]|不会|不懂|怎么|如何/.test(lastUtterance) && TRYING_SIGNALS.some((s) => lastUtterance.includes(s));
 
   // ---- 执行错误：同样从 L1 开始，用"邀请自查"而不是直接示范 ----
   //
@@ -180,9 +175,9 @@ export function decideLevel({ problem, diagnosis, history, explicitHelpSeeking, 
       next = next + 1;
       reasons.push(`护栏B：L${from} 在同一卡点已给过 ${sameLevelSameStepCount} 次，允许升一级以免原地打转`);
     } else {
-      // 已在最高层且仍在同一卡点重复 ⇒ 不再"给提示"，改为要求学生复述自己的下一步
+      // 已在最高层且仍在同一卡点重复 ⇒ 不再"给提示"，改为补充当前步骤必需的前置知识并给一个更小任务
       reasons.push(
-        `护栏B：L3 在同一卡点已给过 ${sameLevelSameStepCount} 次，不再继续给提示，改为要求学生复述自己的下一步`,
+        `护栏B：L3 在同一卡点已给过 ${sameLevelSameStepCount} 次，不再继续给提示，改为补充当前步骤必需的前置知识并给一个更小任务`,
       );
     }
   }
@@ -261,15 +256,15 @@ const STRATEGY_INSTRUCTIONS = {
   clarify_goal_and_knowns:
     '学生还没形成思路。只帮他分清"已知什么/要求什么/哪里不确定"，用开放式提问。不要给出任何物理方向。',
   condition_question:
-    '学生用错了规律或漏了前提。只针对该规律的前提条件提出一个追问，逼他自己去检查条件。绝不提示"应该用哪个公式"。',
+    '学生用错了规律或漏了前提。先明确当前一步的方向或待检查的前提，再留一个小任务；明确忘记通用公式时可提醒公式及条件，不能给最终待求量结果式。',
   self_check_invitation:
     '学生思路方向正确，可能只是执行失误。邀请他自己回查关键一步（如单位、分母项、方向），不要直接指出错误位置。',
   direction_pointing:
-    '学生知道该用哪个规律但走不下去。指出应该关注哪个量、哪个关系、哪个模块之间的连接，但仍然不给表达式。',
+    '学生知道该用哪个规律但走不下去。指出应该关注哪个量、哪个关系、哪个模块之间的连接，可补充尚未给过的通用关系、变量含义或适用条件，但不得给最终待求量表达式。',
   tool_switch:
     '学生自己已经发现当前这条路走不通。引导他判断"缺的是哪一类工具"（例如需要处理时间累积量的定理），但仍不点名具体公式，也不给出关系式。',
   worked_step_demo:
-    '下沉到"动作级示范"：示范如何设研究对象、如何写出某一项的符号形式、如何做一步变形。只示范一个动作，且不含任何数值结果。',
+    '下沉到"动作级示范"：示范如何设研究对象、如何写出某一项的符号形式、如何做一步变形。只解释当前一个动作，可补充必要前置知识；不含本题最终数值或整题结果式。',
 };
 
 export function buildStrategy(stuckKind, level) {
@@ -352,7 +347,7 @@ export function buildForbidden(problem, diagnosis, pastViolations = []) {
   if (problem.formulaFingerprints?.length) {
     forbidden.push(`解法性表达式（例如这类形式：${problem.formulaFingerprints.slice(0, 3).join(' / ')} 的完整写法）`);
   }
-  forbidden.push('本题的任何数值结果（包括近似值、"大约是多少"）');
+  forbidden.push('本题最终数值结果（包括近似值、"大约是多少"）和待求量完整结果式');
   forbidden.push('完整解题步骤清单或推导链');
   forbidden.push('"所以答案是/最终结果/因此可得"这类收口句式');
 

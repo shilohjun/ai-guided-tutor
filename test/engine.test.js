@@ -154,17 +154,16 @@ describe('引擎 · 守卫兜底（模型泄题场景）', () => {
 });
 
 describe('引擎 · 降级容错', () => {
-  it('模型完全不可用时仍能给出安全提示', async () => {
+  it('观察模型不可用时明确报系统故障，不诊断为学生不会', async () => {
     const engine = createEngine({ adapter: createBrokenAdapter(), problem: P1 });
-    const res = await engine.handleTurn({
-      problemId: P1.id,
-      utterance: '我不会做这道题',
-      history: [],
-      mode: 'ai_companion',
-      explicitHelpSeeking: true,
-    });
-    assertNoAnswerLeak(res.message, P1, '降级路径');
-    assert(res.hint.text.length > 5, '降级后仍应有可读提示');
+    const history = [{ role: 'student', text: '我想用欧姆定律' }];
+    let failure;
+    try {
+      await engine.handleTurn({ utterance: '还是不会', history, mode: 'ai_companion', explicitHelpSeeking: true });
+    } catch (error) { failure = error; }
+    assertEquals(failure?.code, 'OBSERVATION_UNAVAILABLE');
+    assertEquals(failure?.statusCode, 503);
+    assertEquals(history.length, 1, '故障不能修改学习历史');
   });
 
   it('空输入不崩溃', async () => {
@@ -290,6 +289,7 @@ describe('引擎 · 教学质量护栏（两次真实事故的固化）', () => 
         level: res.hint.level,
         metaStep: res.diagnosis.position.stepIndex,
         metaGraphId: res.diagnosis.position.graphId,
+        metaStuckKind: res.diagnosis.stuckKind,
       });
     }
   });
@@ -337,7 +337,7 @@ describe('引擎 · 教学质量护栏（两次真实事故的固化）', () => 
     });
     assertNotIncludes(res.message, '未提供可诊断的思路', '内部说明泄漏给学生');
     assertNotIncludes(res.message, '我理解你的意思是', '拒绝路径不应有复述段');
-    assert(res.message.startsWith('答案我先不给'), `拒绝话术应直接开场，实际：${res.message.slice(0, 30)}`);
+    assert(res.message.startsWith('提示：我可以帮你拆解当前一步'), `拒绝话术应直接开场，实际：${res.message.slice(0, 30)}`);
   });
 
   it('停在"死胡同路径"末步时不得判为已完成', async () => {
@@ -362,7 +362,8 @@ describe('引擎 · 教学质量护栏（两次真实事故的固化）', () => 
     const history = [];
     // 第 1 轮：学生走能量路径
     // 第 2 轮：学生自己发现这条路走不通（这就是死胡同信号）
-    const utterances = ['我用能量守恒，Fx=½mv²，能量守恒就够了', '但是未知量太多解不出来', '还是不会'];
+    // 新路径从L1重新开始，需要在同一卡点继续追问才能到L2。
+    const utterances = ['我用能量守恒，Fx=½mv²，能量守恒就够了', '但是未知量太多解不出来', '还是不会', '还是不会', '还是不会'];
     let sawDeadEndKind = false;
     let l2Text = '';
     for (let i = 0; i < utterances.length; i += 1) {
@@ -384,6 +385,7 @@ describe('引擎 · 教学质量护栏（两次真实事故的固化）', () => 
         level: res.hint.level,
         metaStep: res.diagnosis.position.stepIndex,
         metaGraphId: res.diagnosis.position.graphId,
+        metaStuckKind: res.diagnosis.stuckKind,
       });
     }
     assert(sawDeadEndKind, '应识别出 dead_end_path 卡点性质');
