@@ -523,9 +523,23 @@ describe('拍照识题 · 路由契约', () => {
   });
 
   it('公网部署默认关闭拍照识题（否则等于把额度挂在公开链接上）', () => {
-    const api = readFileSync(join(ROOT, 'api/index.js'), 'utf8');
-    assertIncludes(api, 'PUBLIC_DEMO_ALLOW_OCR', '需要一个显式的开关，而不是靠部署时"记得别配"');
-    assert(/delete process\.env\.ALIYUN_OCR_APPCODE/.test(api), '默认必须清除凭据');
+    /**
+     * 断言的是"判定逻辑在共享模块里、且两个入口都用它"，而不是某个具体文件里有几个字。
+     *
+     * 为什么改成这样：这段逻辑原来写在 api/index.js，后来因为要同时跑在
+     * Cloudflare Workers 上而抽到了 src/server/demo-gate.js。
+     * 如果这里继续钉死 api/index.js，正确重构也会被判失败；
+     * 而如果放宽成"随便哪个文件有就行"，又会漏掉"某个入口自己手写一套"的漂移。
+     * 所以两头都钉：规则在共享模块，两个入口都 import 它。
+     */
+    const gate = readFileSync(join(ROOT, 'src/server/demo-gate.js'), 'utf8');
+    assertIncludes(gate, 'PUBLIC_DEMO_ALLOW_OCR', '需要一个显式的开关，而不是靠部署时"记得别配"');
+    assert(/delete env\.ALIYUN_OCR_APPCODE/.test(gate), '默认必须清除凭据');
+
+    for (const entry of ['api/index.js', 'api/worker.js']) {
+      const source = readFileSync(join(ROOT, entry), 'utf8');
+      assertIncludes(source, 'buildRequestContext', `${entry} 必须复用共享判定，而不是自己写一套`);
+    }
   });
 
   it('仓库里的示例配置不含真实凭据', () => {

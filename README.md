@@ -9,7 +9,7 @@
 
 [![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](package.json)
 [![依赖](https://img.shields.io/badge/dependencies-0-brightgreen)](package.json)
-[![测试](https://img.shields.io/badge/tests-265%2F272-yellow)](test/run.js)
+[![测试](https://img.shields.io/badge/tests-290%2F297-yellow)](test/run.js)
 [![许可](https://img.shields.io/badge/license-UNLICENSED-lightgrey)](LICENSE)
 
 仓库地址：<https://github.com/shilohjun/ai-guided-tutor>
@@ -22,10 +22,6 @@
 </p>
 
 ---
-
-## 回答规范升级（yangshuhan）
-
-学生回复尽量60–100字、硬上限150字；三级提示逐步补充信息，完整消息统一检查。见[改动与验收说明](docs/07-prompt-upgrade.md)、[当前提示词](docs/02-prompt-spec.md)及[分支使用说明](docs/08-branch-workflow.md)。新增17项回归使用 `npm run test:reply-policy`，原有7项页面契约失败保留。
 
 ## 目录
 
@@ -219,7 +215,7 @@ OCR 只识别题干文字，**不会自动理解受力图、电路图或几何�
 ```bash
 npm start          # 启动本地服务
 npm run dev        # 监听文件变化并重启
-npm test           # 运行全部单元测试（当前 272 个注册用例）
+npm test           # 运行全部单元测试（当前 297 个注册用例）
 npm run eval       # 离线评测（19 场景，无需 Key）
 npm run eval:llm   # 使用 .env 中配置的模型重跑评测
 npm run ocr:path   # 探测 OCR 链路连通性
@@ -234,7 +230,7 @@ npm run all        # 测试 + 离线评测
 npm test
 ```
 
-当前注册 **272 个用例**；**265 通过，7 条旧页面契约待迁移**：
+当前注册 **312 个用例**；**305 通过，7 条旧页面契约待迁移**：
 
 - 2 条 OCR 路由契约（旧页面入口位置）；
 - 3 条 DOM 契约（仍按旧 `app.js` 检查）；
@@ -265,6 +261,7 @@ public/
   index.html            v3 五步壳
   shell.css             v3 学术界面样式
   shell-overrides.css   对话/报告/演示模式覆盖
+  youth.css             青春活力皮肤（只覆盖视觉层，不改页面结构与跳转）
   shell.js              真实题库、对话、报告、历史、演示模式
   mathinput.js          符号插入与自动替换
   app.js / styles.css   旧版页面，保留作迁移参考，当前不引用
@@ -324,6 +321,74 @@ DESIGN-TOKENS.md         v3 设计 token 与可访问性说明
 确实需要在公网演示某一环时，必须显式设置对应开关（如 `PUBLIC_DEMO_ALLOW_OCR=1`），
 并先阅读 `api/index.js` 中的限制说明。
 
+### 三种可选形态
+
+默认是"安全优先"的形态。想要更完整的演示效果，按需往上开一档：
+
+| 形态 | 需要的环境变量 | 拿到的人能用到 |
+|---|---|---|
+| **默认**（不配任何变量） | 无 | 只有离线规则桩；OCR 与教师视图关闭 |
+| **满血公开** | `PUBLIC_DEMO_FORCE_OFFLINE=0`<br>`PUBLIC_DEMO_ALLOW_OCR=1` | 真模型 + 拍照识题。**任何拿到链接的人都在消耗额度** |
+| **口令门**（推荐） | 上面两个都不配<br>`DEMO_ACCESS_CODE=你的口令` | 带对口令（`?code=` 或请求头 `x-demo-code`）才是真模型 + OCR；<br>不带口令退回离线桩，页面照常可浏览 |
+
+关于**口令门**的两个实现细节，因为它们直接决定它是否真的安全：
+
+- **口令比较在服务端做**，用的是定时安全比较，前端拿不到口令本身；
+  浏览器取到口令后存进 `localStorage` 并把它从地址栏抹掉，避免截图/投屏/转发泄露。
+- **凭据按请求隔离**，不是改 `process.env`。后者是进程级的，两种形态共存时
+  并发一交错就会串号——没带口令的请求会白捡上一个请求留下的真模型。
+  实现见 `src/server/router.js` 的 `envFor()`（`AsyncLocalStorage`）。
+
+> ⚠️ 选"满血公开"之前先想清楚成本：拍照识题**按成功调用次数计费**（约 0.083 元/次），
+> 且没有"额度用完自动停"。建议先在阿里云控制台给该 AppCode 设额度上限或告警。
+> 教师视图另由 `TEACHER_KEY` 控制，**口令门不放行它**——那接口返回完整解题路径与参考答案。
+
+### 三个平台的入口
+
+同一份业务逻辑与同一份判定，跑在三个 serverless 平台上：
+
+| | Vercel | Cloudflare Workers | 腾讯云 CloudBase |
+|---|---|---|---|
+| 入口文件 | `api/index.js`（Node 的 `req`/`res`） | `api/worker.js`（Fetch API） | `src/server/cloudbase-handler.js`（云函数事件） |
+| 配置文件 | `vercel.json` | `wrangler.jsonc` | `cloudbaserc.json` |
+| 静态资源 | `outputDirectory: public` | `assets.directory: ./public` | 静态托管（`staticstore`） |
+| 凭据来源 | `process.env` | 绑定的 Secret（`wrangler secret put`） | 云函数环境变量（`tcb fn config update`） |
+| 部署命令 | `npx vercel deploy --prod` | `npx wrangler deploy` | `tcb hosting deploy ./public` + `tcb fn deploy bubujie-api` |
+
+**为什么需要三份入口**：不是因为技术栈不同，而是因为网络可达性不同。
+`*.vercel.app` 被 DNS 投毒成 `157.240.x.x`（Facebook 的地址段），
+`*.workers.dev` 被投毒成 `128.121.x.x`，两条域在国内都解析不到真地址 ——
+带代理能 curl 通，**不代表用户能打开**。所以最后落在腾讯云：域名解析到 `124.223.146.214`
+这类上海节点，不经代理直连首页约 0.4 秒、`/api/chat` 约 3 秒。
+
+**CloudBase 走的是单域方案**，不是"静态托管 + 跨域接口"：
+
+```
+同一个域名  xxx.service.tcloudbase.com
+  /      → 静态托管 staticstore      （public/ 里的 8 个文件）
+  /api   → 云函数 bubujie-api        （与本地、Vercel 同一份 router）
+```
+
+踩过的坑写在 `src/server/cloudbase-handler.js` 的注释里，这里记结论：
+把 `/` 也绑到云函数时，HTTP 访问服务对非 `/api` 路径直接回 404（**响应体是 0 字节**，
+看起来像函数里读文件失败，其实是网关自己拒的）。`/` 必须指向 `STATIC_STORE`，
+`/api` 指向 SCF，同域就没有 CORS、前端一行不用改。
+
+三处刻意的复用，防止平台之间行为漂移：
+
+- **口令门与凭据裁剪** → `src/server/demo-gate.js`，三个入口都只调 `buildRequestContext()`
+- **业务逻辑** → `src/server/router.js`，连本地 `server/server.js` 也是同一份
+- **函数打包** → `scripts/build-cloudbase.mjs`，把 CJS 入口、ESM 的 `src/`、`public/` 铺成
+  `dist-cloudbase/bubujie-api/`（根 `package.json` 是 `"type": "module"`，云函数要 CJS，
+  所以入口用动态 `import()` 接，两边都不用改源码）
+
+翻译层的正确性各有测试：`test/worker-adapter.test.js`（9 条，含请求体穿桥）、
+`test/cloudbase-adapter.test.js`（15 条，含网关两种 path 形态、base64 body、静态资源命中）。
+
+⚠️ 部署前先把 `compatibility_date` 保持在 `2025-09-01` 或更新：
+`src/core/env.js` 在模块顶层 import 了 `node:fs`（只用来读可选的 `.env`），
+更早的日期不会默认提供该模块的实现，构建会直接失败。
+
 `showcase/` 是**独立的单文件展示页**，由
 [`.github/workflows/pages.yml`](.github/workflows/pages.yml) 发布到 GitHub Pages；
 它与可交互的应用页面相互独立。发布前需在仓库 Settings → Pages 中把 Source 设为
@@ -342,7 +407,7 @@ DESIGN-TOKENS.md         v3 设计 token 与可访问性说明
 
 | 限制 | 说明 |
 |---|---|
-| 测试状态 | 272 个注册用例中 265 通过；7 条旧页面契约待迁移，新链路无测试覆盖 |
+| 测试状态 | 297 个注册用例中 290 通过；7 条旧页面契约待迁移，新链路无测试覆盖 |
 | 演示答案范围 | 只覆盖 4 道内置物理题；其他题暂无演示答案 |
 | 公式卡范围 | 按知识点表匹配；导入题的知识点不在表内时不发卡 |
 | 场景集规模 | 19 个场景且由人编写，覆盖不了真实学生的表达多样性 |

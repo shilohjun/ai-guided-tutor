@@ -13,8 +13,40 @@ const $$ = (s) => Array.from(document.querySelectorAll(s));
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+/* =========================================================================
+   访问口令（可选）
+   -------------------------------------------------------------------------
+   公网部署默认只给离线规则桩；只有知道口令的人才会被放行到真模型与拍照识题。
+   口令从 `?code=xxx` 取一次，存进 localStorage，之后每次 /api 请求自动带上。
+
+   为什么取到后要把 code 从地址栏抹掉：
+     地址栏是最容易泄露口令的地方 —— 截图、投屏、转发链接都会把它一起带走。
+     存进 localStorage 之后，口令只存在这台浏览器里。
+   ========================================================================= */
+const DEMO_CODE_KEY = 'dsh-demo-code';
+
+function captureDemoCode() {
+  try {
+    const fromUrl = new URLSearchParams(location.search).get('code');
+    if (fromUrl) {
+      localStorage.setItem(DEMO_CODE_KEY, fromUrl.trim());
+      const u = new URL(location.href);
+      u.searchParams.delete('code');
+      history.replaceState(null, '', `${u.pathname}${u.search}${u.hash}`);
+      return fromUrl.trim();
+    }
+    return (localStorage.getItem(DEMO_CODE_KEY) ?? '').trim();
+  } catch {
+    /* 隐私模式下 localStorage 可能不可用：退化成"这次不带上"，不影响浏览 */
+    return '';
+  }
+}
+
+const DEMO_CODE = captureDemoCode();
+
 async function api(path, options = {}) {
   const headers = { 'content-type': 'application/json', ...(options.headers ?? {}) };
+  if (DEMO_CODE) headers['x-demo-code'] = DEMO_CODE;
   const res = await fetch(path, { ...options, headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -184,6 +216,7 @@ const state = {
   reportError: '',
   history: [],
   restored: false,
+  renderedStep: null,
 };
 
 const LEARNING_KEY = 'dsh-v3-learning-history:v1';
@@ -428,7 +461,10 @@ function syncFlow() {
 function render() {
   document.body.dataset.step = String(state.step);
   const pages = { 1: inputPage, 2: modePage, 3: chatPage, 4: reportPage, 5: practicePage };
-  $('#app').innerHTML = `<div class="page-shell" data-page="${state.step}">${pages[state.step]()}</div>`;
+  // 只在「换页」时播放上浮动画，页内点按不重播，避免界面一直抖
+  const pageChanged = state.renderedStep !== state.step;
+  state.renderedStep = state.step;
+  $('#app').innerHTML = `<div class="page-shell${pageChanged ? ' page-enter' : ''}" data-page="${state.step}">${pages[state.step]()}</div>`;
   syncFlow();
   bind();
   if (state.step === 1) {
@@ -1086,6 +1122,32 @@ async function openFormulaCard() {
   render();
 }
 
+const CONFETTI_COLORS = ['#5B52E0', '#7C4DFF', '#F2673A', '#F4B740', '#2BB894', '#E85D9C'];
+
+/* 完成时的彩纸：纯装饰，减少动态时直接跳过 */
+function burstConfetti() {
+  const layer = $('#confetti-layer');
+  if (!layer) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    layer.innerHTML = '';
+    return;
+  }
+  layer.innerHTML = '';
+  for (let i = 0; i < 40; i += 1) {
+    const piece = document.createElement('i');
+    piece.className = 'confetti';
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.background = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+    piece.style.width = `${6 + Math.random() * 7}px`;
+    piece.style.height = `${9 + Math.random() * 11}px`;
+    piece.style.borderRadius = Math.random() > 0.55 ? '50%' : '2px';
+    piece.style.setProperty('--drift', `${(Math.random() * 2 - 1) * 170}px`);
+    piece.style.setProperty('--dur', `${3 + Math.random() * 1.8}s`);
+    piece.style.setProperty('--delay', `${Math.random() * 0.7}s`);
+    layer.appendChild(piece);
+  }
+}
+
 function showCongrats(completion) {
   const answers = (completion.matched ?? [])
     .map((m) => `${m.value ?? ''} ${m.unit ?? ''}`.trim() || m.quote)
@@ -1106,6 +1168,7 @@ function showCongrats(completion) {
   const overlay = $('#done-overlay');
   if (overlay) {
     overlay.hidden = false;
+    burstConfetti();
     $('#btn-done-report')?.focus();
   }
 }

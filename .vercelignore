@@ -1,0 +1,40 @@
+# 部署排除清单
+#
+# 为什么单独写这个文件：
+#   vercel deploy 会把当前目录整个打包上传。仓库里有些东西
+#   **绝不该跟着上公网**，有些则完全用不到，只是把包撑大。
+#
+#   最要紧的一条是 .env —— 里面是真 LLM Key。
+#   .gitignore 挡住了 git，但这个项目要用 CLI 部署，
+#   两道门都要关。部署前 .env 也会被临时移走，双保险。
+
+# ---- 凭据 ----
+.env
+.env.*
+.env.disabled-for-deploy
+
+# ---- 缓存与版本控制 ----
+.npm-cache
+node_modules
+.git
+.vercel
+
+# ---- 运行时用不到的内部资料 ----
+docs
+worklog
+test
+scripts
+preview
+share
+.workbuddy
+.github
+
+# ---- 原型与草稿（成品在 public/） ----
+gzs_malong.html
+v2.html
+v3.html
+test-stem.png
+*.md
+
+# ---- 独立展示页（走 GitHub Pages，不走 Vercel） ----
+showcase

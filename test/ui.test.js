@@ -143,10 +143,20 @@ describe('视图隔离 · 教师端点鉴权（三种形态）', () => {
     restore();
   });
 
-  it('api/index.js 会在没有口令时强制锁死（这条是"部署时忘了配"的唯一防线）', () => {
-    const apiEntry = readFileSync(join(ROOT, 'api/index.js'), 'utf8');
-    assertIncludes(apiEntry, 'DSH_FORCE_TEACHER_LOCK', '公网入口必须显式锁死教师视图');
-    assertIncludes(apiEntry, 'TEACHER_KEY', '锁死逻辑必须给"配了口令"留出口');
+  it('公网入口会在没有口令时强制锁死（这条是"部署时忘了配"的唯一防线）', () => {
+    /**
+     * 判定逻辑在 src/server/demo-gate.js，两个入口（Vercel / Cloudflare）共用。
+     * 这里同时钉住"规则本身在"和"两个入口都引用了它"，
+     * 免得以后有人为了省事在某个入口里手写一套 —— 那一定会漂移。
+     */
+    const gate = readFileSync(join(ROOT, 'src/server/demo-gate.js'), 'utf8');
+    assertIncludes(gate, 'DSH_FORCE_TEACHER_LOCK', '公网入口必须显式锁死教师视图');
+    assertIncludes(gate, 'TEACHER_KEY', '锁死逻辑必须给"配了口令"留出口');
+
+    for (const entry of ['api/index.js', 'api/worker.js']) {
+      const source = readFileSync(join(ROOT, entry), 'utf8');
+      assertIncludes(source, 'buildRequestContext', `${entry} 必须复用共享判定`);
+    }
   });
 });
 
