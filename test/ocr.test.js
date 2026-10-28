@@ -445,7 +445,7 @@ describe('拍照识题 · 端到端（假 fetch，不产生任何计费）', () 
 describe('拍照识题 · 路由契约', () => {
   const router = readFileSync(join(ROOT, 'src/server/router.js'), 'utf8');
   const appJs = readFileSync(join(ROOT, 'public/app.js'), 'utf8');
-  const html = readFileSync(join(ROOT, 'public/index.html'), 'utf8');
+  const html = readFileSync(join(ROOT, 'public/classic.html'), 'utf8');
 
   it('路由存在，且在调用前先挡掉过大的图片', () => {
     assertIncludes(router, "'/api/ocr'", '缺少 /api/ocr 路由');
@@ -466,7 +466,7 @@ describe('拍照识题 · 路由契约', () => {
   });
 
   it('凭据只在服务端：前端文件里不出现任何 OCR 凭据变量名', () => {
-    for (const [name, text] of [['app.js', appJs], ['index.html', html]]) {
+    for (const [name, text] of [['app.js', appJs], ['classic.html', html]]) {
       assertNotIncludes(text, 'ALIYUN_OCR_APPCODE', `${name} 里不该出现服务端凭据变量`);
       assertNotIncludes(text, 'APPCODE', `${name} 里不该出现 AppCode 认证头`);
     }

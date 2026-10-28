@@ -4,7 +4,7 @@
  * 这个套件守的是两类"只有在浏览器里才会炸"的问题 ——
  * 而它们恰恰是最容易漏测的，因为它们不属于引擎逻辑：
  *
- *   ① **DOM 契约**：app.js 里 $('  #xxx  ') 引用的每个 id，index.html 里必须真的存在。
+ *   ① **DOM 契约**：app.js 里 $('  #xxx  ') 引用的每个 id，宿主页（classic.html）里必须真的存在。
  *      写错一个字母不会报错，只会静默地什么都不发生 ——
  *      表现为"点了按钮没反应"，而现场演示时才发现。
  *
@@ -19,12 +19,12 @@ import { describe, it, assert, assertEquals, assertIncludes, assertNotIncludes }
 import { loadEnvFile, ROOT } from '../src/core/env.js';
 import { teacherMode, checkTeacherAuth } from '../src/server/router.js';
 
-const html = readFileSync(join(ROOT, 'public/index.html'), 'utf8');
+const html = readFileSync(join(ROOT, 'public/classic.html'), 'utf8');
 const appJs = readFileSync(join(ROOT, 'public/app.js'), 'utf8');
 /** 去掉 HTML 注释后的版本 —— 注释里写"这里不放防泄题面板"是正常的，学生看不到注释 */
 const htmlVisible = html.replace(/<!--[\s\S]*?-->/g, '');
 
-/** index.html 里声明的所有 id */
+/** 宿主页（classic.html）里声明的所有 id */
 function htmlIds() {
   const ids = new Set();
   for (const m of html.matchAll(/\sid="([^"]+)"/g)) ids.add(m[1]);
@@ -61,14 +61,14 @@ const DYNAMIC_IDS = new Set([
 ]);
 
 describe('前端 · DOM 契约（防止"点了没反应"）', () => {
-  it('app.js 引用的每个 id 都存在于 index.html（或是有意动态创建的）', () => {
+  it('app.js 引用的每个 id 都存在于 classic.html（或是有意动态创建的）', () => {
     const declared = htmlIds();
     const missing = [];
     for (const [id, count] of referencedIds()) {
       if (declared.has(id) || DYNAMIC_IDS.has(id)) continue;
       missing.push(`${id}（引用 ${count} 次）`);
     }
-    assert(missing.length === 0, `以下 id 在 index.html 里不存在，运行时会静默失效：\n  ${missing.join('\n  ')}`);
+    assert(missing.length === 0, `以下 id 在 classic.html 里不存在，运行时会静默失效：\n  ${missing.join('\n  ')}`);
   });
 
   it('学生视图不含任何"防泄题 / 教研"面板（那些内容不该出现在学生面前）', () => {
@@ -196,12 +196,12 @@ describe('前端 · 文案不会被当成纯文本显示', () => {
    * 在页面上就是带着星号的样子 —— 截图里一眼能看到。
    * 同一份文档习惯（Markdown）被带进了渲染层，改起来只要一处，但很容易再犯。
    */
-  it('index.html 的可见文本里没有 Markdown 星号', () => {
+  it('classic.html 的可见文本里没有 Markdown 星号', () => {
     const hits = htmlVisible
       .split(/\r?\n/)
       .map((line, i) => ({ line: line.trim(), no: i + 1 }))
       .filter((x) => x.line.includes('**'));
-    assert(hits.length === 0, `index.html 有 Markdown 星号会被原样显示：\n  ${hits.map((h) => `${h.no}: ${h.line.slice(0, 80)}`).join('\n  ')}`);
+    assert(hits.length === 0, `classic.html 有 Markdown 星号会被原样显示：\n  ${hits.map((h) => `${h.no}: ${h.line.slice(0, 80)}`).join('\n  ')}`);
   });
 
   it('app.js 的渲染模板里没有 Markdown 星号（注释不算）', () => {

@@ -38,7 +38,8 @@ import { loadEnvFile, maskSecret } from '../core/env.js';
 import { createAdapter, readLLMConfig } from '../core/llm.js';
 import { readOcrConfig, recognizeProblemImage, ocrStatus } from '../core/ocr.js';
 import { createEngine } from '../core/engine.js';
-import { totalSteps } from '../core/locate.js';
+import { totalSteps, findStepByPosition } from '../core/locate.js';
+import { safeStepRef } from '../core/guard.js';
 import { understandProblem } from '../core/intake.js';
 import { getProblemById, listProblems, getImportMeta, getProblemAnalysis, registerImportedProblem, registryStats } from '../core/registry.js';
 import { toStudentAnalysis, toTeacherAnalysis } from '../core/analysis.js';
@@ -339,12 +340,29 @@ export function toTeacherProblem(problem) {
 }
 
 /**
+ * 把"已走过的步骤号"翻译成学生可读的步骤名。
+ *
+ * 单一出口：所有名字都过 safeStepRef，不在这里自己拼标题 ——
+ * 一旦这里自己拼，就会出现"界面比提示更早说出结论"的口子。
+ */
+function stepLabelsFor(problem, graphId, completed) {
+  const out = {};
+  if (!problem || !Array.isArray(completed)) return out;
+  for (const index of completed) {
+    const step = findStepByPosition(problem, { graphId, stepIndex: index });
+    const ref = safeStepRef(problem, step);
+    if (ref) out[index] = ref.replace(/^「|」$/g, '');
+  }
+  return out;
+}
+
+/**
  * 学生可见的一轮回复。
  *
  * 这个函数是"学生拿不到教研数据"的**唯一执行点** ——
  * 想确认某个字段有没有外泄，只看这里就够了。
  */
-export function buildStudentTurn(response, mode) {
+export function buildStudentTurn(response, mode, problem) {
   const d = response.diagnosis;
   const guardBlocked = (response.meta.guardHistory ?? []).filter((g) => !g.passed).length;
   const stepCount = response.stepCount ?? 0;
@@ -375,6 +393,18 @@ export function buildStudentTurn(response, mode) {
        * UI 上因此写的是"已走过"而不是"已做对"。
        */
       completed: d.position.completedSteps ?? [],
+      /**
+       * 已走过步骤的**可公开名字**（键 = 步号，值 = 这一句在做什么）。
+       *
+       * 为什么只给"已走过"的：未走到的步骤标题等于提前泄题 ——
+       * 学生看到"第 6 步：用匀速条件做受力平衡"，就等于拿到了下一步该干什么。
+       * 已走完的步骤再告诉他叫什么，是复盘，不是剧透。
+       *
+       * 取值一律走 safeStepRef（与提示文案、学习报告同一条出口规则）：
+       * 推导 / 结论类步骤会自动退化成"第 N 步（推导）"，
+       * 因此这里**没有新增任何暴露面**，只是把同一套规则再用一次。
+       */
+      stepLabels: stepLabelsFor(problem, d.position.graphId, d.position.completedSteps ?? []),
       /** 只给"有多确定"的粗档，不给 0.55 这种数字（学生会追问 0.55 是什么） */
       confidenceLabel: d.position.confidence >= 0.7 ? '高' : d.position.confidence >= 0.5 ? '中' : '低',
     },
@@ -700,7 +730,7 @@ export async function handleApi(req, res, url) {
     appendTurn(session.record, { utterance, response, problem });
 
     // 学生载荷 —— 只走白名单投影
-    sendJson(res, 200, buildStudentTurn({ ...response, stepCount: totalSteps(problem, response.diagnosis.position.graphId) }, normalizedMode));
+    sendJson(res, 200, buildStudentTurn({ ...response, stepCount: totalSteps(problem, response.diagnosis.position.graphId) }, normalizedMode, problem));
     return true;
   }
 
