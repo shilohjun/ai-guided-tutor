@@ -216,6 +216,26 @@ describe('前端 · 文案不会被当成纯文本显示', () => {
       .filter((x) => x.line.includes('**'));
     assert(hits.length === 0, `app.js 渲染模板里还有 Markdown 星号：\n  ${hits.map((h) => `${h.no}: ${h.line.slice(0, 80)}`).join('\n  ')}`);
   });
+
+  /**
+   * 新视图（五页）把模板搬进了 index.html 的内联脚本，同一个坑照样会犯 ——
+   * 只是这次不会有 app.js 那条断言替它兜着。
+   */
+  it('新视图的内联脚本里没有 Markdown 星号（注释不算）', () => {
+    const newUi = readFileSync(join(ROOT, 'public/index.html'), 'utf8');
+    const inline = [...newUi.matchAll(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/g)]
+      .map((m) => m[1])
+      .join('\n')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split(/\r?\n/)
+      .filter((l) => !l.trim().startsWith('//'))
+      .join('\n');
+    const hits = inline
+      .split(/\r?\n/)
+      .map((line, i) => ({ line: line.trim(), no: i + 1 }))
+      .filter((x) => x.line.includes('**'));
+    assert(hits.length === 0, `index.html 的内联脚本里有 Markdown 星号，会被原样显示：\n  ${hits.map((h) => `${h.no}: ${h.line.slice(0, 80)}`).join('\n  ')}`);
+  });
 });
 
 describe('前端 · 陪伴模式的两个控件必须同步', () => {

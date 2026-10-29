@@ -149,7 +149,12 @@ const BUSINESS_ERRORS = {
  */
 export function readOcrConfig(env = process.env) {
   const appCode = String(env.ALIYUN_OCR_APPCODE ?? '').trim();
-  const providerName = String(env.ALIYUN_OCR_PROVIDER ?? 'marketplace').trim() || 'marketplace';
+
+  /** 通道选择：显式配置优先，但只认契约表里真的存在的通道 */
+  const providerName = (() => {
+    const explicit = String(env.ALIYUN_OCR_PROVIDER ?? '').trim();
+    return explicit && PROVIDERS[explicit] ? explicit : 'marketplace';
+  })();
   const provider = PROVIDERS[providerName] ?? PROVIDERS.marketplace;
 
   const endpoint = String(env.ALIYUN_OCR_ENDPOINT ?? '').trim();
@@ -160,7 +165,8 @@ export function readOcrConfig(env = process.env) {
   const retries = Math.max(0, Math.min(2, Number(env.ALIYUN_OCR_RETRIES ?? 0)));
 
   /**
-   * 可用性判据：**只要配了 AppCode 就算可用**。
+   * 可用性判据：只要配了 AppCode 就算可用。
+   *
    * 地址缺失不算"不可用"，而是走候选数组去发现 —— 否则第一次部署会
    * 因为"还没确认地址"而整体降级，白白浪费一次实测机会。
    */
@@ -189,11 +195,12 @@ export function ocrStatus(env = process.env) {
     provider: c.provider,
     providerLabel: c.providerLabel,
     endpoint: c.endpoint || null,
+    /** 缺什么就直接说，只说"未配置"会让人不知道该填哪个变量 */
     hint: c.unimplemented
       ? '该通道尚未实现（需要 AK/SK 签名）'
       : c.available
         ? '可用'
-        : '未配置 ALIYUN_OCR_APPCODE —— 拍照识题不可用（不影响文字导入）',
+        : '未配置 ALIYUN_OCR_APPCODE（题目识别）—— 拍照识题不可用（不影响文字导入）',
   };
 }
 

@@ -14,6 +14,11 @@
     "eval": "node scripts/eval.js",
     "eval:llm": "node scripts/eval.js --adapter llm",
     "ocr:path": "node scripts/ocr-path-probe.js",
+    "ui:audit": "node scripts/audit-ui-style.js",
+    "ui:shots": "node scripts/shoot-ui.cjs",
+    "preview:capture": "node scripts/capture-demo.cjs",
+    "preview:build": "node scripts/build-preview.cjs",
+    "preview:verify": "node scripts/verify-preview.cjs",
     "all": "node test/run.js && node scripts/eval.js"
   },
   "keywords": [

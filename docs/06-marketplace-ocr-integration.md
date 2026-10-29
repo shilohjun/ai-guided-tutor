@@ -11,6 +11,10 @@
 > 配套工具：[scripts/ocr-verify.js](../scripts/ocr-verify.js)（首次验收，1 次调用）·
 > [scripts/ocr-path-probe.js](../scripts/ocr-path-probe.js)（探路径，网关 404 不计费）
 >
+> **2026-10 补充**：视图层重做为五页流程后，拍照入口挪到页一输入框右下。
+> 本文件记录的仍是云市场通道的契约与实测质量；通道选择与视图层约束见
+> [docs/04 §6.3](04-intake-and-views.md#63-拍照识题本轮启用)。
+>
 > 成本结论见 [docs/05-ocr-feasibility.md](05-ocr-feasibility.md)；
 > 本文件记录**接入契约与实测质量**。
 

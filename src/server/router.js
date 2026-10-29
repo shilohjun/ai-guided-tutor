@@ -593,8 +593,10 @@ export async function handleApi(req, res, url) {
         detail: result.detail ?? null,
         charged: result.charged,
         hint: result.charged
-          ? '这次调用可能已经计费，建议先确认照片是否清晰、是否确实是题目，再决定要不要重试。'
-          : '这次请求没有到达识别服务（未计费），可以直接重试。',
+          ? '这次调用可能已经产生费用，建议先确认照片是否清晰、是否确实是题目，再决定要不要重试。'
+          : result.reason === 'http'
+            ? '请求已被服务拒绝，没有可用结果；可以直接重试，或先检查拍照识题的配置。'
+            : '这次请求没有到达识别服务（未计费），可以直接重试。',
       });
       return true;
     }

@@ -1,0 +1,35 @@
+{
+  "name": "ai-guided-tutor-hint-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "步步解 —— 面向中学生重难题的 AI 引导解题助手：看懂学生思路，只给提示不给答案；另有现场演示模式",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node --watch server/server.js",
+    "test": "node test/run.js",
+    "env": "node scripts/set-env.js",
+    "eval": "node scripts/eval.js",
+    "eval:llm": "node scripts/eval.js --adapter llm",
+    "ocr:path": "node scripts/ocr-path-probe.js",
+    "ui:audit": "node scripts/audit-ui-style.js",
+    "ui:shots": "node scripts/shoot-ui.cjs",
+    "preview:capture": "node scripts/capture-demo.cjs",
+    "preview:build": "node scripts/build-preview.cjs",
+    "preview:verify": "node scripts/verify-preview.cjs",
+    "all": "node test/run.js && node scripts/eval.js"
+  },
+  "keywords": [
+    "education",
+    "ai-tutor",
+    "hint-engine",
+    "guardrail",
+    "physics"
+  ],
+  "license": "UNLICENSED",
+  "dependencies": {},
+  "devDependencies": {}
+}
