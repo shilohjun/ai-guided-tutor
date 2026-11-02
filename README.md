@@ -437,6 +437,19 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 `src/core/env.js` 在模块顶层 import 了 `node:fs`（只用来读可选的 `.env`），
 更早的日期不会默认提供该模块的实现，构建会直接失败。
 
+### 推上去就发
+
+两条自动化的现状与开关：
+
+| 平台 | 怎么触发 | 还差什么 |
+|---|---|---|
+| Vercel | `main` 有新提交 → 自动生产部署 | 先把项目连上仓库：`npx vercel@latest git connect --scope jun-f44e`。这步会报 “add a Login Connection to your GitHub account first”，得先在 Vercel 账号设置里用 GitHub 登录一次，再跑该命令 |
+| 腾讯云 | `.github/workflows/deploy-cloudbase.yml` | 仓库加两个 Secret：`TCB_SECRET_ID`、`TCB_SECRET_KEY`（建议用只授予 CloudBase 权限的**子账号**密钥）。没配时流水线只跑测试、跳过部署，不会留红灯 |
+
+两条都先跑 `node test/run.js` 与样式审计，过了才部署；腾讯云那条传完还会带
+`Cache-Control: no-cache` 把线上 HTML 拉回来跟本地比一次 sha256 ——
+**上传成功不等于用户看得到**，CDN 有自己的缓存，刷也需要时间。
+
 `showcase/` 是**独立的单文件展示页**，由
 [`.github/workflows/pages.yml`](.github/workflows/pages.yml) 发布到 GitHub Pages；
 它与可交互的应用页面相互独立。发布前需在仓库 Settings → Pages 中把 Source 设为
