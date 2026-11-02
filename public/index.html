@@ -26,8 +26,8 @@
    0. 设计 token
    ---------------------------------------------------------------------
    间距：只取 2 / 4 / 6 / 8 / 12 / 16 / 24 / 32，禁止 13、17、22 这类魔数
-   字号：只取 12 / 14 / 16 / 20 四档（12 标签、14 正文与题干、16 小节标题、20 页面标题）
-         —— 对齐 LeetCode：正文 14px / 行高 21px，标签 12px，按钮 32px 高
+   字号：只取 11 / 13 / 15 / 18 四档（11 标签、13 正文与题干、15 小节标题、18 页面标题）
+         —— 比 LeetCode 的 12/14 再收一档：中文笔画密，13px 读长题正好
    字重：只取 400 / 600 / 700（700 只给标题与数字，600 只给标签与按钮）
    圆角：内层 8 + 内边距 16 = 卡片 24；次级面 16；药丸 999
    色彩：白底为基准 + 一个主色（靛蓝 54% 饱和），辅助色饱和度一律 ≤ 60%
@@ -74,13 +74,13 @@
   --r-sm:8px; --r-md:8px; --r-lg:24px; --r-xl:24px;  /* 兼容别名 */
 
   /* —— 字号四档 + 行高（对齐 LeetCode：正文 14/21、标签 12、小节 16、大标题 20） —— */
-  --fs-meta:12px;
-  --fs-body:14px;  --lh-body:1.5;
-  --fs-lead:14px;
-  --fs-sub:16px;   --lh-sub:1.4;
-  --fs-title:20px; --lh-title:1.25;
+  --fs-meta:11px;
+  --fs-body:13px;  --lh-body:1.45;
+  --fs-lead:13px;
+  --fs-sub:15px;   --lh-sub:1.35;
+  --fs-title:18px; --lh-title:1.25;
 
-  --topbar:56px;
+  --topbar:52px;
 }
 
 html[data-theme="dark"]{
@@ -288,7 +288,7 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
 
 .btn-primary{
   display:inline-flex;align-items:center;gap:8px;
-  min-height:32px;padding:6px 16px;border-radius:var(--r-inner);
+  min-height:28px;padding:4px 16px;border-radius:var(--r-inner);
   background:var(--brand);color:#fff;
   font-weight:500;font-size:var(--fs-body);line-height:var(--lh-body);
   transition:.18s;
@@ -297,7 +297,7 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
 .btn-primary:disabled{background:var(--surface-3);color:var(--ink-3);cursor:not-allowed}
 
 .btn-ghost{
-  min-height:32px;padding:6px 12px;border-radius:var(--r-inner);border:1px solid var(--line-strong);
+  min-height:28px;padding:4px 12px;border-radius:var(--r-inner);border:1px solid var(--line-strong);
   font-weight:500;font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink-2);background:var(--surface);
   transition:.18s;
 }
@@ -305,7 +305,7 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
 
 .tag{
   display:inline-flex;align-items:center;gap:4px;
-  padding:2px 8px;border-radius:var(--r-pill);
+  padding:2px 6px;border-radius:var(--r-pill);
   font-size:var(--fs-meta);font-weight:600;line-height:1.4;
   background:var(--surface-2);color:var(--ink-3);
   border:1px solid var(--line);
@@ -712,7 +712,7 @@ body.resizing *{cursor:col-resize !important}
 }
 .sug{
   flex:none;
-  padding:4px 16px;border-radius:var(--r-pill);
+  padding:4px 12px;border-radius:var(--r-pill);
   font-size:var(--fs-body);font-weight:500;line-height:var(--lh-body);color:var(--ink-2);
   background:var(--surface-2);border:1px solid var(--line);
   transition:.16s;white-space:nowrap;
