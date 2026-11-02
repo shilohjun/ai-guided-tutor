@@ -8,11 +8,12 @@ const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
-const WS = [
-  'puppeteer-core',
-  'C:/Users/liz20/.workbuddy/binaries/node/workspace/node_modules/puppeteer-core'
-].find((p) => { try { require.resolve(p); return true; } catch (e) { return false; } });
-if (!WS) throw new Error('没装 puppeteer-core');
+const WS = ['puppeteer-core'].find((p) => { try { require.resolve(p); return true; } catch (e) { return false; } });
+if (!WS) {
+  console.error('这个脚本要 puppeteer-core（只是为了让预览版的点击流程能被无人值守地跑一遍）。');
+  console.error('不想装的话：用 npm run ui:shots 截真实服务端的五页，或直接双击 preview/preview.html 手动点。');
+  process.exit(1);
+}
 const puppeteer = require(WS);
 
 const CHROME = [

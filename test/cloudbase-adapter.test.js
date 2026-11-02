@@ -79,7 +79,7 @@ describe('CloudBase 适配层 · 网关的形状差异', () => {
       sessionId: `cb-b64-${Date.now()}`,
       problemId: 'phy-emi-01',
       utterance: '我觉得是安培力让杆慢下来的',
-      mode: 'ai_companion',
+      mode: 'self_training',
     });
     const res = await call({
       httpMethod: 'POST',

@@ -134,7 +134,7 @@ describe('Workers 适配层 · 请求体要能穿过桥', () => {
         sessionId: `worker-${Date.now()}`,
         problemId: 'phy-emi-01',
         utterance: '我觉得是安培力让杆慢下来的',
-        mode: 'ai_companion',
+        mode: 'self_training',
       },
     });
     assertEquals(res.status, 200, '离线桩下应 200');

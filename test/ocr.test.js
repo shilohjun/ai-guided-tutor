@@ -444,10 +444,12 @@ describe('拍照识题 · 端到端（假 fetch，不产生任何计费）', () 
 
 describe('拍照识题 · 路由契约', () => {
   const router = readFileSync(join(ROOT, 'src/server/router.js'), 'utf8');
-  const appJs = readFileSync(join(ROOT, 'public/app.js'), 'utf8');
-  const html = readFileSync(join(ROOT, 'public/classic.html'), 'utf8');
-  /** 当前默认入口（五页视图）——拍照入口在这里，不在 app.js 里 */
-  const newUi = readFileSync(join(ROOT, 'public/index.html'), 'utf8');
+  /** 主界面是单文件：markup 与内联脚本都在 public/index.html 里，拍照入口就在那份内联脚本里 */
+  const html = readFileSync(join(ROOT, 'public/index.html'), 'utf8');
+  const appJs = [...html.matchAll(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/g)]
+    .map((m) => m[1])
+    .join('\n');
+  const newUi = html;
 
   it('路由存在，且在调用前先挡掉过大的图片', () => {
     assertIncludes(router, "'/api/ocr'", '缺少 /api/ocr 路由');
@@ -456,7 +458,7 @@ describe('拍照识题 · 路由契约', () => {
 
   it('识别结果只回填、不自动导入（这条是省钱也是防错）', () => {
     assertIncludes(router, 'edit_then_import', '服务端要显式告诉前端"这一步还没导入"');
-    assertIncludes(appJs, 'stem-input', '识别结果要填进题干输入框');
+    assertIncludes(appJs, 'input1', '识别结果要填进题干输入框');
     // 反例：识别成功后直接调导入接口就是"一键直通"，那是设计上明确否掉的
     const ocrFn = appJs.slice(appJs.indexOf('async function runOcr'), appJs.indexOf('function resetOcrPick'));
     assertNotIncludes(ocrFn, '/api/problem/import', '识别流程里不能顺手导入题目');
@@ -468,7 +470,7 @@ describe('拍照识题 · 路由契约', () => {
   });
 
   it('凭据只在服务端：前端文件里不出现任何 OCR 凭据变量名', () => {
-    for (const [name, text] of [['app.js', appJs], ['classic.html', html]]) {
+    for (const [name, text] of [['index.html 内联脚本', appJs], ['index.html', html]]) {
       assertNotIncludes(text, 'ALIYUN_OCR_APPCODE', `${name} 里不该出现服务端凭据变量`);
       assertNotIncludes(text, 'APPCODE', `${name} 里不该出现 AppCode 认证头`);
     }
@@ -509,8 +511,15 @@ describe('拍照识题 · 路由契约', () => {
   });
 
   it('识别结果直接落进输入框（不再另开一张卡片）', () => {
-    assertIncludes(appJs, 'text-entry-fold', '回填时要展开文字入口');
-    assertIncludes(appJs, 'fold.open = true', '折叠状态下的填充等于没填 —— 学生看不到识别结果');
+    /**
+     * 新版把结果直接写进输入框本体，没有折叠块可展开；
+     * 所以这里盯住"落进可编辑的输入框"这条链路，而不是某个旧壳的类名。
+     */
+    const runOcr = appJs.slice(appJs.indexOf('function runOcr'), appJs.indexOf("$('#cam1').addEventListener"));
+    assertIncludes(runOcr, 'input.value = t', '识别完成后文字必须直接填进输入框，别再让学生核对第二处');
+    assertIncludes(runOcr, 'input.readOnly = false', '识别完成后输入框要恢复可编辑（识别错一个数值，后面整条链路都跑偏）');
+    assertIncludes(runOcr, 'S.picked = null', '走了拍照识题就不再是题库里那道题，选择状态要一并清掉');
+    assertIncludes(runOcr, '计费', '失败时要讲清这次有没有扣钱，否则学生只能瞎猜要不要重试');
     /**
      * 新视图：识别结果写进输入框**本体**，图片缩略图挂在输入框右侧。
      * 一个入口就够了 —— 题干只有一份，另开一张卡片等于让学生核对两处。
@@ -525,7 +534,13 @@ describe('拍照识题 · 路由契约', () => {
   it('可用性如实显示：未启用时说明缺哪个凭据，而不是静默失败', () => {
     assertIncludes(newUi, "classList.toggle('is-off', !S.ocrReady)", '未启用时按钮要有可见的降级状态');
     assertIncludes(newUi, '未启用拍照识题', '要把"没启用"如实说出来');
-    assertIncludes(newUi, 'ALIYUN_OCR_APPCODE', '提示里要写清缺哪个变量');
+    /**
+     * 界面上不点名环境变量（那是服务端的事，写进前端只会把部署细节漏给学生），
+     * 但必须当场说清"没启用 + 去哪儿补"，并且有可见的降级态。
+     */
+    assertIncludes(newUi, "setNote('拍照识题未启用", '点了没配好的相机要当场说清，而不是静默失败');
+    assertIncludes(newUi, 'README 的「填 Key」一节', '要告诉人去哪儿补凭据，而不是让人自己猜');
+    assertIncludes(newUi, 'cam.title = S.ocrReady', '按钮自己也要挂上原因，悬停就能看到');
   });
 
   it('公网部署默认关闭拍照识题（否则等于把额度挂在公开链接上）', () => {

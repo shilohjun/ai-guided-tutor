@@ -705,10 +705,9 @@ body.resizing *{cursor:col-resize !important}
 /* 输入区 */
 .chat-foot{flex:none;border-top:1px solid var(--line);padding:8px 16px 16px;background:var(--surface)}
 .sugs{
-  display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;
-  scrollbar-width:none;
+  /* 换行而不是横向滚动：滚动条藏起来以后，"还有一句被切掉了"这件事没人看得见 */
+  display:flex;flex-wrap:wrap;gap:8px;padding-bottom:8px;
 }
-.sugs::-webkit-scrollbar{display:none}
 .sug{
   flex:none;
   padding:4px 16px;border-radius:var(--r-pill);
@@ -884,6 +883,24 @@ body.resizing *{cursor:col-resize !important}
   .work{grid-template-columns:1fr;grid-template-rows:1fr 16px 1fr}
   .splitter{cursor:row-resize}
   .metrics{grid-template-columns:1fr}
+  /**
+   * 顶栏原来是三栏等分网格：中间步骤条是 auto 宽度，窄屏下它和右边的模式开关
+   * 谁都不肯让，"1fr" 的两侧被压成 0 —— 品牌名竖着排、整页横向溢出。
+   * 窄屏改成 flex：两侧固定，步骤条可横向滚（它是唯一该让位的东西）。
+   */
+  .topbar{display:flex;padding:0 16px;gap:8px}
+  .tb-left,.tb-right{flex:none}
+  .tb-div{display:none}
+  .stepper{
+    flex:1;min-width:0;justify-content:flex-start;
+    overflow-x:auto;scrollbar-width:none;
+  }
+  .stepper::-webkit-scrollbar{display:none}
+  .brand-name{white-space:nowrap}
+  .p1,.p2-col,.p3,.p4,.p5{padding-left:16px;padding-right:16px}
+  .work{padding:16px}
+  .composer,.bank,.p1-hero,.p1-foot,.p2-head,.p2-foot,.p5-col,.p5-foot{width:100%}
+  .p4-card,.p4-card .metrics{margin-left:0;margin-right:0}
 }
 
 /* 深色下主色变浅，实心面改用更实的紫，保证白字对比 */
@@ -900,6 +917,17 @@ html[data-theme="dark"] .pstep[data-state="now"] i{
 html[data-theme="dark"] .btn-primary:hover:not(:disabled),
 html[data-theme="dark"] .send-btn:hover{background:#6E67D8}
 html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
+  /* 未上线的模式：留在原位、置灰、标「暂未更新」——比整块藏起来更说明"以后会有" */
+  .mode-bar[disabled]{opacity:.6;cursor:not-allowed;box-shadow:none}
+  .mode-bar[disabled]:hover{border-color:var(--line);box-shadow:none}
+  .mode-bar[disabled] .mode-arrow{display:none}
+  .tag.muted{background:var(--surface-2);color:var(--ink-3);border-color:var(--line)}
+  /* 空态：五页都能点到，没数据时在这里说清楚下一步做什么 */
+  .pane-empty{padding:32px 24px;text-align:center;color:var(--ink-3);font-size:var(--fs-body);line-height:1.9}
+  .bar-row.static{cursor:default}
+  .bar-row.static:hover .bar-title{color:inherit}
+  .weak-list{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px}
+  .weak-list .k-chip.bad{background:var(--coral-tint);color:var(--coral);border-color:var(--coral-line)}
 </style>
 </head>
 <body data-page="1">
@@ -923,8 +951,8 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
 
   <div class="tb-right">
     <div class="seg" id="modeSwitch" hidden role="group" aria-label="模式">
-      <button type="button" data-mode="ai" aria-pressed="true">AI 伴学</button>
-      <button type="button" data-mode="self" aria-pressed="false">自主训练</button>
+      <button type="button" data-mode="self" aria-pressed="true">自主训练</button>
+      <button type="button" data-mode="ai" aria-pressed="false" disabled title="AI 伴学暂未上线">AI 伴学</button>
     </div>
     <button class="icon-btn" id="themeBtn" type="button" aria-label="切换深浅色"></button>
   </div>
@@ -1014,22 +1042,7 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
           <p id="p2text">—</p>
         </div>
         <div class="p2-modes" id="modeList">
-          <button class="mode-bar" type="button" data-mode="ai" aria-pressed="true">
-            <span class="mode-ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z"></path>
-                <path d="M9.5 11h.01M14.5 11h.01"></path>
-              </svg>
-            </span>
-            <span class="mode-copy">
-              <span class="mode-title">AI 伴学 <span class="tag brand">推荐</span></span>
-              <span class="mode-desc">每步只给方向，算式由你写；卡住时再追问</span>
-            </span>
-            <span class="mode-arrow" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
-            </span>
-          </button>
-          <button class="mode-bar" type="button" data-mode="self" aria-pressed="false">
+          <button class="mode-bar" type="button" data-mode="self" aria-pressed="true">
             <span class="mode-ico" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 20h9"></path>
@@ -1037,8 +1050,23 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
               </svg>
             </span>
             <span class="mode-copy">
-              <span class="mode-title">自主训练</span>
+              <span class="mode-title">自主训练 <span class="tag brand">推荐</span></span>
               <span class="mode-desc">先自己写到卡住，AI 只在你要提示时出现</span>
+            </span>
+            <span class="mode-arrow" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+            </span>
+          </button>
+          <button class="mode-bar" type="button" data-mode="ai" aria-pressed="false" disabled title="AI 伴学暂未上线">
+            <span class="mode-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z"></path>
+                <path d="M9.5 11h.01M14.5 11h.01"></path>
+              </svg>
+            </span>
+            <span class="mode-copy">
+              <span class="mode-title">AI 伴学 <span class="tag muted">暂未更新</span></span>
+              <span class="mode-desc">陪着你一步步想 —— 这个方式还在做，先别急</span>
             </span>
             <span class="mode-arrow" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
@@ -1156,7 +1184,7 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
 
       <div class="p4-foot">
         <span class="duration">学习时长：<strong id="durNum">—</strong> 分钟</span>
-        <button class="btn-primary" id="go5" type="button">确认</button>
+        <button class="btn-primary" id="go5" type="button">下一步 · 巩固</button>
       </div>
     </div>
   </section>
@@ -1193,8 +1221,8 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
               </svg>
             </span>
             <span class="bar-copy">
-              <span class="bar-title">举一反三</span>
-              <span class="bar-desc">同一知识点，换一个情境再练</span>
+              <span class="bar-title">同类题再练</span>
+              <span class="bar-desc">同一知识点换一道题，把刚学会的规律再用一次</span>
             </span>
             <span class="bar-arrow" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
@@ -1208,6 +1236,21 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
             </span>
           </button>
           <ul class="drop-list scroller" id="dropList"></ul>
+        </div>
+
+        <div class="bar-card" id="weakCard">
+          <div class="bar-row static">
+            <span class="bar-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3.5l9 16H3z"></path><path d="M12 10.5v3.5"></path><path d="M12 17.2h.01"></path>
+              </svg>
+            </span>
+            <span class="bar-copy">
+              <span class="bar-title">薄弱点清单</span>
+              <span class="bar-desc">这次卡住过的知识点，按"要不要回头补"排序</span>
+            </span>
+          </div>
+          <div class="weak-list" id="weakList"></div>
         </div>
       </div>
 
@@ -1230,7 +1273,7 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
   var SVG_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l4.5 4.5L20 7"/></svg>';
   var SVG_MARK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M15.5 8.5l-2.3 5.2-4.7 1.8 2.3-5.2z"></path></svg>';
 
-  var PAGES = ['题目', '方式', '解题', '报告', '迁移'];
+  var PAGES = ['题目', '方式', '解题', '报告', '巩固'];
 
   /* ---------------- 基础工具 ---------------- */
   function esc(s) {
@@ -1295,11 +1338,11 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
     health: null, ocrReady: false,
     bank: [], bankErr: null,
     picked: null, problem: null,
-    mode: 'ai', sessionId: null,
+    mode: 'self', sessionId: null,
     turns: [], progress: { index: null, count: 0, done: [], labels: {} },
     done: false, busy: false,
     report: null, reportTurns: [], reportErr: null,
-    related: [], relatedIdx: 0,
+    related: [], relatedIdx: 0, relatedSource: null, relatedFor: null,
     ledger: [], sessionStart: 0
   };
 
@@ -1325,16 +1368,14 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
       var n = i + 1;
       var state = n === S.page ? 'now' : (n <= S.max ? 'done' : 'todo');
       return '<button class="pstep" type="button" data-state="' + state + '" data-goto="' + n + '"' +
-        (n > S.max ? ' disabled' : '') + ' title="第 ' + n + ' 步 · ' + label + '">' +
+        (n === S.page ? ' aria-current="step"' : '') + ' title="第 ' + n + ' 步 · ' + label + '">' +
         '<i>' + (n < S.page ? '✓' : n) + '</i><span class="lbl">' + label + '</span></button>' +
         (i < PAGES.length - 1 ? '<span class="pstep-line"></span>' : '');
     }).join('');
   }
 
   function setPage(n) {
-    // 关卡门禁：没有题目就不许往后走；没有会话就不许进解题页
-    if (n >= 2 && !S.problem) n = 1;
-    if (n === 3 && !S.sessionId) n = 2;
+    // 五页随时可以切：没有数据就进空态，而不是把人弹回第 1 页
     if (n > S.max) S.max = n;
     S.page = n;
     document.body.setAttribute('data-page', String(n));
@@ -1345,8 +1386,11 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
     renderStepper();
     if (n === 3) { renderLeft(); renderXP(); renderChat(); }
     if (n === 2 && S.problem) $('#p2text').textContent = S.problem.stem;
-    if (n === 4) loadReport();
-    if (n === 5) { renderRelated(); renderP5Note(); }
+    if (n === 4) {
+      if (S.sessionId) loadReport();
+      else { S.report = null; S.reportErr = '还没有开始做题。先在第 1 页选题，到第 3 页对话，报告会自动生成。'; renderReport(); }
+    }
+    if (n === 5) { loadRelated(); renderP5Note(); renderWeak(); }
   }
 
   document.addEventListener('click', function (e) {
@@ -1530,7 +1574,9 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
     }).catch(function (err) {
       input.readOnly = false;
       input.placeholder = '粘贴题目，或说说你卡在哪一步…';
-      hint.textContent = err.message;
+      // 计费状态决定下一步该做什么：没扣钱就可以放心重试，扣了就别连点
+      var billed = !(err.data && err.data.charged === false);
+      hint.textContent = err.message + (billed ? '（这次可能已计费，别连着点）' : '（未计费，可以直接重试）');
       retry.hidden = false;
       throw err;
     });
@@ -1538,7 +1584,7 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
 
   $('#cam1').addEventListener('click', function () {
     if (!S.ocrReady) {
-      setNote('拍照识题未启用：在 .env 填 ALIYUN_OCR_APPCODE 后重启', true);
+      setNote('拍照识题未启用：服务端 .env 缺 OCR 凭据（见 README 的「填 Key」一节）', true);
       return;
     }
     $('#file1').click();
@@ -1607,9 +1653,28 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
     });
   }
 
+  /**
+   * 哪些模式能点，由服务端的能力位说了算（/api/health 的 capabilities.modes）。
+   * 没上线的模式留在原位、置灰、标「暂未更新」—— 比整块藏起来更能说明"以后会有"。
+   */
+  function applyModes(modes) {
+    var list = modes || ['self_training'];
+    var canAi = list.indexOf('ai_companion') > -1;
+    $$('[data-mode="ai"]').forEach(function (b) {
+      b.disabled = !canAi;
+      b.title = canAi ? '' : 'AI 伴学暂未上线';
+      var tag = b.querySelector('.mode-title .tag');
+      if (tag) {
+        tag.textContent = canAi ? '推荐' : '暂未更新';
+        tag.className = 'tag' + (canAi ? ' brand' : ' muted');
+      }
+    });
+    if (!canAi && S.mode === 'ai') { S.mode = 'self'; paintMode(); }
+  }
+
   $('#modeList').addEventListener('click', function (e) {
     var el = e.target.closest('[data-mode]');
-    if (!el) return;
+    if (!el || el.disabled) return;
     S.mode = el.dataset.mode;
     paintMode();
   });
@@ -1623,7 +1688,7 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
 
   $('#modeSwitch').addEventListener('click', function (e) {
     var el = e.target.closest('[data-mode]');
-    if (!el) return;
+    if (!el || el.disabled) return;
     S.mode = el.dataset.mode;
     paintMode();
   });
@@ -1652,7 +1717,12 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
     var body = $('#leftBody');
     if (!body) return;
     var q = S.problem;
-    if (!q) { body.innerHTML = ''; return; }
+    if (!q) {
+      body.innerHTML = '<div class="pane-empty">还没有题目。<br>回第 1 页选一道库里的题，或把你的题粘贴进来。</div>';
+      $('#qKind').textContent = '—';
+      $('#qTopic').textContent = '—';
+      return;
+    }
 
     var topics = q.topics || [];
     $('#qKind').textContent = '难度 ' + (q.difficulty || '—') + '/5';
@@ -1773,6 +1843,14 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
 
   function renderChat() {
     var body = $('#chatBody');
+    if (!S.problem) {
+      body.innerHTML = '<div class="chat-empty"><p>还没有开始一道题。</p>' +
+        '<p class="sub">先在第 1 页选题、第 2 页确认模式，再回到这里对话。</p></div>';
+      $('#qIndexTag').textContent = '0 个提问';
+      $('#stepTag').textContent = '—';
+      $('#rail').innerHTML = '';
+      return;
+    }
     var html = '';
     if (!S.turns.length) {
       html = '<div class="chat-empty"><p>从你的思路开始：这道题你打算先处理哪一部分？</p>' +
@@ -1814,7 +1892,10 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
     if (el) jumpTo(Number(el.dataset.jump));
   });
 
-  function send(text) {
+  function send(text, asksHelp) {
+    // 只有"点了快捷问句"这种明确的求助动作才置 true；
+    // 自己敲的话交给服务端按语句判断，否则自主训练等于每句都在求助
+    var helpFlag = asksHelp === true;
     text = (text || '').trim();
     if (!text || S.busy || S.done || !S.sessionId || !S.problem) return;
 
@@ -1829,7 +1910,7 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
       problemId: S.problem.id,
       utterance: text,
       mode: S.mode === 'self' ? 'self_training' : 'ai_companion',
-      explicitHelpSeeking: S.mode === 'self'
+      explicitHelpSeeking: helpFlag
     }).then(function (r) {
       var p = r.progress || {};
       S.progress = {
@@ -1906,7 +1987,8 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
   $('#sugs').addEventListener('click', function (e) {
     var el = e.target.closest('.sug');
     if (!el) return;
-    send(el.textContent);
+    // 快捷问句本身就是"我在求助"，所以这一轮按显式求助处理
+    send(el.textContent, true);
   });
 
   /* 语音：后端没有识别服务，不伪造转写结果 */
@@ -1920,7 +2002,7 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
   /* 拍照：识别成文字后填进输入框，由学生确认再发送 */
   $('#cam3').addEventListener('click', function () {
     if (!S.ocrReady) {
-      S.turns.push({ role: 'err', text: '拍照识题未启用：在 .env 填 ALIYUN_OCR_APPCODE 后重启。' });
+      S.turns.push({ role: 'err', text: '拍照识题未启用：服务端 .env 缺 OCR 凭据（见 README 的「填 Key」一节）。' });
       renderChat();
       return;
     }
@@ -2065,8 +2147,9 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
       alert.textContent = S.reportErr
         ? '学习报告未能生成：' + S.reportErr
         : '学习报告尚未生成。';
-      $('#mWeak').textContent = (S.problem && (S.problem.topics || [])[0]) || '—';
-      $('#mWeak').parentNode.classList.add('warn');
+      // 没有报告就没有"薄弱"可言：题目主题不是薄弱点，别拿它顶上
+      $('#mWeak').textContent = '—';
+      $('#mWeak').parentNode.classList.remove('warn');
       $('#lvOk').innerHTML = chips([], '—');
       $('#lvWarn').innerHTML = chips([], '—');
       $('#lvBad').innerHTML = chips([], '—');
@@ -2118,20 +2201,38 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
   $('#go5').addEventListener('click', function () { setPage(5); });
 
   /* ---------------- 页面五：迁移 ---------------- */
-  function relatedProblems() {
-    if (!S.problem) return [];
-    var mine = S.problem.topics || [];
-    var same = S.bank.filter(function (q) {
-      if (q.id === S.problem.id) return false;
-      return (q.topics || []).some(function (t) { return mine.indexOf(t) > -1; });
+  /**
+   * 同类题由服务端按知识点重合给出（/api/related）。
+   * 规则只存在于一处：题库以后混进导入题、校本题，界面代码不用跟着改。
+   */
+  function loadRelated() {
+    if (!S.problem) { S.relatedSource = []; S.relatedFor = null; renderRelated(); return; }
+    if (S.relatedFor === S.problem.id) { renderRelated(); return; }
+    var wantId = S.problem.id;
+    API.req('/api/related?id=' + encodeURIComponent(wantId)).then(function (res) {
+      if (S.problem && S.problem.id === wantId) {
+        S.relatedSource = (res && res.problems) || [];
+        S.relatedFor = wantId;
+      }
+      renderRelated();
+    }).catch(function () {
+      S.relatedSource = [];
+      S.relatedFor = wantId;
+      renderRelated();
     });
-    var list = same.length ? same : S.bank.filter(function (q) { return q.id !== S.problem.id; });
-    return list.slice(0, 6);
   }
+
+  function relatedProblems() { return S.relatedSource || []; }
 
   function renderRelated() {
     S.related = relatedProblems();
     var list = $('#dropList');
+    if (!S.problem) {
+      list.innerHTML = '<li><div class="bank-empty"><p>还没有题目 —— 先在第 1 页选一道，或粘贴你自己的题。</p></div></li>';
+      $('#dropCur').textContent = '还没有题目';
+      $('#startRelated').disabled = true;
+      return;
+    }
     if (!S.related.length) {
       list.innerHTML = '<li><div class="bank-empty"><p>题库里没有同知识点的其他题目。</p></div></li>';
       $('#dropCur').textContent = '题库暂无同类题';
@@ -2149,6 +2250,20 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
     }).join('');
     var cur = S.related[S.relatedIdx];
     $('#dropCur').textContent = (cur.topics || []).slice(0, 2).join(' · ') + ' — ' + (cur.stemPreview || '');
+  }
+
+  /** 巩固页第三卡：这次卡住过的知识点，按"要不要回头补"排序 */
+  function renderWeak() {
+    var box = $('#weakList');
+    if (!box) return;
+    if (!S.problem) { box.innerHTML = '<span class="k-chip muted">还没有题目</span>'; return; }
+    var buckets = levelBuckets(S.report || {});
+    var list = buckets.bad.concat(buckets.warn);
+    box.innerHTML = list.length
+      ? list.slice(0, 6).map(function (t) {
+          return '<span class="k-chip bad" title="这次卡在这里">' + esc(t) + '</span>';
+        }).join('')
+      : '<span class="k-chip muted">这次没有卡住的知识点 —— 直接做一道同类题就行</span>';
   }
 
   function renderP5Note() {
@@ -2210,10 +2325,11 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
 
   API.health().then(function (h) {
     S.health = h;
+    applyModes(h.capabilities && h.capabilities.modes);
     S.ocrReady = Boolean(h.capabilities && h.capabilities.ocr);
     var cam = $('#cam1');
     cam.classList.toggle('is-off', !S.ocrReady);
-    cam.title = S.ocrReady ? '拍照上传题目' : '未启用拍照识题（配 ALIYUN_OCR_APPCODE）';
+    cam.title = S.ocrReady ? '拍照上传题目' : '未启用拍照识题（服务端缺 OCR 凭据）';
     /**
      * 触屏设备直接调起后置相机（capture=environment）；
      * 桌面保留文件选择器 —— 桌面上写死 capture 只会让人没法选已有照片。

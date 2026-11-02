@@ -58,6 +58,31 @@ const STILL_STUCK_SIGNALS = [
 /** 学生表示"我再试试"的语言信号（用于抑制升级，给他空间） */
 const TRYING_SIGNALS = ['我试试', '我想想', '让我想', '等等', '我先', '我明白了', '懂了', '知道了'];
 
+/**
+ * 学生在自由输入框里主动求助的信号。
+ *
+ * 为什么需要它：自主训练的模式约定是"AI 不主动开口，等学生问"。
+ * 如果这里永远返回 false，学生自己敲一句"这一步该用什么规律"也得不到回应，
+ * 那"自主"就变成了"没人管"；反过来若永远返回 true，AI 又会抢话。
+ * 所以判据只能是**这句话本身**。
+ */
+const HELP_REQUEST_SIGNALS = [
+  '不会', '不懂', '不明白', '不理解', '看不懂', '没思路', '不会做',
+  '怎么', '为什么', '是不是', '对不对', '卡住', '卡在',
+  '提示', '帮我', '教教', '怎么做', '从哪', '下一步', '然后呢'
+];
+
+/**
+ * 这句话算不算在求助：带问号，或者命中常见求助说法。
+ * 只用于"要不要开口"的第一道门，不决定给到几级 —— 升级仍由 decideLevel 管。
+ */
+export function looksLikeHelpRequest(utterance = '') {
+  const text = String(utterance ?? '');
+  if (!text.trim()) return false;
+  if (/[？?]/.test(text)) return true;
+  return HELP_REQUEST_SIGNALS.some((s) => text.includes(s));
+}
+
 export function decideLevel({ problem, diagnosis, history, explicitHelpSeeking, mode }) {
   const reasons = [];
   if (mode === 'self_training' && !explicitHelpSeeking) {
@@ -415,5 +440,5 @@ export function route({ problem, diagnosis, history, explicitHelpSeeking, mode, 
   };
 }
 
-export { STRATEGY_INSTRUCTIONS, STRATEGY_MATRIX, STILL_STUCK_SIGNALS, TRYING_SIGNALS };
+export { STRATEGY_INSTRUCTIONS, STRATEGY_MATRIX, STILL_STUCK_SIGNALS, TRYING_SIGNALS, HELP_REQUEST_SIGNALS };
 export { maxReachableLevel as __maxReachableLevel };

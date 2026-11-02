@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node server/server.js",
     "dev": "node --watch server/server.js",
-    "test": "node test/run.js",
+    "test": "node test/run.js && node scripts/audit-ui-style.js",
     "eval": "node scripts/eval.js",
     "eval:llm": "node scripts/eval.js --adapter llm",
     "ocr:path": "node scripts/ocr-path-probe.js",
@@ -22,7 +22,9 @@
     "preview:capture": "node scripts/capture-demo.cjs",
     "preview:build": "node scripts/build-preview.cjs",
     "preview:verify": "node scripts/verify-preview.cjs",
-    "all": "node test/run.js && node scripts/eval.js"
+    "all": "node test/run.js && node scripts/eval.js",
+    "test:ui": "node test/run.js ui",
+    "verify": "node test/run.js && node scripts/audit-ui-style.js"
   },
   "keywords": [
     "education",

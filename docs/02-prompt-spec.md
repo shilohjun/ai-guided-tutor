@@ -171,7 +171,7 @@ L2仍说“匀速对应什么条件”：没有新增信息。
   "subject": "physics | math | chemistry",
   "topics": ["知识点，3~6 个，用中学教材里的标准名称"],
   "difficulty": 1到5的整数,
-  "summary": "这道题在问什么（一句话，教师可见）",
+  "summary": "这道题在问什么（一句话）",
   "givens": ["已知量，如 'm = 2 kg'，用题干原话"],
   "asked": ["待求量，如 '底端速度 v'"],
   "keyConditions": [

@@ -40,7 +40,7 @@ import { getProblemById, listProblems, getImportMeta, getProblemAnalysis, regist
 import { toStudentAnalysis } from '../core/analysis.js';
 import { createSessionRecord, appendTurn, buildReport } from '../core/report.js';
 import { formulaCardFor } from '../core/formula-cards.js';
-import { demoAnswerFor } from '../core/demo-answers.js';
+import { looksLikeHelpRequest } from '../core/route.js';
 import { runEvaluation, formatEvaluation } from '../core/eval.js';
 import { STUDENT_LEVEL_NOTE, inspectVoice } from '../core/prompt.js';
 import { PROBLEMS } from '../core/problems.data.js';
@@ -479,6 +479,23 @@ export async function handleApi(req, res, url) {
     return true;
   }
 
+  // ---- GET /api/related?id=xxx（巩固页：同一知识点的同类题） ----
+  /**
+   * 为什么放在服务端而不是前端从题库里筛：
+   *   题库以后会变成"导入题 + 校本题 + 爬取题"的混合体，筛选规则一旦写进前端，
+   *   每接一个来源就要改一次界面代码。规则只留一处，界面只负责渲染。
+   */
+  if (path === '/api/related' && req.method === 'GET') {
+    const id = url.searchParams.get('id');
+    const base = getProblemById(id);
+    if (!base) {
+      sendJson(res, 404, { error: `未找到题目 ${id}` });
+      return true;
+    }
+    sendJson(res, 200, { problems: relatedProblems(base) });
+    return true;
+  }
+
   // ---- GET /api/problem?id=xxx（学生可见版本） ----
   if (path === '/api/problem' && req.method === 'GET') {
     const id = url.searchParams.get('id') ?? PROBLEMS[0].id;
@@ -650,21 +667,6 @@ export async function handleApi(req, res, url) {
     return true;
   }
 
-  // ---- GET /api/demo-scripts ----
-  if (path === '/api/demo-scripts' && req.method === 'GET') {
-    const { SCENARIOS } = await import('../core/eval.js');
-    const id = url.searchParams.get('id');
-    const list = SCENARIOS.filter((s) => !id || s.problemId === id).map((s) => ({
-      id: s.id,
-      problemId: s.problemId,
-      title: s.title,
-      kind: s.kind,
-      utterances: s.utterances,
-    }));
-    sendJson(res, 200, { scripts: list });
-    return true;
-  }
-
   // ---- POST /api/chat ----
   if (path === '/api/chat' && req.method === 'POST') {
     const body = await readJson(req);
@@ -679,8 +681,15 @@ export async function handleApi(req, res, url) {
       return true;
     }
 
+    if (mode === 'ai_companion') {
+      // 只上线了自主训练：能力位（/api/health 的 capabilities.modes）里没有的模式，
+      // 前端点不到、服务端也不接 —— 免得改漏一处就悄悄跑出一个没验收过的模式。
+      sendJson(res, 400, { error: 'AI 伴学暂未上线，目前只支持自主训练。', code: 'MODE_UNAVAILABLE' });
+      return true;
+    }
+
     const session = getSession(sessionId || 'demo', problemId);
-    const normalizedMode = mode === 'self_training' ? 'self_training' : 'ai_companion';
+    const normalizedMode = 'self_training';
 
     let response;
     try {
@@ -689,7 +698,9 @@ export async function handleApi(req, res, url) {
         utterance,
         history: session.history,
         mode: normalizedMode,
-        explicitHelpSeeking: Boolean(explicitHelpSeeking),
+        // 前端只负责"点了快捷问句"这种显式信号；自由输入由服务端按这句话本身判定，
+        // 免得"自主训练"退化成"每句都算求助"或"问破喉咙也没人理"
+        explicitHelpSeeking: Boolean(explicitHelpSeeking) || looksLikeHelpRequest(utterance),
         sessionId: session.id,
       });
     } catch (error) {
@@ -714,27 +725,6 @@ export async function handleApi(req, res, url) {
 
     // 学生载荷 —— 只走白名单投影
     sendJson(res, 200, buildStudentTurn({ ...response, stepCount: totalSteps(problem, response.diagnosis.position.graphId) }, normalizedMode, problem));
-    return true;
-  }
-
-  // ---- POST /api/demo/answer ----
-  /**
-   * 演示模式专用：只在演示者点击“我已做出答案（演示）”时返回最终结果。
-   * 不是学生端接口 —— 必须显式带 demo:true，避免被普通页面误用。
-   */
-  if (path === '/api/demo/answer' && req.method === 'POST') {
-    const body = await readJson(req).catch(() => ({}));
-    if (body?.demo !== true) {
-      sendJson(res, 403, { error: '这个接口只用于演示模式。' });
-      return true;
-    }
-    const problemId = String(body?.problemId ?? '');
-    const answer = demoAnswerFor(problemId);
-    if (!answer) {
-      sendJson(res, 404, { error: '这道题暂时没有演示答案。' });
-      return true;
-    }
-    sendJson(res, 200, answer);
     return true;
   }
 
@@ -828,6 +818,19 @@ export async function handleApi(req, res, url) {
   }
 
   return false;
+}
+
+/**
+ * 同类题：先按知识点重合挑，重合的没有才退化成"题库里除它之外的题"。
+ *
+ * 不按难度排序 —— 巩固的目标是"换个情境把同一条规律再用一次"，
+ * 难度跳太多就变成做新题了，反而练不到刚卡住的那一步。
+ */
+function relatedProblems(base) {
+  const mine = new Set(base.topics ?? []);
+  const rest = listProblems().filter((p) => p.id !== base.id);
+  const same = rest.filter((p) => (p.topics ?? []).some((t) => mine.has(t)));
+  return (same.length ? same : rest).slice(0, 6);
 }
 
 export { sessions, SESSION_TTL_MS, MAX_SESSIONS, sendJson, sendText, readJson, getAdapter, getSession, adapterTagFor };
