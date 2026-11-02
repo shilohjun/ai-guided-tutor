@@ -7,18 +7,29 @@
 <title>步步解 · 引导解题工作台</title>
 <link rel="icon" type="image/png" href="/brand.png">
 <script>
-/* 上色放在样式之前，避免首屏闪白 */
+/* 上色与档位都放在样式之前：闪白和"大档先看到一帧中档"都是首屏一帧的事 */
 (function(){
   var root = document.documentElement;
-  var KEY = 'bsj-theme';
+  var q = new URLSearchParams(location.search);
   var read = function(k){ try { return localStorage.getItem(k); } catch(e){ return null; } };
-  var fromUrl = new URLSearchParams(location.search).get('theme');
-  var pref = (fromUrl === 'light' || fromUrl === 'dark') ? fromUrl : read(KEY);
-  if (pref !== 'light' && pref !== 'dark') {
-    pref = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  }
-  root.setAttribute('data-theme', pref);
+  var oneOf = function(v, list){ return list.indexOf(v) >= 0 ? v : null; };
+
+  /* 主题：存的是偏好（light / dark / system），落到 DOM 的是生效后的颜色。
+     老用户存的是 light|dark，直读可用；没存过 = 跟随系统（与改造前的行为一致）。 */
+  var pref = oneOf(q.get('theme'), ['light', 'dark', 'system'])
+    || oneOf(read('bsj-theme'), ['light', 'dark', 'system'])
+    || 'system';
+  var sysDark = window.matchMedia('(prefers-color-scheme: dark)');
+  var dark = pref === 'dark' || (pref === 'system' && sysDark.matches);
+  root.setAttribute('data-theme', dark ? 'dark' : 'light');
+  root.setAttribute('data-theme-pref', pref);
+
+  /* 字号档位：s / m / l，没存过 = 中（现状） */
+  var ux = oneOf(q.get('ux'), ['s', 'm', 'l']) || oneOf(read('bsj-ux'), ['s', 'm', 'l']) || 'm';
+  root.setAttribute('data-ux', ux);
+
   window.__PREF__ = pref;
+  window.__UX__ = ux;
 })();
 </script>
 <style>
@@ -73,14 +84,63 @@
   --r-circle:50%;
   --r-sm:8px; --r-md:8px; --r-lg:24px; --r-xl:24px;  /* 兼容别名 */
 
-  /* —— 字号四档 + 行高（对齐 LeetCode：正文 14/21、标签 12、小节 16、大标题 20） —— */
+  /* —— 字号四档 + 行高（对齐 LeetCode：正文 14/21、标签 12、小节 16、大标题 20）
+        这一组是「中」档，也就是改造前的原样；小/大两档在下面 html[data-ux] 里整组覆盖 —— */
   --fs-meta:11px;
   --fs-body:13px;  --lh-body:1.45;
   --fs-lead:13px;
   --fs-sub:15px;   --lh-sub:1.35;
   --fs-title:18px; --lh-title:1.25;
 
+  /* —— 盒子尺寸：只收「包着文字的固定盒子」。间距与圆角不跟档位走 ——
+        撑开版面靠盒子高度；留白跟着放大会让大档又大又稀，反而更难读 */
   --topbar:52px;
+  --topbar-sm:46px;
+  --ctl:32px;
+  --input-h:48px;
+  --ico:30px;
+  --ico-lg:40px;
+  --ico-sm:24px;
+  --av:32px;
+  --av-img:26px;
+  --pane-head:44px;
+}
+
+/* —— 档位：小。整组覆盖而不是乘一个系数，每个值都能逐行核对 —— */
+html[data-ux="s"]{
+  --fs-meta:10px;
+  --fs-body:12px;
+  --fs-lead:12px;
+  --fs-sub:14px;
+  --fs-title:16px;
+  --topbar:48px;
+  --topbar-sm:44px;
+  --ctl:30px;
+  --input-h:44px;
+  --ico:28px;
+  --ico-lg:36px;
+  --ico-sm:22px;
+  --av:30px;
+  --av-img:24px;
+  --pane-head:40px;
+}
+/* —— 档位：大 —— */
+html[data-ux="l"]{
+  --fs-meta:13px;
+  --fs-body:15px;
+  --fs-lead:15px;
+  --fs-sub:17px;
+  --fs-title:21px;
+  --topbar:58px;
+  --topbar-sm:50px;
+  --ctl:36px;
+  --input-h:54px;
+  --ico:34px;
+  --ico-lg:44px;
+  --ico-sm:28px;
+  --av:36px;
+  --av-img:30px;
+  --pane-head:48px;
 }
 
 html[data-theme="dark"]{
@@ -164,14 +224,14 @@ img{display:block;max-width:100%}
 .brand{display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:var(--r-inner);transition:background .18s}
 .brand:hover{background:var(--surface-2)}
 .brand-mark{
-  width:30px;height:30px;flex:none;
+  width:var(--ico);height:var(--ico);flex:none;
   display:grid;place-items:center;
 }
-.brand-mark img{width:30px;height:30px;display:block}
+.brand-mark img{width:var(--ico);height:var(--ico);display:block}
 .brand-name{font-weight:700;font-size:var(--fs-lead);letter-spacing:.02em}
 .brand-sub{font-size:var(--fs-meta);color:var(--ink-3);font-weight:400}
 
-.tb-div{width:1px;height:24px;background:var(--line)}
+.tb-div{width:1px;height:var(--ico-sm);background:var(--line)}
 
 /* 页面进度：普通态为带文字的步骤条 */
 .stepper{display:flex;align-items:center;gap:0}
@@ -183,7 +243,7 @@ img{display:block;max-width:100%}
   white-space:nowrap;
 }
 .pstep i{
-  width:24px;height:24px;border-radius:var(--r-circle);flex:none;
+  width:var(--ico-sm);height:var(--ico-sm);border-radius:var(--r-circle);flex:none;
   display:grid;place-items:center;
   font-style:normal;font-size:var(--fs-body);font-weight:700;
   background:var(--surface-3);color:var(--ink-2);
@@ -203,23 +263,21 @@ img{display:block;max-width:100%}
 .tb-right{display:flex;align-items:center;gap:8px;flex:none;justify-self:end}
 
 .icon-btn{
-  width:32px;height:32px;border-radius:var(--r-inner);
+  width:var(--ctl);height:var(--ctl);border-radius:var(--r-inner);
   display:grid;place-items:center;
   color:var(--ink-2);
   border:1px solid transparent;
   transition:.18s;
 }
 .icon-btn:hover{background:var(--surface-2);color:var(--ink);border-color:var(--line)}
-.icon-btn svg{width:16px;height:16px}
-.icon-btn.sm{width:32px;height:32px}
+.icon-btn svg{width:calc(var(--ctl) / 2);height:calc(var(--ctl) / 2)}
+.icon-btn.sm{width:var(--ctl);height:var(--ctl)}
 .icon-btn.sm svg{width:16px;height:16px}
 .icon-btn.is-off{opacity:.45;cursor:not-allowed}
 
-/* 页面三：紧凑顶栏 */
-body[data-page="3"]{--topbar:46px}
+/* 页面三：紧凑顶栏（只保留"更矮"这一条，其余跟着全局档位走） */
+body[data-page="3"]{--topbar:var(--topbar-sm)}
 body[data-page="3"] .topbar{padding:0 16px;gap:8px}
-body[data-page="3"] .brand-mark{width:26px;height:26px}
-body[data-page="3"] .brand-mark img{width:26px;height:26px}
 body[data-page="3"] .brand-name{font-size:var(--fs-body)}
 body[data-page="3"] .brand{padding:2px 4px}
 body[data-page="3"] .brand-sub{display:none}
@@ -228,7 +286,7 @@ body[data-page="3"] .brand-sub{display:none}
 .xp{display:flex;align-items:center;flex:0 1 auto;min-width:0}
 .xp-dot{
   position:relative;flex:none;
-  width:24px;height:24px;border-radius:var(--r-circle);
+  width:var(--ico-sm);height:var(--ico-sm);border-radius:var(--r-circle);
   display:grid;place-items:center;
   font-size:var(--fs-body);font-weight:600;
   background:var(--surface);
@@ -323,10 +381,10 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
   padding:24px 0;
 }
 .hero-mark{
-  width:40px;height:40px;flex:none;
+  width:var(--ico-lg);height:var(--ico-lg);flex:none;
   display:grid;place-items:center;
 }
-.hero-mark img{width:40px;height:40px;display:block}
+.hero-mark img{width:var(--ico-lg);height:var(--ico-lg);display:block}
 .hero-text{min-width:0}
 .p1-hero h1{font-size:var(--fs-sub);font-weight:700;line-height:var(--lh-sub);letter-spacing:0}
 .p1-hero h1 span{color:var(--brand)}
@@ -353,7 +411,7 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
   box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 12%,transparent),var(--shadow-1);
 }
 .composer textarea{
-  width:100%;height:48px;border:0;outline:none;resize:none;
+  width:100%;height:var(--input-h);border:0;outline:none;resize:none;
   background:transparent;color:var(--ink);
   font-family:inherit;font-size:var(--fs-body);line-height:var(--lh-body);
 }
@@ -361,7 +419,7 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
 .composer-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px}
 .c-left{display:flex;align-items:center;gap:8px;min-width:0}
 .c-chip{
-  display:inline-flex;align-items:center;gap:4px;
+  display:inline-flex;align-items:center;gap:4px;flex:none;white-space:nowrap;
   padding:2px 8px;border-radius:var(--r-pill);
   font-size:var(--fs-body);font-weight:600;line-height:1.4;color:var(--brand-ink);
   background:var(--brand-tint);border:1px solid var(--brand-line);
@@ -370,12 +428,12 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
 .c-hint{font-size:var(--fs-meta);color:var(--ink-3);font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .c-right{display:flex;align-items:center;gap:8px;flex:none}
 .send-btn{
-  width:32px;height:32px;border-radius:var(--r-circle);
+  width:var(--ctl);height:var(--ctl);border-radius:var(--r-circle);
   display:grid;place-items:center;
   background:var(--brand);color:#fff;
   transition:.18s;
 }
-.send-btn svg{width:16px;height:16px}
+.send-btn svg{width:calc(var(--ctl) / 2);height:calc(var(--ctl) / 2)}
 .send-btn:hover{background:var(--brand-strong)}
 .send-btn[disabled]{background:var(--surface-3);color:var(--ink-3);cursor:not-allowed}
 
@@ -439,18 +497,18 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
 }
 .q-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 .q-meta{display:flex;align-items:center;gap:8px;font-size:var(--fs-meta);font-weight:400;color:var(--ink-3)}
-.q-meta .kind{color:var(--ink-3);background:var(--surface-2);border:1px solid var(--line);padding:2px 8px;border-radius:var(--r-pill);font-size:var(--fs-meta);font-weight:600;line-height:1.4}
+.q-meta .kind{color:var(--ink-3);background:var(--surface-2);border:1px solid var(--line);padding:2px 8px;border-radius:var(--r-pill);font-size:var(--fs-meta);font-weight:600;line-height:1.4;white-space:nowrap}
 .q-item[aria-pressed="true"] .q-meta .kind{background:var(--surface);border-color:var(--brand-line);color:var(--brand-ink)}
 .q-text{
   font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink);
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
 .q-check{
-  width:24px;height:24px;border-radius:var(--r-circle);flex:none;
+  width:var(--ico-sm);height:var(--ico-sm);border-radius:var(--r-circle);flex:none;
   border:2px solid var(--line-strong);color:transparent;
   display:grid;place-items:center;transition:.16s;
 }
-.q-check svg{width:12px;height:12px}
+.q-check svg{width:calc(var(--ico-sm) / 2);height:calc(var(--ico-sm) / 2)}
 .q-item[aria-pressed="true"] .q-check{background:var(--brand);border-color:var(--brand);color:#fff}
 
 .p1-foot{
@@ -544,7 +602,7 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
   position:relative;z-index:2;   /* 抬一层，圆点的悬停提示才不会被下面的 pane-body 盖住 */
   flex:none;display:flex;align-items:center;gap:8px;
   padding:6px 16px;border-bottom:1px solid var(--line);
-  min-height:44px;
+  min-height:var(--pane-head);
 }
 .pane-head strong{flex:none;white-space:nowrap;font-size:var(--fs-lead);font-weight:700;line-height:var(--lh-body);letter-spacing:.02em}
 .pane-head .tag{flex:none;white-space:nowrap}
@@ -555,7 +613,7 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
 .pane-head .xp-line{width:8px;margin:0 4px}
 /* 左栏变窄时依次降级：先缩圆点，再收标签 —— 不能让「题目」折成两行 */
 @container (max-width:560px){
-  .pane-head .xp-dot{width:20px;height:20px}
+  .pane-head .xp-dot{width:calc(var(--ico-sm) - 4px);height:calc(var(--ico-sm) - 4px)}
 }
 @container (max-width:380px){
   .pane-head .tag{display:none}
@@ -641,11 +699,11 @@ body.resizing *{cursor:col-resize !important}
 .msg:last-child{margin-bottom:4px}
 @keyframes msgIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 .msg .av{
-  width:32px;height:32px;flex:none;
+  width:var(--av);height:var(--av);flex:none;
   display:grid;place-items:center;
   margin-top:2px;
 }
-.msg .av img{width:26px;height:26px;display:block}
+.msg .av img{width:var(--av-img);height:var(--av-img);display:block}
 .bubble{
   max-width:min(84%,460px);
   padding:8px 16px;border-radius:var(--r-sub);
@@ -716,10 +774,9 @@ body.resizing *{cursor:col-resize !important}
 }
 .sug:hover{border-color:var(--brand-line);color:var(--brand-ink);background:var(--brand-tint)}
 .composer.sm{border-radius:var(--r-sub);padding:8px;box-shadow:none}
-.composer.sm textarea{height:24px;font-size:var(--fs-body);max-height:72px}
-.composer.sm .send-btn{width:32px;height:32px}
-.composer.sm .send-btn svg{width:16px;height:16px}
-.composer.sm .icon-btn{width:32px;height:32px}
+.composer.sm textarea{height:calc(var(--ctl) - 8px);font-size:var(--fs-body);max-height:72px}
+.composer.sm .send-btn,.composer.sm .icon-btn{width:var(--ctl);height:var(--ctl)}
+.composer.sm .send-btn svg{width:calc(var(--ctl) / 2);height:calc(var(--ctl) / 2)}
 .attach-chip{
   display:inline-flex;align-items:center;gap:4px;
   margin-bottom:8px;padding:4px 8px;border-radius:var(--r-inner);
@@ -923,6 +980,77 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
   .tag.muted{background:var(--surface-2);color:var(--ink-3);border-color:var(--line)}
   /* 空态：五页都能点到，没数据时在这里说清楚下一步做什么 */
   .pane-empty{padding:32px 24px;text-align:center;color:var(--ink-3);font-size:var(--fs-body);line-height:1.9}
+
+/* =====================================================================
+   10. 设置：主题三选 + 字号三档
+   ---------------------------------------------------------------------
+   桌面锚在齿轮下方（fixed，所以不受顶栏 grid 与 backdrop-filter 影响），
+   ≤760px 改成贴底整宽抽屉 —— 见上面的小屏兜底
+   ===================================================================== */
+.set{
+  position:fixed;z-index:41;
+  top:calc(var(--topbar) + 8px);right:24px;
+  width:288px;
+  display:flex;flex-direction:column;gap:16px;
+  padding:16px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--r-card);
+  box-shadow:var(--shadow-2);
+  animation:setIn .16s ease both;
+}
+.set[hidden]{display:none}
+@keyframes setIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.set-mask{position:fixed;inset:0;z-index:40;display:none;background:rgba(17,17,22,.32)}
+.set-mask[hidden]{display:none}
+
+.set-grp{display:flex;flex-direction:column;gap:8px}
+.set-label{font-size:var(--fs-meta);font-weight:600;color:var(--ink-3);letter-spacing:.04em}
+
+/* 三选：复用 .seg 的观感，只把圆角收到与面板闭合的那一档（24 = 8 + 16） */
+.set-seg{display:grid;grid-template-columns:repeat(3,1fr);border-radius:var(--r-inner)}
+.set-seg button{padding:4px 2px;text-align:center}
+.set-seg button[aria-checked="true"]{background:var(--surface);color:var(--brand-ink);box-shadow:0 1px 2px rgba(26,26,26,.10)}
+html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
+.set-seg button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+/* 字号滑块：原生 range，只把轨道和滑块画成我们自己的样子 */
+.set-range{
+  -webkit-appearance:none;appearance:none;
+  width:100%;height:24px;margin:0;
+  background:transparent;cursor:pointer;
+}
+.set-range:focus-visible{outline:2px solid var(--brand);outline-offset:4px;border-radius:var(--r-inner)}
+.set-range::-webkit-slider-runnable-track{
+  height:4px;border-radius:var(--r-pill);
+  background:linear-gradient(to right,var(--brand) var(--fill,50%),var(--line-strong) var(--fill,50%));
+}
+.set-range::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:16px;height:16px;border-radius:var(--r-circle);
+  background:var(--surface);border:2px solid var(--brand);
+  box-shadow:var(--shadow-1);
+  margin-top:calc((4px - 16px) / 2);
+  transition:transform .12s;
+}
+.set-range:active::-webkit-slider-thumb{transform:scale(1.12)}
+.set-range::-moz-range-track{height:4px;border-radius:var(--r-pill);background:var(--line-strong)}
+.set-range::-moz-range-progress{height:4px;border-radius:var(--r-pill);background:var(--brand)}
+.set-range::-moz-range-thumb{width:16px;height:16px;border-radius:var(--r-circle);background:var(--surface);border:2px solid var(--brand);box-shadow:var(--shadow-1)}
+.set-ticks{display:flex;justify-content:space-between;font-size:var(--fs-meta);color:var(--ink-3);font-weight:600}
+.set-ticks .is-on{color:var(--brand-ink)}
+
+/* 小屏：贴底整宽抽屉。必须排在基础规则之后，否则桌面数值先到先赢 */
+@media (max-width:760px){
+  .set{
+    top:auto;left:0;right:0;bottom:0;width:auto;
+    border-radius:var(--r-card) var(--r-card) 0 0;
+    padding:16px 16px 24px;
+    animation:setUp .18s ease both;
+  }
+  .set-mask{display:block;background:rgba(17,17,22,.40)}
+  @keyframes setUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+}
 </style>
 </head>
 <body data-page="1">
@@ -947,9 +1075,27 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
       <button type="button" data-mode="self" aria-pressed="true">自主训练</button>
       <button type="button" data-mode="ai" aria-pressed="false" disabled title="AI 伴学暂未上线">AI 伴学</button>
     </div>
-    <button class="icon-btn" id="themeBtn" type="button" aria-label="切换深浅色"></button>
+    <button class="icon-btn" id="setBtn" type="button" aria-label="设置" aria-haspopup="dialog" aria-expanded="false" aria-controls="setPop"></button>
   </div>
 </header>
+
+<!-- 设置：主题与字号。桌面锚在齿轮下方，≤760px 变贴底抽屉 -->
+<div class="set-mask" id="setMask" hidden></div>
+<div class="set" id="setPop" role="dialog" aria-label="设置" hidden>
+  <div class="set-grp">
+    <div class="set-label">主题</div>
+    <div class="seg set-seg" id="themeSeg" role="radiogroup" aria-label="主题">
+      <button type="button" role="radio" aria-checked="true" data-theme-set="light">浅色</button>
+      <button type="button" role="radio" aria-checked="false" data-theme-set="dark">深色</button>
+      <button type="button" role="radio" aria-checked="false" data-theme-set="system">跟随系统</button>
+    </div>
+  </div>
+  <div class="set-grp">
+    <div class="set-label">字号</div>
+    <input class="set-range" id="uxRange" type="range" min="0" max="2" step="1" value="1" aria-label="字号" aria-valuetext="中">
+    <div class="set-ticks" id="uxTicks" aria-hidden="true"><span>小</span><span class="is-on">中</span><span>大</span></div>
+  </div>
+</div>
 
 <div id="app">
 
@@ -1323,18 +1469,83 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
 
   var work = $('#work'), splitter = $('#splitter');
 
-  /* ---------------- 主题 ---------------- */
-  var SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4"/></svg>';
-  var MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>';
+  /* ---------------- 设置：主题 + 字号 ---------------- */
+  var GEAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
 
-  function paintTheme(t) {
-    document.documentElement.setAttribute('data-theme', t);
-    $('#themeBtn').innerHTML = t === 'dark' ? SUN : MOON;
-    try { localStorage.setItem('bsj-theme', t); } catch (e) {}
+  var UXK = ['s', 'm', 'l'], UXN = { s: '小', m: '中', l: '大' };
+  var rootEl = document.documentElement;
+  var setBtn = $('#setBtn'), setPop = $('#setPop'), setMask = $('#setMask');
+  var themeSeg = $('#themeSeg'), uxRange = $('#uxRange'), uxTicks = $('#uxTicks');
+  var sysDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+  function themePref() { return rootEl.getAttribute('data-theme-pref') || 'system'; }
+
+  /* 偏好与生效值分开：偏好可以是 system，data-theme 永远只有 light / dark，
+     这样 20 多条深色选择器一条都不用改 */
+  function paintTheme(pref, persist) {
+    var dark = pref === 'dark' || (pref === 'system' && sysDark.matches);
+    rootEl.setAttribute('data-theme-pref', pref);
+    rootEl.setAttribute('data-theme', dark ? 'dark' : 'light');
+    if (persist !== false) { try { localStorage.setItem('bsj-theme', pref); } catch (e) {} }
+    Array.prototype.forEach.call(themeSeg.children, function (b) {
+      b.setAttribute('aria-checked', b.getAttribute('data-theme-set') === pref ? 'true' : 'false');
+    });
   }
-  paintTheme(document.documentElement.getAttribute('data-theme') || 'light');
-  $('#themeBtn').addEventListener('click', function () {
-    paintTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  function paintUx(ux, persist) {
+    if (UXK.indexOf(ux) < 0) ux = 'm';
+    var i = UXK.indexOf(ux);
+    rootEl.setAttribute('data-ux', ux);
+    if (persist !== false) { try { localStorage.setItem('bsj-ux', ux); } catch (e) {} }
+    uxRange.value = String(i);
+    uxRange.setAttribute('aria-valuetext', UXN[ux]);
+    uxRange.style.setProperty('--fill', (i * 50) + '%');
+    Array.prototype.forEach.call(uxTicks.children, function (s, k) {
+      s.className = k === i ? 'is-on' : '';
+    });
+  }
+
+  setBtn.innerHTML = GEAR;
+  /* 首屏只还原、不落盘：否则 ?theme= / ?ux= 这种一次性的预览会被写进偏好 */
+  paintTheme(themePref(), false);
+  paintUx(rootEl.getAttribute('data-ux') || 'm', false);
+
+  /* 偏好是 system 时，系统换色要跟着换 */
+  var onSys = function () { if (themePref() === 'system') paintTheme('system', false); };
+  if (sysDark.addEventListener) sysDark.addEventListener('change', onSys);
+  else if (sysDark.addListener) sysDark.addListener(onSys);
+
+  function setOpen(on) {
+    setPop.hidden = !on;
+    setMask.hidden = !on;
+    setBtn.setAttribute('aria-expanded', on ? 'true' : 'false');
+    if (on) {
+      var cur = themeSeg.querySelector('[aria-checked="true"]') || themeSeg.children[0];
+      if (cur) cur.focus();
+    }
+  }
+  function setShown() { return !setPop.hidden; }
+
+  setBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    setOpen(!setShown());
+  });
+  setMask.addEventListener('click', function () { setOpen(false); });
+  document.addEventListener('click', function (e) {
+    if (!setShown()) return;
+    if (setPop.contains(e.target) || setBtn.contains(e.target)) return;
+    setOpen(false);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || !setShown()) return;
+    setOpen(false);
+    setBtn.focus();
+  });
+  themeSeg.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-theme-set]') : null;
+    if (b) paintTheme(b.getAttribute('data-theme-set'));
+  });
+  uxRange.addEventListener('input', function () {
+    paintUx(UXK[Number(uxRange.value)] || 'm');
   });
 
   /* ---------------- 页面切换 / 步骤回溯 ---------------- */

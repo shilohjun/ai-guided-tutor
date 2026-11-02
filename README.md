@@ -11,7 +11,7 @@
 
 [![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](package.json)
 [![依赖](https://img.shields.io/badge/dependencies-0-brightgreen)](package.json)
-[![测试](https://img.shields.io/badge/tests-311%2F311-brightgreen)](test/run.js)
+[![测试](https://img.shields.io/badge/tests-324%2F324-brightgreen)](test/run.js)
 [![许可](https://img.shields.io/badge/license-UNLICENSED-lightgrey)](LICENSE)
 
 仓库地址：<https://github.com/shilohjun/ai-guided-tutor>
@@ -57,6 +57,7 @@
 - **公式卡**：`/api/formula` 在 L3 之后按知识点下发；报告单独统计公式卡次数并扣独立完成度。
 - **巩固页**：重做本题 / 用 `GET /api/related` 挑同知识点的题。
 - **只有自主训练**：`/api/health` 的 `capabilities.modes` 只登记 `self_training`；AI 伴学禁用并标「暂未更新」，服务端收到 `ai_companion` 直接返回 400。
+- **设置**：顶栏齿轮打开面板 —— 主题三选（浅色 / 深色 / 跟随系统）、字号三档（小 / 中 / 大，拖到哪档停哪档）。盒子跟着字一起放大，间距与圆角一律不动；偏好记在本机，`?theme=` `?ux=` 只影响这一次。
 
 ---
 
@@ -236,7 +237,7 @@ ALIYUN_OCR_PROVIDER=marketplace
 ```bash
 npm start          # 启动本地服务
 npm run dev        # 监听文件变化并重启
-npm test           # 全部单元测试 + UI 令牌审计（当前 311 个注册用例）
+npm test           # 全部单元测试 + UI 令牌审计（当前 324 个注册用例）
 npm run eval       # 离线评测（19 场景，无需 Key）
 npm run eval:llm   # 使用 .env 中配置的模型重跑评测
 npm run ocr:path   # 探测 OCR 链路连通性
@@ -279,14 +280,18 @@ npm run preview:verify    # file:// 打开验收
 npm test
 ```
 
-当前注册 **311 个用例，全部通过**。`npm test` 跑完测试后会接着跑
-`scripts/audit-ui-style.js`：它把设计令牌（间距 2/4/6/8/12/16/24/32、字号四档 11/13/15/18、
+当前注册 **324 个用例，全部通过**。`npm test` 跑完测试后会接着跑
+`scripts/audit-ui-style.js`：它把设计令牌（间距 2/4/6/8/12/16/24/32、字号三档、
 嵌套圆角、语义色）做成可执行规则，样式一跑偏就报出来 —— 只靠人眼看不住。
-字号与控件尺寸参考 LeetCode 做题页后，再按中文密度收一档（题干 13/18.9、标签 11、按钮高 28、顶栏 52）。
+字号与控件尺寸参考 LeetCode 做题页后，再按中文密度收一档（中档题干 13/18.9、标签 11、按钮高 32、顶栏 52）。
+字号与盒子都是显式的整数表（小 ≈ −10%、大 ≈ +15%），审计会核对「三档齐全、整数、小<中<大」——
+省得有人只改一档、另一档悄悄掉回默认值。
 
 前端契约按**新版单文件**（`public/index.html`）检查：五页流程、页二的模式能力位、
 页三"做到第几步"、页五两张卡、答案与教师功能不留入口，都在 `test/ui.test.js` 里。
 `test/docs.test.js` 会从源码实际数出卡点种类、守卫类别与用例总数，再回头核对本文档。
+设置面板（主题三选 + 字号三档）的静态契约在 `test/settings.test.js`：首屏不落盘、白名单、
+三档递增、小屏抽屉规则的先后顺序都在那里钉着。
 
 ```bash
 npm run eval
@@ -450,7 +455,7 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 
 | 限制 | 说明 |
 |---|---|
-| 测试状态 | 311 个注册用例全部通过（含 UI 令牌审计） |
+| 测试状态 | 324 个注册用例全部通过（含 UI 令牌审计） |
 | AI 伴学 | 未上线：`capabilities.modes` 只有 `self_training`，接口对 `ai_companion` 返回 400 `MODE_UNAVAILABLE` |
 | 公式卡范围 | 按知识点表匹配；导入题的知识点不在表内时不发卡 |
 | 场景集规模 | 19 个场景且由人编写，覆盖不了真实学生的表达多样性 |
@@ -474,6 +479,7 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 | [`06-marketplace-ocr-integration.md`](docs/06-marketplace-ocr-integration.md) | 云市场题目 OCR 接入研究 |
 | [`07-prompt-upgrade.md`](docs/07-prompt-upgrade.md) | 回答规范升级与验收 |
 | [`08-branch-workflow.md`](docs/08-branch-workflow.md) | 分支使用说明 |
+| [`superpowers/specs/2026-11-02-设置面板-主题与字号-design.md`](docs/superpowers/specs/2026-11-02-设置面板-主题与字号-design.md) | 设置面板（主题三选 + 字号三档）设计书与实现踩坑 |
 | [`DESIGN-TOKENS.md`](DESIGN-TOKENS.md) | v3 设计 token 与可访问性说明 |
 | [`showcase/`](showcase/) | 项目成果展示页 |
 

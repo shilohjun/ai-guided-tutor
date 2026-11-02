@@ -6,7 +6,7 @@
  *   1. 间距只取 2/4/6/8/12/16/24/32（padding / margin / gap 分开统计）
  *   2. 嵌套圆角：外 = 内 + 间距，禁止内外一样
  *   3. 颜色饱和度 ≤ 70%，禁用 #000，正文固定 #1A1A1A
- *   4. 字号只取 --fs-* 四档 token，字重只取 400/500/600/700
+ *   4. 字号只取 --fs-* token；每个 token 必须齐三档（中/小/大），且整数、小<中<大
  *   5. 装饰性微组件可例外（圆点、进度条、图标尺寸等不计入间距）
  */
 import { readFileSync } from 'node:fs';
@@ -23,16 +23,16 @@ if (!styles.length) {
   process.exit(1);
 }
 const css = styles.join('\n');
-// 把字号 token 展开成 px，便于逐条核对四档
-const FS_TOKENS = Object.fromEntries(
-  [...css.matchAll(/(--fs-[a-z]+):\s*([0-9.]+)px/g)].map((m) => [m[1], m[2]])
-);
+// 字号 token 现在有三档（中 / 小 / 大）。这里先平铺收集：
+// 同名后定义覆盖前定义，所以 FS_TOKENS 展开 var() 时用的是「大」档（字号最全的一档）；
+// SIZES 收三档全集，用来抓散落在别处的字面量 font-size。
+const FS_DECL = [...css.matchAll(/(--fs-[a-z]+):\s*([0-9.]+)px/g)];
+const FS_TOKENS = Object.fromEntries(FS_DECL.map((m) => [m[1], m[2]]));
 const body = css
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/var\((--fs-[a-z]+)\)/g, (_, k) => (FS_TOKENS[k] ?? 'NaN') + 'px');
 
-// 四档以 :root 里的 token 为准 —— 改字号只需要改 token，不用回来改脚本
-const SIZES = new Set(Object.values(FS_TOKENS));
+const SIZES = new Set(FS_DECL.map((m) => m[2]));
 const SPACES = new Set(['0', '2', '4', '6', '8', '12', '16', '24', '32']);
 const WEIGHTS = new Set(['400', '500', '600', '700']);
 const RADII = new Set(['0', '2', '4', '8', '10', '12', '16', '24', '999']);
@@ -60,6 +60,44 @@ const dump = (obj, sortKey = (x) => x) =>
     .sort((a, b) => sortKey(a[0]) - sortKey(b[0]))
     .map(([k, v]) => `${k}×${v}`)
     .join('  ');
+
+/* ---------- 0. 字号档位结构 ----------
+   字号分三档是很便宜的能力，也很便宜地会写坏：少一档、多一档、小档比中档还大、
+   某一档漏掉一个 token —— 这些都不会报错，只会让人选到半档。所以逐 token 验算。 */
+const TIER_NAMES = ['中', '小', '大'];
+const TIER_BLOCK = {
+  中: /:root\{([\s\S]*?)\n\}/,
+  小: /html\[data-ux="s"\]\{([\s\S]*?)\}/,
+  大: /html\[data-ux="l"\]\{([\s\S]*?)\}/
+};
+const TIER_FS = {};
+for (const [name, re] of Object.entries(TIER_BLOCK)) {
+  const m = css.match(re);
+  if (!m) {
+    problems.push(`找不到「${name}」档的字号块（${re}）`);
+    continue;
+  }
+  TIER_FS[name] = {};
+  for (const d of m[1].matchAll(/(--fs-[a-z]+):\s*([0-9.]+)px/g)) TIER_FS[name][d[1]] = d[2];
+}
+const FS_KEYS = Object.keys(TIER_FS['中'] ?? {});
+for (const key of FS_KEYS) {
+  const vals = TIER_NAMES.map((n) => TIER_FS[n]?.[key]);
+  if (vals.some((v) => v == null)) {
+    problems.push(`字号 token ${key} 缺档：${TIER_NAMES.map((n, i) => `${n}=${vals[i] ?? '—'}`).join(' ')}`);
+    continue;
+  }
+  if (vals.some((v) => !Number.isInteger(Number(v)))) problems.push(`字号 token ${key} 出现非整数：${vals.join('/')}`);
+  const [mid, small, large] = vals.map(Number);
+  if (!(small < mid && mid < large)) {
+    problems.push(`字号 token ${key} 三档不是小<中<大：小${small} 中${mid} 大${large}`);
+  }
+}
+for (const name of ['小', '大']) {
+  for (const key of Object.keys(TIER_FS[name] ?? {})) {
+    if (!FS_KEYS.includes(key)) problems.push(`「${name}」档多出中档没有的字号 token：${key}`);
+  }
+}
 
 /* ---------- 1. 字号 ---------- */
 const fontSizes = {};
@@ -112,7 +150,8 @@ const NEST = [
   { outer: '.bar-card', inner: '.drop-trigger', gap: 16 },
   { outer: '.bar-card', inner: '.bar-ico', gap: 16 },
   { outer: '.drop-list', inner: '.drop-list .q-item', gap: 4 },
-  { outer: '.composer', inner: '.shot', gap: 16 }
+  { outer: '.composer', inner: '.shot', gap: 16 },
+  { outer: '.set', inner: '.set-seg', gap: 16 }
 ];
 
 const TOKEN = {
