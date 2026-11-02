@@ -1,0 +1,28 @@
+name: 检查 · 测试与样式审计
+
+# 只做检查，不做部署 —— 部署交给 Vercel 自己的 Git 集成（推 main 即生产）。
+# 腾讯云静态托管没有仓库钩子，那条路手动走，命令写在 README「推上去就发」里。
+#
+# 需要 Node 22：仓库零依赖，所以不需要 npm ci，直接跑脚本。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: 324 条测试 + 样式审计
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node test/run.js
+      - run: node scripts/audit-ui-style.js

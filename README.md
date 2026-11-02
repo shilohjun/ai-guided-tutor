@@ -439,16 +439,15 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 
 ### 推上去就发
 
-两条自动化的现状与开关：
+`git push origin main` 之后：
 
-| 平台 | 怎么触发 | 还差什么 |
+| 平台 | 谁在管 | 说明 |
 |---|---|---|
-| Vercel | `main` 有新提交 → 自动生产部署 | 先把项目连上仓库：`npx vercel@latest git connect --scope jun-f44e`。这步会报 “add a Login Connection to your GitHub account first”，得先在 Vercel 账号设置里用 GitHub 登录一次，再跑该命令 |
-| 腾讯云 | `.github/workflows/deploy-cloudbase.yml` | 仓库加两个 Secret：`TCB_SECRET_ID`、`TCB_SECRET_KEY`（建议用只授予 CloudBase 权限的**子账号**密钥）。没配时流水线只跑测试、跳过部署，不会留红灯 |
+| Vercel | Vercel 的 Git 集成 | 项目已连 `shilohjun/ai-guided-tutor`，`main` 是生产分支；推送即出生产部署，开 PR 出 preview |
+| 腾讯云 | 手动 | 静态托管没有仓库钩子，改完前端要 `tcb hosting deploy ./public -e bubujie-d9gr331f098d64df2`；`/api` 改了再加 `tcb fn deploy bubujie-api` |
 
-两条都先跑 `node test/run.js` 与样式审计，过了才部署；腾讯云那条传完还会带
-`Cache-Control: no-cache` 把线上 HTML 拉回来跟本地比一次 sha256 ——
-**上传成功不等于用户看得到**，CDN 有自己的缓存，刷也需要时间。
+`.github/workflows/ci.yml` 每次推送与 PR 都跑 `node test/run.js` + 样式审计。
+它只负责「改坏了要有人喊」，不拦部署：Vercel 那边是独立跑的，测试红了它也会发。
 
 `showcase/` 是**独立的单文件展示页**，由
 [`.github/workflows/pages.yml`](.github/workflows/pages.yml) 发布到 GitHub Pages；
