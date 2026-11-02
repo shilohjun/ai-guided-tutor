@@ -6,7 +6,7 @@
  *   1. 间距只取 2/4/6/8/12/16/24/32（padding / margin / gap 分开统计）
  *   2. 嵌套圆角：外 = 内 + 间距，禁止内外一样
  *   3. 颜色饱和度 ≤ 70%，禁用 #000，正文固定 #1A1A1A
- *   4. 字号只取 --fs-* 四档 token，字重只取 400/600/700
+ *   4. 字号只取 --fs-* 四档 token，字重只取 400/500/600/700
  *   5. 装饰性微组件可例外（圆点、进度条、图标尺寸等不计入间距）
  */
 import { readFileSync } from 'node:fs';
@@ -34,7 +34,7 @@ const body = css
 // 四档以 :root 里的 token 为准 —— 改字号只需要改 token，不用回来改脚本
 const SIZES = new Set(Object.values(FS_TOKENS));
 const SPACES = new Set(['0', '2', '4', '6', '8', '12', '16', '24', '32']);
-const WEIGHTS = new Set(['400', '600', '700']);
+const WEIGHTS = new Set(['400', '500', '600', '700']);
 const RADII = new Set(['0', '2', '4', '8', '10', '12', '16', '24', '999']);
 
 function hsl(hex) {
