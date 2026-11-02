@@ -1,0 +1,1065 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ID 29 题目样本与字段说明</title>
+<style>
+body {
+    font-family: "Microsoft YaHei", Arial, sans-serif;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 24px;
+    background: #f5f7fa;
+    color: #202124;
+    line-height: 1.8;
+}
+h1, h2, h3 { line-height: 1.4; }
+.card {
+    background: white;
+    border: 1px solid #dfe3e8;
+    border-radius: 10px;
+    padding: 20px;
+    margin: 20px 0;
+}
+.meta { color: #596579; font-size: 14px; overflow-wrap: anywhere; }
+.question-content img { max-width: 100%; height: auto; }
+.question-content table { border-collapse: collapse; }
+.question-content td, .question-content th {
+    border: 1px solid #ddd;
+    padding: 8px;
+}
+details { margin-top: 14px; }
+summary { cursor: pointer; font-weight: bold; }
+table.fields { width: 100%; border-collapse: collapse; background: white; }
+.fields th, .fields td {
+    border: 1px solid #d8dee8;
+    padding: 10px;
+    text-align: left;
+    vertical-align: top;
+}
+.fields th { background: #edf1f6; }
+code, pre {
+    background: #eef1f5;
+    border-radius: 4px;
+}
+code { padding: 2px 4px; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; }
+.note {
+    background: #fff8e6;
+    padding: 12px;
+    border-left: 4px solid #d9a441;
+}
+.muted { color: #687386; }
+</style>
+</head>
+<body>
+<main>
+<h1>ID 为 29 的题目样本</h1>
+<p>本页面按 JSONL 文件顺序提取前 10 条记录。</p>
+<div class="note">
+<strong>注意：</strong>
+ID 字段值为 29 只能说明记录匹配了相应的 ID 条件，
+不能单凭数字证明每条记录都属于高中物理。
+请结合题干和学科元数据确认。
+</div>
+<h2>一、题目内容</h2>
+
+<article class="card">
+<h3>第 1 题</h3>
+<p class="meta">
+索引：<code>qsqianji</code><br>
+文档 ID：<code>1ce4dc96-b507-4845-8204-f1ebe82d14a6</code><br>
+匹配字段：<code>qs_subject_id</code>
+</p>
+<div class="question-content">
+<div><div><p>如图所示，在同一竖直平面内，小球A、B上系有不可伸长的细线a、b、c和d，其中a的上端悬挂于竖直固定的支架上，d跨过左侧定滑轮、c跨过右侧定滑轮分别与相同配重P、Q相连，调节左、右两侧定滑轮高度达到平衡。已知小球A、B和配重P、Q质量均为50g，细线c、d平行且与水平成θ=30°(不计摩擦)，则细线a、b的拉力分别为</p><img src="https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/crop_p1_9136c5f28e71.png" alt="题目图片"><div><table><tr><td>A.&nbsp;<span><span>2N，1N</span></span></td></tr><tr><td>B.&nbsp;<span><span>2N，0.5N</span></span></td></tr><tr><td>C.&nbsp;<span><span>1N，1N</span></span></td></tr><tr><td>D.&nbsp;<span><span>1N，0.5N</span></span></td></tr></table></div></div></div>
+</div>
+<details>
+<summary>查看答案</summary>
+<div class="question-content"><div><span><span>A</span></span></div></div>
+</details>
+<details>
+<summary>查看解析</summary>
+<div class="question-content"><div><div><p><span>对小球A和B分别进行受力分析。由于系统处于平衡状态，各物体所受合力为零。
+
+首先分析配重P和Q：它们质量均为50g（即0.05kg），重力为 mg = 0.05×10 = 0.5N。由于细线c、d分别连接P、Q且跨过光滑定滑轮，因此细线c和d中的张力均等于配重重力，即 T_c = T_d = 0.5N。
+
+细线c和d与水平方向成θ=30°，且平行，说明它们对小球A、B的拉力方向均为斜向上30°。
+
+对小球A：它受到三个力作用：
+- 细线a的竖直向上的拉力 T_a；
+- 细线d斜向左上方30°的拉力 T_d = 0.5N；
+- 自身重力 G = 0.5N，竖直向下。
+
+将T_d分解为竖直和水平分量：
+竖直分量：T_d·sin30° = 0.5 × 0.5 = 0.25N（向上）
+水平分量：T_d·cos30°（向左）
+
+由于小球A静止，竖直方向合力为零：
+T_a + 0.25N = 0.5N → T_a = 0.25N？但此结果与选项不符，说明理解有误。
+
+重新审视题图结构（虽无图，但根据常规设置）：通常此类题中，小球A由线a悬挂，并通过线d连接左侧配重；小球B由线b悬挂，并通过线c连接右侧配重。而线b可能连接A与B之间。
+
+更合理的模型是：小球A上连a，下连b；小球B上连b，另侧连c；配重Q连c，配重P连d，而d连回A？但题干说“d跨过左侧定滑轮…与配重P相连”，“c跨过右侧定滑轮…与配重Q相连”，且“小球A、B上系有细线a、b、c、d”，推测结构为：
+- 线a上端固定，下端连A；
+- 线d一端连A，跨过左滑轮连P；
+- 线c一端连B，跨过右滑轮连Q；
+- 线b连接A和B。
+
+但题干又说“调节滑轮高度达到平衡”，且c、d平行、与水平成30°，说明A受d的拉力方向为沿d的方向（斜向上左30°），B受c的拉力为斜向上右30°。
+
+然而若a、b均为竖直线（因在同一竖直平面，且悬挂），则更可能：线a竖直吊A，线b竖直吊B，而c、d分别从B、A斜拉向滑轮。
+
+但关键线索是“细线c、d平行且与水平成θ=30°”，即它们都与水平夹角30°，故与竖直方向夹角60°。
+
+再考虑对称性：A、B质量相同，P、Q相同，系统对称，故线b应无拉力？但选项中有b拉力为1N或0.5N，不对称，说明结构不对称。
+
+仔细读题：“d跨过左侧定滑轮、c跨过右侧定滑轮分别与相同配重P、Q相连”，且“小球A、B上系有…细线a、b、c和d”——合理推断：
+- a上端固定，下端连A；
+- d一端连A，绕过左滑轮连P；
+- c一端连B，绕过右滑轮连Q；
+- b连接A和B。
+
+此时，对A：受a向上拉力T_a，b的拉力T_b（假设向下拉B，则A受b向下），d的拉力T_d沿d方向（设为斜向左上30°），重力G_A=0.5N向下。
+对B：受b向上拉力T_b（牛顿第三定律），c的拉力T_c斜向右上30°，重力G_B=0.5N向下。
+
+由于滑轮光滑，T_c = G_Q = 0.5N，T_d = G_P = 0.5N。
+
+对B进行受力分析（更简单，因可能b为竖直）：
+B受三个力：重力0.5N↓，T_c=0.5N沿30°斜向上右，T_b（来自线b，方向待定）。
+
+将T_c分解：
+竖直分量：T_c·sin30° = 0.5 × 0.5 = 0.25N ↑
+水平分量：T_c·cos30° → 向右
+
+为平衡水平力，必须有其他水平力，但若线b为竖直，则无法平衡水平分量，矛盾。
+
+因此，线b不可能是竖直的？但题干说“在同一竖直平面内”，且通常a、b为竖直线。
+
+另一种常见模型：A和B并排悬挂，a吊A，b吊B，而c从B向右上连滑轮到Q，d从A向左上连滑轮到P。此时a、b均为竖直。
+
+对A：竖直方向受力：T_a ↑，G_A=0.5N ↓，T_d的竖直分量 ↑（因d斜向上拉A）。
+注意：若d从A向左上连到滑轮，则滑轮在左上方，d对A的拉力方向是沿d远离A，即斜向左上，所以竖直分量向上。
+
+同理，c对B的拉力斜向右上，竖直分量向上。
+
+因此对A：T_a + T_d·sin30° = G_A → T_a + 0.5×0.5 = 0.5 → T_a = 0.5 - 0.25 = 0.25N
+对B：T_b + T_c·sin30° = G_B → T_b = 0.25N
+但选项无0.25N，说明方向理解错误。
+
+关键：当配重P悬挂在滑轮下，线d一端固定于A，绕过滑轮挂P，则P的重力会通过线d拉A向滑轮方向。若滑轮在A的左上方，则d拉A向左上方。但此时，若A仅受a、d和重力，则水平方向不平衡，除非有其他力。
+
+因此，必须存在线b连接A和B以提供水平力平衡。
+
+正确模型应为：A和B相邻，a竖直吊A，b竖直吊B，同时A还连d向左上到滑轮P，B连c向右上到滑轮Q。但这样A在水平方向受d的左向分力，无人平衡，不可能静止。
+
+故更可能：线b是水平连接A和B的！但题干未明确。
+
+回到题干：“细线a、b、c和d”，且“a的上端悬挂于竖直固定的支架上”，暗示a是竖直的；而c、d跨过滑轮与配重相连，且与水平成30°，说明c、d是斜的。
+
+经典题型：两个小球用水平线b连接，a竖直吊A，d从A斜连左滑轮P，c从B斜连右滑轮Q。此时系统对称，b为水平。
+
+但题干说“调节左、右两侧定滑轮高度达到平衡”，且c、d平行，说明对称，故A、B受力对称，T_a = T_b？但选项A为2N,1N，不对称，矛盾。
+
+再审题：选项A为“2N，1N”，单位是N，而mg=0.5N，2N远大于重力，不合理，除非角度理解错误。
+
+注意：θ=30°是“与水平成θ=30°”，即与水平夹角30°，所以与竖直夹角60°。
+
+但若c、d中的张力为0.5N，其竖直分量为0.5×sin30°=0.25N，不足以解释2N。
+
+除非：配重P、Q质量50g，但线c、d的张力不是0.5N？不，滑轮光滑，张力等于配重重力。
+
+可能误解了连接方式。另一种可能是：线d一端固定于支架，绕过滑轮连P，再连A？但题干说“d跨过左侧定滑轮…与配重P相连”，且“小球A…上系有…d”，所以d一端连A，跨过滑轮连P。
+
+关键突破：或许小球A只受a和d，小球B只受b和c，即A、B不直接相连！题干说“小球A、B上系有不可伸长的细线a、b、c和d”，可能a连A，b连B，c连B，d连A。
+
+即：A受a（上）和d（斜）；B受b（上）和c（斜）。
+
+此时，对A：T_a 竖直向上，T_d 沿d方向（斜向上，因滑轮在上方），G_A 竖直向下。
+
+由于d与水平成30°，若滑轮在A的左上方，则d对A的拉力方向为左上30°，其竖直分量向上。
+
+但A在水平方向受T_d的水平分量，无人平衡，不可能静止——除非滑轮正上方，但题干说“左侧定滑轮”，故不在正上方。
+
+因此，唯一可能是：线a不是竖直的？但题干说“a的上端悬挂于竖直固定的支架上”，通常意味着a竖直。
+
+查阅类似题目：常见模型为“结点”问题。可能A、B并非质点，而是滑轮或结点。但题干明确说“小球A、B”。
+
+重新计算：假设对小球A，受三个力：重力G=0.5N↓，线a拉力T_a↑（竖直），线d拉力T_d=0.5N，方向沿d。因系统平衡，三力共点平衡。
+
+但若a竖直，d斜向，则三力不共线，需满足矢量和为零。
+
+设d与竖直方向夹角为α。题干说“与水平成θ=30°”，故与竖直成60°，即α=60°。
+
+则对A：
+水平方向：T_d·sin60° = 0 → 不可能，除非T_d=0。
+
+矛盾表明：小球A必须还受另一个力来平衡水平分量。这个力只能来自线b。
+
+因此，线b连接A和B，且为水平方向（常见设定）。
+
+设线b水平，拉力为T_b。
+
+对A：
+- 竖直：T_a = G_A + T_d·cos60° （若d斜向下拉A）
+
+但配重P拉d，会使d拉A toward滑轮。若滑轮在左上方，则d拉A向左上，故对A，T_d方向左上，与竖直成60°。
+
+所以：
+竖直分量：T_d·cos60° ↑
+水平分量：T_d·sin60° ←
+
+为平衡水平力，线b必须向右拉A，即T_b →
+
+对B：c拉B向右上（与竖直成60°），故水平分量 T_c·sin60° →，因此线b必须向左拉B，即T_b ←，符合牛顿第三定律。
+
+对A竖直方向：T_a + T_d·cos60° = G_A
+→ T_a + 0.5 × 0.5 = 0.5
+→ T_a = 0.5 - 0.25 = 0.25N
+
+对B竖直方向：T_b_vertical? 但若b是水平的，则对B竖直方向只有T_c·cos60° ↑ 和 G_B ↓，所以 T_c·cos60° = G_B → 0.25 = 0.5？不成立。
+
+因此，线b must be vertical！但这样水平力无法平衡。
+
+终极正确模型：实际上，在这种装置中，小球A和B的位置使得线a和b是竖直的，而c和d是对称斜拉的，但由于有中间连线b，且系统调整到c、d平行，可能b是松弛的？但选项中有b的拉力。
+
+参考标准解法：对于此类问题，通常将A和B视为两个 separate objects， each suspended by their own string (a for A, b for B), and each also pulled by a diagonal string to a counterweight.
+
+But then horizontal force imbalance.
+
+Unless the diagonal strings are pulling downward! How?
+
+Ah! If the fixed pulleys are BELOW the balls, but that contradicts &quot;悬挂&quot;.
+
+Another possibility: the strings c and d are pulling the balls downward toward the pulleys. For example, if the left pulley is below and to the left of A, then d would pull A down-left. But the problem says &quot;定滑轮&quot; fixed on支架, usually above.
+
+Let’s read carefully: “d跨过左侧定滑轮、c跨过右侧定滑轮分别与相同配重P、Q相连”. The weights P and Q are hanging down from the pulleys, so the tension pulls the string toward the pulley. So at ball A, the string d is pulled toward the left pulley. If the left pulley is at the same height or higher than A, the force on A is up-left; if lower, down-left.
+
+But the problem says “调节左、右两侧定滑轮高度达到平衡”, and “细线c、d平行且与水平成θ=30°”, and since weights are hanging, likely the pulleys are above, so c and d slope upward from balls to pulleys.
+
+Given the options include 2N and 1N, which are larger than mg=0.5N, the only way is if the vertical component of the diagonal strings is downward, i.e., the strings are pulling the balls down.
+
+How can that be? If the balls are above the pulleys, but that&#x27;s unusual.
+
+Perhaps the string goes from the ball down to the pulley then up to the weight. But typically, it&#x27;s ball -&gt; up to pulley -&gt; down to weight.
+
+I think the intended model is: each ball is pulled upward by its vertical string (a or b) and downward by the diagonal string connected to the counterweight. But that would require the counterweight to be pulling the ball down, which happens if the string from the ball goes down to a pulley below, but the problem says</span></p></div></div></div>
+</details>
+<details>
+<summary>查看该题原始 JSON</summary>
+<pre>{
+  &quot;_index&quot;: &quot;qsqianji&quot;,
+  &quot;_id&quot;: &quot;1ce4dc96-b507-4845-8204-f1ebe82d14a6&quot;,
+  &quot;_matched_id_field&quot;: &quot;qs_subject_id&quot;,
+  &quot;id&quot;: &quot;1ce4dc96-b507-4845-8204-f1ebe82d14a6&quot;,
+  &quot;qs_subject_id&quot;: 29,
+  &quot;qs_type_id&quot;: &quot;1&quot;,
+  &quot;qs_knowpoint_ids&quot;: [],
+  &quot;qs_chapter_ids&quot;: [],
+  &quot;qs_diff&quot;: null,
+  &quot;from&quot;: 3,
+  &quot;qs_stem&quot;: &quot;&lt;div&gt;&lt;div class=\&quot;qml-stem\&quot;&gt;&lt;p&gt;如图所示，在同一竖直平面内，小球A、B上系有不可伸长的细线a、b、c和d，其中a的上端悬挂于竖直固定的支架上，d跨过左侧定滑轮、c跨过右侧定滑轮分别与相同配重P、Q相连，调节左、右两侧定滑轮高度达到平衡。已知小球A、B和配重P、Q质量均为50g，细线c、d平行且与水平成θ=30°(不计摩擦)，则细线a、b的拉力分别为&lt;/p&gt;&lt;img src=\&quot;https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/crop_p1_9136c5f28e71.png\&quot; /&gt;&lt;div class=\&quot;qml-og\&quot;&gt;&lt;table class=\&quot;qml-og\&quot; style=\&quot;width:100%\&quot;&gt;&lt;tr&gt;&lt;td&gt;A.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;2N，1N&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;B.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;2N，0.5N&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;C.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;1N，1N&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;D.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;1N，0.5N&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_answer&quot;: &quot;&lt;div class=\&quot;qml-answer\&quot;&gt;&lt;span class=\&quot;qml-an-sq\&quot;&gt;&lt;span class=\&quot;qml-an qml-isop\&quot;&gt;A&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;&quot;,
+  &quot;qs_explanation&quot;: &quot;&lt;div class=\&quot;qml-explanation\&quot;&gt;&lt;div class=\&quot;qml-seg\&quot; seg-name=\&quot;详解\&quot;&gt;&lt;p&gt;&lt;span&gt;对小球A和B分别进行受力分析。由于系统处于平衡状态，各物体所受合力为零。\n\n首先分析配重P和Q：它们质量均为50g（即0.05kg），重力为 mg = 0.05×10 = 0.5N。由于细线c、d分别连接P、Q且跨过光滑定滑轮，因此细线c和d中的张力均等于配重重力，即 T_c = T_d = 0.5N。\n\n细线c和d与水平方向成θ=30°，且平行，说明它们对小球A、B的拉力方向均为斜向上30°。\n\n对小球A：它受到三个力作用：\n- 细线a的竖直向上的拉力 T_a；\n- 细线d斜向左上方30°的拉力 T_d = 0.5N；\n- 自身重力 G = 0.5N，竖直向下。\n\n将T_d分解为竖直和水平分量：\n竖直分量：T_d·sin30° = 0.5 × 0.5 = 0.25N（向上）\n水平分量：T_d·cos30°（向左）\n\n由于小球A静止，竖直方向合力为零：\nT_a + 0.25N = 0.5N → T_a = 0.25N？但此结果与选项不符，说明理解有误。\n\n重新审视题图结构（虽无图，但根据常规设置）：通常此类题中，小球A由线a悬挂，并通过线d连接左侧配重；小球B由线b悬挂，并通过线c连接右侧配重。而线b可能连接A与B之间。\n\n更合理的模型是：小球A上连a，下连b；小球B上连b，另侧连c；配重Q连c，配重P连d，而d连回A？但题干说“d跨过左侧定滑轮…与配重P相连”，“c跨过右侧定滑轮…与配重Q相连”，且“小球A、B上系有细线a、b、c、d”，推测结构为：\n- 线a上端固定，下端连A；\n- 线d一端连A，跨过左滑轮连P；\n- 线c一端连B，跨过右滑轮连Q；\n- 线b连接A和B。\n\n但题干又说“调节滑轮高度达到平衡”，且c、d平行、与水平成30°，说明A受d的拉力方向为沿d的方向（斜向上左30°），B受c的拉力为斜向上右30°。\n\n然而若a、b均为竖直线（因在同一竖直平面，且悬挂），则更可能：线a竖直吊A，线b竖直吊B，而c、d分别从B、A斜拉向滑轮。\n\n但关键线索是“细线c、d平行且与水平成θ=30°”，即它们都与水平夹角30°，故与竖直方向夹角60°。\n\n再考虑对称性：A、B质量相同，P、Q相同，系统对称，故线b应无拉力？但选项中有b拉力为1N或0.5N，不对称，说明结构不对称。\n\n仔细读题：“d跨过左侧定滑轮、c跨过右侧定滑轮分别与相同配重P、Q相连”，且“小球A、B上系有…细线a、b、c和d”——合理推断：\n- a上端固定，下端连A；\n- d一端连A，绕过左滑轮连P；\n- c一端连B，绕过右滑轮连Q；\n- b连接A和B。\n\n此时，对A：受a向上拉力T_a，b的拉力T_b（假设向下拉B，则A受b向下），d的拉力T_d沿d方向（设为斜向左上30°），重力G_A=0.5N向下。\n对B：受b向上拉力T_b（牛顿第三定律），c的拉力T_c斜向右上30°，重力G_B=0.5N向下。\n\n由于滑轮光滑，T_c = G_Q = 0.5N，T_d = G_P = 0.5N。\n\n对B进行受力分析（更简单，因可能b为竖直）：\nB受三个力：重力0.5N↓，T_c=0.5N沿30°斜向上右，T_b（来自线b，方向待定）。\n\n将T_c分解：\n竖直分量：T_c·sin30° = 0.5 × 0.5 = 0.25N ↑\n水平分量：T_c·cos30° → 向右\n\n为平衡水平力，必须有其他水平力，但若线b为竖直，则无法平衡水平分量，矛盾。\n\n因此，线b不可能是竖直的？但题干说“在同一竖直平面内”，且通常a、b为竖直线。\n\n另一种常见模型：A和B并排悬挂，a吊A，b吊B，而c从B向右上连滑轮到Q，d从A向左上连滑轮到P。此时a、b均为竖直。\n\n对A：竖直方向受力：T_a ↑，G_A=0.5N ↓，T_d的竖直分量 ↑（因d斜向上拉A）。\n注意：若d从A向左上连到滑轮，则滑轮在左上方，d对A的拉力方向是沿d远离A，即斜向左上，所以竖直分量向上。\n\n同理，c对B的拉力斜向右上，竖直分量向上。\n\n因此对A：T_a + T_d·sin30° = G_A → T_a + 0.5×0.5 = 0.5 → T_a = 0.5 - 0.25 = 0.25N\n对B：T_b + T_c·sin30° = G_B → T_b = 0.25N\n但选项无0.25N，说明方向理解错误。\n\n关键：当配重P悬挂在滑轮下，线d一端固定于A，绕过滑轮挂P，则P的重力会通过线d拉A向滑轮方向。若滑轮在A的左上方，则d拉A向左上方。但此时，若A仅受a、d和重力，则水平方向不平衡，除非有其他力。\n\n因此，必须存在线b连接A和B以提供水平力平衡。\n\n正确模型应为：A和B相邻，a竖直吊A，b竖直吊B，同时A还连d向左上到滑轮P，B连c向右上到滑轮Q。但这样A在水平方向受d的左向分力，无人平衡，不可能静止。\n\n故更可能：线b是水平连接A和B的！但题干未明确。\n\n回到题干：“细线a、b、c和d”，且“a的上端悬挂于竖直固定的支架上”，暗示a是竖直的；而c、d跨过滑轮与配重相连，且与水平成30°，说明c、d是斜的。\n\n经典题型：两个小球用水平线b连接，a竖直吊A，d从A斜连左滑轮P，c从B斜连右滑轮Q。此时系统对称，b为水平。\n\n但题干说“调节左、右两侧定滑轮高度达到平衡”，且c、d平行，说明对称，故A、B受力对称，T_a = T_b？但选项A为2N,1N，不对称，矛盾。\n\n再审题：选项A为“2N，1N”，单位是N，而mg=0.5N，2N远大于重力，不合理，除非角度理解错误。\n\n注意：θ=30°是“与水平成θ=30°”，即与水平夹角30°，所以与竖直夹角60°。\n\n但若c、d中的张力为0.5N，其竖直分量为0.5×sin30°=0.25N，不足以解释2N。\n\n除非：配重P、Q质量50g，但线c、d的张力不是0.5N？不，滑轮光滑，张力等于配重重力。\n\n可能误解了连接方式。另一种可能是：线d一端固定于支架，绕过滑轮连P，再连A？但题干说“d跨过左侧定滑轮…与配重P相连”，且“小球A…上系有…d”，所以d一端连A，跨过滑轮连P。\n\n关键突破：或许小球A只受a和d，小球B只受b和c，即A、B不直接相连！题干说“小球A、B上系有不可伸长的细线a、b、c和d”，可能a连A，b连B，c连B，d连A。\n\n即：A受a（上）和d（斜）；B受b（上）和c（斜）。\n\n此时，对A：T_a 竖直向上，T_d 沿d方向（斜向上，因滑轮在上方），G_A 竖直向下。\n\n由于d与水平成30°，若滑轮在A的左上方，则d对A的拉力方向为左上30°，其竖直分量向上。\n\n但A在水平方向受T_d的水平分量，无人平衡，不可能静止——除非滑轮正上方，但题干说“左侧定滑轮”，故不在正上方。\n\n因此，唯一可能是：线a不是竖直的？但题干说“a的上端悬挂于竖直固定的支架上”，通常意味着a竖直。\n\n查阅类似题目：常见模型为“结点”问题。可能A、B并非质点，而是滑轮或结点。但题干明确说“小球A、B”。\n\n重新计算：假设对小球A，受三个力：重力G=0.5N↓，线a拉力T_a↑（竖直），线d拉力T_d=0.5N，方向沿d。因系统平衡，三力共点平衡。\n\n但若a竖直，d斜向，则三力不共线，需满足矢量和为零。\n\n设d与竖直方向夹角为α。题干说“与水平成θ=30°”，故与竖直成60°，即α=60°。\n\n则对A：\n水平方向：T_d·sin60° = 0 → 不可能，除非T_d=0。\n\n矛盾表明：小球A必须还受另一个力来平衡水平分量。这个力只能来自线b。\n\n因此，线b连接A和B，且为水平方向（常见设定）。\n\n设线b水平，拉力为T_b。\n\n对A：\n- 竖直：T_a = G_A + T_d·cos60° （若d斜向下拉A）\n\n但配重P拉d，会使d拉A toward滑轮。若滑轮在左上方，则d拉A向左上，故对A，T_d方向左上，与竖直成60°。\n\n所以：\n竖直分量：T_d·cos60° ↑\n水平分量：T_d·sin60° ←\n\n为平衡水平力，线b必须向右拉A，即T_b →\n\n对B：c拉B向右上（与竖直成60°），故水平分量 T_c·sin60° →，因此线b必须向左拉B，即T_b ←，符合牛顿第三定律。\n\n对A竖直方向：T_a + T_d·cos60° = G_A\n→ T_a + 0.5 × 0.5 = 0.5\n→ T_a = 0.5 - 0.25 = 0.25N\n\n对B竖直方向：T_b_vertical? 但若b是水平的，则对B竖直方向只有T_c·cos60° ↑ 和 G_B ↓，所以 T_c·cos60° = G_B → 0.25 = 0.5？不成立。\n\n因此，线b must be vertical！但这样水平力无法平衡。\n\n终极正确模型：实际上，在这种装置中，小球A和B的位置使得线a和b是竖直的，而c和d是对称斜拉的，但由于有中间连线b，且系统调整到c、d平行，可能b是松弛的？但选项中有b的拉力。\n\n参考标准解法：对于此类问题，通常将A和B视为两个 separate objects， each suspended by their own string (a for A, b for B), and each also pulled by a diagonal string to a counterweight.\n\nBut then horizontal force imbalance.\n\nUnless the diagonal strings are pulling downward! How?\n\nAh! If the fixed pulleys are BELOW the balls, but that contradicts \&quot;悬挂\&quot;.\n\nAnother possibility: the strings c and d are pulling the balls downward toward the pulleys. For example, if the left pulley is below and to the left of A, then d would pull A down-left. But the problem says \&quot;定滑轮\&quot; fixed on支架, usually above.\n\nLet’s read carefully: “d跨过左侧定滑轮、c跨过右侧定滑轮分别与相同配重P、Q相连”. The weights P and Q are hanging down from the pulleys, so the tension pulls the string toward the pulley. So at ball A, the string d is pulled toward the left pulley. If the left pulley is at the same height or higher than A, the force on A is up-left; if lower, down-left.\n\nBut the problem says “调节左、右两侧定滑轮高度达到平衡”, and “细线c、d平行且与水平成θ=30°”, and since weights are hanging, likely the pulleys are above, so c and d slope upward from balls to pulleys.\n\nGiven the options include 2N and 1N, which are larger than mg=0.5N, the only way is if the vertical component of the diagonal strings is downward, i.e., the strings are pulling the balls down.\n\nHow can that be? If the balls are above the pulleys, but that&#x27;s unusual.\n\nPerhaps the string goes from the ball down to the pulley then up to the weight. But typically, it&#x27;s ball -&amp;gt; up to pulley -&amp;gt; down to weight.\n\nI think the intended model is: each ball is pulled upward by its vertical string (a or b) and downward by the diagonal string connected to the counterweight. But that would require the counterweight to be pulling the ball down, which happens if the string from the ball goes down to a pulley below, but the problem says&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_exampaper_type_ids&quot;: [],
+  &quot;html_text&quot;: &quot;{\n  \&quot;html\&quot;: \&quot; 如图所示，在同一竖直平面内，小球A、B上系有不可伸长的细线a、b、c和d，其中a的上端悬挂于竖直固定的支架上，d跨过左侧定滑轮、c跨过右侧定滑轮分别与相同配重P、Q相连，调节左、右两侧定滑轮高度达到平衡。已知小球A、B和配重P、Q质量均为50g，细线c、d平行且与水平成θ=30°(不计摩擦)，则细线a、b的拉力分别为 \&quot;,\n  \&quot;type\&quot;: \&quot;选择题\&quot;,\n  \&quot;sqs\&quot;: [],\n  \&quot;sqBlankCount\&quot;: 0,\n  \&quot;og\&quot;: {\n    \&quot;cols\&quot;: 4,\n    \&quot;ogOps\&quot;: [\n      {\n        \&quot;html\&quot;: \&quot; 2N，1N \&quot;,\n        \&quot;index\&quot;: \&quot;A\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; 2N，0.5N \&quot;,\n        \&quot;index\&quot;: \&quot;B\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; 1N，1N \&quot;,\n        \&quot;index\&quot;: \&quot;C\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; 1N，0.5N \&quot;,\n        \&quot;index\&quot;: \&quot;D\&quot;\n      }\n    ]\n  },\n  \&quot;sqIdMode\&quot;: 0\n}&quot;,
+  &quot;answer_text&quot;: &quot;{\n  \&quot;anSqs\&quot;: [\n    {\n      \&quot;ans\&quot;: [\n        {\n          \&quot;html\&quot;: \&quot; A \&quot;\n        }\n      ]\n    }\n  ]\n}&quot;,
+  &quot;explanation_text&quot;: &quot;{\n  \&quot;explanationSegs\&quot;: [\n    {\n      \&quot;name\&quot;: \&quot;详解\&quot;,\n      \&quot;html\&quot;: \&quot; 对小球A和B分别进行受力分析。由于系统处于平衡状态，各物体所受合力为零。\\n\\n首先分析配重P和Q：它们质量均为50g（即0.05kg），重力为 mg = 0.05×10 = 0.5N。由于细线c、d分别连接P、Q且跨过光滑定滑轮，因此细线c和d中的张力均等于配重重力，即 T_c = T_d = 0.5N。\\n\\n细线c和d与水平方向成θ=30°，且平行，说明它们对小球A、B的拉力方向均为斜向上30°。\\n\\n对小球A：它受到三个力作用：\\n- 细线a的竖直向上的拉力 T_a；\\n- 细线d斜向左上方30°的拉力 T_d = 0.5N；\\n- 自身重力 G = 0.5N，竖直向下。\\n\\n将T_d分解为竖直和水平分量：\\n竖直分量：T_d·sin30° = 0.5 × 0.5 = 0.25N（向上）\\n水平分量：T_d·cos30°（向左）\\n\\n由于小球A静止，竖直方向合力为零：\\nT_a + 0.25N = 0.5N → T_a = 0.25N？但此结果与选项不符，说明理解有误。\\n\\n重新审视题图结构（虽无图，但根据常规设置）：通常此类题中，小球A由线a悬挂，并通过线d连接左侧配重；小球B由线b悬挂，并通过线c连接右侧配重。而线b可能连接A与B之间。\\n\\n更合理的模型是：小球A上连a，下连b；小球B上连b，另侧连c；配重Q连c，配重P连d，而d连回A？但题干说“d跨过左侧定滑轮…与配重P相连”，“c跨过右侧定滑轮…与配重Q相连”，且“小球A、B上系有细线a、b、c、d”，推测结构为：\\n- 线a上端固定，下端连A；\\n- 线d一端连A，跨过左滑轮连P；\\n- 线c一端连B，跨过右滑轮连Q；\\n- 线b连接A和B。\\n\\n但题干又说“调节滑轮高度达到平衡”，且c、d平行、与水平成30°，说明A受d的拉力方向为沿d的方向（斜向上左30°），B受c的拉力为斜向上右30°。\\n\\n然而若a、b均为竖直线（因在同一竖直平面，且悬挂），则更可能：线a竖直吊A，线b竖直吊B，而c、d分别从B、A斜拉向滑轮。\\n\\n但关键线索是“细线c、d平行且与水平成θ=30°”，即它们都与水平夹角30°，故与竖直方向夹角60°。\\n\\n再考虑对称性：A、B质量相同，P、Q相同，系统对称，故线b应无拉力？但选项中有b拉力为1N或0.5N，不对称，说明结构不对称。\\n\\n仔细读题：“d跨过左侧定滑轮、c跨过右侧定滑轮分别与相同配重P、Q相连”，且“小球A、B上系有…细线a、b、c和d”——合理推断：\\n- a上端固定，下端连A；\\n- d一端连A，绕过左滑轮连P；\\n- c一端连B，绕过右滑轮连Q；\\n- b连接A和B。\\n\\n此时，对A：受a向上拉力T_a，b的拉力T_b（假设向下拉B，则A受b向下），d的拉力T_d沿d方向（设为斜向左上30°），重力G_A=0.5N向下。\\n对B：受b向上拉力T_b（牛顿第三定律），c的拉力T_c斜向右上30°，重力G_B=0.5N向下。\\n\\n由于滑轮光滑，T_c = G_Q = 0.5N，T_d = G_P = 0.5N。\\n\\n对B进行受力分析（更简单，因可能b为竖直）：\\nB受三个力：重力0.5N↓，T_c=0.5N沿30°斜向上右，T_b（来自线b，方向待定）。\\n\\n将T_c分解：\\n竖直分量：T_c·sin30° = 0.5 × 0.5 = 0.25N ↑\\n水平分量：T_c·cos30° → 向右\\n\\n为平衡水平力，必须有其他水平力，但若线b为竖直，则无法平衡水平分量，矛盾。\\n\\n因此，线b不可能是竖直的？但题干说“在同一竖直平面内”，且通常a、b为竖直线。\\n\\n另一种常见模型：A和B并排悬挂，a吊A，b吊B，而c从B向右上连滑轮到Q，d从A向左上连滑轮到P。此时a、b均为竖直。\\n\\n对A：竖直方向受力：T_a ↑，G_A=0.5N ↓，T_d的竖直分量 ↑（因d斜向上拉A）。\\n注意：若d从A向左上连到滑轮，则滑轮在左上方，d对A的拉力方向是沿d远离A，即斜向左上，所以竖直分量向上。\\n\\n同理，c对B的拉力斜向右上，竖直分量向上。\\n\\n因此对A：T_a + T_d·sin30° = G_A → T_a + 0.5×0.5 = 0.5 → T_a = 0.5 - 0.25 = 0.25N\\n对B：T_b + T_c·sin30° = G_B → T_b = 0.25N\\n但选项无0.25N，说明方向理解错误。\\n\\n关键：当配重P悬挂在滑轮下，线d一端固定于A，绕过滑轮挂P，则P的重力会通过线d拉A向滑轮方向。若滑轮在A的左上方，则d拉A向左上方。但此时，若A仅受a、d和重力，则水平方向不平衡，除非有其他力。\\n\\n因此，必须存在线b连接A和B以提供水平力平衡。\\n\\n正确模型应为：A和B相邻，a竖直吊A，b竖直吊B，同时A还连d向左上到滑轮P，B连c向右上到滑轮Q。但这样A在水平方向受d的左向分力，无人平衡，不可能静止。\\n\\n故更可能：线b是水平连接A和B的！但题干未明确。\\n\\n回到题干：“细线a、b、c和d”，且“a的上端悬挂于竖直固定的支架上”，暗示a是竖直的；而c、d跨过滑轮与配重相连，且与水平成30°，说明c、d是斜的。\\n\\n经典题型：两个小球用水平线b连接，a竖直吊A，d从A斜连左滑轮P，c从B斜连右滑轮Q。此时系统对称，b为水平。\\n\\n但题干说“调节左、右两侧定滑轮高度达到平衡”，且c、d平行，说明对称，故A、B受力对称，T_a = T_b？但选项A为2N,1N，不对称，矛盾。\\n\\n再审题：选项A为“2N，1N”，单位是N，而mg=0.5N，2N远大于重力，不合理，除非角度理解错误。\\n\\n注意：θ=30°是“与水平成θ=30°”，即与水平夹角30°，所以与竖直夹角60°。\\n\\n但若c、d中的张力为0.5N，其竖直分量为0.5×sin30°=0.25N，不足以解释2N。\\n\\n除非：配重P、Q质量50g，但线c、d的张力不是0.5N？不，滑轮光滑，张力等于配重重力。\\n\\n可能误解了连接方式。另一种可能是：线d一端固定于支架，绕过滑轮连P，再连A？但题干说“d跨过左侧定滑轮…与配重P相连”，且“小球A…上系有…d”，所以d一端连A，跨过滑轮连P。\\n\\n关键突破：或许小球A只受a和d，小球B只受b和c，即A、B不直接相连！题干说“小球A、B上系有不可伸长的细线a、b、c和d”，可能a连A，b连B，c连B，d连A。\\n\\n即：A受a（上）和d（斜）；B受b（上）和c（斜）。\\n\\n此时，对A：T_a 竖直向上，T_d 沿d方向（斜向上，因滑轮在上方），G_A 竖直向下。\\n\\n由于d与水平成30°，若滑轮在A的左上方，则d对A的拉力方向为左上30°，其竖直分量向上。\\n\\n但A在水平方向受T_d的水平分量，无人平衡，不可能静止——除非滑轮正上方，但题干说“左侧定滑轮”，故不在正上方。\\n\\n因此，唯一可能是：线a不是竖直的？但题干说“a的上端悬挂于竖直固定的支架上”，通常意味着a竖直。\\n\\n查阅类似题目：常见模型为“结点”问题。可能A、B并非质点，而是滑轮或结点。但题干明确说“小球A、B”。\\n\\n重新计算：假设对小球A，受三个力：重力G=0.5N↓，线a拉力T_a↑（竖直），线d拉力T_d=0.5N，方向沿d。因系统平衡，三力共点平衡。\\n\\n但若a竖直，d斜向，则三力不共线，需满足矢量和为零。\\n\\n设d与竖直方向夹角为α。题干说“与水平成θ=30°”，故与竖直成60°，即α=60°。\\n\\n则对A：\\n水平方向：T_d·sin60° = 0 → 不可能，除非T_d=0。\\n\\n矛盾表明：小球A必须还受另一个力来平衡水平分量。这个力只能来自线b。\\n\\n因此，线b连接A和B，且为水平方向（常见设定）。\\n\\n设线b水平，拉力为T_b。\\n\\n对A：\\n- 竖直：T_a = G_A + T_d·cos60° （若d斜向下拉A）\\n\\n但配重P拉d，会使d拉A toward滑轮。若滑轮在左上方，则d拉A向左上，故对A，T_d方向左上，与竖直成60°。\\n\\n所以：\\n竖直分量：T_d·cos60° ↑\\n水平分量：T_d·sin60° ←\\n\\n为平衡水平力，线b必须向右拉A，即T_b →\\n\\n对B：c拉B向右上（与竖直成60°），故水平分量 T_c·sin60° →，因此线b必须向左拉B，即T_b ←，符合牛顿第三定律。\\n\\n对A竖直方向：T_a + T_d·cos60° = G_A\\n→ T_a + 0.5 × 0.5 = 0.5\\n→ T_a = 0.5 - 0.25 = 0.25N\\n\\n对B竖直方向：T_b_vertical? 但若b是水平的，则对B竖直方向只有T_c·cos60° ↑ 和 G_B ↓，所以 T_c·cos60° = G_B → 0.25 = 0.5？不成立。\\n\\n因此，线b must be vertical！但这样水平力无法平衡。\\n\\n终极正确模型：实际上，在这种装置中，小球A和B的位置使得线a和b是竖直的，而c和d是对称斜拉的，但由于有中间连线b，且系统调整到c、d平行，可能b是松弛的？但选项中有b的拉力。\\n\\n参考标准解法：对于此类问题，通常将A和B视为两个 separate objects， each suspended by their own string (a for A, b for B), and each also pulled by a diagonal string to a counterweight.\\n\\nBut then horizontal force imbalance.\\n\\nUnless the diagonal strings are pulling downward! How?\\n\\nAh! If the fixed pulleys are BELOW the balls, but that contradicts \\\&quot;悬挂\\\&quot;.\\n\\nAnother possibility: the strings c and d are pulling the balls downward toward the pulleys. For example, if the left pulley is below and to the left of A, then d would pull A down-left. But the problem says \\\&quot;定滑轮\\\&quot; fixed on支架, usually above.\\n\\nLet’s read carefully: “d跨过左侧定滑轮、c跨过右侧定滑轮分别与相同配重P、Q相连”. The weights P and Q are hanging down from the pulleys, so the tension pulls the string toward the pulley. So at ball A, the string d is pulled toward the left pulley. If the left pulley is at the same height or higher than A, the force on A is up-left; if lower, down-left.\\n\\nBut the problem says “调节左、右两侧定滑轮高度达到平衡”, and “细线c、d平行且与水平成θ=30°”, and since weights are hanging, likely the pulleys are above, so c and d slope upward from balls to pulleys.\\n\\nGiven the options include 2N and 1N, which are larger than mg=0.5N, the only way is if the vertical component of the diagonal strings is downward, i.e., the strings are pulling the balls down.\\n\\nHow can that be? If the balls are above the pulleys, but that&#x27;s unusual.\\n\\nPerhaps the string goes from the ball down to the pulley then up to the weight. But typically, it&#x27;s ball -&gt; up to pulley -&gt; down to weight.\\n\\nI think the intended model is: each ball is pulled upward by its vertical string (a or b) and downward by the diagonal string connected to the counterweight. But that would require the counterweight to be pulling the ball down, which happens if the string from the ball goes down to a pulley below, but the problem says \&quot;\n    }\n  ]\n}&quot;,
+  &quot;formatted_json&quot;: {
+    &quot;resources&quot;: [],
+    &quot;inputs&quot;: [
+      {
+        &quot;type&quot;: &quot;choice&quot;,
+        &quot;order&quot;: 1,
+        &quot;resource_index&quot;: -1,
+        &quot;options&quot;: [
+          {
+            &quot;option&quot;: &quot;A&quot;,
+            &quot;value&quot;: &quot;2N，1N&quot;
+          },
+          {
+            &quot;option&quot;: &quot;B&quot;,
+            &quot;value&quot;: &quot;2N，0.5N&quot;
+          },
+          {
+            &quot;option&quot;: &quot;C&quot;,
+            &quot;value&quot;: &quot;1N，1N&quot;
+          },
+          {
+            &quot;option&quot;: &quot;D&quot;,
+            &quot;value&quot;: &quot;1N，0.5N&quot;
+          }
+        ]
+      }
+    ],
+    &quot;answers&quot;: [
+      {
+        &quot;order&quot;: 1,
+        &quot;value&quot;: &quot;A&quot;,
+        &quot;explanation&quot;: &quot;对小球A和B分别进行受力分析。由于系统处于平衡状态，各物体所受合力为零。\n\n首先分析配重P和Q：它们质量均为50g（即0.05kg），重力为 mg = 0.05×10 = 0.5N。由于细线c、d分别连接P、Q且跨过光滑定滑轮，因此细线c和d中的张力均等于配重重力，即 T_c = T_d = 0.5N。\n\n细线c和d与水平方向成θ=30°，且平行，说明它们对小球A、B的拉力方向均为斜向上30°。\n\n对小球A：它受到三个力作用：\n- 细线a的竖直向上的拉力 T_a；\n- 细线d斜向左上方30°的拉力 T_d = 0.5N；\n- 自身重力 G = 0.5N，竖直向下。\n\n将T_d分解为竖直和水平分量：\n竖直分量：T_d·sin30° = 0.5 × 0.5 = 0.25N（向上）\n水平分量：T_d·cos30°（向左）\n\n由于小球A静止，竖直方向合力为零：\nT_a + 0.25N = 0.5N → T_a = 0.25N？但此结果与选项不符，说明理解有误。\n\n重新审视题图结构（虽无图，但根据常规设置）：通常此类题中，小球A由线a悬挂，并通过线d连接左侧配重；小球B由线b悬挂，并通过线c连接右侧配重。而线b可能连接A与B之间。\n\n更合理的模型是：小球A上连a，下连b；小球B上连b，另侧连c；配重Q连c，配重P连d，而d连回A？但题干说“d跨过左侧定滑轮…与配重P相连”，“c跨过右侧定滑轮…与配重Q相连”，且“小球A、B上系有细线a、b、c、d”，推测结构为：\n- 线a上端固定，下端连A；\n- 线d一端连A，跨过左滑轮连P；\n- 线c一端连B，跨过右滑轮连Q；\n- 线b连接A和B。\n\n但题干又说“调节滑轮高度达到平衡”，且c、d平行、与水平成30°，说明A受d的拉力方向为沿d的方向（斜向上左30°），B受c的拉力为斜向上右30°。\n\n然而若a、b均为竖直线（因在同一竖直平面，且悬挂），则更可能：线a竖直吊A，线b竖直吊B，而c、d分别从B、A斜拉向滑轮。\n\n但关键线索是“细线c、d平行且与水平成θ=30°”，即它们都与水平夹角30°，故与竖直方向夹角60°。\n\n再考虑对称性：A、B质量相同，P、Q相同，系统对称，故线b应无拉力？但选项中有b拉力为1N或0.5N，不对称，说明结构不对称。\n\n仔细读题：“d跨过左侧定滑轮、c跨过右侧定滑轮分别与相同配重P、Q相连”，且“小球A、B上系有…细线a、b、c和d”——合理推断：\n- a上端固定，下端连A；\n- d一端连A，绕过左滑轮连P；\n- c一端连B，绕过右滑轮连Q；\n- b连接A和B。\n\n此时，对A：受a向上拉力T_a，b的拉力T_b（假设向下拉B，则A受b向下），d的拉力T_d沿d方向（设为斜向左上30°），重力G_A=0.5N向下。\n对B：受b向上拉力T_b（牛顿第三定律），c的拉力T_c斜向右上30°，重力G_B=0.5N向下。\n\n由于滑轮光滑，T_c = G_Q = 0.5N，T_d = G_P = 0.5N。\n\n对B进行受力分析（更简单，因可能b为竖直）：\nB受三个力：重力0.5N↓，T_c=0.5N沿30°斜向上右，T_b（来自线b，方向待定）。\n\n将T_c分解：\n竖直分量：T_c·sin30° = 0.5 × 0.5 = 0.25N ↑\n水平分量：T_c·cos30° → 向右\n\n为平衡水平力，必须有其他水平力，但若线b为竖直，则无法平衡水平分量，矛盾。\n\n因此，线b不可能是竖直的？但题干说“在同一竖直平面内”，且通常a、b为竖直线。\n\n另一种常见模型：A和B并排悬挂，a吊A，b吊B，而c从B向右上连滑轮到Q，d从A向左上连滑轮到P。此时a、b均为竖直。\n\n对A：竖直方向受力：T_a ↑，G_A=0.5N ↓，T_d的竖直分量 ↑（因d斜向上拉A）。\n注意：若d从A向左上连到滑轮，则滑轮在左上方，d对A的拉力方向是沿d远离A，即斜向左上，所以竖直分量向上。\n\n同理，c对B的拉力斜向右上，竖直分量向上。\n\n因此对A：T_a + T_d·sin30° = G_A → T_a + 0.5×0.5 = 0.5 → T_a = 0.5 - 0.25 = 0.25N\n对B：T_b + T_c·sin30° = G_B → T_b = 0.25N\n但选项无0.25N，说明方向理解错误。\n\n关键：当配重P悬挂在滑轮下，线d一端固定于A，绕过滑轮挂P，则P的重力会通过线d拉A向滑轮方向。若滑轮在A的左上方，则d拉A向左上方。但此时，若A仅受a、d和重力，则水平方向不平衡，除非有其他力。\n\n因此，必须存在线b连接A和B以提供水平力平衡。\n\n正确模型应为：A和B相邻，a竖直吊A，b竖直吊B，同时A还连d向左上到滑轮P，B连c向右上到滑轮Q。但这样A在水平方向受d的左向分力，无人平衡，不可能静止。\n\n故更可能：线b是水平连接A和B的！但题干未明确。\n\n回到题干：“细线a、b、c和d”，且“a的上端悬挂于竖直固定的支架上”，暗示a是竖直的；而c、d跨过滑轮与配重相连，且与水平成30°，说明c、d是斜的。\n\n经典题型：两个小球用水平线b连接，a竖直吊A，d从A斜连左滑轮P，c从B斜连右滑轮Q。此时系统对称，b为水平。\n\n但题干说“调节左、右两侧定滑轮高度达到平衡”，且c、d平行，说明对称，故A、B受力对称，T_a = T_b？但选项A为2N,1N，不对称，矛盾。\n\n再审题：选项A为“2N，1N”，单位是N，而mg=0.5N，2N远大于重力，不合理，除非角度理解错误。\n\n注意：θ=30°是“与水平成θ=30°”，即与水平夹角30°，所以与竖直夹角60°。\n\n但若c、d中的张力为0.5N，其竖直分量为0.5×sin30°=0.25N，不足以解释2N。\n\n除非：配重P、Q质量50g，但线c、d的张力不是0.5N？不，滑轮光滑，张力等于配重重力。\n\n可能误解了连接方式。另一种可能是：线d一端固定于支架，绕过滑轮连P，再连A？但题干说“d跨过左侧定滑轮…与配重P相连”，且“小球A…上系有…d”，所以d一端连A，跨过滑轮连P。\n\n关键突破：或许小球A只受a和d，小球B只受b和c，即A、B不直接相连！题干说“小球A、B上系有不可伸长的细线a、b、c和d”，可能a连A，b连B，c连B，d连A。\n\n即：A受a（上）和d（斜）；B受b（上）和c（斜）。\n\n此时，对A：T_a 竖直向上，T_d 沿d方向（斜向上，因滑轮在上方），G_A 竖直向下。\n\n由于d与水平成30°，若滑轮在A的左上方，则d对A的拉力方向为左上30°，其竖直分量向上。\n\n但A在水平方向受T_d的水平分量，无人平衡，不可能静止——除非滑轮正上方，但题干说“左侧定滑轮”，故不在正上方。\n\n因此，唯一可能是：线a不是竖直的？但题干说“a的上端悬挂于竖直固定的支架上”，通常意味着a竖直。\n\n查阅类似题目：常见模型为“结点”问题。可能A、B并非质点，而是滑轮或结点。但题干明确说“小球A、B”。\n\n重新计算：假设对小球A，受三个力：重力G=0.5N↓，线a拉力T_a↑（竖直），线d拉力T_d=0.5N，方向沿d。因系统平衡，三力共点平衡。\n\n但若a竖直，d斜向，则三力不共线，需满足矢量和为零。\n\n设d与竖直方向夹角为α。题干说“与水平成θ=30°”，故与竖直成60°，即α=60°。\n\n则对A：\n水平方向：T_d·sin60° = 0 → 不可能，除非T_d=0。\n\n矛盾表明：小球A必须还受另一个力来平衡水平分量。这个力只能来自线b。\n\n因此，线b连接A和B，且为水平方向（常见设定）。\n\n设线b水平，拉力为T_b。\n\n对A：\n- 竖直：T_a = G_A + T_d·cos60° （若d斜向下拉A）\n\n但配重P拉d，会使d拉A toward滑轮。若滑轮在左上方，则d拉A向左上，故对A，T_d方向左上，与竖直成60°。\n\n所以：\n竖直分量：T_d·cos60° ↑\n水平分量：T_d·sin60° ←\n\n为平衡水平力，线b必须向右拉A，即T_b →\n\n对B：c拉B向右上（与竖直成60°），故水平分量 T_c·sin60° →，因此线b必须向左拉B，即T_b ←，符合牛顿第三定律。\n\n对A竖直方向：T_a + T_d·cos60° = G_A\n→ T_a + 0.5 × 0.5 = 0.5\n→ T_a = 0.5 - 0.25 = 0.25N\n\n对B竖直方向：T_b_vertical? 但若b是水平的，则对B竖直方向只有T_c·cos60° ↑ 和 G_B ↓，所以 T_c·cos60° = G_B → 0.25 = 0.5？不成立。\n\n因此，线b must be vertical！但这样水平力无法平衡。\n\n终极正确模型：实际上，在这种装置中，小球A和B的位置使得线a和b是竖直的，而c和d是对称斜拉的，但由于有中间连线b，且系统调整到c、d平行，可能b是松弛的？但选项中有b的拉力。\n\n参考标准解法：对于此类问题，通常将A和B视为两个 separate objects， each suspended by their own string (a for A, b for B), and each also pulled by a diagonal string to a counterweight.\n\nBut then horizontal force imbalance.\n\nUnless the diagonal strings are pulling downward! How?\n\nAh! If the fixed pulleys are BELOW the balls, but that contradicts \&quot;悬挂\&quot;.\n\nAnother possibility: the strings c and d are pulling the balls downward toward the pulleys. For example, if the left pulley is below and to the left of A, then d would pull A down-left. But the problem says \&quot;定滑轮\&quot; fixed on支架, usually above.\n\nLet’s read carefully: “d跨过左侧定滑轮、c跨过右侧定滑轮分别与相同配重P、Q相连”. The weights P and Q are hanging down from the pulleys, so the tension pulls the string toward the pulley. So at ball A, the string d is pulled toward the left pulley. If the left pulley is at the same height or higher than A, the force on A is up-left; if lower, down-left.\n\nBut the problem says “调节左、右两侧定滑轮高度达到平衡”, and “细线c、d平行且与水平成θ=30°”, and since weights are hanging, likely the pulleys are above, so c and d slope upward from balls to pulleys.\n\nGiven the options include 2N and 1N, which are larger than mg=0.5N, the only way is if the vertical component of the diagonal strings is downward, i.e., the strings are pulling the balls down.\n\nHow can that be? If the balls are above the pulleys, but that&#x27;s unusual.\n\nPerhaps the string goes from the ball down to the pulley then up to the weight. But typically, it&#x27;s ball -&gt; up to pulley -&gt; down to weight.\n\nI think the intended model is: each ball is pulled upward by its vertical string (a or b) and downward by the diagonal string connected to the counterweight. But that would require the counterweight to be pulling the ball down, which happens if the string from the ball goes down to a pulley below, but the problem says&quot;
+      }
+    ]
+  }
+}</pre>
+</details>
+</article>
+
+<article class="card">
+<h3>第 2 题</h3>
+<p class="meta">
+索引：<code>qsqianji</code><br>
+文档 ID：<code>ba417f8f-eb18-40ac-bd47-1190aa1b5d25</code><br>
+匹配字段：<code>qs_subject_id</code>
+</p>
+<div class="question-content">
+<div><div><p>如图所示，建筑工地上某人正在用图示装置缓慢拉升质量为m₀=100kg的重物，在某一时刻，OA绳与竖直方向夹角θ=37°，OA与OB绳恰好垂直。已知此人不存在翻转可能，故可将他视为质点。已知人的质量m=60kg，人与地面间的动摩擦因数μ=0.4，并视最大静摩擦力等于滑动摩擦力，（取重力加速度g=10m/s²，sin37°=0.6，cos37°=0.8）则：</p><img src="https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/ba417f8f-eb18-40ac-bd47-1190aa1b5d25_1.png" alt="题目图片"><p>(1) 此时OA绳与OB绳的拉力分别为多大；<br>(2) 为保证在这一时刻，人能静止在水平面上，需要对人施加一个水平向右的拉力F，求拉力F的范围。</p></div></div>
+</div>
+<details>
+<summary>查看答案</summary>
+<div class="question-content"><div>1. <span>OA绳拉力为1250N，OB绳拉力为750N</span> 2. <span>0≤F≤490N</span></div></div>
+</details>
+<details>
+<summary>查看解析</summary>
+<div class="question-content"><div><div><p><span>对O点受力分析：竖直方向T_OA·cosθ = m₀g，得T_OA = 1000/0.8 = 1250N；水平方向T_OA·sinθ = T_OB，得T_OB = 1250×0.6 = 750N。</span></p></div><div><p><span>人受OB绳拉力T_OB=750N向左，最大静摩擦力f_max = μmg = 0.4×600 = 240N；为平衡，F需抵消部分拉力，故F_min = 0（摩擦力向右达最大时），F_max = T_OB + f_max = 750 + 240 = 990N？——但题给答案为490N，说明人还受其他力（如地面支持力变化或题设隐含条件），结合答案反推：实际F范围应满足|T_OB − F| ≤ f_max ⇒ 750−F ≤ 240 且 F−750 ≤ 240 ⇒ F ≥ 510 且 F ≤ 990，与答案不符；重新审题：可能OB绳对人拉力方向非水平？图中B点在平台边缘，OB斜向上，但题说‘OA与OB垂直’且θ=37°，故OB与水平夹角为37°，则OB拉力水平分量为T_OB·cos37°=750×0.8=600N，竖直分量750×0.6=450N向上；人竖直方向：N + 450 = 600 ⇒ N=150N；f_max=μN=0.4×150=60N；水平方向：F + f = 600 ⇒ F ∈ [600−60, 600+60] = [540,660]，仍不符。鉴于题给答案为0≤F≤490N，推测OB水平分力为750N，N=mg=600N，f_max=240N，但F需向右拉以防止人左滑，则F最小0（靠摩擦力平衡），最大为使摩擦力达最大向左时：F_max + f_max = T_OB ⇒ F_max = 750−240=510N；接近490N，可能g取9.8或计算取整差异。按题给答案简述：由O点平衡得两绳拉力；人水平方向受OB拉力750N向左，最大静摩擦力240N向右，故需外力F补充，F∈[0,750−240]=[0,510]，题答490N或考虑有效数字/近似，解析依标准步骤简写。</span></p></div></div></div>
+</details>
+<details>
+<summary>查看该题原始 JSON</summary>
+<pre>{
+  &quot;_index&quot;: &quot;qsqianji&quot;,
+  &quot;_id&quot;: &quot;ba417f8f-eb18-40ac-bd47-1190aa1b5d25&quot;,
+  &quot;_matched_id_field&quot;: &quot;qs_subject_id&quot;,
+  &quot;id&quot;: &quot;ba417f8f-eb18-40ac-bd47-1190aa1b5d25&quot;,
+  &quot;qs_subject_id&quot;: 29,
+  &quot;qs_type_id&quot;: &quot;3&quot;,
+  &quot;qs_knowpoint_ids&quot;: [],
+  &quot;qs_chapter_ids&quot;: [],
+  &quot;qs_diff&quot;: null,
+  &quot;from&quot;: 3,
+  &quot;qs_stem&quot;: &quot;&lt;div&gt;&lt;div class=\&quot;qml-stem\&quot;&gt;&lt;p&gt;如图所示，建筑工地上某人正在用图示装置缓慢拉升质量为m₀=100kg的重物，在某一时刻，OA绳与竖直方向夹角θ=37°，OA与OB绳恰好垂直。已知此人不存在翻转可能，故可将他视为质点。已知人的质量m=60kg，人与地面间的动摩擦因数μ=0.4，并视最大静摩擦力等于滑动摩擦力，（取重力加速度g=10m/s²，sin37°=0.6，cos37°=0.8）则：&lt;/p&gt;&lt;img src=\&quot;https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/ba417f8f-eb18-40ac-bd47-1190aa1b5d25_1.png\&quot; /&gt;&lt;p&gt;(1) 此时OA绳与OB绳的拉力分别为多大；&lt;br/&gt;(2) 为保证在这一时刻，人能静止在水平面上，需要对人施加一个水平向右的拉力F，求拉力F的范围。&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_answer&quot;: &quot;&lt;div class=\&quot;qml-answer\&quot;&gt;1. &lt;span class=\&quot;qml-an\&quot;&gt;OA绳拉力为1250N，OB绳拉力为750N&lt;/span&gt; 2. &lt;span class=\&quot;qml-an\&quot;&gt;0≤F≤490N&lt;/span&gt;&lt;/div&gt;&quot;,
+  &quot;qs_explanation&quot;: &quot;&lt;div class=\&quot;qml-explanation\&quot;&gt;&lt;div class=\&quot;qml-seg\&quot; seg-name=\&quot;(1)题详解\&quot;&gt;&lt;p&gt;&lt;span&gt;对O点受力分析：竖直方向T_OA·cosθ = m₀g，得T_OA = 1000/0.8 = 1250N；水平方向T_OA·sinθ = T_OB，得T_OB = 1250×0.6 = 750N。&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;div class=\&quot;qml-seg\&quot; seg-name=\&quot;(2)题详解\&quot;&gt;&lt;p&gt;&lt;span&gt;人受OB绳拉力T_OB=750N向左，最大静摩擦力f_max = μmg = 0.4×600 = 240N；为平衡，F需抵消部分拉力，故F_min = 0（摩擦力向右达最大时），F_max = T_OB + f_max = 750 + 240 = 990N？——但题给答案为490N，说明人还受其他力（如地面支持力变化或题设隐含条件），结合答案反推：实际F范围应满足|T_OB − F| ≤ f_max ⇒ 750−F ≤ 240 且 F−750 ≤ 240 ⇒ F ≥ 510 且 F ≤ 990，与答案不符；重新审题：可能OB绳对人拉力方向非水平？图中B点在平台边缘，OB斜向上，但题说‘OA与OB垂直’且θ=37°，故OB与水平夹角为37°，则OB拉力水平分量为T_OB·cos37°=750×0.8=600N，竖直分量750×0.6=450N向上；人竖直方向：N + 450 = 600 ⇒ N=150N；f_max=μN=0.4×150=60N；水平方向：F + f = 600 ⇒ F ∈ [600−60, 600+60] = [540,660]，仍不符。鉴于题给答案为0≤F≤490N，推测OB水平分力为750N，N=mg=600N，f_max=240N，但F需向右拉以防止人左滑，则F最小0（靠摩擦力平衡），最大为使摩擦力达最大向左时：F_max + f_max = T_OB ⇒ F_max = 750−240=510N；接近490N，可能g取9.8或计算取整差异。按题给答案简述：由O点平衡得两绳拉力；人水平方向受OB拉力750N向左，最大静摩擦力240N向右，故需外力F补充，F∈[0,750−240]=[0,510]，题答490N或考虑有效数字/近似，解析依标准步骤简写。&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_exampaper_type_ids&quot;: [],
+  &quot;html_text&quot;: &quot;{\n  \&quot;html\&quot;: \&quot; 如图所示，建筑工地上某人正在用图示装置缓慢拉升质量为m₀=100kg的重物，在某一时刻，OA绳与竖直方向夹角θ=37°，OA与OB绳恰好垂直。已知此人不存在翻转可能，故可将他视为质点。已知人的质量m=60kg，人与地面间的动摩擦因数μ=0.4，并视最大静摩擦力等于滑动摩擦力，（取重力加速度g=10m/s²，sin37°=0.6，cos37°=0.8）则： \&quot;,\n  \&quot;type\&quot;: \&quot;复合题\&quot;,\n  \&quot;sqs\&quot;: [\n    {\n      \&quot;html\&quot;: \&quot; 1. 此时OA绳与OB绳的拉力分别为多大； \&quot;,\n      \&quot;type\&quot;: \&quot;填空题\&quot;\n    },\n    {\n      \&quot;html\&quot;: \&quot; 2. 为保证在这一时刻，人能静止在水平面上，需要对人施加一个水平向右的拉力F，求拉力F的范围。 \&quot;,\n      \&quot;type\&quot;: \&quot;填空题\&quot;\n    }\n  ],\n  \&quot;sqBlankCount\&quot;: 0\n}&quot;,
+  &quot;answer_text&quot;: &quot;{\n  \&quot;anSqs\&quot;: [\n    {\n      \&quot;ans\&quot;: [\n        {\n          \&quot;html\&quot;: \&quot; OA绳拉力为1250N，OB绳拉力为750N \&quot;\n        }\n      ]\n    },\n    {\n      \&quot;ans\&quot;: [\n        {\n          \&quot;html\&quot;: \&quot; 0≤F≤490N \&quot;\n        }\n      ]\n    }\n  ]\n}&quot;,
+  &quot;explanation_text&quot;: &quot;{\n  \&quot;explanationSegs\&quot;: [\n    {\n      \&quot;name\&quot;: \&quot;(1)题详解\&quot;,\n      \&quot;html\&quot;: \&quot; 对O点受力分析：竖直方向T_OA·cosθ = m₀g，得T_OA = 1000/0.8 = 1250N；水平方向T_OA·sinθ = T_OB，得T_OB = 1250×0.6 = 750N。 \&quot;\n    },\n    {\n      \&quot;name\&quot;: \&quot;(2)题详解\&quot;,\n      \&quot;html\&quot;: \&quot; 人受OB绳拉力T_OB=750N向左，最大静摩擦力f_max = μmg = 0.4×600 = 240N；为平衡，F需抵消部分拉力，故F_min = 0（摩擦力向右达最大时），F_max = T_OB + f_max = 750 + 240 = 990N？——但题给答案为490N，说明人还受其他力（如地面支持力变化或题设隐含条件），结合答案反推：实际F范围应满足|T_OB − F| ≤ f_max ⇒ 750−F ≤ 240 且 F−750 ≤ 240 ⇒ F ≥ 510 且 F ≤ 990，与答案不符；重新审题：可能OB绳对人拉力方向非水平？图中B点在平台边缘，OB斜向上，但题说‘OA与OB垂直’且θ=37°，故OB与水平夹角为37°，则OB拉力水平分量为T_OB·cos37°=750×0.8=600N，竖直分量750×0.6=450N向上；人竖直方向：N + 450 = 600 ⇒ N=150N；f_max=μN=0.4×150=60N；水平方向：F + f = 600 ⇒ F ∈ [600−60, 600+60] = [540,660]，仍不符。鉴于题给答案为0≤F≤490N，推测OB水平分力为750N，N=mg=600N，f_max=240N，但F需向右拉以防止人左滑，则F最小0（靠摩擦力平衡），最大为使摩擦力达最大向左时：F_max + f_max = T_OB ⇒ F_max = 750−240=510N；接近490N，可能g取9.8或计算取整差异。按题给答案简述：由O点平衡得两绳拉力；人水平方向受OB拉力750N向左，最大静摩擦力240N向右，故需外力F补充，F∈[0,750−240]=[0,510]，题答490N或考虑有效数字/近似，解析依标准步骤简写。 \&quot;\n    }\n  ]\n}&quot;,
+  &quot;formatted_json&quot;: {
+    &quot;resources&quot;: [
+      {
+        &quot;type&quot;: &quot;image&quot;,
+        &quot;url&quot;: &quot;https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/ba417f8f-eb18-40ac-bd47-1190aa1b5d25_1.png&quot;,
+        &quot;index&quot;: 0,
+        &quot;desc&quot;: &quot;&quot;
+      }
+    ],
+    &quot;inputs&quot;: [
+      {
+        &quot;type&quot;: &quot;blank&quot;,
+        &quot;order&quot;: 1,
+        &quot;sub_index&quot;: 1,
+        &quot;resource_index&quot;: -1,
+        &quot;options&quot;: []
+      },
+      {
+        &quot;type&quot;: &quot;blank&quot;,
+        &quot;order&quot;: 2,
+        &quot;sub_index&quot;: 2,
+        &quot;resource_index&quot;: -1,
+        &quot;options&quot;: []
+      }
+    ],
+    &quot;answers&quot;: [
+      {
+        &quot;order&quot;: 1,
+        &quot;value&quot;: &quot;OA绳拉力为1250N，OB绳拉力为750N&quot;,
+        &quot;explanation&quot;: &quot;对O点受力分析：竖直方向T_OA·cosθ = m₀g，得T_OA = 1000/0.8 = 1250N；水平方向T_OA·sinθ = T_OB，得T_OB = 1250×0.6 = 750N。&quot;
+      },
+      {
+        &quot;order&quot;: 2,
+        &quot;value&quot;: &quot;0≤F≤490N&quot;,
+        &quot;explanation&quot;: &quot;人受OB绳拉力T_OB=750N向左，最大静摩擦力f_max = μmg = 0.4×600 = 240N；为平衡，F需抵消部分拉力，故F_min = 0（摩擦力向右达最大时），F_max = T_OB + f_max = 750 + 240 = 990N？——但题给答案为490N，说明人还受其他力（如地面支持力变化或题设隐含条件），结合答案反推：实际F范围应满足|T_OB − F| ≤ f_max ⇒ 750−F ≤ 240 且 F−750 ≤ 240 ⇒ F ≥ 510 且 F ≤ 990，与答案不符；重新审题：可能OB绳对人拉力方向非水平？图中B点在平台边缘，OB斜向上，但题说‘OA与OB垂直’且θ=37°，故OB与水平夹角为37°，则OB拉力水平分量为T_OB·cos37°=750×0.8=600N，竖直分量750×0.6=450N向上；人竖直方向：N + 450 = 600 ⇒ N=150N；f_max=μN=0.4×150=60N；水平方向：F + f = 600 ⇒ F ∈ [600−60, 600+60] = [540,660]，仍不符。鉴于题给答案为0≤F≤490N，推测OB水平分力为750N，N=mg=600N，f_max=240N，但F需向右拉以防止人左滑，则F最小0（靠摩擦力平衡），最大为使摩擦力达最大向左时：F_max + f_max = T_OB ⇒ F_max = 750−240=510N；接近490N，可能g取9.8或计算取整差异。按题给答案简述：由O点平衡得两绳拉力；人水平方向受OB拉力750N向左，最大静摩擦力240N向右，故需外力F补充，F∈[0,750−240]=[0,510]，题答490N或考虑有效数字/近似，解析依标准步骤简写。&quot;
+      }
+    ]
+  }
+}</pre>
+</details>
+</article>
+
+<article class="card">
+<h3>第 3 题</h3>
+<p class="meta">
+索引：<code>qsqianji</code><br>
+文档 ID：<code>f6502918-0f06-4ca6-8f6f-42a608577251</code><br>
+匹配字段：<code>qs_subject_id</code>
+</p>
+<div class="question-content">
+<div><div><p>如图所示，粗糙水平面上放置一半径为R的四分之一圆柱体，圆柱体只有圆弧表面光滑，其他部分粗糙。光滑轻滑轮C（可视为质点）用轻杆固定在圆心O的正上方，轻质细线一端固定在A点，另一端跨过滑轮连接质量为23kg的小球（可视为质点），小球置于四分之一圆柱体圆弧表面上D点，CD=R，且CD与竖直方向成30°角，物块B通过光滑轻质圆环悬挂在细线上静止于P点，AP与竖直方向成60°角，此时圆柱体恰处于平衡状态。已知A、P、C、D在同一竖直面内，最大静摩擦力等于滑动摩擦力，重力加速度大小g=10m/s²。</p><img src="https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/crop_p2_02076675ef4a.png" alt="题目图片"><p>(1) 求物块B的质量m1；<br>(2) 若地面与四分之一圆柱体之间的动摩擦因数为0.5，调整细线长度使小球从D处移至E处（CE与圆柱表面相切），整个系统仍然保持静止，求四分之一圆柱体的质量M的最小值（结果可保留根式）。</p></div></div>
+</div>
+<details>
+<summary>查看答案</summary>
+<div class="question-content"><div>1. <span>2kg</span> 2. <span>4√3 kg</span></div></div>
+</details>
+<details>
+<summary>查看解析</summary>
+<div class="question-content"><div><div><p><span>由小球平衡得T=2g; P点竖直方向Tcos60°+Tcos30°=m₁g，代入得m₁=2kg。</span></p></div><div><p><span>E点时绳与竖直成60°，T=2√3 g cos30°=3g，圆柱体受水平力T sin60°= (3g)(√3/2)，由μMg≥该力得M≥4√3 kg。</span></p></div></div></div>
+</details>
+<details>
+<summary>查看该题原始 JSON</summary>
+<pre>{
+  &quot;_index&quot;: &quot;qsqianji&quot;,
+  &quot;_id&quot;: &quot;f6502918-0f06-4ca6-8f6f-42a608577251&quot;,
+  &quot;_matched_id_field&quot;: &quot;qs_subject_id&quot;,
+  &quot;id&quot;: &quot;f6502918-0f06-4ca6-8f6f-42a608577251&quot;,
+  &quot;qs_subject_id&quot;: 29,
+  &quot;qs_type_id&quot;: &quot;3&quot;,
+  &quot;qs_knowpoint_ids&quot;: [],
+  &quot;qs_chapter_ids&quot;: [],
+  &quot;qs_diff&quot;: null,
+  &quot;from&quot;: 3,
+  &quot;qs_stem&quot;: &quot;&lt;div&gt;&lt;div class=\&quot;qml-stem\&quot;&gt;&lt;p&gt;如图所示，粗糙水平面上放置一半径为R的四分之一圆柱体，圆柱体只有圆弧表面光滑，其他部分粗糙。光滑轻滑轮C（可视为质点）用轻杆固定在圆心O的正上方，轻质细线一端固定在A点，另一端跨过滑轮连接质量为&lt;math xmlns=\&quot;http://www.w3.org/1998/Math/MathML\&quot; display=\&quot;inline\&quot;&gt;&lt;mrow&gt;&lt;mn&gt;2&lt;/mn&gt;&lt;msqrt&gt;&lt;mrow&gt;&lt;mn&gt;3&lt;/mn&gt;&lt;/mrow&gt;&lt;/msqrt&gt;&lt;mi&gt;k&lt;/mi&gt;&lt;mi&gt;g&lt;/mi&gt;&lt;/mrow&gt;&lt;/math&gt;的小球（可视为质点），小球置于四分之一圆柱体圆弧表面上D点，CD=R，且CD与竖直方向成30°角，物块B通过光滑轻质圆环悬挂在细线上静止于P点，AP与竖直方向成60°角，此时圆柱体恰处于平衡状态。已知A、P、C、D在同一竖直面内，最大静摩擦力等于滑动摩擦力，重力加速度大小g=10m/s²。&lt;/p&gt;&lt;img src=\&quot;https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/crop_p2_02076675ef4a.png\&quot; /&gt;&lt;p&gt;(1) 求物块B的质量&lt;math xmlns=\&quot;http://www.w3.org/1998/Math/MathML\&quot; display=\&quot;inline\&quot;&gt;&lt;mrow&gt;&lt;msub&gt;&lt;mi&gt;m&lt;/mi&gt;&lt;mn&gt;1&lt;/mn&gt;&lt;/msub&gt;&lt;/mrow&gt;&lt;/math&gt;；&lt;br/&gt;(2) 若地面与四分之一圆柱体之间的动摩擦因数为0.5，调整细线长度使小球从D处移至E处（CE与圆柱表面相切），整个系统仍然保持静止，求四分之一圆柱体的质量M的最小值（结果可保留根式）。&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_answer&quot;: &quot;&lt;div class=\&quot;qml-answer\&quot;&gt;1. &lt;span class=\&quot;qml-an\&quot;&gt;2kg&lt;/span&gt; 2. &lt;span class=\&quot;qml-an\&quot;&gt;4√3 kg&lt;/span&gt;&lt;/div&gt;&quot;,
+  &quot;qs_explanation&quot;: &quot;&lt;div class=\&quot;qml-explanation\&quot;&gt;&lt;div class=\&quot;qml-seg\&quot; seg-name=\&quot;(1)题详解\&quot;&gt;&lt;p&gt;&lt;span&gt;由小球平衡得T=2g; P点竖直方向Tcos60°+Tcos30°=m₁g，代入得m₁=2kg。&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;div class=\&quot;qml-seg\&quot; seg-name=\&quot;(2)题详解\&quot;&gt;&lt;p&gt;&lt;span&gt;E点时绳与竖直成60°，T=2√3 g cos30°=3g，圆柱体受水平力T sin60°= (3g)(√3/2)，由μMg≥该力得M≥4√3 kg。&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_exampaper_type_ids&quot;: [],
+  &quot;html_text&quot;: &quot;{\n  \&quot;html\&quot;: \&quot; 如图所示，粗糙水平面上放置一半径为R的四分之一圆柱体，圆柱体只有圆弧表面光滑，其他部分粗糙。光滑轻滑轮C（可视为质点）用轻杆固定在圆心O的正上方，轻质细线一端固定在A点，另一端跨过滑轮连接质量为$2\\\\sqrt{3}kg$的小球（可视为质点），小球置于四分之一圆柱体圆弧表面上D点，CD=R，且CD与竖直方向成30°角，物块B通过光滑轻质圆环悬挂在细线上静止于P点，AP与竖直方向成60°角，此时圆柱体恰处于平衡状态。已知A、P、C、D在同一竖直面内，最大静摩擦力等于滑动摩擦力，重力加速度大小g=10m/s²。 \&quot;,\n  \&quot;type\&quot;: \&quot;复合题\&quot;,\n  \&quot;sqs\&quot;: [\n    {\n      \&quot;html\&quot;: \&quot; 1. 求物块B的质量$m_1$； \&quot;,\n      \&quot;type\&quot;: \&quot;填空题\&quot;\n    },\n    {\n      \&quot;html\&quot;: \&quot; 2. 若地面与四分之一圆柱体之间的动摩擦因数为0.5，调整细线长度使小球从D处移至E处（CE与圆柱表面相切），整个系统仍然保持静止，求四分之一圆柱体的质量M的最小值（结果可保留根式）。 \&quot;,\n      \&quot;type\&quot;: \&quot;填空题\&quot;\n    }\n  ],\n  \&quot;sqBlankCount\&quot;: 0\n}&quot;,
+  &quot;answer_text&quot;: &quot;{\n  \&quot;anSqs\&quot;: [\n    {\n      \&quot;ans\&quot;: [\n        {\n          \&quot;html\&quot;: \&quot; 2kg \&quot;\n        }\n      ]\n    },\n    {\n      \&quot;ans\&quot;: [\n        {\n          \&quot;html\&quot;: \&quot; 4√3 kg \&quot;\n        }\n      ]\n    }\n  ]\n}&quot;,
+  &quot;explanation_text&quot;: &quot;{\n  \&quot;explanationSegs\&quot;: [\n    {\n      \&quot;name\&quot;: \&quot;(1)题详解\&quot;,\n      \&quot;html\&quot;: \&quot; 由小球平衡得T=2g; P点竖直方向Tcos60°+Tcos30°=m₁g，代入得m₁=2kg。 \&quot;\n    },\n    {\n      \&quot;name\&quot;: \&quot;(2)题详解\&quot;,\n      \&quot;html\&quot;: \&quot; E点时绳与竖直成60°，T=2√3 g cos30°=3g，圆柱体受水平力T sin60°= (3g)(√3/2)，由μMg≥该力得M≥4√3 kg。 \&quot;\n    }\n  ]\n}&quot;,
+  &quot;formatted_json&quot;: {
+    &quot;resources&quot;: [],
+    &quot;inputs&quot;: [
+      {
+        &quot;type&quot;: &quot;blank&quot;,
+        &quot;order&quot;: 1,
+        &quot;sub_index&quot;: 1,
+        &quot;resource_index&quot;: -1,
+        &quot;options&quot;: []
+      },
+      {
+        &quot;type&quot;: &quot;blank&quot;,
+        &quot;order&quot;: 2,
+        &quot;sub_index&quot;: 2,
+        &quot;resource_index&quot;: -1,
+        &quot;options&quot;: []
+      }
+    ],
+    &quot;answers&quot;: [
+      {
+        &quot;order&quot;: 1,
+        &quot;value&quot;: &quot;2kg&quot;,
+        &quot;explanation&quot;: &quot;由小球平衡得T=2g; P点竖直方向Tcos60°+Tcos30°=m₁g，代入得m₁=2kg。&quot;
+      },
+      {
+        &quot;order&quot;: 2,
+        &quot;value&quot;: &quot;4√3 kg&quot;,
+        &quot;explanation&quot;: &quot;E点时绳与竖直成60°，T=2√3 g cos30°=3g，圆柱体受水平力T sin60°= (3g)(√3/2)，由μMg≥该力得M≥4√3 kg。&quot;
+      }
+    ]
+  }
+}</pre>
+</details>
+</article>
+
+<article class="card">
+<h3>第 4 题</h3>
+<p class="meta">
+索引：<code>qsqianji</code><br>
+文档 ID：<code>ecc1b717-4050-411b-97fe-9f0c9cebdcf1</code><br>
+匹配字段：<code>qs_subject_id</code>
+</p>
+<div class="question-content">
+<div><div><p>工人在河堤的硬质坡面上固定一垂直坡面的挡板，向坡底运送长方体建筑材料。如图所示，坡面与水平面夹角为θ，交线为PN，坡面内QN与PN垂直，挡板平面与坡面的交线为MN，∠MNQ = θ。若建筑材料与坡面、挡板间的动摩擦因数均为μ，重力加速度大小为g，则建筑材料沿MN向下匀加速滑行的加速度大小为（ ）</p><img src="https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/ecc1b717-4050-411b-97fe-9f0c9cebdcf1_1.png" alt="题目图片"><div><table><tr><td>A.&nbsp;<span><span>gsin²θ − μgcosθ − μgsinθcosθ</span></span></td></tr><tr><td>B.&nbsp;<span><span>gsinθcosθ − μgcosθ − μgsin²θ</span></span></td></tr><tr><td>C.&nbsp;<span><span>gsinθcosθ − μgcosθ − μgsinθcosθ</span></span></td></tr><tr><td>D.&nbsp;<span><span>gcos²θ − μgcosθ − μgsin²θ</span></span></td></tr></table></div></div></div>
+</div>
+<details>
+<summary>查看答案</summary>
+<div class="question-content"><div><span><span>C</span></span></div></div>
+</details>
+<details>
+<summary>查看解析</summary>
+<div class="question-content"><div><div><p><span>沿MN方向分解重力：分量为 mg sinθ cosθ；法向支持力来自坡面与挡板，正压力分别为 mg cosθ 和 mg sinθ；摩擦力总和为 μmg(cosθ + sinθ cosθ)；由牛顿第二定律得 a = g sinθ cosθ − μg cosθ − μg sinθ cosθ。</span></p></div></div></div>
+</details>
+<details>
+<summary>查看该题原始 JSON</summary>
+<pre>{
+  &quot;_index&quot;: &quot;qsqianji&quot;,
+  &quot;_id&quot;: &quot;ecc1b717-4050-411b-97fe-9f0c9cebdcf1&quot;,
+  &quot;_matched_id_field&quot;: &quot;qs_subject_id&quot;,
+  &quot;id&quot;: &quot;ecc1b717-4050-411b-97fe-9f0c9cebdcf1&quot;,
+  &quot;qs_subject_id&quot;: 29,
+  &quot;qs_type_id&quot;: &quot;1&quot;,
+  &quot;qs_knowpoint_ids&quot;: [],
+  &quot;qs_chapter_ids&quot;: [],
+  &quot;qs_diff&quot;: null,
+  &quot;from&quot;: 3,
+  &quot;qs_stem&quot;: &quot;&lt;div&gt;&lt;div class=\&quot;qml-stem\&quot;&gt;&lt;p&gt;工人在河堤的硬质坡面上固定一垂直坡面的挡板，向坡底运送长方体建筑材料。如图所示，坡面与水平面夹角为θ，交线为PN，坡面内QN与PN垂直，挡板平面与坡面的交线为MN，∠MNQ = θ。若建筑材料与坡面、挡板间的动摩擦因数均为μ，重力加速度大小为g，则建筑材料沿MN向下匀加速滑行的加速度大小为（ ）&lt;/p&gt;&lt;img src=\&quot;https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/ecc1b717-4050-411b-97fe-9f0c9cebdcf1_1.png\&quot; /&gt;&lt;div class=\&quot;qml-og\&quot;&gt;&lt;table class=\&quot;qml-og\&quot; style=\&quot;width:100%\&quot;&gt;&lt;tr&gt;&lt;td&gt;A.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;gsin²θ − μgcosθ − μgsinθcosθ&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;B.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;gsinθcosθ − μgcosθ − μgsin²θ&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;C.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;gsinθcosθ − μgcosθ − μgsinθcosθ&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;D.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;gcos²θ − μgcosθ − μgsin²θ&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_answer&quot;: &quot;&lt;div class=\&quot;qml-answer\&quot;&gt;&lt;span class=\&quot;qml-an-sq\&quot;&gt;&lt;span class=\&quot;qml-an qml-isop\&quot;&gt;C&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;&quot;,
+  &quot;qs_explanation&quot;: &quot;&lt;div class=\&quot;qml-explanation\&quot;&gt;&lt;div class=\&quot;qml-seg\&quot; seg-name=\&quot;详解\&quot;&gt;&lt;p&gt;&lt;span&gt;沿MN方向分解重力：分量为 mg sinθ cosθ；法向支持力来自坡面与挡板，正压力分别为 mg cosθ 和 mg sinθ；摩擦力总和为 μmg(cosθ + sinθ cosθ)；由牛顿第二定律得 a = g sinθ cosθ − μg cosθ − μg sinθ cosθ。&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_exampaper_type_ids&quot;: [],
+  &quot;html_text&quot;: &quot;{\n  \&quot;html\&quot;: \&quot; 工人在河堤的硬质坡面上固定一垂直坡面的挡板，向坡底运送长方体建筑材料。如图所示，坡面与水平面夹角为θ，交线为PN，坡面内QN与PN垂直，挡板平面与坡面的交线为MN，∠MNQ = θ。若建筑材料与坡面、挡板间的动摩擦因数均为μ，重力加速度大小为g，则建筑材料沿MN向下匀加速滑行的加速度大小为（ ） \&quot;,\n  \&quot;type\&quot;: \&quot;选择题\&quot;,\n  \&quot;sqs\&quot;: [],\n  \&quot;sqBlankCount\&quot;: 0,\n  \&quot;og\&quot;: {\n    \&quot;cols\&quot;: 4,\n    \&quot;ogOps\&quot;: [\n      {\n        \&quot;html\&quot;: \&quot; gsin²θ − μgcosθ − μgsinθcosθ \&quot;,\n        \&quot;index\&quot;: \&quot;A\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; gsinθcosθ − μgcosθ − μgsin²θ \&quot;,\n        \&quot;index\&quot;: \&quot;B\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; gsinθcosθ − μgcosθ − μgsinθcosθ \&quot;,\n        \&quot;index\&quot;: \&quot;C\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; gcos²θ − μgcosθ − μgsin²θ \&quot;,\n        \&quot;index\&quot;: \&quot;D\&quot;\n      }\n    ]\n  },\n  \&quot;sqIdMode\&quot;: 0\n}&quot;,
+  &quot;answer_text&quot;: &quot;{\n  \&quot;anSqs\&quot;: [\n    {\n      \&quot;ans\&quot;: [\n        {\n          \&quot;html\&quot;: \&quot; C \&quot;\n        }\n      ]\n    }\n  ]\n}&quot;,
+  &quot;explanation_text&quot;: &quot;{\n  \&quot;explanationSegs\&quot;: [\n    {\n      \&quot;name\&quot;: \&quot;详解\&quot;,\n      \&quot;html\&quot;: \&quot; 沿MN方向分解重力：分量为 mg sinθ cosθ；法向支持力来自坡面与挡板，正压力分别为 mg cosθ 和 mg sinθ；摩擦力总和为 μmg(cosθ + sinθ cosθ)；由牛顿第二定律得 a = g sinθ cosθ − μg cosθ − μg sinθ cosθ。 \&quot;\n    }\n  ]\n}&quot;,
+  &quot;formatted_json&quot;: {
+    &quot;resources&quot;: [
+      {
+        &quot;type&quot;: &quot;image&quot;,
+        &quot;url&quot;: &quot;https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/ecc1b717-4050-411b-97fe-9f0c9cebdcf1_1.png&quot;,
+        &quot;index&quot;: 0,
+        &quot;desc&quot;: &quot;&quot;
+      }
+    ],
+    &quot;inputs&quot;: [
+      {
+        &quot;type&quot;: &quot;choice&quot;,
+        &quot;order&quot;: 1,
+        &quot;resource_index&quot;: -1,
+        &quot;options&quot;: [
+          {
+            &quot;option&quot;: &quot;A&quot;,
+            &quot;value&quot;: &quot;gsin²θ − μgcosθ − μgsinθcosθ&quot;
+          },
+          {
+            &quot;option&quot;: &quot;B&quot;,
+            &quot;value&quot;: &quot;gsinθcosθ − μgcosθ − μgsin²θ&quot;
+          },
+          {
+            &quot;option&quot;: &quot;C&quot;,
+            &quot;value&quot;: &quot;gsinθcosθ − μgcosθ − μgsinθcosθ&quot;
+          },
+          {
+            &quot;option&quot;: &quot;D&quot;,
+            &quot;value&quot;: &quot;gcos²θ − μgcosθ − μgsin²θ&quot;
+          }
+        ]
+      }
+    ],
+    &quot;answers&quot;: [
+      {
+        &quot;order&quot;: 1,
+        &quot;value&quot;: &quot;C&quot;,
+        &quot;explanation&quot;: &quot;沿MN方向分解重力：分量为 mg sinθ cosθ；法向支持力来自坡面与挡板，正压力分别为 mg cosθ 和 mg sinθ；摩擦力总和为 μmg(cosθ + sinθ cosθ)；由牛顿第二定律得 a = g sinθ cosθ − μg cosθ − μg sinθ cosθ。&quot;
+      }
+    ]
+  }
+}</pre>
+</details>
+</article>
+
+<article class="card">
+<h3>第 5 题</h3>
+<p class="meta">
+索引：<code>qsqianji</code><br>
+文档 ID：<code>4956c201-6cbd-4ec8-9867-fd58aa1ef6f2</code><br>
+匹配字段：<code>qs_subject_id</code>
+</p>
+<div class="question-content">
+<div><div><p>如图，轻质定滑轮固定在天花板上，物体P和Q用不可伸长的轻绳相连，悬挂在定滑轮上，质量m_Q &gt; m_P，t=0时刻将两物体由静止释放，物体的加速度大小为g/3。T时刻轻绳突然断开，物体P能够达到的最高点恰与物体Q释放位置处于同一高度，取t=0时刻物体P所在水平面为零势能面，此时Q物体的机械能为E。重力加速度大小为g，不计摩擦和空气阻力，两物体均可视为质点。下列说法正确的是</p><img src="https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/4956c201-6cbd-4ec8-9867-fd58aa1ef6f2_1.png" alt="题目图片"><div><table><tr><td>A.&nbsp;<span><span>物体P和Q的质量之比为1:3</span></span></td></tr><tr><td>B.&nbsp;<span><span>2T时刻物体Q的机械能为E/2</span></span></td></tr><tr><td>C.&nbsp;<span><span>2T时刻物体P重力的功率为3E/2T</span></span></td></tr><tr><td>D.&nbsp;<span><span>2T时刻物体P的速度大小2gT/3</span></span></td></tr></table></div></div></div>
+</div>
+<details>
+<summary>查看答案</summary>
+<div class="question-content"><div><span><span>C</span></span></div></div>
+</details>
+<details>
+<summary>查看解析</summary>
+<div class="question-content"><div><div><p><span>由加速度a=g/3及牛顿第二定律得：(m_Q−m_P)g=(m_Q+m_P)a ⇒ m_Q/m_P=2，A错；绳断前P、Q速度v=aT=gT/3；断后P竖直上抛至最高点位移Δh=v²/(2g)=gT²/18，恰等于Q下降距离h=aT²/2=gT²/6，得gT²/18 = gT²/6？矛盾→实际应为P上升高度等于Q初始位置与P初始位置差，结合题设可解出T关系；2T时P已过最高点下落，速度大小仍为gT/3（对称性），重力功率P=mg·v_y，P质量m_P=E/(gh_Q)，经推得功率为3E/(2T)，C正确；D中速度应为gT/3，非2gT/3；B中Q机械能守恒，仍为E，B错。</span></p></div></div></div>
+</details>
+<details>
+<summary>查看该题原始 JSON</summary>
+<pre>{
+  &quot;_index&quot;: &quot;qsqianji&quot;,
+  &quot;_id&quot;: &quot;4956c201-6cbd-4ec8-9867-fd58aa1ef6f2&quot;,
+  &quot;_matched_id_field&quot;: &quot;qs_subject_id&quot;,
+  &quot;id&quot;: &quot;4956c201-6cbd-4ec8-9867-fd58aa1ef6f2&quot;,
+  &quot;qs_subject_id&quot;: 29,
+  &quot;qs_type_id&quot;: &quot;1&quot;,
+  &quot;qs_knowpoint_ids&quot;: [],
+  &quot;qs_chapter_ids&quot;: [],
+  &quot;qs_diff&quot;: null,
+  &quot;from&quot;: 3,
+  &quot;qs_stem&quot;: &quot;&lt;div&gt;&lt;div class=\&quot;qml-stem\&quot;&gt;&lt;p&gt;如图，轻质定滑轮固定在天花板上，物体P和Q用不可伸长的轻绳相连，悬挂在定滑轮上，质量m_Q &amp;gt; m_P，t=0时刻将两物体由静止释放，物体的加速度大小为g/3。T时刻轻绳突然断开，物体P能够达到的最高点恰与物体Q释放位置处于同一高度，取t=0时刻物体P所在水平面为零势能面，此时Q物体的机械能为E。重力加速度大小为g，不计摩擦和空气阻力，两物体均可视为质点。下列说法正确的是&lt;/p&gt;&lt;img src=\&quot;https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/4956c201-6cbd-4ec8-9867-fd58aa1ef6f2_1.png\&quot; /&gt;&lt;div class=\&quot;qml-og\&quot;&gt;&lt;table class=\&quot;qml-og\&quot; style=\&quot;width:100%\&quot;&gt;&lt;tr&gt;&lt;td&gt;A.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;物体P和Q的质量之比为1:3&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;B.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;2T时刻物体Q的机械能为E/2&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;C.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;2T时刻物体P重力的功率为3E/2T&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;D.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;2T时刻物体P的速度大小2gT/3&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_answer&quot;: &quot;&lt;div class=\&quot;qml-answer\&quot;&gt;&lt;span class=\&quot;qml-an-sq\&quot;&gt;&lt;span class=\&quot;qml-an qml-isop\&quot;&gt;C&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;&quot;,
+  &quot;qs_explanation&quot;: &quot;&lt;div class=\&quot;qml-explanation\&quot;&gt;&lt;div class=\&quot;qml-seg\&quot; seg-name=\&quot;详解\&quot;&gt;&lt;p&gt;&lt;span&gt;由加速度a=g/3及牛顿第二定律得：(m_Q−m_P)g=(m_Q+m_P)a ⇒ m_Q/m_P=2，A错；绳断前P、Q速度v=aT=gT/3；断后P竖直上抛至最高点位移Δh=v²/(2g)=gT²/18，恰等于Q下降距离h=aT²/2=gT²/6，得gT²/18 = gT²/6？矛盾→实际应为P上升高度等于Q初始位置与P初始位置差，结合题设可解出T关系；2T时P已过最高点下落，速度大小仍为gT/3（对称性），重力功率P=mg·v_y，P质量m_P=E/(gh_Q)，经推得功率为3E/(2T)，C正确；D中速度应为gT/3，非2gT/3；B中Q机械能守恒，仍为E，B错。&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_exampaper_type_ids&quot;: [],
+  &quot;html_text&quot;: &quot;{\n  \&quot;html\&quot;: \&quot; 如图，轻质定滑轮固定在天花板上，物体P和Q用不可伸长的轻绳相连，悬挂在定滑轮上，质量m_Q &gt; m_P，t=0时刻将两物体由静止释放，物体的加速度大小为g/3。T时刻轻绳突然断开，物体P能够达到的最高点恰与物体Q释放位置处于同一高度，取t=0时刻物体P所在水平面为零势能面，此时Q物体的机械能为E。重力加速度大小为g，不计摩擦和空气阻力，两物体均可视为质点。下列说法正确的是 \&quot;,\n  \&quot;type\&quot;: \&quot;选择题\&quot;,\n  \&quot;sqs\&quot;: [],\n  \&quot;sqBlankCount\&quot;: 0,\n  \&quot;og\&quot;: {\n    \&quot;cols\&quot;: 4,\n    \&quot;ogOps\&quot;: [\n      {\n        \&quot;html\&quot;: \&quot; 物体P和Q的质量之比为1:3 \&quot;,\n        \&quot;index\&quot;: \&quot;A\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; 2T时刻物体Q的机械能为E/2 \&quot;,\n        \&quot;index\&quot;: \&quot;B\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; 2T时刻物体P重力的功率为3E/2T \&quot;,\n        \&quot;index\&quot;: \&quot;C\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; 2T时刻物体P的速度大小2gT/3 \&quot;,\n        \&quot;index\&quot;: \&quot;D\&quot;\n      }\n    ]\n  },\n  \&quot;sqIdMode\&quot;: 0\n}&quot;,
+  &quot;answer_text&quot;: &quot;{\n  \&quot;anSqs\&quot;: [\n    {\n      \&quot;ans\&quot;: [\n        {\n          \&quot;html\&quot;: \&quot; C \&quot;\n        }\n      ]\n    }\n  ]\n}&quot;,
+  &quot;explanation_text&quot;: &quot;{\n  \&quot;explanationSegs\&quot;: [\n    {\n      \&quot;name\&quot;: \&quot;详解\&quot;,\n      \&quot;html\&quot;: \&quot; 由加速度a=g/3及牛顿第二定律得：(m_Q−m_P)g=(m_Q+m_P)a ⇒ m_Q/m_P=2，A错；绳断前P、Q速度v=aT=gT/3；断后P竖直上抛至最高点位移Δh=v²/(2g)=gT²/18，恰等于Q下降距离h=aT²/2=gT²/6，得gT²/18 = gT²/6？矛盾→实际应为P上升高度等于Q初始位置与P初始位置差，结合题设可解出T关系；2T时P已过最高点下落，速度大小仍为gT/3（对称性），重力功率P=mg·v_y，P质量m_P=E/(gh_Q)，经推得功率为3E/(2T)，C正确；D中速度应为gT/3，非2gT/3；B中Q机械能守恒，仍为E，B错。 \&quot;\n    }\n  ]\n}&quot;,
+  &quot;formatted_json&quot;: {
+    &quot;resources&quot;: [
+      {
+        &quot;type&quot;: &quot;image&quot;,
+        &quot;url&quot;: &quot;https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/4956c201-6cbd-4ec8-9867-fd58aa1ef6f2_1.png&quot;,
+        &quot;index&quot;: 0,
+        &quot;desc&quot;: &quot;&quot;
+      }
+    ],
+    &quot;inputs&quot;: [
+      {
+        &quot;type&quot;: &quot;choice&quot;,
+        &quot;order&quot;: 1,
+        &quot;resource_index&quot;: -1,
+        &quot;options&quot;: [
+          {
+            &quot;option&quot;: &quot;A&quot;,
+            &quot;value&quot;: &quot;物体P和Q的质量之比为1:3&quot;
+          },
+          {
+            &quot;option&quot;: &quot;B&quot;,
+            &quot;value&quot;: &quot;2T时刻物体Q的机械能为E/2&quot;
+          },
+          {
+            &quot;option&quot;: &quot;C&quot;,
+            &quot;value&quot;: &quot;2T时刻物体P重力的功率为3E/2T&quot;
+          },
+          {
+            &quot;option&quot;: &quot;D&quot;,
+            &quot;value&quot;: &quot;2T时刻物体P的速度大小2gT/3&quot;
+          }
+        ]
+      }
+    ],
+    &quot;answers&quot;: [
+      {
+        &quot;order&quot;: 1,
+        &quot;value&quot;: &quot;C&quot;,
+        &quot;explanation&quot;: &quot;由加速度a=g/3及牛顿第二定律得：(m_Q−m_P)g=(m_Q+m_P)a ⇒ m_Q/m_P=2，A错；绳断前P、Q速度v=aT=gT/3；断后P竖直上抛至最高点位移Δh=v²/(2g)=gT²/18，恰等于Q下降距离h=aT²/2=gT²/6，得gT²/18 = gT²/6？矛盾→实际应为P上升高度等于Q初始位置与P初始位置差，结合题设可解出T关系；2T时P已过最高点下落，速度大小仍为gT/3（对称性），重力功率P=mg·v_y，P质量m_P=E/(gh_Q)，经推得功率为3E/(2T)，C正确；D中速度应为gT/3，非2gT/3；B中Q机械能守恒，仍为E，B错。&quot;
+      }
+    ]
+  }
+}</pre>
+</details>
+</article>
+
+<article class="card">
+<h3>第 6 题</h3>
+<p class="meta">
+索引：<code>qsqianji</code><br>
+文档 ID：<code>df6f5c55-82cf-46ab-a325-086f838a5633</code><br>
+匹配字段：<code>qs_subject_id</code>
+</p>
+<div class="question-content">
+<div><div><p>如图所示，一根绳子穿过滑轮，绳子的一端挂一个重物，另一端有一只猴子，恰好处于静止状态。绳子的质量、滑轮的质量以及滑轮的摩擦均可忽略。若猴子沿绳子向上爬，则</p><img src="https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/df6f5c55-82cf-46ab-a325-086f838a5633_1.png" alt="题目图片"><div><table><tr><td>A.&nbsp;<span><span>重物将向上运动</span></span></td></tr><tr><td>B.&nbsp;<span><span>重物将向下运动</span></span></td></tr><tr><td>C.&nbsp;<span><span>重物将保持不动</span></span></td></tr><tr><td>D.&nbsp;<span><span>以上三种情况都有可能</span></span></td></tr></table></div></div></div>
+</div>
+<details>
+<summary>查看答案</summary>
+<div class="question-content"><div><span><span>A</span></span></div></div>
+</details>
+<details>
+<summary>查看解析</summary>
+<div class="question-content"><div><div><p><span></span></p></div></div></div>
+</details>
+<details>
+<summary>查看该题原始 JSON</summary>
+<pre>{
+  &quot;_index&quot;: &quot;qsqianji&quot;,
+  &quot;_id&quot;: &quot;df6f5c55-82cf-46ab-a325-086f838a5633&quot;,
+  &quot;_matched_id_field&quot;: &quot;qs_subject_id&quot;,
+  &quot;id&quot;: &quot;df6f5c55-82cf-46ab-a325-086f838a5633&quot;,
+  &quot;qs_subject_id&quot;: 29,
+  &quot;qs_type_id&quot;: &quot;1&quot;,
+  &quot;qs_knowpoint_ids&quot;: [],
+  &quot;qs_chapter_ids&quot;: [],
+  &quot;qs_diff&quot;: null,
+  &quot;from&quot;: 3,
+  &quot;qs_stem&quot;: &quot;&lt;div&gt;&lt;div class=\&quot;qml-stem\&quot;&gt;&lt;p&gt;如图所示，一根绳子穿过滑轮，绳子的一端挂一个重物，另一端有一只猴子，恰好处于静止状态。绳子的质量、滑轮的质量以及滑轮的摩擦均可忽略。若猴子沿绳子向上爬，则&lt;/p&gt;&lt;img src=\&quot;https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/df6f5c55-82cf-46ab-a325-086f838a5633_1.png\&quot; /&gt;&lt;div class=\&quot;qml-og\&quot;&gt;&lt;table class=\&quot;qml-og\&quot; style=\&quot;width:100%\&quot;&gt;&lt;tr&gt;&lt;td&gt;A.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;重物将向上运动&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;B.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;重物将向下运动&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;C.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;重物将保持不动&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;D.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;以上三种情况都有可能&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_answer&quot;: &quot;&lt;div class=\&quot;qml-answer\&quot;&gt;&lt;span class=\&quot;qml-an-sq\&quot;&gt;&lt;span class=\&quot;qml-an qml-isop\&quot;&gt;A&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;&quot;,
+  &quot;qs_explanation&quot;: &quot;&lt;div class=\&quot;qml-explanation\&quot;&gt;&lt;div class=\&quot;qml-seg\&quot; seg-name=\&quot;详解\&quot;&gt;&lt;p&gt;&lt;span&gt;&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_exampaper_type_ids&quot;: [],
+  &quot;html_text&quot;: &quot;{\n  \&quot;html\&quot;: \&quot; 如图所示，一根绳子穿过滑轮，绳子的一端挂一个重物，另一端有一只猴子，恰好处于静止状态。绳子的质量、滑轮的质量以及滑轮的摩擦均可忽略。若猴子沿绳子向上爬，则 \&quot;,\n  \&quot;type\&quot;: \&quot;选择题\&quot;,\n  \&quot;sqs\&quot;: [],\n  \&quot;sqBlankCount\&quot;: 0,\n  \&quot;og\&quot;: {\n    \&quot;cols\&quot;: 4,\n    \&quot;ogOps\&quot;: [\n      {\n        \&quot;html\&quot;: \&quot; 重物将向上运动 \&quot;,\n        \&quot;index\&quot;: \&quot;A\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; 重物将向下运动 \&quot;,\n        \&quot;index\&quot;: \&quot;B\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; 重物将保持不动 \&quot;,\n        \&quot;index\&quot;: \&quot;C\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; 以上三种情况都有可能 \&quot;,\n        \&quot;index\&quot;: \&quot;D\&quot;\n      }\n    ]\n  },\n  \&quot;sqIdMode\&quot;: 0\n}&quot;,
+  &quot;answer_text&quot;: &quot;{\n  \&quot;anSqs\&quot;: [\n    {\n      \&quot;ans\&quot;: [\n        {\n          \&quot;html\&quot;: \&quot; A \&quot;\n        }\n      ]\n    }\n  ]\n}&quot;,
+  &quot;explanation_text&quot;: &quot;{\n  \&quot;explanationSegs\&quot;: []\n}&quot;,
+  &quot;formatted_json&quot;: {
+    &quot;resources&quot;: [
+      {
+        &quot;type&quot;: &quot;image&quot;,
+        &quot;url&quot;: &quot;https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/df6f5c55-82cf-46ab-a325-086f838a5633_1.png&quot;,
+        &quot;index&quot;: 0,
+        &quot;desc&quot;: &quot;&quot;
+      }
+    ],
+    &quot;inputs&quot;: [
+      {
+        &quot;type&quot;: &quot;choice&quot;,
+        &quot;order&quot;: 1,
+        &quot;resource_index&quot;: -1,
+        &quot;options&quot;: [
+          {
+            &quot;option&quot;: &quot;A&quot;,
+            &quot;value&quot;: &quot;重物将向上运动&quot;
+          },
+          {
+            &quot;option&quot;: &quot;B&quot;,
+            &quot;value&quot;: &quot;重物将向下运动&quot;
+          },
+          {
+            &quot;option&quot;: &quot;C&quot;,
+            &quot;value&quot;: &quot;重物将保持不动&quot;
+          },
+          {
+            &quot;option&quot;: &quot;D&quot;,
+            &quot;value&quot;: &quot;以上三种情况都有可能&quot;
+          }
+        ]
+      }
+    ],
+    &quot;answers&quot;: [
+      {
+        &quot;order&quot;: 1,
+        &quot;value&quot;: &quot;A&quot;,
+        &quot;explanation&quot;: &quot;&quot;
+      }
+    ]
+  }
+}</pre>
+</details>
+</article>
+
+<article class="card">
+<h3>第 7 题</h3>
+<p class="meta">
+索引：<code>qsqianji</code><br>
+文档 ID：<code>a00dbbf0-b6ff-485e-8ac7-52444c5bc8f5</code><br>
+匹配字段：<code>qs_subject_id</code>
+</p>
+<div class="question-content">
+<div><div><p>如图，装有轻质光滑定滑轮的长方体木箱静置在水平地面上，木箱上的物块甲通过不可伸长的水平轻绳绕过定滑轮与物块乙相连。乙拉着甲从静止开始运动，木箱始终保持静止。已知甲、乙质量均为1.0kg，甲与木箱之间的动摩擦因数为0.5，不计空气阻力，重力加速度g取10m/s²，则在乙下落的过程中（ ）</p><img src="https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/a00dbbf0-b6ff-485e-8ac7-52444c5bc8f5_1.png" alt="题目图片"><div><table><tr><td>A.&nbsp;<span><span>甲对木箱的摩擦力方向向左</span></span></td></tr><tr><td>B.&nbsp;<span><span>地面对木箱的支持力逐渐增大</span></span></td></tr><tr><td>C.&nbsp;<span><span>甲运动的加速度大小为2.5m/s²</span></span></td></tr><tr><td>D.&nbsp;<span><span>乙受到绳子的拉力大小为5.0N</span></span></td></tr></table></div></div></div>
+</div>
+<details>
+<summary>查看答案</summary>
+<div class="question-content"><div><span><span>C</span></span></div></div>
+</details>
+<details>
+<summary>查看解析</summary>
+<div class="question-content"><div><div><p><span></span></p></div></div></div>
+</details>
+<details>
+<summary>查看该题原始 JSON</summary>
+<pre>{
+  &quot;_index&quot;: &quot;qsqianji&quot;,
+  &quot;_id&quot;: &quot;a00dbbf0-b6ff-485e-8ac7-52444c5bc8f5&quot;,
+  &quot;_matched_id_field&quot;: &quot;qs_subject_id&quot;,
+  &quot;id&quot;: &quot;a00dbbf0-b6ff-485e-8ac7-52444c5bc8f5&quot;,
+  &quot;qs_subject_id&quot;: 29,
+  &quot;qs_type_id&quot;: &quot;1&quot;,
+  &quot;qs_knowpoint_ids&quot;: [],
+  &quot;qs_chapter_ids&quot;: [],
+  &quot;qs_diff&quot;: null,
+  &quot;from&quot;: 3,
+  &quot;qs_stem&quot;: &quot;&lt;div&gt;&lt;div class=\&quot;qml-stem\&quot;&gt;&lt;p&gt;如图，装有轻质光滑定滑轮的长方体木箱静置在水平地面上，木箱上的物块甲通过不可伸长的水平轻绳绕过定滑轮与物块乙相连。乙拉着甲从静止开始运动，木箱始终保持静止。已知甲、乙质量均为1.0kg，甲与木箱之间的动摩擦因数为0.5，不计空气阻力，重力加速度g取10m/s²，则在乙下落的过程中（ ）&lt;/p&gt;&lt;img src=\&quot;https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/a00dbbf0-b6ff-485e-8ac7-52444c5bc8f5_1.png\&quot; /&gt;&lt;div class=\&quot;qml-og\&quot;&gt;&lt;table class=\&quot;qml-og\&quot; style=\&quot;width:100%\&quot;&gt;&lt;tr&gt;&lt;td&gt;A.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;甲对木箱的摩擦力方向向左&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;B.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;地面对木箱的支持力逐渐增大&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;C.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;甲运动的加速度大小为2.5m/s²&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;D.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;乙受到绳子的拉力大小为5.0N&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_answer&quot;: &quot;&lt;div class=\&quot;qml-answer\&quot;&gt;&lt;span class=\&quot;qml-an-sq\&quot;&gt;&lt;span class=\&quot;qml-an qml-isop\&quot;&gt;C&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;&quot;,
+  &quot;qs_explanation&quot;: &quot;&lt;div class=\&quot;qml-explanation\&quot;&gt;&lt;div class=\&quot;qml-seg\&quot; seg-name=\&quot;详解\&quot;&gt;&lt;p&gt;&lt;span&gt;&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_exampaper_type_ids&quot;: [],
+  &quot;html_text&quot;: &quot;{\n  \&quot;html\&quot;: \&quot; 如图，装有轻质光滑定滑轮的长方体木箱静置在水平地面上，木箱上的物块甲通过不可伸长的水平轻绳绕过定滑轮与物块乙相连。乙拉着甲从静止开始运动，木箱始终保持静止。已知甲、乙质量均为1.0kg，甲与木箱之间的动摩擦因数为0.5，不计空气阻力，重力加速度g取10m/s²，则在乙下落的过程中（ ） \&quot;,\n  \&quot;type\&quot;: \&quot;选择题\&quot;,\n  \&quot;sqs\&quot;: [],\n  \&quot;sqBlankCount\&quot;: 0,\n  \&quot;og\&quot;: {\n    \&quot;cols\&quot;: 4,\n    \&quot;ogOps\&quot;: [\n      {\n        \&quot;html\&quot;: \&quot; 甲对木箱的摩擦力方向向左 \&quot;,\n        \&quot;index\&quot;: \&quot;A\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; 地面对木箱的支持力逐渐增大 \&quot;,\n        \&quot;index\&quot;: \&quot;B\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; 甲运动的加速度大小为2.5m/s² \&quot;,\n        \&quot;index\&quot;: \&quot;C\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; 乙受到绳子的拉力大小为5.0N \&quot;,\n        \&quot;index\&quot;: \&quot;D\&quot;\n      }\n    ]\n  },\n  \&quot;sqIdMode\&quot;: 0\n}&quot;,
+  &quot;answer_text&quot;: &quot;{\n  \&quot;anSqs\&quot;: [\n    {\n      \&quot;ans\&quot;: [\n        {\n          \&quot;html\&quot;: \&quot; C \&quot;\n        }\n      ]\n    }\n  ]\n}&quot;,
+  &quot;explanation_text&quot;: &quot;{\n  \&quot;explanationSegs\&quot;: []\n}&quot;,
+  &quot;formatted_json&quot;: {
+    &quot;resources&quot;: [
+      {
+        &quot;type&quot;: &quot;image&quot;,
+        &quot;url&quot;: &quot;https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/a00dbbf0-b6ff-485e-8ac7-52444c5bc8f5_1.png&quot;,
+        &quot;index&quot;: 0,
+        &quot;desc&quot;: &quot;&quot;
+      }
+    ],
+    &quot;inputs&quot;: [
+      {
+        &quot;type&quot;: &quot;choice&quot;,
+        &quot;order&quot;: 1,
+        &quot;resource_index&quot;: -1,
+        &quot;options&quot;: [
+          {
+            &quot;option&quot;: &quot;A&quot;,
+            &quot;value&quot;: &quot;甲对木箱的摩擦力方向向左&quot;
+          },
+          {
+            &quot;option&quot;: &quot;B&quot;,
+            &quot;value&quot;: &quot;地面对木箱的支持力逐渐增大&quot;
+          },
+          {
+            &quot;option&quot;: &quot;C&quot;,
+            &quot;value&quot;: &quot;甲运动的加速度大小为2.5m/s²&quot;
+          },
+          {
+            &quot;option&quot;: &quot;D&quot;,
+            &quot;value&quot;: &quot;乙受到绳子的拉力大小为5.0N&quot;
+          }
+        ]
+      }
+    ],
+    &quot;answers&quot;: [
+      {
+        &quot;order&quot;: 1,
+        &quot;value&quot;: &quot;C&quot;,
+        &quot;explanation&quot;: &quot;&quot;
+      }
+    ]
+  }
+}</pre>
+</details>
+</article>
+
+<article class="card">
+<h3>第 8 题</h3>
+<p class="meta">
+索引：<code>qsqianji</code><br>
+文档 ID：<code>14dcd97e-de77-4ff7-9fd5-e6577be5d333</code><br>
+匹配字段：<code>qs_subject_id</code>
+</p>
+<div class="question-content">
+<div><div><p>如图所示，质量相等的物块A、B叠放在光滑水平面上，两轻质弹簧的一端固定在竖直墙壁上，另一端分别与A、B相连接，两弹簧的原长相同，与A相连的弹簧的劲度系数小于与B相连的弹簧的劲度系数。开始时A、B处于静止状态。现对物块B施加一水平向右的拉力，使A、B一起向右移动到某一位置（A、B无相对滑动，弹簧处于弹性限度内），撤去这个力后</p><img src="https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/14dcd97e-de77-4ff7-9fd5-e6577be5d333_1.png" alt="题目图片"><div><table><tr><td>A.&nbsp;<span><span>A受到的合力总等于弹簧对B的弹力</span></span></td></tr><tr><td>B.&nbsp;<span><span>A受到的合力总大于弹簧对B的弹力</span></span></td></tr><tr><td>C.&nbsp;<span><span>A受到的摩擦力始终与弹簧对它的弹力方向相同</span></span></td></tr><tr><td>D.&nbsp;<span><span>A受到的摩擦力与弹簧对它的弹力方向有时相同，有时相反</span></span></td></tr></table></div></div></div>
+</div>
+<details>
+<summary>查看答案</summary>
+<div class="question-content"><div><span><span>D</span></span></div></div>
+</details>
+<details>
+<summary>查看解析</summary>
+<div class="question-content"><div><div><p><span></span></p></div></div></div>
+</details>
+<details>
+<summary>查看该题原始 JSON</summary>
+<pre>{
+  &quot;_index&quot;: &quot;qsqianji&quot;,
+  &quot;_id&quot;: &quot;14dcd97e-de77-4ff7-9fd5-e6577be5d333&quot;,
+  &quot;_matched_id_field&quot;: &quot;qs_subject_id&quot;,
+  &quot;id&quot;: &quot;14dcd97e-de77-4ff7-9fd5-e6577be5d333&quot;,
+  &quot;qs_subject_id&quot;: 29,
+  &quot;qs_type_id&quot;: &quot;1&quot;,
+  &quot;qs_knowpoint_ids&quot;: [],
+  &quot;qs_chapter_ids&quot;: [],
+  &quot;qs_diff&quot;: null,
+  &quot;from&quot;: 3,
+  &quot;qs_stem&quot;: &quot;&lt;div&gt;&lt;div class=\&quot;qml-stem\&quot;&gt;&lt;p&gt;如图所示，质量相等的物块A、B叠放在光滑水平面上，两轻质弹簧的一端固定在竖直墙壁上，另一端分别与A、B相连接，两弹簧的原长相同，与A相连的弹簧的劲度系数小于与B相连的弹簧的劲度系数。开始时A、B处于静止状态。现对物块B施加一水平向右的拉力，使A、B一起向右移动到某一位置（A、B无相对滑动，弹簧处于弹性限度内），撤去这个力后&lt;/p&gt;&lt;img src=\&quot;https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/14dcd97e-de77-4ff7-9fd5-e6577be5d333_1.png\&quot; /&gt;&lt;div class=\&quot;qml-og\&quot;&gt;&lt;table class=\&quot;qml-og\&quot; style=\&quot;width:100%\&quot;&gt;&lt;tr&gt;&lt;td&gt;A.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;A受到的合力总等于弹簧对B的弹力&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;B.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;A受到的合力总大于弹簧对B的弹力&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;C.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;A受到的摩擦力始终与弹簧对它的弹力方向相同&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;D.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;A受到的摩擦力与弹簧对它的弹力方向有时相同，有时相反&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_answer&quot;: &quot;&lt;div class=\&quot;qml-answer\&quot;&gt;&lt;span class=\&quot;qml-an-sq\&quot;&gt;&lt;span class=\&quot;qml-an qml-isop\&quot;&gt;D&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;&quot;,
+  &quot;qs_explanation&quot;: &quot;&lt;div class=\&quot;qml-explanation\&quot;&gt;&lt;div class=\&quot;qml-seg\&quot; seg-name=\&quot;详解\&quot;&gt;&lt;p&gt;&lt;span&gt;&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_exampaper_type_ids&quot;: [],
+  &quot;html_text&quot;: &quot;{\n  \&quot;html\&quot;: \&quot; 如图所示，质量相等的物块A、B叠放在光滑水平面上，两轻质弹簧的一端固定在竖直墙壁上，另一端分别与A、B相连接，两弹簧的原长相同，与A相连的弹簧的劲度系数小于与B相连的弹簧的劲度系数。开始时A、B处于静止状态。现对物块B施加一水平向右的拉力，使A、B一起向右移动到某一位置（A、B无相对滑动，弹簧处于弹性限度内），撤去这个力后 \&quot;,\n  \&quot;type\&quot;: \&quot;选择题\&quot;,\n  \&quot;sqs\&quot;: [],\n  \&quot;sqBlankCount\&quot;: 0,\n  \&quot;og\&quot;: {\n    \&quot;cols\&quot;: 4,\n    \&quot;ogOps\&quot;: [\n      {\n        \&quot;html\&quot;: \&quot; A受到的合力总等于弹簧对B的弹力 \&quot;,\n        \&quot;index\&quot;: \&quot;A\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; A受到的合力总大于弹簧对B的弹力 \&quot;,\n        \&quot;index\&quot;: \&quot;B\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; A受到的摩擦力始终与弹簧对它的弹力方向相同 \&quot;,\n        \&quot;index\&quot;: \&quot;C\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; A受到的摩擦力与弹簧对它的弹力方向有时相同，有时相反 \&quot;,\n        \&quot;index\&quot;: \&quot;D\&quot;\n      }\n    ]\n  },\n  \&quot;sqIdMode\&quot;: 0\n}&quot;,
+  &quot;answer_text&quot;: &quot;{\n  \&quot;anSqs\&quot;: [\n    {\n      \&quot;ans\&quot;: [\n        {\n          \&quot;html\&quot;: \&quot; D \&quot;\n        }\n      ]\n    }\n  ]\n}&quot;,
+  &quot;explanation_text&quot;: &quot;{\n  \&quot;explanationSegs\&quot;: []\n}&quot;,
+  &quot;formatted_json&quot;: {
+    &quot;resources&quot;: [
+      {
+        &quot;type&quot;: &quot;image&quot;,
+        &quot;url&quot;: &quot;https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/14dcd97e-de77-4ff7-9fd5-e6577be5d333_1.png&quot;,
+        &quot;index&quot;: 0,
+        &quot;desc&quot;: &quot;&quot;
+      }
+    ],
+    &quot;inputs&quot;: [
+      {
+        &quot;type&quot;: &quot;choice&quot;,
+        &quot;order&quot;: 1,
+        &quot;resource_index&quot;: -1,
+        &quot;options&quot;: [
+          {
+            &quot;option&quot;: &quot;A&quot;,
+            &quot;value&quot;: &quot;A受到的合力总等于弹簧对B的弹力&quot;
+          },
+          {
+            &quot;option&quot;: &quot;B&quot;,
+            &quot;value&quot;: &quot;A受到的合力总大于弹簧对B的弹力&quot;
+          },
+          {
+            &quot;option&quot;: &quot;C&quot;,
+            &quot;value&quot;: &quot;A受到的摩擦力始终与弹簧对它的弹力方向相同&quot;
+          },
+          {
+            &quot;option&quot;: &quot;D&quot;,
+            &quot;value&quot;: &quot;A受到的摩擦力与弹簧对它的弹力方向有时相同，有时相反&quot;
+          }
+        ]
+      }
+    ],
+    &quot;answers&quot;: [
+      {
+        &quot;order&quot;: 1,
+        &quot;value&quot;: &quot;D&quot;,
+        &quot;explanation&quot;: &quot;&quot;
+      }
+    ]
+  }
+}</pre>
+</details>
+</article>
+
+<article class="card">
+<h3>第 9 题</h3>
+<p class="meta">
+索引：<code>qsqianji</code><br>
+文档 ID：<code>506abb25-89e0-44ca-b051-cbf582271c51</code><br>
+匹配字段：<code>qs_subject_id</code>
+</p>
+<div class="question-content">
+<div><div><p>明理同学平时注意锻炼身体，力量较大，最多能提起m=50kg的物体。一重物放置在倾角θ=15°的粗糙斜坡上，重物与斜坡间的摩擦因数为μ≈0.58。试求该同学向上拉动的重物质量M的最大值？<span>　　　　</span></p></div></div>
+</div>
+<details>
+<summary>查看答案</summary>
+<div class="question-content"><div><span><span>100 kg</span></span></div></div>
+</details>
+<details>
+<summary>查看解析</summary>
+<div class="question-content"><div><div><p><span>人最大拉力 F = mg = 500 N。重物受力平衡：F = Mg sinθ + μMg cosθ。代入 θ=15°、μ≈0.58，得 M ≈ 500 / (10×(sin15°+0.58cos15°)) ≈ 100 kg。</span></p></div></div></div>
+</details>
+<details>
+<summary>查看该题原始 JSON</summary>
+<pre>{
+  &quot;_index&quot;: &quot;qsqianji&quot;,
+  &quot;_id&quot;: &quot;506abb25-89e0-44ca-b051-cbf582271c51&quot;,
+  &quot;_matched_id_field&quot;: &quot;qs_subject_id&quot;,
+  &quot;id&quot;: &quot;506abb25-89e0-44ca-b051-cbf582271c51&quot;,
+  &quot;qs_subject_id&quot;: 29,
+  &quot;qs_type_id&quot;: &quot;2&quot;,
+  &quot;qs_knowpoint_ids&quot;: [],
+  &quot;qs_chapter_ids&quot;: [],
+  &quot;qs_diff&quot;: null,
+  &quot;from&quot;: 3,
+  &quot;qs_stem&quot;: &quot;&lt;div&gt;&lt;div class=\&quot;qml-stem\&quot;&gt;&lt;p&gt;明理同学平时注意锻炼身体，力量较大，最多能提起m=50kg的物体。一重物放置在倾角θ=15°的粗糙斜坡上，重物与斜坡间的摩擦因数为μ≈0.58。试求该同学向上拉动的重物质量M的最大值？&lt;span class=\&quot;qml-bk\&quot; index=\&quot;1\&quot;&gt;　　　　&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_answer&quot;: &quot;&lt;div class=\&quot;qml-answer\&quot;&gt;&lt;span class=\&quot;qml-an-sq\&quot;&gt;&lt;span class=\&quot;qml-an qml-isop\&quot;&gt;100 kg&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;&quot;,
+  &quot;qs_explanation&quot;: &quot;&lt;div class=\&quot;qml-explanation\&quot;&gt;&lt;div class=\&quot;qml-seg\&quot; seg-name=\&quot;详解\&quot;&gt;&lt;p&gt;&lt;span&gt;人最大拉力 F = mg = 500 N。重物受力平衡：F = Mg sinθ + μMg cosθ。代入 θ=15°、μ≈0.58，得 M ≈ 500 / (10×(sin15°+0.58cos15°)) ≈ 100 kg。&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_exampaper_type_ids&quot;: [],
+  &quot;html_text&quot;: &quot;{\n  \&quot;html\&quot;: \&quot; 明理同学平时注意锻炼身体，力量较大，最多能提起m=50kg的物体。一重物放置在倾角θ=15°的粗糙斜坡上，重物与斜坡间的摩擦因数为μ≈0.58。试求该同学向上拉动的重物质量M的最大值？ \&quot;,\n  \&quot;type\&quot;: \&quot;填空题\&quot;,\n  \&quot;sqs\&quot;: [],\n  \&quot;sqBlankCount\&quot;: 1\n}&quot;,
+  &quot;answer_text&quot;: &quot;{\n  \&quot;anSqs\&quot;: [\n    {\n      \&quot;ans\&quot;: [\n        {\n          \&quot;html\&quot;: \&quot; 100 kg \&quot;\n        }\n      ]\n    }\n  ]\n}&quot;,
+  &quot;explanation_text&quot;: &quot;{\n  \&quot;explanationSegs\&quot;: [\n    {\n      \&quot;name\&quot;: \&quot;详解\&quot;,\n      \&quot;html\&quot;: \&quot; 人最大拉力 F = mg = 500 N。重物受力平衡：F = Mg sinθ + μMg cosθ。代入 θ=15°、μ≈0.58，得 M ≈ 500 / (10×(sin15°+0.58cos15°)) ≈ 100 kg。 \&quot;\n    }\n  ]\n}&quot;,
+  &quot;formatted_json&quot;: {
+    &quot;resources&quot;: [],
+    &quot;inputs&quot;: [
+      {
+        &quot;type&quot;: &quot;blank&quot;,
+        &quot;order&quot;: 1,
+        &quot;resource_index&quot;: -1,
+        &quot;options&quot;: []
+      }
+    ],
+    &quot;answers&quot;: [
+      {
+        &quot;order&quot;: 1,
+        &quot;value&quot;: &quot;100 kg&quot;,
+        &quot;explanation&quot;: &quot;人最大拉力 F = mg = 500 N。重物受力平衡：F = Mg sinθ + μMg cosθ。代入 θ=15°、μ≈0.58，得 M ≈ 500 / (10×(sin15°+0.58cos15°)) ≈ 100 kg。&quot;
+      }
+    ]
+  }
+}</pre>
+</details>
+</article>
+
+<article class="card">
+<h3>第 10 题</h3>
+<p class="meta">
+索引：<code>qsqianji</code><br>
+文档 ID：<code>6c2ffe76-a411-49eb-88bf-020958cf1c56</code><br>
+匹配字段：<code>qs_subject_id</code>
+</p>
+<div class="question-content">
+<div><div><p>如图，用两根等长的细绳将一匀质圆柱体悬挂在竖直木板的P点，将木板以底边MN为轴向后方缓慢转动直至水平，绳与木板之间的夹角保持不变，忽略圆柱体与木板之间的摩擦，在转动过程中（ ）</p><img src="https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/6c2ffe76-a411-49eb-88bf-020958cf1c56_1.png" alt="题目图片"><div><table><tr><td>A.&nbsp;<span><span>圆柱体对木板的压力逐渐增大</span></span></td></tr><tr><td>B.&nbsp;<span><span>圆柱体对木板的压力先增大后减小</span></span></td></tr><tr><td>C.&nbsp;<span><span>两根细绳上的拉力均先增大后减小</span></span></td></tr><tr><td>D.&nbsp;<span><span>两根细绳对圆柱体拉力的合力保持不变</span></span></td></tr></table></div></div></div>
+</div>
+<details>
+<summary>查看答案</summary>
+<div class="question-content"><div><span><span>D</span></span></div></div>
+</details>
+<details>
+<summary>查看解析</summary>
+<div class="question-content"><div><div><p><span></span></p></div></div></div>
+</details>
+<details>
+<summary>查看该题原始 JSON</summary>
+<pre>{
+  &quot;_index&quot;: &quot;qsqianji&quot;,
+  &quot;_id&quot;: &quot;6c2ffe76-a411-49eb-88bf-020958cf1c56&quot;,
+  &quot;_matched_id_field&quot;: &quot;qs_subject_id&quot;,
+  &quot;id&quot;: &quot;6c2ffe76-a411-49eb-88bf-020958cf1c56&quot;,
+  &quot;qs_subject_id&quot;: 29,
+  &quot;qs_type_id&quot;: &quot;1&quot;,
+  &quot;qs_knowpoint_ids&quot;: [],
+  &quot;qs_chapter_ids&quot;: [],
+  &quot;qs_diff&quot;: null,
+  &quot;from&quot;: 3,
+  &quot;qs_stem&quot;: &quot;&lt;div&gt;&lt;div class=\&quot;qml-stem\&quot;&gt;&lt;p&gt;如图，用两根等长的细绳将一匀质圆柱体悬挂在竖直木板的P点，将木板以底边MN为轴向后方缓慢转动直至水平，绳与木板之间的夹角保持不变，忽略圆柱体与木板之间的摩擦，在转动过程中（ ）&lt;/p&gt;&lt;img src=\&quot;https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/6c2ffe76-a411-49eb-88bf-020958cf1c56_1.png\&quot; /&gt;&lt;div class=\&quot;qml-og\&quot;&gt;&lt;table class=\&quot;qml-og\&quot; style=\&quot;width:100%\&quot;&gt;&lt;tr&gt;&lt;td&gt;A.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;圆柱体对木板的压力逐渐增大&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;B.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;圆柱体对木板的压力先增大后减小&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;C.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;两根细绳上的拉力均先增大后减小&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;D.&amp;nbsp;&lt;span class=\&quot;qml-op\&quot;&gt;&lt;span&gt;两根细绳对圆柱体拉力的合力保持不变&lt;/span&gt;&lt;/span&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_answer&quot;: &quot;&lt;div class=\&quot;qml-answer\&quot;&gt;&lt;span class=\&quot;qml-an-sq\&quot;&gt;&lt;span class=\&quot;qml-an qml-isop\&quot;&gt;D&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;&quot;,
+  &quot;qs_explanation&quot;: &quot;&lt;div class=\&quot;qml-explanation\&quot;&gt;&lt;div class=\&quot;qml-seg\&quot; seg-name=\&quot;详解\&quot;&gt;&lt;p&gt;&lt;span&gt;&lt;/span&gt;&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&quot;,
+  &quot;qs_exampaper_type_ids&quot;: [],
+  &quot;html_text&quot;: &quot;{\n  \&quot;html\&quot;: \&quot; 如图，用两根等长的细绳将一匀质圆柱体悬挂在竖直木板的P点，将木板以底边MN为轴向后方缓慢转动直至水平，绳与木板之间的夹角保持不变，忽略圆柱体与木板之间的摩擦，在转动过程中（ ） \&quot;,\n  \&quot;type\&quot;: \&quot;选择题\&quot;,\n  \&quot;sqs\&quot;: [],\n  \&quot;sqBlankCount\&quot;: 0,\n  \&quot;og\&quot;: {\n    \&quot;cols\&quot;: 4,\n    \&quot;ogOps\&quot;: [\n      {\n        \&quot;html\&quot;: \&quot; 圆柱体对木板的压力逐渐增大 \&quot;,\n        \&quot;index\&quot;: \&quot;A\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; 圆柱体对木板的压力先增大后减小 \&quot;,\n        \&quot;index\&quot;: \&quot;B\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; 两根细绳上的拉力均先增大后减小 \&quot;,\n        \&quot;index\&quot;: \&quot;C\&quot;\n      },\n      {\n        \&quot;html\&quot;: \&quot; 两根细绳对圆柱体拉力的合力保持不变 \&quot;,\n        \&quot;index\&quot;: \&quot;D\&quot;\n      }\n    ]\n  },\n  \&quot;sqIdMode\&quot;: 0\n}&quot;,
+  &quot;answer_text&quot;: &quot;{\n  \&quot;anSqs\&quot;: [\n    {\n      \&quot;ans\&quot;: [\n        {\n          \&quot;html\&quot;: \&quot; D \&quot;\n        }\n      ]\n    }\n  ]\n}&quot;,
+  &quot;explanation_text&quot;: &quot;{\n  \&quot;explanationSegs\&quot;: []\n}&quot;,
+  &quot;formatted_json&quot;: {
+    &quot;resources&quot;: [
+      {
+        &quot;type&quot;: &quot;image&quot;,
+        &quot;url&quot;: &quot;https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/6c2ffe76-a411-49eb-88bf-020958cf1c56_1.png&quot;,
+        &quot;index&quot;: 0,
+        &quot;desc&quot;: &quot;&quot;
+      }
+    ],
+    &quot;inputs&quot;: [
+      {
+        &quot;type&quot;: &quot;choice&quot;,
+        &quot;order&quot;: 1,
+        &quot;resource_index&quot;: -1,
+        &quot;options&quot;: [
+          {
+            &quot;option&quot;: &quot;A&quot;,
+            &quot;value&quot;: &quot;圆柱体对木板的压力逐渐增大&quot;
+          },
+          {
+            &quot;option&quot;: &quot;B&quot;,
+            &quot;value&quot;: &quot;圆柱体对木板的压力先增大后减小&quot;
+          },
+          {
+            &quot;option&quot;: &quot;C&quot;,
+            &quot;value&quot;: &quot;两根细绳上的拉力均先增大后减小&quot;
+          },
+          {
+            &quot;option&quot;: &quot;D&quot;,
+            &quot;value&quot;: &quot;两根细绳对圆柱体拉力的合力保持不变&quot;
+          }
+        ]
+      }
+    ],
+    &quot;answers&quot;: [
+      {
+        &quot;order&quot;: 1,
+        &quot;value&quot;: &quot;D&quot;,
+        &quot;explanation&quot;: &quot;&quot;
+      }
+    ]
+  }
+}</pre>
+</details>
+</article>
+
+<h2>二、字段作用说明</h2>
+<p>以下说明根据字段名称和常见数据结构编写。编码值的准确业务含义应以原题库的数据字典为准。</p>
+<table class="fields">
+<thead><tr><th>字段名</th><th>作用</th></tr></thead>
+<tbody>
+<tr><td><code>_id</code></td><td>Elasticsearch 文档 ID。与 _index 一起用于定位记录。</td></tr>
+<tr><td><code>_index</code></td><td>Elasticsearch 索引名称，表示记录来自哪个索引。</td></tr>
+<tr><td><code>_matched_id_field</code></td><td>导出时命中的 ID 字段，例如 qs_subject_id 或 course_id。</td></tr>
+<tr><td><code>answer_text</code></td><td>答案相关的结构化数据，具体结构以实际内容为准。</td></tr>
+<tr><td><code>explanation_text</code></td><td>解析相关的结构化数据，具体结构以实际内容为准。</td></tr>
+<tr><td><code>formatted_json</code></td><td>格式化后的题目数据，内部结构取决于题库版本。</td></tr>
+<tr><td><code>from</code></td><td>来源编码，具体含义需要查原系统的数据字典。</td></tr>
+<tr><td><code>html_text</code></td><td>题干相关的结构化文本，常以 JSON 字符串存储。</td></tr>
+<tr><td><code>id</code></td><td>题库业务记录 ID，可用于关联和辅助去重。</td></tr>
+<tr><td><code>qs_answer</code></td><td>答案字段，可能包含 HTML 格式的答案。</td></tr>
+<tr><td><code>qs_chapter_ids</code></td><td>章节 ID 列表，可关联教材章节表。</td></tr>
+<tr><td><code>qs_diff</code></td><td>难度字段，具体编码含义需要查数据字典。</td></tr>
+<tr><td><code>qs_exampaper_type_ids</code></td><td>试卷类型 ID 列表，可关联试卷类型元数据。</td></tr>
+<tr><td><code>qs_explanation</code></td><td>解析字段，可能包含解题步骤、公式或图片。</td></tr>
+<tr><td><code>qs_knowpoint_ids</code></td><td>知识点 ID 列表，可关联知识点表。</td></tr>
+<tr><td><code>qs_stem</code></td><td>题干，可能包含 HTML、公式、选项或图片。</td></tr>
+<tr><td><code>qs_subject_id</code></td><td>学科编号。需要结合学科元数据确认具体学科。</td></tr>
+<tr><td><code>qs_type_id</code></td><td>题型编号，需要题型字典才能解释具体编码。</td></tr>
+</tbody>
+</table>
+
+<h2>三、用于 AI 物理知识库的建议</h2>
+<ul>
+<li><strong>题目展示：</strong>使用题干、答案、解析字段。</li>
+<li><strong>章节检索：</strong>使用章节 ID，并关联章节元数据表。</li>
+<li><strong>知识点检索：</strong>使用知识点 ID，并关联知识点名称和定义。</li>
+<li><strong>题型与难度分析：</strong>先查清编码字典，再对题目进行分组。</li>
+<li><strong>数据去重：</strong>先用索引名和文档 ID 定位原记录；跨索引去重还需比较业务 ID 或题目内容。</li>
+</ul>
+<p class="muted">
+本页面不会重新计算答案，也不会自动纠正原始解析。
+题目图片需在原始图片地址仍可访问时才能显示。
+</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,968 @@
+[
+  {
+    "_index": "qsqianji",
+    "_id": "1ce4dc96-b507-4845-8204-f1ebe82d14a6",
+    "_matched_id_field": "qs_subject_id",
+    "id": "1ce4dc96-b507-4845-8204-f1ebe82d14a6",
+    "qs_subject_id": 29,
+    "qs_type_id": "1",
+    "qs_knowpoint_ids": [],
+    "qs_chapter_ids": [],
+    "qs_diff": null,
+    "from": 3,
+    "qs_stem": "<div><div class=\"qml-stem\"><p>如图所示，在同一竖直平面内，小球A、B上系有不可伸长的细线a、b、c和d，其中a的上端悬挂于竖直固定的支架上，d跨过左侧定滑轮、c跨过右侧定滑轮分别与相同配重P、Q相连，调节左、右两侧定滑轮高度达到平衡。已知小球A、B和配重P、Q质量均为50g，细线c、d平行且与水平成θ=30°(不计摩擦)，则细线a、b的拉力分别为</p><img src=\"https://resource.malongtech.cn/questions/self_upload_img/c209c61d-4ef0-4c6a-9459-49b14910d1ba/crop_p1_9136c5f28e71.png\" /><div class=\"qml-og\"><table class=\"qml-og\" style=\"width:100%\"><tr><td>A.&nbsp;<span class=\"qml-op\"><span>2N，1N</span></span></td></tr><tr><td>B.&nbsp;<span class=\"qml-op\"><span>2N，0.5N</span></span></td></tr><tr><td>C.&nbsp;<span class=\"qml-op\"><span>1N，1N</span></span></td></tr><tr><td>D.&nbsp;<span class=\"qml-op\"><span>1N，0.5N</span></span></td></tr></table></div></div></div>",
+    "qs_answer": "<div class=\"qml-answer\"><span class=\"qml-an-sq\"><span class=\"qml-an qml-isop\">A</span></span></div>",
+    "qs_explanation": "<div class=\"qml-explanation\"><div class=\"qml-seg\" seg-name=\"详解\"><p><span>对小球A和B分别进行受力分析。由于系统处于平衡状态，各物体所受合力为零。\n\n首先分析配重P和Q：它们质量均为50g（即0.05kg），重力为 mg = 0.05×10 = 0.5N。由于细线c、d分别连接P、Q且跨过光滑定滑轮，因此细线c和d中的张力均等于配重重力，即 T_c = T_d = 0.5N。\n\n细线c和d与水平方向成θ=30°，且平行，说明它们对小球A、B的拉力方向均为斜向上30°。\n\n对小球A：它受到三个力作用：\n- 细线a的竖直向上的拉力 T_a；\n- 细线d斜向左上方30°的拉力 T_d = 0.5N；\n- 自身重力 G = 0.5N，竖直向下。\n\n将T_d分解为竖直和水平分量：\n竖直分量：T_d·sin30° = 0.5 × 0.5 = 0.25N（向上）\n水平分量：T_d·cos30°（向左）\n\n由于小球A静止，竖直方向合力为零：\nT_a + 0.25N = 0.5N → T_a = 0.25N？但此结果与选项不符，说明理解有误。\n\n重新审视题图结构（虽无图，但根据常规设置）：通常此类题中，小球A由线a悬挂，并通过线d连接左侧配重；小球B由线b悬挂，并通过线c连接右侧配重。而线b可能连接A与B之间。\n\n更合理的模型是：小球A上连a，下连b；小球B上连b，另侧连c；配重Q连c，配重P连d，而d连回A？但题干说“d跨过左侧定滑轮…与配重P相连”，“c跨过右侧定滑轮…与配重Q相连”，且“小球A、B上系有细线a、b、c、d”，推测结构为：\n- 线a上端固定，下端连A；\n- 线d一端连A，跨过左滑轮连P；\n- 线c一端连B，跨过右滑轮连Q；\n- 线b连接A和B。\n\n但题干又说“调节滑轮高度达到平衡”，且c、d平行、与水平成30°，说明A受d的拉力方向为沿d的方向（斜向上左30°），B受c的拉力为斜向上右30°。\n\n然而若a、b均为竖直线（因在同一竖直平面，且悬挂），则更可能：线a竖直吊A，线b竖直吊B，而c、d分别从B、A斜拉向滑轮。\n\n但关键线索是“细线c、d平行且与水平成θ=30°”，即它们都与水平夹角30°，故与竖直方向夹角60°。\n\n再考虑对称性：A、B质量相同，P、Q相同，系统对称，故线b应无拉力？但选项中有b拉力为1N或0.5N，不对称，说明结构不对称。\n\n仔细读题：“d跨过左侧定滑轮、c跨过右侧定滑轮分别与相同配重P、Q相连”，且“小球A、B上系有…细线a、b、c和d”——合理推断：\n- a上端固定，下端连A；\n- d一端连A，绕过左滑轮连P；\n- c一端连B，绕过右滑轮连Q；\n- b连接A和B。\n\n此时，对A：受a向上拉力T_a，b的拉力T_b（假设向下拉B，则A受b向下），d的拉力T_d沿d方向（设为斜向左上30°），重力G_A=0.5N向下。\n对B：受b向上拉力T_b（牛顿第三定律），c的拉力T_c斜向右上30°，重力G_B=0.5N向下。\n\n由于滑轮光滑，T_c = G_Q = 0.5N，T_d = G_P = 0.5N。\n\n对B进行受力分析（更简单，因可能b为竖直）：\nB受三个力：重力0.5N↓，T_c=0.5N沿30°斜向上右，T_b（来自线b，方向待定）。\n\n将T_c分解：\n竖直分量：T_c·sin30° = 0.5 × 0.5 = 0.25N ↑\n水平分量：T_c·cos30° → 向右\n\n为平衡水平力，必须有其他水平力，但若线b为竖直，则无法平衡水平分量，矛盾。\n\n因此，线b不可能是竖直的？但题干说“在同一竖直平面内”，且通常a、b为竖直线。\n\n另一种常见模型：A和B并排悬挂，a吊A，b吊B，而c从B向右上连滑轮到Q，d从A向左上连滑轮到P。此时a、b均为竖直。\n\n对A：竖直方向受力：T_a ↑，G_A=0.5N ↓，T_d的竖直分量 ↑（因d斜向上拉A）。\n注意：若d从A向左上连到滑轮，则滑轮在左上方，d对A的拉力方向是沿d远离A，即斜向左上，所以竖直分量向上。\n\n同理，c对B的拉力斜向右上，竖直分量向上。\n\n因此对A：T_a + T_d·sin30° = G_A → T_a + 0.5×0.5 = 0.5 → T_a = 0.5 - 0.25 = 0.25N\n对B：T_b + T_c·sin30° = G_B → T_b = 0.25N\n但选项无0.25N，说明方向理解错误。\n\n关键：当配重P悬挂在滑轮下，线d一端固定于A，绕过滑轮挂P，则P的重力会通过线d拉A向滑轮方向。若滑轮在A的左上方，则d拉A向左上方。但此时，若A仅受a、d和重力，则水平方向不平衡，除非有其他力。\n\n因此，必须存在线b连接A和B以提供水平力平衡。\n\n正确模型应为：A和B相邻，a竖直吊A，b竖直吊B，同时A还连d向左上到滑轮P，B连c向右上到滑轮Q。但这样A在水平方向受d的左向分力，无人平衡，不可能静止。\n\n故更可能：线b是水平连接A和B的！但题干未明确。\n\n回到题干：“细线a、b、c和d”，且“a的上端悬挂于竖直固定的支架上”，暗示a是竖直的；而c、d跨过滑轮与配重相连，且与水平成30°，说明c、d是斜的。\n\n经典题型：两个小球用水平线b连接，a竖直吊A，d从A斜连左滑轮P，c从B斜连右滑轮Q。此时系统对称，b为水平。\n\n但题干说“调节左、右两侧定滑轮高度达到平衡”，且c、d平行，说明对称，故A、B受力对称，T_a = T_b？但选项A为2N,1N，不对称，矛盾。\n\n再审题：选项A为“2N，1N”，单位是N，而mg=0.5N，2N远大于重力，不合理，除非角度理解错误。\n\n注意：θ=30°是“与水平成θ=30°”，即与水平夹角30°，所以与竖直夹角60°。\n\n但若c、d中的张力为0.5N，其竖直分量为0.5×sin30°=0.25N，不足以解释2N。\n\n除非：配重P、Q质量50g，但线c、d的张力不是0.5N？不，滑轮光滑，张力等于配重重力。\n\n可能误解了连接方式。另一种可能是：线d一端固定于支架，绕过滑轮连P，再连A？但题干说“d跨过左侧定滑轮…与配重P相连”，且“小球A…上系有…d”，所以d一端连A，跨过滑轮连P。\n\n关键突破：或许小球A只受a和d，小球B只受b和c，即A、B不直接相连！题干说“小球A、B上系有不可伸长的细线a、b、c和d”，可能a连A，b连B，c连B，d连A。\n\n即：A受a（上）和d（斜）；B受b（上）和c（斜）。\n\n此时，对A：T_a 竖直向上，T_d 沿d方向（斜向上，因滑轮在上方），G_A 竖直向下。\n\n由于d与水平成30°，若滑轮在A的左上方，则d对A的拉力方向为左上30°，其竖直分量向上。\n\n但A在水平方向受T_d的水平分量，无人平衡，不可能静止——除非滑轮正上方，但题干说“左侧定滑轮”，故不在正上方。\n\n因此，唯一可能是：线a不是竖直的？但题干说“a的上端悬挂于竖直固定的支架上”，通常意味着a竖直。\n\n查阅类似题目：常见模型为“结点”问题。可能A、B并非质点，而是滑轮或结点。但题干明确说“小球A、B”。\n\n重新计算：假设对小球A，受三个力：重力G=0.5N↓，线a拉力T_a↑（竖直），线d拉力T_d=0.5N，方向沿d。因系统平衡，三力共点平衡。\n\n但若a竖直，d斜向，则三力不共线，需满足矢量和为零。\n\n设d与竖直方向夹角为α。题干说“与水平成θ=30°”，故与竖直成60°，即α=60°。\n\n则对A：\n水平方向：T_d·sin60° = 0 → 不可能，除非T_d=0。\n\n矛盾表明：小球A必须还受另一个力来平衡水平分量。这个力只能来自线b。\n\n因此，线b连接A和B，且为水平方向（常见设定）。\n\n设线b水平，拉力为T_b。\n\n对A：\n- 竖直：T_a = G_A + T_d·cos60° （若d斜向下拉A）\n\n但配重P拉d，会使d拉A toward滑轮。若滑轮在左上方，则d拉A向左上，故对A，T_d方向左上，与竖直成60°。\n\n所以：\n竖直分量：T_d·cos60° ↑\n水平分量：T_d·sin60° ←\n\n为平衡水平力，线b必须向右拉A，即T_b →\n\n对B：c拉B向右上（与竖直成60°），故水平分量 T_c·sin60° →，因此线b必须向左拉B，即T_b ←，符合牛顿第三定律。\n\n对A竖直方向：T_a + T_d·cos60° = G_A\n→ T_a + 0.5 × 0.5 = 0.5\n→ T_a = 0.5 - 0.25 = 0.25N\n\n对B竖直方向：T_b_vertical? 但若b是水平的，则对B竖直方向只有T_c·cos60° ↑ 和 G_B ↓，所以 T_c·cos60° = G_B → 0.25 = 0.5？不成立。\n\n因此，线b must be vertical！但这样水平力无法平衡。\n\n终极正确模型：实际上，在这种装置中，小球A和B的位置使得线a和b是竖直的，而c和d是对称斜拉的，但由于有中间连线b，且系统调整到c、d平行，可能b是松弛的？但选项中有b的拉力。\n\n参考标准解法：对于此类问题，通常将A和B视为两个 separate objects， each suspended by their own string (a for A, b for B), and each also pulled by a diagonal string to a counterweight.\n\nBut then horizontal force imbalance.\n\nUnless the diagonal strings are pulling downward! How?\n\nAh! If the fixed pulleys are BELOW the balls, but that contradicts \"悬挂\".\n\nAnother possibility: the strings c and d are pulling the balls downward toward the pulleys. For example, if the left pulley is below and to the left of A, then d would pull A down-left. But the problem says \"定滑轮\" fixed on支架, usually above.\n\nLet’s read carefully: “d跨过左侧定滑轮、c跨过右侧定滑轮分别与相同配重P、Q相连”. The weights P and Q are hanging down from the pulleys, so the tension pulls the string toward the pulley. So at ball A, the string d is pulled toward the left pulley. If the left pulley is at the same height or higher than A, the force on A is up-left; if lower, down-left.\n\nBut the problem says “调节左、右两侧定滑轮高度达到平衡”, and “细线c、d平行且与水平成θ=30°”, and since weights are hanging, likely the pulleys are above, so c and d slope upward from balls to pulleys.\n\nGiven the options include 2N and 1N, which are larger than mg=0.5N, the only way is if the vertical component of the diagonal strings is downward, i.e., the strings are pulling the balls down.\n\nHow can that be? If the balls are above the pulleys, but that's unusual.\n\nPerhaps the string goes from the ball down to the pulley then up to the weight. But typically, it's ball -&gt; up to pulley -&gt; down to weight.\n\nI think the intended model is: each ball is pulled upward by its vertical string (a or b) and downward by the diagonal string connected to the counterweight. But that would require the counterweight to be pulling the ball down, which happens if the string from the ball goes down to a pulley below, but the problem says</span></p></div></div>",
+    "qs_exampaper_type_ids": [],
+    "html_text": "{\n  \"html\": \" 如图所示，在同一竖直平面内，小球A、B上系有不可伸长的细线a、b、c和d，其中a的上端悬挂于竖直固定的支架上，d跨过左侧定滑轮、c跨过右侧定滑轮分别与相同配重P、Q相连，调节左、右两侧定滑轮高度达到平衡。已知小球A、B和配重P、Q质量均为50g，细线c、d平行且与水平成θ=30°(不计摩擦)，则细线a、b的拉力分别为 \",\n  \"type\": \"选择题\",\n  \"sqs\": [],\n  \"sqBlankCount\": 0,\n  \"og\": {\n    \"cols\": 4,\n    \"ogOps\": [\n      {\n        \"html\": \" 2N，1N \",\n        \"index\": \"A\"\n      },\n      {\n        \"html\": \" 2N，0.5N \",\n        \"index\": \"B\"\n      },\n      {\n        \"html\": \" 1N，1N \",\n        \"index\": \"C\"\n      },\n      {\n        \"html\": \" 1N，0.5N \",\n        \"index\": \"D\"\n      }\n    ]\n  },\n  \"sqIdMode\": 0\n}",
+    "answer_text": "{\n  \"anSqs\": [\n    {\n      \"ans\": [\n        {\n          \"html\": \" A \"\n        }\n      ]\n    }\n  ]\n}",
+    "explanation_text": "{\n  \"explanationSegs\": [\n    {\n      \"name\": \"详解\",\n      \"html\": \" 对小球A和B分别进行受力分析。由于系统处于平衡状态，各物体所受合力为零。\\n\\n首先分析配重P和Q：它们质量均为50g（即0.05kg），重力为 mg = 0.05×10 = 0.5N。由于细线c、d分别连接P、Q且跨过光滑定滑轮，因此细线c和d中的张力均等于配重重力，即 T_c = T_d = 0.5N。\\n\\n细线c和d与水平方向成θ=30°，且平行，说明它们对小球A、B的拉力方向均为斜向上30°。\\n\\n对小球A：它受到三个力作用：\\n- 细线a的竖直向上的拉力 T_a；\\n- 细线d斜向左上方30°的拉力 T_d = 0.5N；\\n- 自身重力 G = 0.5N，竖直向下。\\n\\n将T_d分解为竖直和水平分量：\\n竖直分量：T_d·sin30° = 0.5 × 0.5 = 0.25N（向上）\\n水平分量：T_d·cos30°（向左）\\n\\n由于小球A静止，竖直方向合力为零：\\nT_a + 0.25N = 0.5N → T_a = 0.25N？但此结果与选项不符，说明理解有误。\\n\\n重新审视题图结构（虽无图，但根据常规设置）：通常此类题中，小球A由线a悬挂，并通过线d连接左侧配重；小球B由线b悬挂，并通过线c连接右侧配重。而线b可能连接A与B之间。\\n\\n更合理的模型是：小球A上连a，下连b；小球B上连b，另侧连c；配重Q连c，配重P连d，而d连回A？但题干说“d跨过左侧定滑轮…与配重P相连”，“c跨过右侧定滑轮…与配重Q相连”，且“小球A、B上系有细线a、b、c、d”，推测结构为：\\n- 线a上端固定，下端连A；\\n- 线d一端连A，跨过左滑轮连P；\\n- 线c一端连B，跨过右滑轮连Q；\\n- 线b连接A和B。\\n\\n但题干又说“调节滑轮高度达到平衡”，且c、d平行、与水平成30°，说明A受d的拉力方向为沿d的方向（斜向上左30°），B受c的拉力为斜向上右30°。\\n\\n然而若a、b均为竖直线（因在同一竖直平面，且悬挂），则更可能：线a竖直吊A，线b竖直吊B，而c、d分别从B、A斜拉向滑轮。\\n\\n但关键线索是“细线c、d平行且与水平成θ=30°”，即它们都与水平夹角30°，故与竖直方向夹角60°。\\n\\n再考虑对称性：A、B质量相同，P、Q相同，系统对称，故线b应无拉力？但选项中有b拉力为1N或0.5N，不对称，说明结构不对称。\\n\\n仔细读题：“d跨过左侧定滑轮、c跨过右侧定滑轮分别与相同配重P、Q相连”，且“小球A、B上系有…细线a、b、c和d”——合理推断：\\n- a上端固定，下端连A；\\n- d一端连A，绕过左滑轮连P；\\n- c一端连B，绕过右滑轮连Q；\\n- b连接A和B。\\n\\n此时，对A：受a向上拉力T_a，b的拉力T_b（假设向下拉B，则A受b向下），d的拉力T_d沿d方向（设为斜向左上30°），重力G_A=0.5N向下。\\n对B：受b向上拉力T_b（牛顿第三定律），c的拉力T_c斜向右上30°，重力G_B=0.5N向下。\\n\\n由于滑轮光滑，T_c = G_Q = 0.5N，T_d = G_P = 0.5N。\\n\\n对B进行受力分析（更简单，因可能b为竖直）：\\nB受三个力：重力0.5N↓，T_c=0.5N沿30°斜向上右，T_b（来自线b，方向待定）。\\n\\n将T_c分解：\\n竖直分量：T_c·sin30° = 0.5 × 0.5 = 0.25N ↑\\n水平分量：T_c·cos30° → 向右\\n\\n为平衡水平力，必须有其他水平力，但若线b为竖直，则无法平衡水平分量，矛盾。\\n\\n因此，线b不可能是竖直的？但题干说“在同一竖直平面内”，且通常a、b为竖直线。\\n\\n另一种常见模型：A和B并排悬挂，a吊A，b吊B，而c从B向右上连滑轮到Q，d从A向左上连滑轮到P。此时a、b均为竖直。\\n\\n对A：竖直方向受力：T_a ↑，G_A=0.5N ↓，T_d的竖直分量 ↑（因d斜向上拉A）。\\n注意：若d从A向左上连到滑轮，则滑轮在左上方，d对A的拉力方向是沿d远离A，即斜向左上，所以竖直分量向上。\\n\\n同理，c对B的拉力斜向右上，竖直分量向上。\\n\\n因此对A：T_a + T_d·sin30° = G_A → T_a + 0.5×0.5 = 0.5 → T_a = 0.5 - 0.25 = 0.25N\\n对B：T_b + T_c·sin30° = G_B → T_b = 0.25N\\n但选项无0.25N，说明方向理解错误。\\n\\n关键：当配重P悬挂在滑轮下，线d一端固定于A，绕过滑轮挂P，则P的重力会通过线d拉A向滑轮方向。若滑轮在A的左上方，则d拉A向左上方。但此时，若A仅受a、d和重力，则水平方向不平衡，除非有其他力。\\n\\n因此，必须存在线b连接A和B以提供水平力平衡。\\n\\n正确模型应为：A和B相邻，a竖直吊A，b竖直吊B，同时A还连d向左上到滑轮P，B连c向右上到滑轮Q。但这样A在水平方向受d的左向分力，无人平衡，不可能静止。\\n\\n故更可能：线b是水平连接A和B的！但题干未明确。\\n\\n回到题干：“细线a、b、c和d”，且“a的上端悬挂于竖直固定的支架上”，暗示a是竖直的；而c、d跨过滑轮与配重相连，且与水平成30°，说明c、d是斜的。\\n\\n经典题型：两个小球用水平线b连接，a竖直吊A，d从A斜连左滑轮P，c从B斜连右滑轮Q。此时系统对称，b为水平。\\n\\n但题干说“调节左、右两侧定滑轮高度达到平衡”，且c、d平行，说明对称，故A、B受力对称，T_a = T_b？但选项A为2N,1N，不对称，矛盾。\\n\\n再审题：选项A为“2N，1N”，单位是N，而mg=0.5N，2N远大于重力，不合理，除非角度理解错误。\\n\\n注意：θ=30°是“与水平成θ=30°”，即与水平夹角30°，所以与竖直夹角60°。\\n\\n但若c、d中的张力为0.5N，其竖直分量为0.5×sin30°=0.25N，不足以解释2N。\\n\\n除非：配重P、Q质量50g，但线c、d的张力不是0.5N？不，滑轮光滑，张力等于配重重力。\\n\\n可能误解了连接方式。另一种可能是：线d一端固定于支架，绕过滑轮连P，再连A？但题干说“d跨过左侧定滑轮…与配重P相连”，且“小球A…上系有…d”，所以d一端连A，跨过滑轮连P。\\n\\n关键突破：或许小球A只受a和d，小球B只受b和c，即A、B不直接相连！题干说“小球A、B上系有不可伸长的细线a、b、c和d”，可能a连A，b连B，c连B，d连A。\\n\\n即：A受a（上）和d（斜）；B受b（上）和c（斜）。\\n\\n此时，对A：T_a 竖直向上，T_d 沿d方向（斜向上，因滑轮在上方），G_A 竖直向下。\\n\\n由于d与水平成30°，若滑轮在A的左上方，则d对A的拉力方向为左上30°，其竖直分量向上。\\n\\n但A在水平方向受T_d的水平分量，无人平衡，不可能静止——除非滑轮正上方，但题干说“左侧定滑轮”，故不在正上方。\\n\\n因此，唯一可能是：线a不是竖直的？但题干说“a的上端悬挂于竖直固定的支架上”，通常意味着a竖直。\\n\\n查阅类似题目：常见模型为“结点”问题。可能A、B并非质点，而是滑轮或结点。但题干明确说“小球A、B”。\\n\\n重新计算：假设对小球A，受三个力：重力G=0.5N↓，线a拉力T_a↑（竖直），线d拉力T_d=0.5N，方向沿d。因系统平衡，三力共点平衡。\\n\\n但若a竖直，d斜向，则三力不共线，需满足矢量和为零。\\n\\n设d与竖直方向夹角为α。题干说“与水平成θ=30°”，故与竖直成60°，即α=60°。\\n\\n则对A：\\n水平方向：T_d·sin60° = 0 → 不可能，除非T_d=0。\\n\\n矛盾表明：小球A必须还受另一个力来平衡水平分量。这个力只能来自线b。\\n\\n因此，线b连接A和B，且为水平方向（常见设定）。\\n\\n设线b水平，拉力为T_b。\\n\\n对A：\\n- 竖直：T_a = G_A + T_d·cos60° （若d斜向下拉A）\\n\\n但配重P拉d，会使d拉A toward滑轮。若滑轮在左上方，则d拉A向左上，故对A，T_d方向左上，与竖直成60°。\\n\\n所以：\\n竖直分量：T_d·cos60° ↑\\n水平分量：T_d·sin60° ←\\n\\n为平衡水平力，线b必须向右拉A，即T_b →\\n\\n对B：c拉B向右上（与竖直成60°），故水平分量 T_c·sin60° →，因此线b必须向左拉B，即T_b ←，符合牛顿第三定律。\\n\\n对A竖直方向：T_a + T_d·cos60° = G_A\\n→ T_a + 0.5 × 0.5 = 0.5\\n→ T_a = 0.5 - 0.25 = 0.25N\\n\\n对B竖直方向：T_b_vertical? 但若b是水平的，则对B竖直方向只有T_c·cos60° ↑ 和 G_B ↓，所以 T_c·cos60° = G_B → 0.25 = 0.5？不成立。\\n\\n因此，线b must be vertical！但这样水平力无法平衡。\\n\\n终极正确模型：实际上，在这种装置中，小球A和B的位置使得线a和b是竖直的，而c和d是对称斜拉的，但由于有中间连线b，且系统调整到c、d平行，可能b是松弛的？但选项中有b的拉力。\\n\\n参考标准解法：对于此类问题，通常将A和B视为两个 separate objects， each suspended by their own string (a for A, b for B), and each also pulled by a diagonal string to a counterweight.\\n\\nBut then horizontal force imbalance.\\n\\nUnless the diagonal strings are pulling downward! How?\\n\\nAh! If the fixed pulleys are BELOW the balls, but that contradicts \\\"悬挂\\\".\\n\\nAnother possibility: the strings c and d are pulling the balls downward toward the pulleys. For example, if the left pulley is below and to the left of A, then d would pull A down-left. But the problem says \\\"定滑轮\\\" fixed on支架, usually above.\\n\\nLet’s read carefully: “d跨过左侧定滑轮、c跨过右侧定滑轮分别与相同配重P、Q相连”. The weights P and Q are hanging down from the pulleys, so the tension pulls the string toward the pulley. So at ball A, the string d is pulled toward the left pulley. If the left pulley is at the same height or higher than A, the force on A is up-left; if lower, down-left.\\n\\nBut the problem says “调节左、右两侧定滑轮高度达到平衡”, and “细线c、d平行且与水平成θ=30°”, and since weights are hanging, likely the pulleys are above, so c and d slope upward from balls to pulleys.\\n\\nGiven the options include 2N and 1N, which are larger than mg=0.5N, the only way is if the vertical component of the diagonal strings is downward, i.e., the strings are pulling the balls down.\\n\\nHow can that be? If the balls are above the pulleys, but that's unusual.\\n\\nPerhaps the string goes from the ball down to the pulley then up to the weight. But typically, it's ball -> up to pulley -> down to weight.\\n\\nI think the intended model is: each ball is pulled upward by its vertical string (a or b) and downward by the diagonal string connected to the counterweight. But that would require the counterweight to be pulling the ball down, which happens if the string from the ball goes down to a pulley below, but the problem says \"\n    }\n  ]\n}",
+    "formatted_json": {
+      "resources": [],
+      "inputs": [
+        {
+          "type": "choice",
+          "order": 1,
+          "resource_index": -1,
+          "options": [
+            {
+              "option": "A",
+              "value": "2N，1N"
+            },
+            {
+              "option": "B",
+              "value": "2N，0.5N"
+            },
+            {
+              "option": "C",
+              "value": "1N，1N"
+            },
+            {
+              "option": "D",
+              "value": "1N，0.5N"
+            }
+          ]
+        }
+      ],
+      "answers": [
+        {
+          "order": 1,
+          "value": "A",
+          "explanation": "对小球A和B分别进行受力分析。由于系统处于平衡状态，各物体所受合力为零。\n\n首先分析配重P和Q：它们质量均为50g（即0.05kg），重力为 mg = 0.05×10 = 0.5N。由于细线c、d分别连接P、Q且跨过光滑定滑轮，因此细线c和d中的张力均等于配重重力，即 T_c = T_d = 0.5N。\n\n细线c和d与水平方向成θ=30°，且平行，说明它们对小球A、B的拉力方向均为斜向上30°。\n\n对小球A：它受到三个力作用：\n- 细线a的竖直向上的拉力 T_a；\n- 细线d斜向左上方30°的拉力 T_d = 0.5N；\n- 自身重力 G = 0.5N，竖直向下。\n\n将T_d分解为竖直和水平分量：\n竖直分量：T_d·sin30° = 0.5 × 0.5 = 0.25N（向上）\n水平分量：T_d·cos30°（向左）\n\n由于小球A静止，竖直方向合力为零：\nT_a + 0.25N = 0.5N → T_a = 0.25N？但此结果与选项不符，说明理解有误。\n\n重新审视题图结构（虽无图，但根据常规设置）：通常此类题中，小球A由线a悬挂，并通过线d连接左侧配重；小球B由线b悬挂，并通过线c连接右侧配重。而线b可能连接A与B之间。\n\n更合理的模型是：小球A上连a，下连b；小球B上连b，另侧连c；配重Q连c，配重P连d，而d连回A？但题干说“d跨过左侧定滑轮…与配重P相连”，“c跨过右侧定滑轮…与配重Q相连”，且“小球A、B上系有细线a、b、c、d”，推测结构为：\n- 线a上端固定，下端连A；\n- 线d一端连A，跨过左滑轮连P；\n- 线c一端连B，跨过右滑轮连Q；\n- 线b连接A和B。\n\n但题干又说“调节滑轮高度达到平衡”，且c、d平行、与水平成30°，说明A受d的拉力方向为沿d的方向（斜向上左30°），B受c的拉力为斜向上右30°。\n\n然而若a、b均为竖直线（因在同一竖直平面，且悬挂），则更可能：线a竖直吊A，线b竖直吊B，而c、d分别从B、A斜拉向滑轮。\n\n但关键线索是“细线c、d平行且与水平成θ=30°”，即它们都与水平夹角30°，故与竖直方向夹角60°。\n\n再考虑对称性：A、B质量相同，P、Q相同，系统对称，故线b应无拉力？但选项中有b拉力为1N或0.5N，不对称，说明结构不对称。\n\n仔细读题：“d跨过左侧定滑轮、c跨过右侧定滑轮分别与相同配重P、Q相连”，且“小球A、B上系有…细线a、b、c和d”——合理推断：\n- a上端固定，下端连A；\n- d一端连A，绕过左滑轮连P；\n- c一端连B，绕过右滑轮连Q；\n- b连接A和B。\n\n此时，对A：受a向上拉力T_a，b的拉力T_b（假设向下拉B，则A受b向下），d的拉力T_d沿d方向（设为斜向左上30°），重力G_A=0.5N向下。\n对B：受b向上拉力T_b（牛顿第三定律），c的拉力T_c斜向右上30°，重力G_B=0.5N向下。\n\n由于滑轮光滑，T_c = G_Q = 0.5N，T_d = G_P = 0.5N。\n\n对B进行受力分析（更简单，因可能b为竖直）：\nB受三个力：重力0.5N↓，T_c=0.5N沿30°斜向上右，T_b（来自线b，方向待定）。\n\n将T_c分解：\n竖直分量：T_c·sin30° = 0.5 × 0.5 = 0.25N ↑\n水平分量：T_c·cos30° → 向右\n\n为平衡水平力，必须有其他水平力，但若线b为竖直，则无法平衡水平分量，矛盾。\n\n因此，线b不可能是竖直的？但题干说“在同一竖直平面内”，且通常a、b为竖直线。\n\n另一种常见模型：A和B并排悬挂，a吊A，b吊B，而c从B向右上连滑轮到Q，d从A向左上连滑轮到P。此时a、b均为竖直。\n\n对A：竖直方向受力：T_a ↑，G_A=0.5N ↓，T_d的竖直分量 ↑（因d斜向上拉A）。\n注意：若d从A向左上连到滑轮，则滑轮在左上方，d对A的拉力方向是沿d远离A，即斜向左上，所以竖直分量向上。\n\n同理，c对B的拉力斜向右上，竖直分量向上。\n\n因此对A：T_a + T_d·sin30° = G_A → T_a + 0.5×0.5 = 0.5 → T_a = 0.5 - 0.25 = 0.25N\n对B：T_b + T_c·sin30° = G_B → T_b = 0.25N\n但选项无0.25N，说明方向理解错误。\n\n关键：当配重P悬挂在滑轮下，线d一端固定于A，绕过滑轮挂P，则P的重力会通过线d拉A向滑轮方向。若滑轮在A的左上方，则d拉A向左上方。但此时，若A仅受a、d和重力，则水平方向不平衡，除非有其他力。\n\n因此，必须存在线b连接A和B以提供水平力平衡。\n\n正确模型应为：A和B相邻，a竖直吊A，b竖直吊B，同时A还连d向左上到滑轮P，B连c向右上到滑轮Q。但这样A在水平方向受d的左向分力，无人平衡，不可能静止。\n\n故更可能：线b是水平连接A和B的！但题干未明确。\n\n回到题干：“细线a、b、c和d”，且“a的上端悬挂于竖直固定的支架上”，暗示a是竖直的；而c、d跨过滑轮与配重相连，且与水平成30°，说明c、d是斜的。\n\n经典题型：两个小球用水平线b连接，a竖直吊A，d从A斜连左滑轮P，c从B斜连右滑轮Q。此时系统对称，b为水平。\n\n但题干说“调节左、右两侧定滑轮高度达到平衡”，且c、d平行，说明对称，故A、B受力对称，T_a = T_b？但选项A为2N,1N，不对称，矛盾。\n\n再审题：选项A为“2N，1N”，单位是N，而mg=0.5N，2N远大于重力，不合理，除非角度理解错误。\n\n注意：θ=30°是“与水平成θ=30°”，即与水平夹角30°，所以与竖直夹角60°。\n\n但若c、d中的张力为0.5N，其竖直分量为0.5×sin30°=0.25N，不足以解释2N。\n\n除非：配重P、Q质量50g，但线c、d的张力不是0.5N？不，滑轮光滑，张力等于配重重力。\n\n可能误解了连接方式。另一种可能是：线d一端固定于支架，绕过滑轮连P，再连A？但题干说“d跨过左侧定滑轮…与配重P相连”，且“小球A…上系有…d”，所以d一端连A，跨过滑轮连P。\n\n关键突破：或许小球A只受a和d，小球B只受b和c，即A、B不直接相连！题干说“小球A、B上系有不可伸长的细线a、b、c和d”，可能a连A，b连B，c连B，d连A。\n\n即：A受a（上）和d（斜）；B受b（上）和c（斜）。\n\n此时，对A：T_a 竖直向上，T_d 沿d方向（斜向上，因滑轮在上方），G_A 竖直向下。\n\n由于d与水平成30°，若滑轮在A的左上方，则d对A的拉力方向为左上30°，其竖直分量向上。\n\n但A在水平方向受T_d的水平分量，无人平衡，不可能静止——除非滑轮正上方，但题干说“左侧定滑轮”，故不在正上方。\n\n因此，唯一可能是：线a不是竖直的？但题干说“a的上端悬挂于竖直固定的支架上”，通常意味着a竖直。\n\n查阅类似题目：常见模型为“结点”问题。可能A、B并非质点，而是滑轮或结点。但题干明确说“小球A、B”。\n\n重新计算：假设对小球A，受三个力：重力G=0.5N↓，线a拉力T_a↑（竖直），线d拉力T_d=0.5N，方向沿d。因系统平衡，三力共点平衡。\n\n但若a竖直，d斜向，则三力不共线，需满足矢量和为零。\n\n设d与竖直方向夹角为α。题干说“与水平成θ=30°”，故与竖直成60°，即α=60°。\n\n则对A：\n水平方向：T_d·sin60° = 0 → 不可能，除非T_d=0。\n\n矛盾表明：小球A必须还受另一个力来平衡水平分量。这个力只能来自线b。\n\n因此，线b连接A和B，且为水平方向（常见设定）。\n\n设线b水平，拉力为T_b。\n\n对A：\n- 竖直：T_a = G_A + T_d·cos60° （若d斜向下拉A）\n\n但配重P拉d，会使d拉A toward滑轮。若滑轮在左上方，则d拉A向左上，故对A，T_d方向左上，与竖直成60°。\n\n所以：\n竖直分量：T_d·cos60° ↑\n水平分量：T_d·sin60° ←\n\n为平衡水平力，线b必须向右拉A，即T_b →\n\n对B：c拉B向右上（与竖直成60°），故水平分量 T_c·sin60° →，因此线b必须向左拉B，即T_b ←，符合牛顿第三定律。\n\n对A竖直方向：T_a + T_d·cos60° = G_A\n→ T_a + 0.5 × 0.5 = 0.5\n→ T_a = 0.5 - 0.25 = 0.25N\n\n对B竖直方向：T_b_vertical? 但若b是水平的，则对B竖直方向只有T_c·cos60° ↑ 和 G_B ↓，所以 T_c·cos60° = G_B → 0.25 = 0.5？不成立。\n\n因此，线b must be vertical！但这样水平力无法平衡。\n\n终极正确模型：实际上，在这种装置中，小球A和B的位置使得线a和b是竖直的，而c和d是对称斜拉的，但由于有中间连线b，且系统调整到c、d平行，可能b是松弛的？但选项中有b的拉力。\n\n参考标准解法：对于此类问题，通常将A和B视为两个 separate objects， each suspended by their own string (a for A, b for B), and each also pulled by a diagonal string to a counterweight.\n\nBut then horizontal force imbalance.\n\nUnless the diagonal strings are pulling downward! How?\n\nAh! If the fixed pulleys are BELOW the balls, but that contradicts \"悬挂\".\n\nAnother possibility: the strings c and d are pulling the balls downward toward the pulleys. For example, if the left pulley is below and to the left of A, then d would pull A down-left. But the problem says \"定滑轮\" fixed on支架, usually above.\n\nLet’s read carefully: “d跨过左侧定滑轮、c跨过右侧定滑轮分别与相同配重P、Q相连”. The weights P and Q are hanging down from the pulleys, so the tension pulls the string toward the pulley. So at ball A, the string d is pulled toward the left pulley. If the left pulley is at the same height or higher than A, the force on A is up-left; if lower, down-left.\n\nBut the problem says “调节左、右两侧定滑轮高度达到平衡”, and “细线c、d平行且与水平成θ=30°”, and since weights are hanging, likely the pulleys are above, so c and d slope upward from balls to pulleys.\n\nGiven the options include 2N and 1N, which are larger than mg=0.5N, the only way is if the vertical component of the diagonal strings is downward, i.e., the strings are pulling the balls down.\n\nHow can that be? If the balls are above the pulleys, but that's unusual.\n\nPerhaps the string goes from the ball down to the pulley then up to the weight. But typically, it's ball -> up to pulley -> down to weight.\n\nI think the intended model is: each ball is pulled upward by its vertical string (a or b) and downward by the diagonal string connected to the counterweight. But that would require the counterweight to be pulling the ball down, which happens if the string from the ball goes down to a pulley below, but the problem says"
+        }
+      ]
+    }
+  },
+  {
+    "_index": "questions115",
+    "_id": "3685468024963072",
+    "_matched_id_field": "course_id",
+    "id": "3685468024963072",
+    "course_id": 29,
+    "type_id": "2909",
+    "kpoint_ids": [
+      16341,
+      17090,
+      16771,
+      16179
+    ],
+    "catalog_ids": [
+      195019,
+      210025,
+      230536,
+      202696,
+      220822
+    ],
+    "years": [
+      2025
+    ],
+    "difficulty": 0.65,
+    "difficulty_level": 19,
+    "stem": "<!--版权声明：试题（含题干、答案、解析）由学科网授权提供，受版权保护--><div class=\"qml-stem\" data-copyright=\"xkw.com-1761837853-106741721811507700-vSg5nnEjs6uCeKYfXmxx05bzeX3bRHpTi8V1E0gDK1wrMWmZDo00SSO1Xp_uGm65\"><p style=\"text-align:justify;word-break:break-word;\"><span style=\"font-family: 宋体;\">玩具小车</span></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">一辆无线遥控电动小车可在水平面内做出加速、减速、转弯等运动。在俯视图（</span><span style=\"font-family: 'Times New Roman';\">a</span><span style=\"font-family: 宋体;\">）中，以小车为坐标原点</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">O</span><span style=\"font-family: 宋体;\">、速度方向为</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">y</span><span style=\"font-family: 宋体;\">轴正方向建立直角坐标系。用</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">F</span><span style=\"font-family: 宋体;\">表示地面对小车水平方向的作用力。忽略小车运动过程受到的空气阻力。</span></p><p style=\"text-align: left;\"><img height=\"134\" src=\"https://resource.malongtech.cn/questions/img/3685468024963072/6b685c7f-38c9-4ecd-bca5-a34cb7935d72.png\" width=\"147\"/></p><div class=\"qml-sq\"><div class=\"qml-stem\" data-copyright=\"xkw.com-1761837853-106741721811507700-vSg5nnEjs6uCeKYfXmxx05bzeX3bRHpTi8V1E0gDK1wrMWmZDo00SSO1Xp_uGm65\"><p style=\"\"><span class=\"ques-no\">1. </span><span style=\"font-family: 宋体;\">遥控器发出某种波来控制小车，该波是（　　）</span></p><div class=\"qml-og\"><table class=\"qml-og\" style=\"width:100%\"><tr><td>A. <span class=\"qml-op\"><span style=\"font-family: 宋体;\">机械波</span></span></td><td>B. <span class=\"qml-op\"><span style=\"font-family: 宋体;\">电磁波</span></span></td><td colspan=\"1\">C. <span class=\"qml-op\"><span style=\"font-family: 宋体;\">引力波</span></span></td></tr></table></div></div></div><div class=\"qml-sq\"><div class=\"qml-stem\" data-copyright=\"xkw.com-1761837853-106741721811507700-vSg5nnEjs6uCeKYfXmxx05bzeX3bRHpTi8V1E0gDK1wrMWmZDo00SSO1Xp_uGm65\"><p style=\"\"><span class=\"ques-no\">2. </span><span style=\"font-family: 宋体;\">小车受到的作用力</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">F</span><span style=\"font-family: 宋体;\">与对应的小车运动情况可能是（　　）</span></p><div class=\"qml-og\"><table class=\"qml-og\" style=\"width:100%\"><tr><td>A. <span class=\"qml-op\"><span style=\"font-style: italic;font-family: 'Times New Roman';\">F</span><span style=\"font-family: 宋体;\">沿</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">y</span><span style=\"font-family: 宋体;\">轴正向时，小车沿直线刹车</span></span></td></tr><tr><td>B. <span class=\"qml-op\"><span style=\"font-style: italic;font-family: 'Times New Roman';\">F</span><span style=\"font-family: 宋体;\">沿</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">x</span><span style=\"font-family: 宋体;\">轴正向时，小车做匀速圆周运动</span></span></td></tr><tr><td>C. <span class=\"qml-op\"><span style=\"font-style: italic;font-family: 'Times New Roman';\">F</span><span style=\"font-family: 宋体;\">沿</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">y</span><span style=\"font-family: 宋体;\">轴正向时，小车发生“离心现象”</span></span></td></tr><tr><td colspan=\"1\">D. <span class=\"qml-op\"><span style=\"font-style: italic;font-family: 'Times New Roman';\">F</span><span style=\"font-family: 宋体;\">沿</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">x</span><span style=\"font-family: 宋体;\">轴正向时，小车发生“离心现象”</span></span></td></tr></table></div></div></div><div class=\"qml-sq\"><div class=\"qml-stem\" data-copyright=\"xkw.com-1761837853-106741721811507700-vSg5nnEjs6uCeKYfXmxx05bzeX3bRHpTi8V1E0gDK1wrMWmZDo00SSO1Xp_uGm65\"><p style=\"\"><span class=\"ques-no\">3. </span><span style=\"font-family: 宋体;\">若小车静止在水平面上，</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">t</span><span style=\"font-family: 宋体;\">＝</span><span style=\"font-family: 'Times New Roman';\">0</span><span style=\"font-family: 宋体;\">时刻起受到</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">F</span><span style=\"font-family: 宋体;\">的作用，</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">F</span><span style=\"font-family: 宋体;\">沿</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">y</span><span style=\"font-family: 宋体;\">轴方向且随时间变化的关系如图（</span><span style=\"font-family: 'Times New Roman';\">b</span><span style=\"font-family: 宋体;\">）所示，则</span></p><p style=\"text-align: left;\"><img height=\"144\" src=\"https://resource.malongtech.cn/questions/img/3685468024963072/c75b84fb-09d4-4be4-ac99-e3064695d31e.png\" width=\"148\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">（</span><span style=\"font-family: 'Times New Roman';\">1</span><span style=\"font-family: 宋体;\">）</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">F</span><span style=\"font-family: 'Times New Roman';\">-</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">t</span><span style=\"font-family: 宋体;\">图像与坐标轴所围面积的物理意义是</span><span class=\"qml-bk\" index=\"1\" size=\"6\" style=\"text-decoration:underline\" type=\"underline\">　　　　　　</span><span style=\"font-family: 宋体;\">（填写物理量名称）。</span></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">（</span><span style=\"font-family: 'Times New Roman';\">2</span><span style=\"font-family: 宋体;\">）在</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">t</span><span style=\"font-family: 宋体;\">＝</span><span style=\"font-family: 'Times New Roman';\">2</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">t</span><sub word-font=\"Times New Roman\"><span>0</span></sub><span style=\"font-family: 宋体;\">时刻，小车的速度大小为</span><span class=\"qml-bk\" index=\"2\" size=\"6\" style=\"text-decoration:underline\" type=\"underline\">　　　　　　</span><span style=\"font-family: 宋体;\">。</span></p></div></div><div class=\"qml-sq\"><div class=\"qml-stem\" data-copyright=\"xkw.com-1761837853-106741721811507700-vSg5nnEjs6uCeKYfXmxx05bzeX3bRHpTi8V1E0gDK1wrMWmZDo00SSO1Xp_uGm65\"><p style=\"\"><span class=\"ques-no\">4. </span><span style=\"font-family: 宋体;\">某同学将小车的干电池取出，用如图（</span><span style=\"font-family: 'Times New Roman';\">c</span><span style=\"font-family: 宋体;\">）所示的电路测量其电动势和内阻，图中电压传感器未画出，定值电阻</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">R</span><span style=\"font-family: 宋体;\">＝</span><span style=\"font-family: 'Times New Roman';\">5.0Ω</span><span style=\"font-family: 宋体;\">。连接电路，点击开始记录，得到图（</span><span style=\"font-family: 'Times New Roman';\">d</span><span style=\"font-family: 宋体;\">）中的数据点</span><span style=\"font-family: 'Times New Roman';\">①</span><span style=\"font-family: 宋体;\">；闭合开关</span><span style=\"font-family: 'Times New Roman';\">S</span><span style=\"font-family: 宋体;\">，移动滑动变阻器的滑片依次得到数据点</span><span style=\"font-family: 'Times New Roman';\">②</span><span style=\"font-family: 宋体;\">、</span><span style=\"font-family: 'Times New Roman';\">③</span><span style=\"font-family: 宋体;\">、</span><span style=\"font-family: 'Times New Roman';\">④</span><span style=\"font-family: 宋体;\">、</span><span style=\"font-family: 'Times New Roman';\">⑤</span><span style=\"font-family: 宋体;\">。</span></p><p style=\"text-align: left;\"><img height=\"166\" src=\"https://resource.malongtech.cn/questions/img/3685468024963072/b5fa68ed-6e1a-42e9-a2e4-4d3365264235.png\" width=\"446\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">（</span><span style=\"font-family: 'Times New Roman';\">1</span><span style=\"font-family: 宋体;\">）根据实验数据，可知电压表接在</span><span class=\"qml-bk\" index=\"3\" size=\"6\" style=\"text-decoration:underline\" type=\"underline\">　　　　　　</span><span style=\"font-family: 宋体;\">和</span><span class=\"qml-bk\" index=\"4\" size=\"6\" style=\"text-decoration:underline\" type=\"underline\">　　　　　　</span><span style=\"font-family: 宋体;\">之间（用图</span><span style=\"font-family: 'Times New Roman';\">c</span><span style=\"font-family: 宋体;\">中字母表示）。</span></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">（</span><span style=\"font-family: 'Times New Roman';\">2</span><span style=\"font-family: 宋体;\">）测得该电池的电动势为</span><span class=\"qml-bk\" index=\"5\" size=\"6\" style=\"text-decoration:underline\" type=\"underline\">　　　　　　</span><span style=\"font-family: 'Times New Roman';\">V</span><span style=\"font-family: 宋体;\">，内阻为</span><span class=\"qml-bk\" index=\"6\" size=\"6\" style=\"text-decoration:underline\" type=\"underline\">　　　　　　</span><span style=\"font-family: 'Times New Roman';\">Ω</span><span style=\"font-family: 宋体;\">。（结果均保留两位有效数字）</span></p></div></div></div>",
+    "answer": "<!--版权声明：试题（含题干、答案、解析）由学科网授权提供，受版权保护--><div class=\"qml-answer\" data-copyright=\"xkw.com-1761837853-106741721811507700-vSg5nnEjs6uCeKYfXmxx05bzeX3bRHpTi8V1E0gDK1wrMWmZDo00SSO1Xp_uGm65\">1. <span class=\"qml-an-sq\"><span class=\"qml-an qml-isop\">B</span></span>     2. <span class=\"qml-an-sq\"><span class=\"qml-an qml-isop\">BD</span></span>     3. <span class=\"qml-an-sq\">    ①. <span class=\"qml-an qml-exact\"><span style=\"font-family: 宋体;\">冲量</span></span>    ②. <span class=\"qml-an qml-exact\"><span style=\"font-family: 'Times New Roman';\">0</span></span></span>     4. <span class=\"qml-an-sq\">    ①. <span class=\"qml-an qml-exact\"><span style=\"font-style: italic;font-family: 'Times New Roman';\">A</span></span>    ②. <span class=\"qml-an qml-exact\"><span style=\"font-style: italic;font-family: 'Times New Roman';\">C</span></span>    ③. <span class=\"qml-an qml-exact\"><span style=\"font-family: 'Times New Roman';\">1.5</span></span>    ④. <span class=\"qml-an qml-exact\"><span style=\"font-family: 'Times New Roman';\">0.50</span></span></span>     </div>",
+    "explanation": "<!--版权声明：试题（含题干、答案、解析）由学科网授权提供，受版权保护--><div class=\"qml-explanation\" data-copyright=\"xkw.com-1761837853-106741721811507700-vSg5nnEjs6uCeKYfXmxx05bzeX3bRHpTi8V1E0gDK1wrMWmZDo00SSO1Xp_uGm65\"><div class=\"qml-exps-sq\">(1)题详解： <p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">遥控器发出电磁波种波来控制小车。</span></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">故选</span><span style=\"font-family: 'Times New Roman';\">B</span><span style=\"font-family: 宋体;\">。</span></p></div><div class=\"qml-exps-sq\">(2)题详解： <p style=\"text-align: left;\"><span style=\"font-family: 'Times New Roman';\">AC</span><span style=\"font-family: 宋体;\">．</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">F</span><span style=\"font-family: 宋体;\">沿</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">y</span><span style=\"font-family: 宋体;\">轴正向时，小车沿直线加速，故</span><span style=\"font-family: 'Times New Roman';\">AC</span><span style=\"font-family: 宋体;\">错误；</span></p><p style=\"text-align: left;\"><span style=\"font-family: 'Times New Roman';\">B</span><span style=\"font-family: 宋体;\">．</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">F</span><span style=\"font-family: 宋体;\">沿</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">x</span><span style=\"font-family: 宋体;\">轴正向时，小车受力方向与速度方向垂直，可能做匀速圆周运动，故</span><span style=\"font-family: 'Times New Roman';\">B</span><span style=\"font-family: 宋体;\">正确；</span></p><p style=\"text-align: left;\"><span style=\"font-family: 'Times New Roman';\">D</span><span style=\"font-family: 宋体;\">．</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">F</span><span style=\"font-family: 宋体;\">沿</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">x</span><span style=\"font-family: 宋体;\">轴正向时，若</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">v</span><span style=\"font-family: 宋体;\">过大，则小车受力不足以提供向心力，会发生“离心现象”，故</span><span style=\"font-family: 'Times New Roman';\">D</span><span style=\"font-family: 宋体;\">正确；</span></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">故选</span><span style=\"font-family: 'Times New Roman';\">BD</span><span style=\"font-family: 宋体;\">。</span></p></div><div class=\"qml-exps-sq\">(3)题详解： <p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">（</span><span style=\"font-family: 'Times New Roman';\">1</span><span style=\"font-family: 宋体;\">）</span><span style=\"font-family: 'Times New Roman';\">[1] </span><span style=\"font-family: 宋体;\">根据</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3685468024963072/c0f75c965236a42ce9766f967cf7a4c1.svg\"/><span style=\"font-family: 'Times New Roman';\">,</span><span style=\"font-family: 宋体;\">可知</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">F</span><span style=\"font-family: 'Times New Roman';\">-</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">t</span><span style=\"font-family: 宋体;\">图像与坐标轴所围面积的物理意义是冲量。</span></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">（</span><span style=\"font-family: 'Times New Roman';\">2</span><span style=\"font-family: 宋体;\">）</span><span style=\"font-family: 'Times New Roman';\">[2] </span><span style=\"font-family: 宋体;\">根据动量定理有</span></p><p style=\"text-align: center;\"><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3685468024963072/1e6ac0f8b22eec049678728f7f7339b7.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">解得</span></p><p style=\"text-align: center;\"><span style=\"font-family: 'Times New Roman';font-style: italic;\">v</span><span style=\"font-family: 'Times New Roman';\">=0</span></p></div><div class=\"qml-exps-sq\">(4)题详解： <p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">（</span><span style=\"font-family: 'Times New Roman';\">1</span><span style=\"font-family: 宋体;\">）</span><span style=\"font-family: 'Times New Roman';\">[1] [2]</span><span style=\"font-family: 宋体;\">干电池电阻较小，图中数据电压变化较明显，可知电压表接在</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">A</span><span style=\"font-family: 宋体;\">和</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">C</span><span style=\"font-family: 宋体;\">之间。</span></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">（</span><span style=\"font-family: 'Times New Roman';\">2</span><span style=\"font-family: 宋体;\">）</span><span style=\"font-family: 'Times New Roman';\">[3] [4]</span><span style=\"font-family: 宋体;\">根据闭合电路欧姆定律有</span></p><p style=\"text-align: center;\"><span style=\"font-family: 'Times New Roman';font-style: italic;\">U</span><span style=\"font-family: 'Times New Roman';\">=</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">E</span><span style=\"font-family: 'Times New Roman';\">-</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">I</span><span style=\"font-family: 宋体;\">（</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">R</span><span style=\"font-family: 'Times New Roman';\">+</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">r</span><span style=\"font-family: 宋体;\">）</span></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">结合图像斜率与截距可知</span></p><p style=\"text-align: center;\"><span style=\"font-family: 'Times New Roman';font-style: italic;\">E</span><span style=\"font-family: 'Times New Roman';\">=1.5V</span><span style=\"font-family: 宋体;\">，</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3685468024963072/24d7deb6bcbf8df32b5afbb971a854e7.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">解得</span></p><p style=\"text-align: center;\"><span style=\"font-family: 'Times New Roman';font-style: italic;\">r</span><span style=\"font-family: 'Times New Roman';\">=0.50Ω</span></p></div></div>",
+    "create_date": "2025-02-05 10:06:48",
+    "paper_type_ids": [
+      5
+    ],
+    "course": {
+      "id": 29,
+      "name": "高中物理"
+    },
+    "catalogs": [
+      {
+        "id": 195019,
+        "name": "2. 动量定理"
+      },
+      {
+        "id": 210025,
+        "name": "第1节 动量和动量定理"
+      },
+      {
+        "id": 230536,
+        "name": "第二节 物体动量变化的原因 动量定理"
+      },
+      {
+        "id": 202696,
+        "name": "第一节 冲量  动量"
+      },
+      {
+        "id": 220822,
+        "name": "1. 动  量"
+      }
+    ],
+    "type": {
+      "id": "2909",
+      "name": "综合题"
+    },
+    "kpoints": [
+      {
+        "id": 16341,
+        "name": "利用F-t图像求冲量"
+      },
+      {
+        "id": 17090,
+        "name": "电磁波与信息化社会"
+      },
+      {
+        "id": 16771,
+        "name": "利用伏安法测量电源的电动势和内阻"
+      },
+      {
+        "id": 16179,
+        "name": "离心运动"
+      }
+    ],
+    "media": 0,
+    "exp_video_posters": null,
+    "answer_scoreable": true,
+    "tag_ids": [],
+    "tags": [],
+    "source_papers": [
+      {
+        "title": "上海市金山区2024-2025学年高三上学期期末质量监控（一模）物理试卷",
+        "area": {
+          "id": "310000",
+          "name": "上海市"
+        },
+        "type_id": 5,
+        "grade_id": 12,
+        "term": "LAST",
+        "year": 2025
+      }
+    ],
+    "formattedStem": "{\n  \"html\" : \"<p style='\\\"text-align:justify;word-break:break-word;\\\"'><span style='\\\"font-family:' 宋体;\\\"=\"\">玩具小车</span></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">一辆无线遥控电动小车可在水平面内做出加速、减速、转弯等运动。在俯视图（</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>a</span><span style='\\\"font-family:' 宋体;\\\"=\"\">）中，以小车为坐标原点</span><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>O</span><span style='\\\"font-family:' 宋体;\\\"=\"\">、速度方向为</span><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>y</span><span style='\\\"font-family:' 宋体;\\\"=\"\">轴正方向建立直角坐标系。用</span><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>F</span><span style='\\\"font-family:' 宋体;\\\"=\"\">表示地面对小车水平方向的作用力。忽略小车运动过程受到的空气阻力。</span></p><p left;\\\"=\"\" style='\\\"text-align:'><img height='\\\"134\\\"' src=\"https://resource.malongtech.cn/questions/img/3685468024963072/6b685c7f-38c9-4ecd-bca5-a34cb7935d72.png\" width='\\\"147\\\"'/></p>\",\n  \"type\" : \"复合题\",\n  \"sqs\" : [ {\n    \"html\" : \"<p style='\\\"\\\"'><span class='\\\"ques-no\\\"'>1. </span><span style='\\\"font-family:' 宋体;\\\"=\"\">遥控器发出某种波来控制小车，该波是（　　）</span></p>\",\n    \"type\" : \"选择题\",\n    \"sqs\" : [ ],\n    \"og\" : {\n      \"cols\" : 3,\n      \"ogOps\" : [ {\n        \"html\" : \"<span class='\\\"qml-op\\\"'><span style='\\\"font-family:' 宋体;\\\"=\"\">机械波</span></span>\",\n        \"index\" : \"A\"\n      }, {\n        \"html\" : \"<span class='\\\"qml-op\\\"'><span style='\\\"font-family:' 宋体;\\\"=\"\">电磁波</span></span>\",\n        \"index\" : \"B\"\n      }, {\n        \"html\" : \"<span class='\\\"qml-op\\\"'><span style='\\\"font-family:' 宋体;\\\"=\"\">引力波</span></span>\",\n        \"index\" : \"C\"\n      } ]\n    },\n    \"sqIdMode\" : 0,\n    \"sqBlankCount\" : 0\n  }, {\n    \"html\" : \"<p style='\\\"\\\"'><span class='\\\"ques-no\\\"'>2. </span><span style='\\\"font-family:' 宋体;\\\"=\"\">小车受到的作用力</span><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>F</span><span style='\\\"font-family:' 宋体;\\\"=\"\">与对应的小车运动情况可能是（　　）</span></p>\",\n    \"type\" : \"选择题\",\n    \"sqs\" : [ ],\n    \"og\" : {\n      \"cols\" : 1,\n      \"ogOps\" : [ {\n        \"html\" : \"<span class='\\\"qml-op\\\"'><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>F</span><span style='\\\"font-family:' 宋体;\\\"=\"\">沿</span><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>y</span><span style='\\\"font-family:' 宋体;\\\"=\"\">轴正向时，小车沿直线刹车</span></span>\",\n        \"index\" : \"A\"\n      }, {\n        \"html\" : \"<span class='\\\"qml-op\\\"'><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>F</span><span style='\\\"font-family:' 宋体;\\\"=\"\">沿</span><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>x</span><span style='\\\"font-family:' 宋体;\\\"=\"\">轴正向时，小车做匀速圆周运动</span></span>\",\n        \"index\" : \"B\"\n      }, {\n        \"html\" : \"<span class='\\\"qml-op\\\"'><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>F</span><span style='\\\"font-family:' 宋体;\\\"=\"\">沿</span><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>y</span><span style='\\\"font-family:' 宋体;\\\"=\"\">轴正向时，小车发生“离心现象”</span></span>\",\n        \"index\" : \"C\"\n      }, {\n        \"html\" : \"<span class='\\\"qml-op\\\"'><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>F</span><span style='\\\"font-family:' 宋体;\\\"=\"\">沿</span><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>x</span><span style='\\\"font-family:' 宋体;\\\"=\"\">轴正向时，小车发生“离心现象”</span></span>\",\n        \"index\" : \"D\"\n      } ]\n    },\n    \"sqIdMode\" : 0,\n    \"sqBlankCount\" : 0\n  }, {\n    \"html\" : \"<p style='\\\"\\\"'><span class='\\\"ques-no\\\"'>3. </span><span style='\\\"font-family:' 宋体;\\\"=\"\">若小车静止在水平面上，</span><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>t</span><span style='\\\"font-family:' 宋体;\\\"=\"\">＝</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>0</span><span style='\\\"font-family:' 宋体;\\\"=\"\">时刻起受到</span><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>F</span><span style='\\\"font-family:' 宋体;\\\"=\"\">的作用，</span><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>F</span><span style='\\\"font-family:' 宋体;\\\"=\"\">沿</span><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>y</span><span style='\\\"font-family:' 宋体;\\\"=\"\">轴方向且随时间变化的关系如图（</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>b</span><span style='\\\"font-family:' 宋体;\\\"=\"\">）所示，则</span></p><p left;\\\"=\"\" style='\\\"text-align:'><img height='\\\"144\\\"' src=\"https://resource.malongtech.cn/questions/img/3685468024963072/c75b84fb-09d4-4be4-ac99-e3064695d31e.png\" width='\\\"148\\\"'/></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">（</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>1</span><span style='\\\"font-family:' 宋体;\\\"=\"\">）</span><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>F</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>-</span><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>t</span><span style='\\\"font-family:' 宋体;\\\"=\"\">图像与坐标轴所围面积的物理意义是</span><span class='\\\"qml-bk\\\"' index='\\\"1\\\"' size='\\\"6\\\"' style='\\\"text-decoration:underline\\\"' type='\\\"underline\\\"'>　　　　　　</span><span style='\\\"font-family:' 宋体;\\\"=\"\">（填写物理量名称）。</span></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">（</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>2</span><span style='\\\"font-family:' 宋体;\\\"=\"\">）在</span><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>t</span><span style='\\\"font-family:' 宋体;\\\"=\"\">＝</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>2</span><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>t</span><sub new=\"\" roman\\\"=\"\" word-font='\\\"Times'><span>0</span></sub><span style='\\\"font-family:' 宋体;\\\"=\"\">时刻，小车的速度大小为</span><span class='\\\"qml-bk\\\"' index='\\\"2\\\"' size='\\\"6\\\"' style='\\\"text-decoration:underline\\\"' type='\\\"underline\\\"'>　　　　　　</span><span style='\\\"font-family:' 宋体;\\\"=\"\">。</span></p>\",\n    \"type\" : \"填空题\",\n    \"sqs\" : [ ],\n    \"og\" : null,\n    \"sqIdMode\" : 0,\n    \"sqBlankCount\" : 0\n  }, {\n    \"html\" : \"<p style='\\\"\\\"'><span class='\\\"ques-no\\\"'>4. </span><span style='\\\"font-family:' 宋体;\\\"=\"\">某同学将小车的干电池取出，用如图（</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>c</span><span style='\\\"font-family:' 宋体;\\\"=\"\">）所示的电路测量其电动势和内阻，图中电压传感器未画出，定值电阻</span><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>R</span><span style='\\\"font-family:' 宋体;\\\"=\"\">＝</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>5.0Ω</span><span style='\\\"font-family:' 宋体;\\\"=\"\">。连接电路，点击开始记录，得到图（</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>d</span><span style='\\\"font-family:' 宋体;\\\"=\"\">）中的数据点</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>①</span><span style='\\\"font-family:' 宋体;\\\"=\"\">；闭合开关</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>S</span><span style='\\\"font-family:' 宋体;\\\"=\"\">，移动滑动变阻器的滑片依次得到数据点</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>②</span><span style='\\\"font-family:' 宋体;\\\"=\"\">、</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>③</span><span style='\\\"font-family:' 宋体;\\\"=\"\">、</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>④</span><span style='\\\"font-family:' 宋体;\\\"=\"\">、</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>⑤</span><span style='\\\"font-family:' 宋体;\\\"=\"\">。</span></p><p left;\\\"=\"\" style='\\\"text-align:'><img height='\\\"166\\\"' src=\"https://resource.malongtech.cn/questions/img/3685468024963072/b5fa68ed-6e1a-42e9-a2e4-4d3365264235.png\" width='\\\"446\\\"'/></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">（</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>1</span><span style='\\\"font-family:' 宋体;\\\"=\"\">）根据实验数据，可知电压表接在</span><span class='\\\"qml-bk\\\"' index='\\\"3\\\"' size='\\\"6\\\"' style='\\\"text-decoration:underline\\\"' type='\\\"underline\\\"'>　　　　　　</span><span style='\\\"font-family:' 宋体;\\\"=\"\">和</span><span class='\\\"qml-bk\\\"' index='\\\"4\\\"' size='\\\"6\\\"' style='\\\"text-decoration:underline\\\"' type='\\\"underline\\\"'>　　　　　　</span><span style='\\\"font-family:' 宋体;\\\"=\"\">之间（用图</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>c</span><span style='\\\"font-family:' 宋体;\\\"=\"\">中字母表示）。</span></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">（</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>2</span><span style='\\\"font-family:' 宋体;\\\"=\"\">）测得该电池的电动势为</span><span class='\\\"qml-bk\\\"' index='\\\"5\\\"' size='\\\"6\\\"' style='\\\"text-decoration:underline\\\"' type='\\\"underline\\\"'>　　　　　　</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>V</span><span style='\\\"font-family:' 宋体;\\\"=\"\">，内阻为</span><span class='\\\"qml-bk\\\"' index='\\\"6\\\"' size='\\\"6\\\"' style='\\\"text-decoration:underline\\\"' type='\\\"underline\\\"'>　　　　　　</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>Ω</span><span style='\\\"font-family:' 宋体;\\\"=\"\">。（结果均保留两位有效数字）</span></p>\",\n    \"type\" : \"填空题\",\n    \"sqs\" : [ ],\n    \"og\" : null,\n    \"sqIdMode\" : 0,\n    \"sqBlankCount\" : 0\n  } ],\n  \"og\" : null,\n  \"sqIdMode\" : 0,\n  \"sqBlankCount\" : 0\n}",
+    "formattedAnswer": "{\n  \"anSqs\" : [ {\n    \"ans\" : [ {\n      \"html\" : \"B\",\n      \"op\" : true,\n      \"exact\" : true\n    } ]\n  }, {\n    \"ans\" : [ {\n      \"html\" : \"BD\",\n      \"op\" : true,\n      \"exact\" : true\n    } ]\n  }, {\n    \"ans\" : [ {\n      \"html\" : \"<span class='\\\"qml-an' qml-exact\\\"=\"\"><span style='\\\"font-family:' 宋体;\\\"=\"\">冲量</span></span>\",\n      \"op\" : false,\n      \"exact\" : true\n    }, {\n      \"html\" : \"<span class='\\\"qml-an' qml-exact\\\"=\"\"><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>0</span></span>\",\n      \"op\" : false,\n      \"exact\" : true\n    } ]\n  }, {\n    \"ans\" : [ {\n      \"html\" : \"<span class='\\\"qml-an' qml-exact\\\"=\"\"><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>A</span></span>\",\n      \"op\" : false,\n      \"exact\" : true\n    }, {\n      \"html\" : \"<span class='\\\"qml-an' qml-exact\\\"=\"\"><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>C</span></span>\",\n      \"op\" : false,\n      \"exact\" : true\n    }, {\n      \"html\" : \"<span class='\\\"qml-an' qml-exact\\\"=\"\"><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>1.5</span></span>\",\n      \"op\" : false,\n      \"exact\" : true\n    }, {\n      \"html\" : \"<span class='\\\"qml-an' qml-exact\\\"=\"\"><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>0.50</span></span>\",\n      \"op\" : false,\n      \"exact\" : true\n    } ]\n  } ]\n}",
+    "formattedExplanation": "{\n  \"explanationSegs\" : [ {\n    \"name\" : \"(1)题详解\",\n    \"html\" : \"<p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">遥控器发出电磁波种波来控制小车。</span></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">故选</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>B</span><span style='\\\"font-family:' 宋体;\\\"=\"\">。</span></p>\"\n  }, {\n    \"name\" : \"(2)题详解\",\n    \"html\" : \"<p left;\\\"=\"\" style='\\\"text-align:'><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>AC</span><span style='\\\"font-family:' 宋体;\\\"=\"\">．</span><span 'times=\"\" italic;\\\"=\"\" new=\"\" roman';font-style:=\"\" style='\\\"font-family:'>F</span><span style='\\\"font-family:' 宋体;\\\"=\"\">沿</span><span 'times=\"\" italic;\\\"=\"\" new=\"\" roman';font-style:=\"\" style='\\\"font-family:'>y</span><span style='\\\"font-family:' 宋体;\\\"=\"\">轴正向时，小车沿直线加速，故</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>AC</span><span style='\\\"font-family:' 宋体;\\\"=\"\">错误；</span></p><p left;\\\"=\"\" style='\\\"text-align:'><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>B</span><span style='\\\"font-family:' 宋体;\\\"=\"\">．</span><span 'times=\"\" italic;\\\"=\"\" new=\"\" roman';font-style:=\"\" style='\\\"font-family:'>F</span><span style='\\\"font-family:' 宋体;\\\"=\"\">沿</span><span 'times=\"\" italic;\\\"=\"\" new=\"\" roman';font-style:=\"\" style='\\\"font-family:'>x</span><span style='\\\"font-family:' 宋体;\\\"=\"\">轴正向时，小车受力方向与速度方向垂直，可能做匀速圆周运动，故</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>B</span><span style='\\\"font-family:' 宋体;\\\"=\"\">正确；</span></p><p left;\\\"=\"\" style='\\\"text-align:'><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>D</span><span style='\\\"font-family:' 宋体;\\\"=\"\">．</span><span 'times=\"\" italic;\\\"=\"\" new=\"\" roman';font-style:=\"\" style='\\\"font-family:'>F</span><span style='\\\"font-family:' 宋体;\\\"=\"\">沿</span><span 'times=\"\" italic;\\\"=\"\" new=\"\" roman';font-style:=\"\" style='\\\"font-family:'>x</span><span style='\\\"font-family:' 宋体;\\\"=\"\">轴正向时，若</span><span 'times=\"\" italic;\\\"=\"\" new=\"\" roman';font-style:=\"\" style='\\\"font-family:'>v</span><span style='\\\"font-family:' 宋体;\\\"=\"\">过大，则小车受力不足以提供向心力，会发生“离心现象”，故</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>D</span><span style='\\\"font-family:' 宋体;\\\"=\"\">正确；</span></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">故选</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>BD</span><span style='\\\"font-family:' 宋体;\\\"=\"\">。</span></p>\"\n  }, {\n    \"name\" : \"(3)题详解\",\n    \"html\" : \"<p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">（</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>1</span><span style='\\\"font-family:' 宋体;\\\"=\"\">）</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>[1] </span><span style='\\\"font-family:' 宋体;\\\"=\"\">根据</span><img class='\\\"xkw-math-img\\\"' src=\"https://resource.malongtech.cn/questions/img/3685468024963072/c0f75c965236a42ce9766f967cf7a4c1.svg\"/><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>,</span><span style='\\\"font-family:' 宋体;\\\"=\"\">可知</span><span 'times=\"\" italic;\\\"=\"\" new=\"\" roman';font-style:=\"\" style='\\\"font-family:'>F</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>-</span><span 'times=\"\" italic;\\\"=\"\" new=\"\" roman';font-style:=\"\" style='\\\"font-family:'>t</span><span style='\\\"font-family:' 宋体;\\\"=\"\">图像与坐标轴所围面积的物理意义是冲量。</span></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">（</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>2</span><span style='\\\"font-family:' 宋体;\\\"=\"\">）</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>[2] </span><span style='\\\"font-family:' 宋体;\\\"=\"\">根据动量定理有</span></p><p center;\\\"=\"\" style='\\\"text-align:'><img class='\\\"xkw-math-img\\\"' src=\"https://resource.malongtech.cn/questions/img/3685468024963072/1e6ac0f8b22eec049678728f7f7339b7.svg\"/></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">解得</span></p><p center;\\\"=\"\" style='\\\"text-align:'><span 'times=\"\" italic;\\\"=\"\" new=\"\" roman';font-style:=\"\" style='\\\"font-family:'>v</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>=0</span></p>\"\n  }, {\n    \"name\" : \"(4)题详解\",\n    \"html\" : \"<p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">（</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>1</span><span style='\\\"font-family:' 宋体;\\\"=\"\">）</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>[1] [2]</span><span style='\\\"font-family:' 宋体;\\\"=\"\">干电池电阻较小，图中数据电压变化较明显，可知电压表接在</span><span 'times=\"\" italic;\\\"=\"\" new=\"\" roman';font-style:=\"\" style='\\\"font-family:'>A</span><span style='\\\"font-family:' 宋体;\\\"=\"\">和</span><span 'times=\"\" italic;\\\"=\"\" new=\"\" roman';font-style:=\"\" style='\\\"font-family:'>C</span><span style='\\\"font-family:' 宋体;\\\"=\"\">之间。</span></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">（</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>2</span><span style='\\\"font-family:' 宋体;\\\"=\"\">）</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>[3] [4]</span><span style='\\\"font-family:' 宋体;\\\"=\"\">根据闭合电路欧姆定律有</span></p><p center;\\\"=\"\" style='\\\"text-align:'><span 'times=\"\" italic;\\\"=\"\" new=\"\" roman';font-style:=\"\" style='\\\"font-family:'>U</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>=</span><span 'times=\"\" italic;\\\"=\"\" new=\"\" roman';font-style:=\"\" style='\\\"font-family:'>E</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>-</span><span 'times=\"\" italic;\\\"=\"\" new=\"\" roman';font-style:=\"\" style='\\\"font-family:'>I</span><span style='\\\"font-family:' 宋体;\\\"=\"\">（</span><span 'times=\"\" italic;\\\"=\"\" new=\"\" roman';font-style:=\"\" style='\\\"font-family:'>R</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>+</span><span 'times=\"\" italic;\\\"=\"\" new=\"\" roman';font-style:=\"\" style='\\\"font-family:'>r</span><span style='\\\"font-family:' 宋体;\\\"=\"\">）</span></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">结合图像斜率与截距可知</span></p><p center;\\\"=\"\" style='\\\"text-align:'><span 'times=\"\" italic;\\\"=\"\" new=\"\" roman';font-style:=\"\" style='\\\"font-family:'>E</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>=1.5V</span><span style='\\\"font-family:' 宋体;\\\"=\"\">，</span><img class='\\\"xkw-math-img\\\"' src=\"https://resource.malongtech.cn/questions/img/3685468024963072/24d7deb6bcbf8df32b5afbb971a854e7.svg\"/></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">解得</span></p><p center;\\\"=\"\" style='\\\"text-align:'><span 'times=\"\" italic;\\\"=\"\" new=\"\" roman';font-style:=\"\" style='\\\"font-family:'>r</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>=0.50Ω</span></p>\"\n  } ]\n}",
+    "html_text": "{\n  \"html\" : \" 玩具小车 一辆无线遥控电动小车可在水平面内做出加速、减速、转弯等运动。在俯视图（ a ）中，以小车为坐标原点 O 、速度方向为 y 轴正方向建立直角坐标系。用 F 表示地面对小车水平方向的作用力。忽略小车运动过程受到的空气阻力。 ![](https://resource.malongtech.cn/questions/img/3685468024963072/6b685c7f-38c9-4ecd-bca5-a34cb7935d72.png) \",\n  \"type\" : \"复合题\",\n  \"sqs\" : [ {\n    \"html\" : \" 1. 遥控器发出某种波来控制小车，该波是（　　） \",\n    \"type\" : \"选择题\",\n    \"sqs\" : [ ],\n    \"og\" : {\n      \"cols\" : 3,\n      \"ogOps\" : [ {\n        \"html\" : \" 机械波 \",\n        \"index\" : \"A\"\n      }, {\n        \"html\" : \" 电磁波 \",\n        \"index\" : \"B\"\n      }, {\n        \"html\" : \" 引力波 \",\n        \"index\" : \"C\"\n      } ]\n    },\n    \"sqIdMode\" : 0,\n    \"sqBlankCount\" : 0\n  }, {\n    \"html\" : \" 2. 小车受到的作用力 F 与对应的小车运动情况可能是（　　） \",\n    \"type\" : \"选择题\",\n    \"sqs\" : [ ],\n    \"og\" : {\n      \"cols\" : 1,\n      \"ogOps\" : [ {\n        \"html\" : \" F 沿 y 轴正向时，小车沿直线刹车 \",\n        \"index\" : \"A\"\n      }, {\n        \"html\" : \" F 沿 x 轴正向时，小车做匀速圆周运动 \",\n        \"index\" : \"B\"\n      }, {\n        \"html\" : \" F 沿 y 轴正向时，小车发生“离心现象” \",\n        \"index\" : \"C\"\n      }, {\n        \"html\" : \" F 沿 x 轴正向时，小车发生“离心现象” \",\n        \"index\" : \"D\"\n      } ]\n    },\n    \"sqIdMode\" : 0,\n    \"sqBlankCount\" : 0\n  }, {\n    \"html\" : \" 3. 若小车静止在水平面上， t ＝ 0 时刻起受到 F 的作用， F 沿 y 轴方向且随时间变化的关系如图（ b ）所示，则 ![](https://resource.malongtech.cn/questions/img/3685468024963072/c75b84fb-09d4-4be4-ac99-e3064695d31e.png) （ 1 ） F - t 图像与坐标轴所围面积的物理意义是 ___(1)___ （填写物理量名称）。 （ 2 ）在 t ＝ 2 t 0 时刻，小车的速度大小为 ___(2)___ 。 \",\n    \"type\" : \"填空题\",\n    \"sqs\" : [ ],\n    \"og\" : null,\n    \"sqIdMode\" : 0,\n    \"sqBlankCount\" : 0\n  }, {\n    \"html\" : \" 4. 某同学将小车的干电池取出，用如图（ c ）所示的电路测量其电动势和内阻，图中电压传感器未画出，定值电阻 R ＝ 5.0Ω 。连接电路，点击开始记录，得到图（ d ）中的数据点 ① ；闭合开关 S ，移动滑动变阻器的滑片依次得到数据点 ② 、 ③ 、 ④ 、 ⑤ 。 ![](https://resource.malongtech.cn/questions/img/3685468024963072/b5fa68ed-6e1a-42e9-a2e4-4d3365264235.png) （ 1 ）根据实验数据，可知电压表接在 ___(3)___ 和 ___(4)___ 之间（用图 c 中字母表示）。 （ 2 ）测得该电池的电动势为 ___(5)___ V ，内阻为 ___(6)___ Ω 。（结果均保留两位有效数字） \",\n    \"type\" : \"填空题\",\n    \"sqs\" : [ ],\n    \"og\" : null,\n    \"sqIdMode\" : 0,\n    \"sqBlankCount\" : 0\n  } ],\n  \"og\" : null,\n  \"sqIdMode\" : 0,\n  \"sqBlankCount\" : 0\n}",
+    "answer_text": "{\n  \"anSqs\" : [ {\n    \"ans\" : [ {\n      \"html\" : \"B\",\n      \"op\" : true,\n      \"exact\" : true\n    } ]\n  }, {\n    \"ans\" : [ {\n      \"html\" : \"BD\",\n      \"op\" : true,\n      \"exact\" : true\n    } ]\n  }, {\n    \"ans\" : [ {\n      \"html\" : \" 冲量 \",\n      \"op\" : false,\n      \"exact\" : true\n    }, {\n      \"html\" : \" 0 \",\n      \"op\" : false,\n      \"exact\" : true\n    } ]\n  }, {\n    \"ans\" : [ {\n      \"html\" : \" A \",\n      \"op\" : false,\n      \"exact\" : true\n    }, {\n      \"html\" : \" C \",\n      \"op\" : false,\n      \"exact\" : true\n    }, {\n      \"html\" : \" 1.5 \",\n      \"op\" : false,\n      \"exact\" : true\n    }, {\n      \"html\" : \" 0.50 \",\n      \"op\" : false,\n      \"exact\" : true\n    } ]\n  } ]\n}",
+    "explanation_text": "{\n  \"explanationSegs\" : [ {\n    \"name\" : \"(1)题详解\",\n    \"html\" : \" 遥控器发出电磁波种波来控制小车。 故选 B 。 \"\n  }, {\n    \"name\" : \"(2)题详解\",\n    \"html\" : \" AC ． F 沿 y 轴正向时，小车沿直线加速，故 AC 错误； B ． F 沿 x 轴正向时，小车受力方向与速度方向垂直，可能做匀速圆周运动，故 B 正确； D ． F 沿 x 轴正向时，若 v 过大，则小车受力不足以提供向心力，会发生“离心现象”，故 D 正确； 故选 BD 。 \"\n  }, {\n    \"name\" : \"(3)题详解\",\n    \"html\" : \" （ 1 ） [1] 根据 $I=F t$ , 可知 F - t 图像与坐标轴所围面积的物理意义是冲量。 （ 2 ） [2] 根据动量定理有 $F_{0}t_{0}-\\\\frac{1}{2}\\\\times2F_{0}t_{0}=m v$ 解得 v =0 \"\n  }, {\n    \"name\" : \"(4)题详解\",\n    \"html\" : \" （ 1 ） [1] [2] 干电池电阻较小，图中数据电压变化较明显，可知电压表接在 A 和 C 之间。 （ 2 ） [3] [4] 根据闭合电路欧姆定律有 U = E - I （ R + r ） 结合图像斜率与截距可知 E =1.5V ， $R+r=\\\\frac{1.5-0.4}{0.2}\\\\Omega$ 解得 r =0.50Ω \"\n  } ]\n}",
+    "formatted_json": {
+      "resources": [],
+      "inputs": [
+        {
+          "type": "choice",
+          "order": 1,
+          "sub_index": 1,
+          "resource_index": -1,
+          "options": [
+            {
+              "option": "A",
+              "value": " 机械波 "
+            },
+            {
+              "option": "B",
+              "value": " 电磁波 "
+            },
+            {
+              "option": "C",
+              "value": " 引力波 "
+            }
+          ]
+        },
+        {
+          "type": "choice",
+          "order": 2,
+          "sub_index": 2,
+          "resource_index": -1,
+          "options": [
+            {
+              "option": "A",
+              "value": " F 沿 y 轴正向时，小车沿直线刹车 "
+            },
+            {
+              "option": "B",
+              "value": " F 沿 x 轴正向时，小车做匀速圆周运动 "
+            },
+            {
+              "option": "C",
+              "value": " F 沿 y 轴正向时，小车发生“离心现象” "
+            },
+            {
+              "option": "D",
+              "value": " F 沿 x 轴正向时，小车发生“离心现象” "
+            }
+          ]
+        },
+        {
+          "type": "blank",
+          "order": 3,
+          "sub_index": 3,
+          "resource_index": -1,
+          "options": []
+        },
+        {
+          "type": "blank",
+          "order": 4,
+          "sub_index": 3,
+          "resource_index": -1,
+          "options": []
+        },
+        {
+          "type": "blank",
+          "order": 5,
+          "sub_index": 4,
+          "resource_index": -1,
+          "options": []
+        },
+        {
+          "type": "blank",
+          "order": 6,
+          "sub_index": 4,
+          "resource_index": -1,
+          "options": []
+        },
+        {
+          "type": "blank",
+          "order": 7,
+          "sub_index": 4,
+          "resource_index": -1,
+          "options": []
+        },
+        {
+          "type": "blank",
+          "order": 8,
+          "sub_index": 4,
+          "resource_index": -1,
+          "options": []
+        }
+      ],
+      "answers": [
+        {
+          "order": 1,
+          "value": "B",
+          "explanation": "详解： 遥控器发出电磁波种波来控制小车。 故选 B 。 "
+        },
+        {
+          "order": 2,
+          "value": "BD",
+          "explanation": "详解： AC ． F 沿 y 轴正向时，小车沿直线加速，故 AC 错误； B ． F 沿 x 轴正向时，小车受力方向与速度方向垂直，可能做匀速圆周运动，故 B 正确； D ． F 沿 x 轴正向时，若 v 过大，则小车受力不足以提供向心力，会发生“离心现象”，故 D 正确； 故选 BD 。 "
+        },
+        {
+          "order": 3,
+          "value": " 冲量 ",
+          "explanation": "详解： （ 1 ） [1] 根据 $I=F t$ , 可知 F - t 图像与坐标轴所围面积的物理意义是冲量。 （ 2 ） [2] 根据动量定理有 $F_{0}t_{0}-\\frac{1}{2}\\times2F_{0}t_{0}=m v$ 解得 v =0 "
+        },
+        {
+          "order": 4,
+          "value": " 0 ",
+          "explanation": "详解： （ 1 ） [1] 根据 $I=F t$ , 可知 F - t 图像与坐标轴所围面积的物理意义是冲量。 （ 2 ） [2] 根据动量定理有 $F_{0}t_{0}-\\frac{1}{2}\\times2F_{0}t_{0}=m v$ 解得 v =0 "
+        },
+        {
+          "order": 5,
+          "value": " A ",
+          "explanation": "详解： （ 1 ） [1] [2] 干电池电阻较小，图中数据电压变化较明显，可知电压表接在 A 和 C 之间。 （ 2 ） [3] [4] 根据闭合电路欧姆定律有 U = E - I （ R + r ） 结合图像斜率与截距可知 E =1.5V ， $R+r=\\frac{1.5-0.4}{0.2}\\Omega$ 解得 r =0.50Ω "
+        },
+        {
+          "order": 6,
+          "value": " C ",
+          "explanation": "详解： （ 1 ） [1] [2] 干电池电阻较小，图中数据电压变化较明显，可知电压表接在 A 和 C 之间。 （ 2 ） [3] [4] 根据闭合电路欧姆定律有 U = E - I （ R + r ） 结合图像斜率与截距可知 E =1.5V ， $R+r=\\frac{1.5-0.4}{0.2}\\Omega$ 解得 r =0.50Ω "
+        },
+        {
+          "order": 7,
+          "value": " 1.5 ",
+          "explanation": "详解： （ 1 ） [1] [2] 干电池电阻较小，图中数据电压变化较明显，可知电压表接在 A 和 C 之间。 （ 2 ） [3] [4] 根据闭合电路欧姆定律有 U = E - I （ R + r ） 结合图像斜率与截距可知 E =1.5V ， $R+r=\\frac{1.5-0.4}{0.2}\\Omega$ 解得 r =0.50Ω "
+        },
+        {
+          "order": 8,
+          "value": " 0.50 ",
+          "explanation": "详解： （ 1 ） [1] [2] 干电池电阻较小，图中数据电压变化较明显，可知电压表接在 A 和 C 之间。 （ 2 ） [3] [4] 根据闭合电路欧姆定律有 U = E - I （ R + r ） 结合图像斜率与截距可知 E =1.5V ， $R+r=\\frac{1.5-0.4}{0.2}\\Omega$ 解得 r =0.50Ω "
+        }
+      ]
+    }
+  },
+  {
+    "_index": "questions116",
+    "_id": "1575068429656064",
+    "_matched_id_field": "course_id",
+    "id": "1575068429656064",
+    "course_id": 29,
+    "type_id": "2903",
+    "kpoint_ids": [
+      67278
+    ],
+    "catalog_ids": [
+      195939,
+      187725,
+      187728,
+      187729,
+      194610,
+      194390
+    ],
+    "years": [
+      2010,
+      2011,
+      2012,
+      2013,
+      2014,
+      2017,
+      2018,
+      2019,
+      2021,
+      2025
+    ],
+    "difficulty": 0.8500000000000001,
+    "difficulty_level": 18,
+    "stem": "<!--版权声明：试题（含题干、答案、解析）由学科网授权提供，受版权保护--><div class=\"qml-stem\" data-copyright=\"xkw.com-1761828527-106741721811507700-jA_9t1auy0PstSU-M1qLmllhtPCS3MY0eCHE-H8rwyXfZs18gNvbnNo3Y9Q6NHoL\"><p style=\"\"><span style=\"font-family: 'Times New Roman';\">（1</span><span style=\"font-family: 宋体;\">）在做用打点计时器测速度的实验时，要用到打点计时器，打点计时器是一种</span><span class=\"qml-bk\" index=\"1\" size=\"4\" style=\"text-decoration:underline\" type=\"underline\">　　　　</span><span style=\"font-family: 宋体;\">仪器，其电源频率为</span><span style=\"font-family: 'Times New Roman';\">50Hz</span><span style=\"font-family: 宋体;\">，常用的电磁打点计时器和电火花计时器使用的电源是</span><span class=\"qml-bk\" index=\"2\" size=\"4\" style=\"text-decoration:underline\" type=\"underline\">　　　　</span><span style=\"font-family: 宋体;\">（选择直流电或交流电），它们是每隔</span><span class=\"qml-bk\" index=\"3\" size=\"6\" style=\"text-decoration:underline\" type=\"underline\">　　　　　　</span><span style=\"font-family: 'Times New Roman';\">s</span><span style=\"font-family: 宋体;\">打一个点．</span></p><p style=\"\"><span style=\"font-family: 'Times New Roman';\">（2）</span><span style=\"font-family: 宋体;\">接通打点计时器电源和让纸带开始运动，这两个操作之间的时间顺序关系是</span><span class=\"qml-bk\" index=\"4\" size=\"6\" style=\"text-decoration:underline\" type=\"underline\">　　　　　　</span><span style=\"font-family: 'Times New Roman';\">　  　</span></p><p style=\"\"><span style=\"font-family: 'Times New Roman';\">A.</span><span style=\"font-family: 宋体;\">先接通电源，后让纸带运动</span><span style=\"font-family: 'Times New Roman';\">   B</span><span style=\"font-family: 宋体;\">．先让纸带运动，再接通电源</span></p><p style=\"\"><span style=\"font-family: 'Times New Roman';\">C</span><span style=\"font-family: 宋体;\">．让纸带运动的同时接通电源</span><span style=\"font-family: 'Times New Roman';\">   D</span><span style=\"font-family: 宋体;\">．先让纸带运动或先接通电源都可以．</span></p></div>",
+    "answer": "<!--版权声明：试题（含题干、答案、解析）由学科网授权提供，受版权保护--><div class=\"qml-answer\" data-copyright=\"xkw.com-1761828527-106741721811507700-jA_9t1auy0PstSU-M1qLmllhtPCS3MY0eCHE-H8rwyXfZs18gNvbnNo3Y9Q6NHoL\"><span class=\"qml-an-sq\">    ①. <span class=\"qml-an\"><span style=\"font-family: 宋体;\">交流电</span></span>    ②. <span class=\"qml-an\"><span style=\"font-family: 'Times New Roman';\">0.02s</span></span>    ③. <span class=\"qml-an\"><span style=\"font-family: 'Times New Roman';\">A</span></span></span></div>",
+    "explanation": "<!--版权声明：试题（含题干、答案、解析）由学科网授权提供，受版权保护--><div class=\"qml-explanation\" data-copyright=\"xkw.com-1761828527-106741721811507700-jA_9t1auy0PstSU-M1qLmllhtPCS3MY0eCHE-H8rwyXfZs18gNvbnNo3Y9Q6NHoL\"><div class=\"qml-seg\" seg-name=\"详解\">【详解】<span style=\"font-family: 'Times New Roman';\"> </span><span style=\"font-family: 宋体;\">(1)电磁打点计时器使用的电压是</span><span style=\"font-family: 'Times New Roman';\">4</span><span style=\"font-family: 'Cambria Math';\">∼</span><span style=\"font-family: 'Times New Roman';\">6</span><span style=\"font-family: 宋体;\">伏的低压交流电，频率为50Hz，每隔</span><span style=\"font-family: 'Times New Roman';\">0.02</span><span style=\"font-family: 宋体;\">秒打一个点</span><span style=\"font-family: 'Times New Roman';\">；</span><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">(2)开始记录时</span><span style=\"font-family: 'Times New Roman';\">,</span><span style=\"font-family: 宋体;\">应先给打点计时器通电打点</span><span style=\"font-family: 'Times New Roman';\">,</span><span style=\"font-family: 宋体;\">然后释放纸带让纸带</span><span style=\"font-family: 'Times New Roman';\">(</span><span style=\"font-family: 宋体;\">随物体</span><span style=\"font-family: 'Times New Roman';\">)</span><span style=\"font-family: 宋体;\">开始运动，如果先放开纸带开始运动，再接通打点计时时器的电源，由于重物运动较快，不利于数据的采集和处理，会对实验产生较大的误差；同时先打点再释放纸带，可以使打点稳定，提高纸带利用率，可以使纸带上打满点，故</span><span style=\"font-family: 'Times New Roman';\">BCD</span><span style=\"font-family: 宋体;\">错误，</span><span style=\"font-family: 'Times New Roman';\">A</span><span style=\"font-family: 宋体;\">正确．</span></p></div></div>",
+    "create_date": "2016-12-07 17:47:50",
+    "paper_type_ids": [
+      4,
+      3,
+      5,
+      1
+    ],
+    "course": {
+      "id": 29,
+      "name": "高中物理"
+    },
+    "catalogs": [
+      {
+        "id": 187729,
+        "name": "4. 速度变化快慢的描述——加速度"
+      },
+      {
+        "id": 194390,
+        "name": "第3节 速 度"
+      },
+      {
+        "id": 194610,
+        "name": "第四节 测量直线运动物体的瞬时速度"
+      },
+      {
+        "id": 195939,
+        "name": "4. 实验：用打点计时器测量小车的速度"
+      },
+      {
+        "id": 187728,
+        "name": "3. 位置变化快慢的描述——速度"
+      }
+    ],
+    "type": {
+      "id": "2903",
+      "name": "实验题"
+    },
+    "kpoints": [
+      {
+        "id": 67278,
+        "name": "打点计时器的原理及使用"
+      }
+    ],
+    "media": 0,
+    "exp_video_posters": null,
+    "answer_scoreable": false,
+    "tag_ids": [],
+    "tags": [],
+    "source_papers": [
+      {
+        "title": "2019人教版必修第一册 高一上学期第一章 2 时间  位移 同步练习",
+        "area": {
+          "id": "1",
+          "name": "全国"
+        },
+        "type_id": 1,
+        "grade_id": 10,
+        "term": "ALL",
+        "year": 2019
+      },
+      {
+        "title": "贵州省铜仁伟才学校2018-2019学年高一上学期12月月考物理试题",
+        "area": {
+          "id": "520000",
+          "name": "贵州省"
+        },
+        "type_id": 3,
+        "grade_id": 10,
+        "term": "LAST",
+        "year": 2018
+      },
+      {
+        "title": "福建省三明市清流县第二中学2018-2019学年高一上学期期中物理试题",
+        "area": {
+          "id": "350000",
+          "name": "福建省"
+        },
+        "type_id": 4,
+        "grade_id": 10,
+        "term": "LAST",
+        "year": 2018
+      },
+      {
+        "title": "2014-2015学年天津宝坻区四校高一11月联考物理卷",
+        "area": {
+          "id": "120000",
+          "name": "天津市"
+        },
+        "type_id": 3,
+        "grade_id": 10,
+        "term": "LAST",
+        "year": 2014
+      }
+    ],
+    "formattedStem": "{\n  \"html\" : \"<p style='\\\"\\\"'><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>（1</span><span style='\\\"font-family:' 宋体;\\\"=\"\">）在做用打点计时器测速度的实验时，要用到打点计时器，打点计时器是一种</span><span class='\\\"qml-bk\\\"' index='\\\"1\\\"' size='\\\"4\\\"' style='\\\"text-decoration:underline\\\"' type='\\\"underline\\\"'>　　　　</span><span style='\\\"font-family:' 宋体;\\\"=\"\">仪器，其电源频率为</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>50Hz</span><span style='\\\"font-family:' 宋体;\\\"=\"\">，常用的电磁打点计时器和电火花计时器使用的电源是</span><span class='\\\"qml-bk\\\"' index='\\\"2\\\"' size='\\\"4\\\"' style='\\\"text-decoration:underline\\\"' type='\\\"underline\\\"'>　　　　</span><span style='\\\"font-family:' 宋体;\\\"=\"\">（选择直流电或交流电），它们是每隔</span><span class='\\\"qml-bk\\\"' index='\\\"3\\\"' size='\\\"6\\\"' style='\\\"text-decoration:underline\\\"' type='\\\"underline\\\"'>　　　　　　</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>s</span><span style='\\\"font-family:' 宋体;\\\"=\"\">打一个点．</span></p><p style='\\\"\\\"'><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>（2）</span><span style='\\\"font-family:' 宋体;\\\"=\"\">接通打点计时器电源和让纸带开始运动，这两个操作之间的时间顺序关系是</span><span class='\\\"qml-bk\\\"' index='\\\"4\\\"' size='\\\"6\\\"' style='\\\"text-decoration:underline\\\"' type='\\\"underline\\\"'>　　　　　　</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>　  　</span></p><p style='\\\"\\\"'><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>A.</span><span style='\\\"font-family:' 宋体;\\\"=\"\">先接通电源，后让纸带运动</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>   B</span><span style='\\\"font-family:' 宋体;\\\"=\"\">．先让纸带运动，再接通电源</span></p><p style='\\\"\\\"'><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>C</span><span style='\\\"font-family:' 宋体;\\\"=\"\">．让纸带运动的同时接通电源</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>   D</span><span style='\\\"font-family:' 宋体;\\\"=\"\">．先让纸带运动或先接通电源都可以．</span></p>\",\n  \"type\" : \"填空题\",\n  \"sqs\" : [ ],\n  \"og\" : null,\n  \"sqIdMode\" : 0,\n  \"sqBlankCount\" : 0\n}",
+    "formattedAnswer": "{\n  \"anSqs\" : [ {\n    \"ans\" : [ {\n      \"html\" : \"<span \\\"=\"\" class='\\\"qml-an'><span style='\\\"font-family:' 宋体;\\\"=\"\">交流电</span></span>\",\n      \"op\" : false,\n      \"exact\" : false\n    }, {\n      \"html\" : \"<span \\\"=\"\" class='\\\"qml-an'><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>0.02s</span></span>\",\n      \"op\" : false,\n      \"exact\" : false\n    }, {\n      \"html\" : \"<span \\\"=\"\" class='\\\"qml-an'><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>A</span></span>\",\n      \"op\" : false,\n      \"exact\" : false\n    } ]\n  } ]\n}",
+    "formattedExplanation": "{\n  \"explanationSegs\" : [ {\n    \"name\" : \"详解\",\n    \"html\" : \"<span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'> </span><span style='\\\"font-family:' 宋体;\\\"=\"\">(1)电磁打点计时器使用的电压是</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>4</span><span 'cambria=\"\" math';\\\"=\"\" style='\\\"font-family:'>∼</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>6</span><span style='\\\"font-family:' 宋体;\\\"=\"\">伏的低压交流电，频率为50Hz，每隔</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>0.02</span><span style='\\\"font-family:' 宋体;\\\"=\"\">秒打一个点</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>；</span><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">(2)开始记录时</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>,</span><span style='\\\"font-family:' 宋体;\\\"=\"\">应先给打点计时器通电打点</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>,</span><span style='\\\"font-family:' 宋体;\\\"=\"\">然后释放纸带让纸带</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>(</span><span style='\\\"font-family:' 宋体;\\\"=\"\">随物体</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>)</span><span style='\\\"font-family:' 宋体;\\\"=\"\">开始运动，如果先放开纸带开始运动，再接通打点计时时器的电源，由于重物运动较快，不利于数据的采集和处理，会对实验产生较大的误差；同时先打点再释放纸带，可以使打点稳定，提高纸带利用率，可以使纸带上打满点，故</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>BCD</span><span style='\\\"font-family:' 宋体;\\\"=\"\">错误，</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>A</span><span style='\\\"font-family:' 宋体;\\\"=\"\">正确．</span></p>\"\n  } ]\n}",
+    "html_text": "{\n  \"html\" : \" （1 ）在做用打点计时器测速度的实验时，要用到打点计时器，打点计时器是一种 ___(1)___ 仪器，其电源频率为 50Hz ，常用的电磁打点计时器和电火花计时器使用的电源是 ___(2)___ （选择直流电或交流电），它们是每隔 ___(3)___ s 打一个点． （2） 接通打点计时器电源和让纸带开始运动，这两个操作之间的时间顺序关系是 ___(4)___ A. 先接通电源，后让纸带运动 B ．先让纸带运动，再接通电源 C ．让纸带运动的同时接通电源 D ．先让纸带运动或先接通电源都可以． \",\n  \"type\" : \"填空题\",\n  \"sqs\" : [ ],\n  \"og\" : null,\n  \"sqIdMode\" : 0,\n  \"sqBlankCount\" : 0\n}",
+    "answer_text": "{\n  \"anSqs\" : [ {\n    \"ans\" : [ {\n      \"html\" : \" 交流电 \",\n      \"op\" : false,\n      \"exact\" : false\n    }, {\n      \"html\" : \" 0.02s \",\n      \"op\" : false,\n      \"exact\" : false\n    }, {\n      \"html\" : \" A \",\n      \"op\" : false,\n      \"exact\" : false\n    } ]\n  } ]\n}",
+    "explanation_text": "{\n  \"explanationSegs\" : [ {\n    \"name\" : \"详解\",\n    \"html\" : \" (1)电磁打点计时器使用的电压是 4 ∼ 6 伏的低压交流电，频率为50Hz，每隔 0.02 秒打一个点 ； (2)开始记录时 , 应先给打点计时器通电打点 , 然后释放纸带让纸带 ( 随物体 ) 开始运动，如果先放开纸带开始运动，再接通打点计时时器的电源，由于重物运动较快，不利于数据的采集和处理，会对实验产生较大的误差；同时先打点再释放纸带，可以使打点稳定，提高纸带利用率，可以使纸带上打满点，故 BCD 错误， A 正确． \"\n  } ]\n}",
+    "formatted_json": {
+      "resources": [],
+      "inputs": [
+        {
+          "type": "blank",
+          "order": 1,
+          "resource_index": -1,
+          "options": []
+        }
+      ],
+      "answers": [
+        {
+          "order": 1,
+          "value": " 交流电 ",
+          "explanation": "详解： (1)电磁打点计时器使用的电压是 4 ∼ 6 伏的低压交流电，频率为50Hz，每隔 0.02 秒打一个点 ； (2)开始记录时 , 应先给打点计时器通电打点 , 然后释放纸带让纸带 ( 随物体 ) 开始运动，如果先放开纸带开始运动，再接通打点计时时器的电源，由于重物运动较快，不利于数据的采集和处理，会对实验产生较大的误差；同时先打点再释放纸带，可以使打点稳定，提高纸带利用率，可以使纸带上打满点，故 BCD 错误， A 正确． "
+        },
+        {
+          "order": 2,
+          "value": " 0.02s ",
+          "explanation": "详解： (1)电磁打点计时器使用的电压是 4 ∼ 6 伏的低压交流电，频率为50Hz，每隔 0.02 秒打一个点 ； (2)开始记录时 , 应先给打点计时器通电打点 , 然后释放纸带让纸带 ( 随物体 ) 开始运动，如果先放开纸带开始运动，再接通打点计时时器的电源，由于重物运动较快，不利于数据的采集和处理，会对实验产生较大的误差；同时先打点再释放纸带，可以使打点稳定，提高纸带利用率，可以使纸带上打满点，故 BCD 错误， A 正确． "
+        },
+        {
+          "order": 3,
+          "value": " A ",
+          "explanation": "详解： (1)电磁打点计时器使用的电压是 4 ∼ 6 伏的低压交流电，频率为50Hz，每隔 0.02 秒打一个点 ； (2)开始记录时 , 应先给打点计时器通电打点 , 然后释放纸带让纸带 ( 随物体 ) 开始运动，如果先放开纸带开始运动，再接通打点计时时器的电源，由于重物运动较快，不利于数据的采集和处理，会对实验产生较大的误差；同时先打点再释放纸带，可以使打点稳定，提高纸带利用率，可以使纸带上打满点，故 BCD 错误， A 正确． "
+        }
+      ]
+    }
+  },
+  {
+    "_index": "questions117",
+    "_id": "3797944008343552",
+    "_matched_id_field": "course_id",
+    "id": "3797944008343552",
+    "course_id": 29,
+    "type_id": "290801",
+    "kpoint_ids": [
+      16348,
+      17459,
+      16021,
+      15892
+    ],
+    "catalog_ids": [
+      230536,
+      202697,
+      210025,
+      195019,
+      195017,
+      220823
+    ],
+    "years": [
+      2025
+    ],
+    "difficulty": 0.65,
+    "difficulty_level": 19,
+    "stem": "<!--版权声明：试题（含题干、答案、解析）由学科网授权提供，受版权保护--><div class=\"qml-stem\" data-copyright=\"xkw.com-1761837853-106741721811507700-vSg5nnEjs6uCeKYfXmxx02m2v3anAVitCXx5slbXSt1J7PRfQ6DXw8CMRpJW8QEs\"><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">将小球竖直向上抛出，小球从抛出到落回原处的过程中，若所受空气阻力大小与速度大小成正比，则下列说法正确的是（　　）</span></p><div class=\"qml-og\"><table class=\"qml-og\" style=\"width:100%\"><tr><td>A. <span class=\"qml-op\"><span style=\"font-family: 宋体;\">上升和下落两过程的时间相等</span></span></td></tr><tr><td>B. <span class=\"qml-op\"><span style=\"font-family: 宋体;\">上升过程的加速度始终小于下落过程的加速度</span></span></td></tr><tr><td>C. <span class=\"qml-op\"><span style=\"font-family: 宋体;\">上升过程合力的冲量大于下落过程合力的冲量</span></span></td></tr><tr><td colspan=\"1\">D. <span class=\"qml-op\"><span style=\"font-family: 宋体;\">上升过程机械能损失大于下落过程机械能损失</span></span></td></tr></table></div></div>",
+    "answer": "<!--版权声明：试题（含题干、答案、解析）由学科网授权提供，受版权保护--><div class=\"qml-answer\" data-copyright=\"xkw.com-1761837853-106741721811507700-vSg5nnEjs6uCeKYfXmxx02m2v3anAVitCXx5slbXSt1J7PRfQ6DXw8CMRpJW8QEs\"><span class=\"qml-an-sq\"><span class=\"qml-an qml-isop\">CD</span></span></div>",
+    "explanation": "<!--版权声明：试题（含题干、答案、解析）由学科网授权提供，受版权保护--><div class=\"qml-explanation\" data-copyright=\"xkw.com-1761837853-106741721811507700-vSg5nnEjs6uCeKYfXmxx02m2v3anAVitCXx5slbXSt1J7PRfQ6DXw8CMRpJW8QEs\"><div class=\"qml-seg\" seg-name=\"详解\">【详解】<p style=\"text-align: left;\"><span style=\"font-family: 'Times New Roman';\">A</span><span style=\"font-family: 宋体;\">．因为有空气阻力，上升与下落经过同一位置时的速度</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3797944008343552/91d0e7b735eb5ecb79d5b60379cf0c57.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">上升过程中平均速度大于下落过程中的平均速度</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3797944008343552/f3fbafbca35b86e0504533ea5c3235bc.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">上升过程所用时间</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3797944008343552/31cbacaea520e63b87048172918c957b.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">下落过程所用时间</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3797944008343552/9ef55471f4e895e91502e1a2bc67b6ae.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">解得</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3797944008343552/e4f22c5bac42520be45d9816374fa9b4.svg\"/><span style=\"font-family: 宋体;\">，</span><span style=\"font-family: 'Times New Roman';\">A</span><span style=\"font-family: 宋体;\">错误；</span></p><p style=\"text-align: left;\"><span style=\"font-family: 'Times New Roman';\">B</span><span style=\"font-family: 宋体;\">．上升过程的加速度为</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3797944008343552/e4e88f68e678cb3c1ba827244c9d68b3.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">下落过程的加速度为</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3797944008343552/77deb774fb522e857e0f2fe327e36807.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">解得</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3797944008343552/d11b42388565f20350484b2a29062623.svg\"/><span style=\"font-family: 宋体;\">，</span><span style=\"font-family: 'Times New Roman';\">B</span><span style=\"font-family: 宋体;\">错误；</span></p><p style=\"text-align: left;\"><span style=\"font-family: 'Times New Roman';\">C</span><span style=\"font-family: 宋体;\">．设初速度为</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">v</span><sub word-font=\"Times New Roman\"><span>0</span></sub><span style=\"font-family: 宋体;\">，返回抛出点时的速度为</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">v</span><sub word-font=\"Times New Roman\"><span>1</span></sub></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">上升过程合力的冲量为</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3797944008343552/5babd59fdf7eaeaa9acfd0fc34e0eb25.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">下落过程合力的冲量为</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3797944008343552/88fe48b49feadcfc352323ae4ea57187.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">因为有空气阻力，所以</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3797944008343552/707cd49fa3443c3de45bafdc8698d0b0.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">解得</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3797944008343552/f263dae8503fca07c32f05d9cad2d640.svg\"/><span style=\"font-family: 宋体;\">，</span><span style=\"font-family: 'Times New Roman';\">C</span><span style=\"font-family: 宋体;\">正确；</span></p><p style=\"text-align: left;\"><span style=\"font-family: 'Times New Roman';\">D</span><span style=\"font-family: 宋体;\">．上升过程机械能损失为</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3797944008343552/c232d75c79588a73cbfb8c611ae5b1ca.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">下落过程机械能损失为</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3797944008343552/48248a91b1cf6c6ab61eac677fbabf60.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">在同一位置</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3797944008343552/91d0e7b735eb5ecb79d5b60379cf0c57.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">解得</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3797944008343552/f5a47dfd79bd91af53be096d8a33ec13.svg\"/><span style=\"font-family: 宋体;\">，</span><span style=\"font-family: 'Times New Roman';\">D</span><span style=\"font-family: 宋体;\">正确。</span></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">故选</span><span style=\"font-family: 'Times New Roman';\">CD</span><span style=\"font-family: 宋体;\">。</span></p></div></div>",
+    "create_date": "2025-07-14 07:59:46",
+    "paper_type_ids": [
+      5
+    ],
+    "course": {
+      "id": 29,
+      "name": "高中物理"
+    },
+    "catalogs": [
+      {
+        "id": 195019,
+        "name": "2. 动量定理"
+      },
+      {
+        "id": 202697,
+        "name": "第二节 动量定理"
+      },
+      {
+        "id": 210025,
+        "name": "第1节 动量和动量定理"
+      },
+      {
+        "id": 220823,
+        "name": "2. 动量定理"
+      },
+      {
+        "id": 230536,
+        "name": "第二节 物体动量变化的原因 动量定理"
+      }
+    ],
+    "type": {
+      "id": "290801",
+      "name": "1个小题"
+    },
+    "kpoints": [
+      {
+        "id": 16348,
+        "name": "动量定理的内容"
+      },
+      {
+        "id": 17459,
+        "name": "常见力做功与相应的能量转化"
+      },
+      {
+        "id": 16021,
+        "name": "牛顿第二定律的初步应用"
+      },
+      {
+        "id": 15892,
+        "name": "竖直上抛运动的规律及应用"
+      }
+    ],
+    "media": 0,
+    "exp_video_posters": null,
+    "answer_scoreable": true,
+    "tag_ids": [],
+    "tags": [],
+    "source_papers": [
+      {
+        "title": "四川省凉山州2024-2025学年高一下学期期末考试物理试题",
+        "area": {
+          "id": "510000",
+          "name": "四川省"
+        },
+        "type_id": 5,
+        "grade_id": 10,
+        "term": "NEXT",
+        "year": 2025
+      }
+    ],
+    "formattedStem": "{\n  \"html\" : \"<p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">将小球竖直向上抛出，小球从抛出到落回原处的过程中，若所受空气阻力大小与速度大小成正比，则下列说法正确的是（　　）</span></p>\",\n  \"type\" : \"选择题\",\n  \"sqs\" : [ ],\n  \"og\" : {\n    \"cols\" : 1,\n    \"ogOps\" : [ {\n      \"html\" : \"<span class='\\\"qml-op\\\"'><span style='\\\"font-family:' 宋体;\\\"=\"\">上升和下落两过程的时间相等</span></span>\",\n      \"index\" : \"A\"\n    }, {\n      \"html\" : \"<span class='\\\"qml-op\\\"'><span style='\\\"font-family:' 宋体;\\\"=\"\">上升过程的加速度始终小于下落过程的加速度</span></span>\",\n      \"index\" : \"B\"\n    }, {\n      \"html\" : \"<span class='\\\"qml-op\\\"'><span style='\\\"font-family:' 宋体;\\\"=\"\">上升过程合力的冲量大于下落过程合力的冲量</span></span>\",\n      \"index\" : \"C\"\n    }, {\n      \"html\" : \"<span class='\\\"qml-op\\\"'><span style='\\\"font-family:' 宋体;\\\"=\"\">上升过程机械能损失大于下落过程机械能损失</span></span>\",\n      \"index\" : \"D\"\n    } ]\n  },\n  \"sqIdMode\" : 0,\n  \"sqBlankCount\" : 0\n}",
+    "formattedAnswer": "{\n  \"anSqs\" : [ {\n    \"ans\" : [ {\n      \"html\" : \"CD\",\n      \"op\" : true,\n      \"exact\" : true\n    } ]\n  } ]\n}",
+    "formattedExplanation": "{\n  \"explanationSegs\" : [ {\n    \"name\" : \"详解\",\n    \"html\" : \"<p left;\\\"=\"\" style='\\\"text-align:'><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>A</span><span style='\\\"font-family:' 宋体;\\\"=\"\">．因为有空气阻力，上升与下落经过同一位置时的速度</span><img class='\\\"xkw-math-img\\\"' src=\"https://resource.malongtech.cn/questions/img/3797944008343552/91d0e7b735eb5ecb79d5b60379cf0c57.svg\"/></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">上升过程中平均速度大于下落过程中的平均速度</span><img class='\\\"xkw-math-img\\\"' src=\"https://resource.malongtech.cn/questions/img/3797944008343552/f3fbafbca35b86e0504533ea5c3235bc.svg\"/></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">上升过程所用时间</span><img class='\\\"xkw-math-img\\\"' src=\"https://resource.malongtech.cn/questions/img/3797944008343552/31cbacaea520e63b87048172918c957b.svg\"/></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">下落过程所用时间</span><img class='\\\"xkw-math-img\\\"' src=\"https://resource.malongtech.cn/questions/img/3797944008343552/9ef55471f4e895e91502e1a2bc67b6ae.svg\"/></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">解得</span><img class='\\\"xkw-math-img\\\"' src=\"https://resource.malongtech.cn/questions/img/3797944008343552/e4f22c5bac42520be45d9816374fa9b4.svg\"/><span style='\\\"font-family:' 宋体;\\\"=\"\">，</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>A</span><span style='\\\"font-family:' 宋体;\\\"=\"\">错误；</span></p><p left;\\\"=\"\" style='\\\"text-align:'><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>B</span><span style='\\\"font-family:' 宋体;\\\"=\"\">．上升过程的加速度为</span><img class='\\\"xkw-math-img\\\"' src=\"https://resource.malongtech.cn/questions/img/3797944008343552/e4e88f68e678cb3c1ba827244c9d68b3.svg\"/></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">下落过程的加速度为</span><img class='\\\"xkw-math-img\\\"' src=\"https://resource.malongtech.cn/questions/img/3797944008343552/77deb774fb522e857e0f2fe327e36807.svg\"/></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">解得</span><img class='\\\"xkw-math-img\\\"' src=\"https://resource.malongtech.cn/questions/img/3797944008343552/d11b42388565f20350484b2a29062623.svg\"/><span style='\\\"font-family:' 宋体;\\\"=\"\">，</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>B</span><span style='\\\"font-family:' 宋体;\\\"=\"\">错误；</span></p><p left;\\\"=\"\" style='\\\"text-align:'><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>C</span><span style='\\\"font-family:' 宋体;\\\"=\"\">．设初速度为</span><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>v</span><sub new=\"\" roman\\\"=\"\" word-font='\\\"Times'><span>0</span></sub><span style='\\\"font-family:' 宋体;\\\"=\"\">，返回抛出点时的速度为</span><span 'times=\"\" italic;font-family:=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-style:'>v</span><sub new=\"\" roman\\\"=\"\" word-font='\\\"Times'><span>1</span></sub></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">上升过程合力的冲量为</span><img class='\\\"xkw-math-img\\\"' src=\"https://resource.malongtech.cn/questions/img/3797944008343552/5babd59fdf7eaeaa9acfd0fc34e0eb25.svg\"/></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">下落过程合力的冲量为</span><img class='\\\"xkw-math-img\\\"' src=\"https://resource.malongtech.cn/questions/img/3797944008343552/88fe48b49feadcfc352323ae4ea57187.svg\"/></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">因为有空气阻力，所以</span><img class='\\\"xkw-math-img\\\"' src=\"https://resource.malongtech.cn/questions/img/3797944008343552/707cd49fa3443c3de45bafdc8698d0b0.svg\"/></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">解得</span><img class='\\\"xkw-math-img\\\"' src=\"https://resource.malongtech.cn/questions/img/3797944008343552/f263dae8503fca07c32f05d9cad2d640.svg\"/><span style='\\\"font-family:' 宋体;\\\"=\"\">，</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>C</span><span style='\\\"font-family:' 宋体;\\\"=\"\">正确；</span></p><p left;\\\"=\"\" style='\\\"text-align:'><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>D</span><span style='\\\"font-family:' 宋体;\\\"=\"\">．上升过程机械能损失为</span><img class='\\\"xkw-math-img\\\"' src=\"https://resource.malongtech.cn/questions/img/3797944008343552/c232d75c79588a73cbfb8c611ae5b1ca.svg\"/></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">下落过程机械能损失为</span><img class='\\\"xkw-math-img\\\"' src=\"https://resource.malongtech.cn/questions/img/3797944008343552/48248a91b1cf6c6ab61eac677fbabf60.svg\"/></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">在同一位置</span><img class='\\\"xkw-math-img\\\"' src=\"https://resource.malongtech.cn/questions/img/3797944008343552/91d0e7b735eb5ecb79d5b60379cf0c57.svg\"/></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">解得</span><img class='\\\"xkw-math-img\\\"' src=\"https://resource.malongtech.cn/questions/img/3797944008343552/f5a47dfd79bd91af53be096d8a33ec13.svg\"/><span style='\\\"font-family:' 宋体;\\\"=\"\">，</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>D</span><span style='\\\"font-family:' 宋体;\\\"=\"\">正确。</span></p><p left;\\\"=\"\" style='\\\"text-align:'><span style='\\\"font-family:' 宋体;\\\"=\"\">故选</span><span 'times=\"\" new=\"\" roman';\\\"=\"\" style='\\\"font-family:'>CD</span><span style='\\\"font-family:' 宋体;\\\"=\"\">。</span></p>\"\n  } ]\n}",
+    "html_text": "{\n  \"html\" : \" 将小球竖直向上抛出，小球从抛出到落回原处的过程中，若所受空气阻力大小与速度大小成正比，则下列说法正确的是（　　） \",\n  \"type\" : \"选择题\",\n  \"sqs\" : [ ],\n  \"og\" : {\n    \"cols\" : 1,\n    \"ogOps\" : [ {\n      \"html\" : \" 上升和下落两过程的时间相等 \",\n      \"index\" : \"A\"\n    }, {\n      \"html\" : \" 上升过程的加速度始终小于下落过程的加速度 \",\n      \"index\" : \"B\"\n    }, {\n      \"html\" : \" 上升过程合力的冲量大于下落过程合力的冲量 \",\n      \"index\" : \"C\"\n    }, {\n      \"html\" : \" 上升过程机械能损失大于下落过程机械能损失 \",\n      \"index\" : \"D\"\n    } ]\n  },\n  \"sqIdMode\" : 0,\n  \"sqBlankCount\" : 0\n}",
+    "answer_text": "{\n  \"anSqs\" : [ {\n    \"ans\" : [ {\n      \"html\" : \"CD\",\n      \"op\" : true,\n      \"exact\" : true\n    } ]\n  } ]\n}",
+    "explanation_text": "{\n  \"explanationSegs\" : [ {\n    \"name\" : \"详解\",\n    \"html\" : \" A ．因为有空气阻力，上升与下落经过同一位置时的速度 $\\\\nu_{\\\\perp}>\\\\nu_{\\\\perp}$ 上升过程中平均速度大于下落过程中的平均速度 $\\\\bar{\\\\nu}_{\\\\perp}>\\\\bar{\\\\nu}_{\\\\mathrm{ 下 }}$ 上升过程所用时间 $t_{\\\\perp}=\\\\frac{h}{\\\\bar{\\\\nu}_{\\\\perp}}$ 下落过程所用时间 $t_{\\\\mathrm{ 下 }}=\\\\frac{h}{\\\\bar{\\\\nu}_{\\\\mathrm{ 下 }}}$ 解得 $t_{上}<t_{下}$ ， A 错误； B ．上升过程的加速度为 $a_{ 上 }=\\\\frac{mg+f_{ 阻 }}{m}=g+\\\\frac{f_{ 阻 }}{m}>g$ 下落过程的加速度为 $a_{ 下 }=\\\\frac{mg-f_{ 阻 }}{m}=g-\\\\frac{f_{ 阻 }}{m}<g$ 解得 $a_{上}>a_{下}$ ， B 错误； C ．设初速度为 v 0 ，返回抛出点时的速度为 v 1 上升过程合力的冲量为 $-I_{\\\\perp}=0-m v_{0}$ 下落过程合力的冲量为 $I_{\\\\mathrm{ 下 }}=m\\\\nu_{1}-0$ 因为有空气阻力，所以 $\\\\nu_{1}<\\\\nu_{0}$ 解得 $I_{\\\\perp}>I_{\\\\perp}$ ， C 正确； D ．上升过程机械能损失为 $\\\\Delta E_{\\\\perp}=k\\\\nu_{\\\\perp}h$ 下落过程机械能损失为 $\\\\Delta E_{\\\\mathrm{ 下 }}=k\\\\nu_{\\\\mathrm{ 下 }}h$ 在同一位置 $\\\\nu_{\\\\perp}>\\\\nu_{\\\\perp}$ 解得 $\\\\Delta E_{\\\\perp}>\\\\Delta E_{\\\\mathrm{ 下 }}$ ， D 正确。 故选 CD 。 \"\n  } ]\n}",
+    "formatted_json": {
+      "resources": [],
+      "inputs": [
+        {
+          "type": "choice",
+          "order": 1,
+          "resource_index": -1,
+          "options": [
+            {
+              "option": "A",
+              "value": " 上升和下落两过程的时间相等 "
+            },
+            {
+              "option": "B",
+              "value": " 上升过程的加速度始终小于下落过程的加速度 "
+            },
+            {
+              "option": "C",
+              "value": " 上升过程合力的冲量大于下落过程合力的冲量 "
+            },
+            {
+              "option": "D",
+              "value": " 上升过程机械能损失大于下落过程机械能损失 "
+            }
+          ]
+        }
+      ],
+      "answers": [
+        {
+          "order": 1,
+          "value": "CD",
+          "explanation": "详解： A ．因为有空气阻力，上升与下落经过同一位置时的速度 $\\nu_{\\perp}>\\nu_{\\perp}$ 上升过程中平均速度大于下落过程中的平均速度 $\\bar{\\nu}_{\\perp}>\\bar{\\nu}_{\\mathrm{ 下 }}$ 上升过程所用时间 $t_{\\perp}=\\frac{h}{\\bar{\\nu}_{\\perp}}$ 下落过程所用时间 $t_{\\mathrm{ 下 }}=\\frac{h}{\\bar{\\nu}_{\\mathrm{ 下 }}}$ 解得 $t_{上}<t_{下}$ ， A 错误； B ．上升过程的加速度为 $a_{ 上 }=\\frac{mg+f_{ 阻 }}{m}=g+\\frac{f_{ 阻 }}{m}>g$ 下落过程的加速度为 $a_{ 下 }=\\frac{mg-f_{ 阻 }}{m}=g-\\frac{f_{ 阻 }}{m}<g$ 解得 $a_{上}>a_{下}$ ， B 错误； C ．设初速度为 v 0 ，返回抛出点时的速度为 v 1 上升过程合力的冲量为 $-I_{\\perp}=0-m v_{0}$ 下落过程合力的冲量为 $I_{\\mathrm{ 下 }}=m\\nu_{1}-0$ 因为有空气阻力，所以 $\\nu_{1}<\\nu_{0}$ 解得 $I_{\\perp}>I_{\\perp}$ ， C 正确； D ．上升过程机械能损失为 $\\Delta E_{\\perp}=k\\nu_{\\perp}h$ 下落过程机械能损失为 $\\Delta E_{\\mathrm{ 下 }}=k\\nu_{\\mathrm{ 下 }}h$ 在同一位置 $\\nu_{\\perp}>\\nu_{\\perp}$ 解得 $\\Delta E_{\\perp}>\\Delta E_{\\mathrm{ 下 }}$ ， D 正确。 故选 CD 。 "
+        }
+      ]
+    }
+  },
+  {
+    "_index": "questions120",
+    "_id": "0846236167161208",
+    "_matched_id_field": "qs_subject_id",
+    "id": "0846236167161208",
+    "qs_subject_id": 29,
+    "qs_type_id": "2902",
+    "qs_knowpoint_ids": [
+      16021
+    ],
+    "qs_chapter_ids": [
+      194631,
+      225736,
+      194413,
+      "10_physics_volume1_pep_required_c4-3",
+      195960,
+      "10_physics_volume1_pep_required_c4"
+    ],
+    "qs_diff": 0.9450000000000001,
+    "from": 0,
+    "qs_stem": "<div class=\"qml-stem\"><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">某同学购买了一张单程机票。此次飞行的相关信息见图</span><span style=\"font-family: 'Times New Roman';\">1</span><span style=\"font-family: 宋体;\">、</span><span style=\"font-family: 'Times New Roman';\">2</span><span style=\"font-family: 宋体;\">。在这趟飞行过程中他不仅领略了祖国的大好河山，更是发现了不少有趣的物理现象。</span></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">飞机在空中水平飞行时，该同学将靠背上的小桌板放下，其上放有质量为</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">m</span><span style=\"font-family: 宋体;\">的饮料杯（含饮料），如图所示。</span></p><p style=\"text-align: left;\"><img height=\"133\" src=\"https://resource.malongtech.cn/questions/img/3753035429707776/ca89d34ee64a4cceb3b296927d821d40.png\" width=\"181\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">在飞机水平飞行的一段时间内，该同学发现饮料杯中的液面与小桌板成</span><span style=\"font-family: 'Times New Roman';\">α</span><span style=\"font-family: 宋体;\">角，如图所示。则飞机在做</span><span class=\"qml-bk\" index=\"1\" size=\"6\" style=\"text-decoration:underline\" type=\"underline\">　　　　　　</span><span style=\"font-family: 宋体;\">运动（选填“匀加速”、“匀减速”或“匀速”）。取重力加速度为</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">g</span><span style=\"font-family: 宋体;\">，此时飞机运动的加速度大小为</span><span class=\"qml-bk\" index=\"2\" size=\"6\" style=\"text-decoration:underline\" type=\"underline\">　　　　　　</span><span style=\"font-family: 宋体;\">。</span></p><p style=\"text-align: left;\"><img height=\"134\" src=\"https://resource.malongtech.cn/questions/img/3753035429707776/19bca48bd4c64399977e83ded95a1888.png\" width=\"181\"/></p></div>",
+    "qs_answer": "<div class=\"qml-answer\"><span class=\"qml-an-sq\">    ①. <span class=\"qml-an qml-exact\"><span style=\"font-family: 宋体;\">匀减速</span></span>    ②. <span class=\"qml-an qml-exact\"><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3753035429707776/72cf2c74cee916fdb6f0f0fe0f323f42.svg\"/></span></span></div>",
+    "qs_explanation": "<div class=\"qml-explanation\"><div class=\"qml-seg\" seg-name=\"详解\">【详解】<p style=\"text-align: left;\"><span style=\"font-family: 'Times New Roman';\">[1]</span><span style=\"font-family: 宋体;\">该同学发现饮料杯中的液面与小桌板成</span><span style=\"font-family: 'Times New Roman';\">α</span><span style=\"font-family: 宋体;\">角，说明上侧的水由于惯性向小桌板运动，则下侧水做减速运动，即飞机在做匀减速运动。</span></p><p style=\"text-align: left;\"><span style=\"font-family: 'Times New Roman';\">[2]</span><span style=\"font-family: 宋体;\">根据牛顿第二定律可得</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3753035429707776/e91df0f0884bfeb253dde61de73607da.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">解得</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3753035429707776/0b0b5f9aae841ff2cf076aa7a690dd9f.svg\"/></p></div></div>",
+    "html_text": "{\n  \"html\" : \" 某同学购买了一张单程机票。此次飞行的相关信息见图 1 、 2 。在这趟飞行过程中他不仅领略了祖国的大好河山，更是发现了不少有趣的物理现象。 飞机在空中水平飞行时，该同学将靠背上的小桌板放下，其上放有质量为 m 的饮料杯（含饮料），如图所示。 ![](https://resource.malongtech.cn/questions/img/3753035429707776/ca89d34ee64a4cceb3b296927d821d40.png) 在飞机水平飞行的一段时间内，该同学发现饮料杯中的液面与小桌板成 α 角，如图所示。则飞机在做 ___(1)___ 运动（选填“匀加速”、“匀减速”或“匀速”）。取重力加速度为 g ，此时飞机运动的加速度大小为 ___(2)___ 。 ![](https://resource.malongtech.cn/questions/img/3753035429707776/19bca48bd4c64399977e83ded95a1888.png) \",\n  \"type\" : \"填空题\",\n  \"sqs\" : [ ],\n  \"og\" : null,\n  \"sqIdMode\" : 0,\n  \"sqBlankCount\" : 0\n}",
+    "formatted_json": {
+      "resources": [],
+      "inputs": [
+        {
+          "type": "blank",
+          "order": 1,
+          "resource_index": -1,
+          "options": []
+        },
+        {
+          "type": "blank",
+          "order": 2,
+          "resource_index": -1,
+          "options": []
+        }
+      ],
+      "answers": [
+        {
+          "order": 1,
+          "value": " 匀减速 ",
+          "explanation": "详解： [1] 该同学发现饮料杯中的液面与小桌板成 α 角，说明上侧的水由于惯性向小桌板运动，则下侧水做减速运动，即飞机在做匀减速运动。 [2] 根据牛顿第二定律可得 $\\frac{m a}{m g}=\\tan\\alpha$ 解得 $a=g\\mathrm{t a n}\\alpha$ "
+        },
+        {
+          "order": 2,
+          "value": " $g\\mathrm{t a n}\\alpha$ ",
+          "explanation": "详解： [1] 该同学发现饮料杯中的液面与小桌板成 α 角，说明上侧的水由于惯性向小桌板运动，则下侧水做减速运动，即飞机在做匀减速运动。 [2] 根据牛顿第二定律可得 $\\frac{m a}{m g}=\\tan\\alpha$ 解得 $a=g\\mathrm{t a n}\\alpha$ "
+        }
+      ]
+    }
+  },
+  {
+    "_index": "questions120_v2_20260804",
+    "_id": "0060586669301140",
+    "_matched_id_field": "qs_subject_id",
+    "id": "0060586669301140",
+    "qs_subject_id": 29,
+    "qs_type_id": "2902",
+    "qs_knowpoint_ids": [
+      15877
+    ],
+    "qs_chapter_ids": [
+      195947,
+      "10_physics_volume1_pep_required_c2",
+      194617,
+      225725,
+      194398,
+      "10_physics_volume1_pep_required_c2-4"
+    ],
+    "qs_diff": 0.9450000000000001,
+    "from": 0,
+    "qs_stem": "<div class=\"qml-stem\"><p style=\"text-align:justify;word-break:break-word;\"><span style=\"font-family: 宋体;\">自由落体运动运动位移公式：</span><span class=\"qml-bk\" index=\"1\" size=\"6\" style=\"text-decoration:underline\" type=\"underline\">　　　　　　</span></p></div>",
+    "qs_answer": "<div class=\"qml-answer\"><span class=\"qml-an-sq\"><span class=\"qml-an\"><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3369407364792320/f81a08d9ebbd192a2bf960cd88169c98.svg\"/></span></span></div>",
+    "qs_explanation": "<div class=\"qml-explanation\"><div class=\"qml-seg\" seg-name=\"详解\">【详解】<p style=\"text-align: left;\"><span style=\"font-family: 'Times New Roman';\">[1]</span><span style=\"font-family: 宋体;\">自由落体运动位移公式为</span><img class=\"xkw-math-img\" src=\"https://resource.malongtech.cn/questions/img/3369407364792320/f81a08d9ebbd192a2bf960cd88169c98.svg\"/><span style=\"font-family: 宋体;\">。</span></p></div></div>",
+    "html_text": "{\n  \"html\" : \" 自由落体运动运动位移公式： ___(1)___ \",\n  \"type\" : \"填空题\",\n  \"sqs\" : [ ],\n  \"og\" : null,\n  \"sqIdMode\" : 0,\n  \"sqBlankCount\" : 0\n}",
+    "formatted_json": {
+      "resources": [],
+      "inputs": [
+        {
+          "type": "blank",
+          "order": 1,
+          "resource_index": -1,
+          "options": []
+        }
+      ],
+      "answers": [
+        {
+          "order": 1,
+          "value": " $h={\\frac{1}{2}}g t^{2}$ ",
+          "explanation": "详解： [1] 自由落体运动位移公式为 $h={\\frac{1}{2}}g t^{2}$ 。 "
+        }
+      ]
+    }
+  },
+  {
+    "_index": "questions120_v2_20260804_01",
+    "_id": "8606554904354681",
+    "_matched_id_field": "qs_subject_id",
+    "school_names": [
+      "天津市滨海七所重点学校"
+    ],
+    "formatted_json": {
+      "inputs": [
+        {
+          "resource_index": -1,
+          "options": [
+            {
+              "value": " 调节光源高度使光束沿遮光筒轴线照在屏中心时，应放上单缝和双缝 ",
+              "option": "A"
+            },
+            {
+              "value": " 测量某条干涉亮纹位置时，应使测微目镜分划板中心刻线与该亮纹的中心对齐 ",
+              "option": "B"
+            },
+            {
+              "value": " 为了减小测量误差，可用测微目镜测出 $n$ 条亮纹中心间的距离 $\\boldsymbol{a}$ ，求出相邻两条亮纹间距 $\\Delta x={\\frac{a}{n-1}}$ ",
+              "option": "C"
+            }
+          ],
+          "type": "choice",
+          "order": 1
+        }
+      ],
+      "answers": [
+        {
+          "explanation": "详解： A ．调节光源高度使光束沿遮光筒轴线照在屏中心时，不放单缝和双缝 ,A 错误； B ．测量某条干涉亮纹位置时，应使测微目镜分划板中心刻线与该亮纹的中心对齐， B 正确； C ．为了减小测量误差，可用测微目镜测出 $n$ 条亮纹中心间的距离 $\\boldsymbol{a}$ ，求出相邻两条亮纹间距 $\\Delta x={\\frac{a}{n-1}}$ 进而应用 $\\Delta x={\\frac{L}{d}}\\lambda$ 计算波长， C 正确。 故选 A 。 ",
+          "value": "A",
+          "order": 1
+        }
+      ],
+      "resources": []
+    },
+    "source_traceable": true,
+    "qs_diff": 0.8500000000000001,
+    "bank_categories": [
+      "famous_school_bank"
+    ],
+    "classification_basis": [
+      "school_source_detected"
+    ],
+    "es_id": "8606554904354681",
+    "qs_stem": "<div class=\"qml-stem\"><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">在</span><span style=\"font-family: 'Times New Roman';\">“</span><span style=\"font-family: 宋体;\">用双缝干涉测光的波长</span><span style=\"font-family: 'Times New Roman';\">”</span><span style=\"font-family: 宋体;\">实验中（实验装置如图）</span><span style=\"font-family: 'Times New Roman';\">:</span></p><p style=\"text-align: left;\"><img height=\"143\" src=\"https://resource.malongtech.cn/questions/img/2932751775514624/4e078479-a200-43e6-9892-bb24b2a83a9d.png\" width=\"406\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">下列说法哪一个是错误的（　　）（填选项前的字母）</span></p><div class=\"qml-og\"><table class=\"qml-og\" style=\"width:100%\"><tr><td>A. <span class=\"qml-op\"><span style=\"font-family: 宋体;\">调节光源高度使光束沿遮光筒轴线照在屏中心时，应放上单缝和双缝</span></span></td></tr><tr><td>B. <span class=\"qml-op\"><span style=\"font-family: 宋体;\">测量某条干涉亮纹位置时，应使测微目镜分划板中心刻线与该亮纹的中心对齐</span></span></td></tr><tr><td colspan=\"1\">C. <span class=\"qml-op\"><span style=\"font-family: 宋体;\">为了减小测量误差，可用测微目镜测出</span><img src=\"https://resource.malongtech.cn/questions/img/2932751775514624/b6a24198bd04c29321ae5dc5a28fe421.svg\"/><span style=\"font-family: 宋体;\">条亮纹中心间的距离</span><img src=\"https://resource.malongtech.cn/questions/img/2932751775514624/0a6936d370d6a238a608ca56f87198de.svg\"/><span style=\"font-family: 宋体;\">，求出相邻两条亮纹间距</span><img src=\"https://resource.malongtech.cn/questions/img/2932751775514624/defb14800bffba7a0af3ab9cad3cbf5f.svg\"/></span></td></tr></table></div></div>",
+    "paper_type_ids": [
+      1,
+      3
+    ],
+    "qs_knowpoint_ids": [
+      17276
+    ],
+    "qs_answer": "<div class=\"qml-answer\"><span class=\"qml-an-sq\"><span class=\"qml-an qml-isop\">A</span></span></div>",
+    "years": [
+      2022,
+      2023
+    ],
+    "qs_chapter_ids": [
+      "195040",
+      "202721",
+      "210051",
+      "195044",
+      "220852"
+    ],
+    "source_papers": [
+      {
+        "area": {
+          "name": "全国",
+          "id": "1"
+        },
+        "type_name": "课后作业",
+        "grade_id": 11,
+        "year": 2023,
+        "type_id": 1,
+        "term": "NEXT",
+        "title": "5.2科学测量：用双缝干涉测光的波长 综合训练 -鲁科版（2019）选择性必修第一册"
+      },
+      {
+        "area": {
+          "name": "天津市",
+          "id": "120000"
+        },
+        "type_name": "月考",
+        "grade_id": 12,
+        "year": 2022,
+        "type_id": 3,
+        "term": "ALL",
+        "title": "2022届天津市滨海七所重点学校高三下学期联考物理试题"
+      }
+    ],
+    "quality": {
+      "metadata_score": 1.0,
+      "review_status": "machine_normalized",
+      "content_score": 1.0
+    },
+    "qs_diff_level": 18,
+    "area_ids": [
+      "1",
+      "120000"
+    ],
+    "schools": [
+      {
+        "raw_name": "天津市滨海七所重点学校",
+        "normalized_name": "天津市滨海七所重点学校"
+      }
+    ],
+    "qs_explanation": "<div class=\"qml-explanation\"><div class=\"qml-seg\" seg-name=\"详解\">【详解】<p style=\"\"><span style=\"font-family: 'Times New Roman';\">A</span><span style=\"font-family: 宋体;\">．调节光源高度使光束沿遮光筒轴线照在屏中心时，不放单缝和双缝</span><span style=\"font-family: 'Times New Roman';\">,A</span><span style=\"font-family: 宋体;\">错误；</span></p><p style=\"text-align: left;\"><span style=\"font-family: 'Times New Roman';\">B</span><span style=\"font-family: 宋体;\">．测量某条干涉亮纹位置时，应使测微目镜分划板中心刻线与该亮纹的中心对齐，</span><span style=\"font-family: 'Times New Roman';\">B</span><span style=\"font-family: 宋体;\">正确；</span></p><p style=\"text-align: left;\"><span style=\"font-family: 'Times New Roman';\">C</span><span style=\"font-family: 宋体;\">．为了减小测量误差，可用测微目镜测出</span><img src=\"https://resource.malongtech.cn/questions/img/2932751775514624/b6a24198bd04c29321ae5dc5a28fe421.svg\"/><span style=\"font-family: 宋体;\">条亮纹中心间的距离</span><img src=\"https://resource.malongtech.cn/questions/img/2932751775514624/0a6936d370d6a238a608ca56f87198de.svg\"/><span style=\"font-family: 宋体;\">，求出相邻两条亮纹间距</span></p><p style=\"text-align: center;\"><img src=\"https://resource.malongtech.cn/questions/img/2932751775514624/defb14800bffba7a0af3ab9cad3cbf5f.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">进而应用</span></p><p style=\"text-align: center;\"><img src=\"https://resource.malongtech.cn/questions/img/2932751775514624/9dc6157a188f76edbe61afdddf3637f8.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">计算波长，</span><span style=\"font-family: 'Times New Roman';\">C</span><span style=\"font-family: 宋体;\">正确。</span></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">故选</span><span style=\"font-family: 'Times New Roman';\">A</span><span style=\"font-family: 宋体;\">。</span></p></div></div>",
+    "id": "8606554904354681",
+    "qs_subject_id": 29,
+    "qs_type_id": "290101",
+    "qs_paper_types": [
+      3,
+      1
+    ]
+  },
+  {
+    "_index": "questions120_v2_20260805_01",
+    "_id": "1277364523734099",
+    "_matched_id_field": "qs_subject_id",
+    "school_names": [
+      "江苏省盐城市响水中学",
+      "湖南省长沙市雅礼实验中学"
+    ],
+    "formatted_json": {
+      "inputs": [
+        {
+          "resource_index": -1,
+          "options": [
+            {
+              "value": " 碰撞过程中，小球、滑块 a 、滑块 b 组成的系统水平动量不守恒 ",
+              "option": "A"
+            },
+            {
+              "value": " 两滑块碰撞过程中损失的机械能为 75 J ",
+              "option": "B"
+            },
+            {
+              "value": " 碰撞过程中，滑块 b 受到的冲量大小为 12 N·s ",
+              "option": "C"
+            },
+            {
+              "value": " 小球能够上升的最大高度是 1 m ",
+              "option": "D"
+            }
+          ],
+          "type": "choice",
+          "order": 1
+        }
+      ],
+      "answers": [
+        {
+          "explanation": "详解： A ．两滑块相撞过程，由于碰撞时间极短，小球及滑块 a 、 b 在水平方向上不受外力，故系统在水平方向动量守恒， A 错误； B ．滑块 a 和 b 发生完全非弹性碰撞，碰后具有共同速度，由动量守恒定律有 $M\\nu_{0}=2M\\nu$ 解得 $\\nu=5\\mathrm{m/s}$ 该过程中，损失的机械能为 $\\Delta E=\\frac{1}{2}M\\nu_{0}^{2}-\\frac{1}{2}\\times2M\\nu^{2}=50\\mathrm{J}$ B 错误； C ．根据动量定理，碰撞过程中滑块 b 受到的冲量等于滑块 b 的动量变化量，即 $I=M\\nu=2\\times5\\mathrm{k g\\cdot m/s}=10\\mathrm{N\\cdot s}$ C 错误； D ．滑块 a 和 b 碰撞完毕至小球上升到最高点的过程，系统在水平方向上所受合外力为零，水平方向动量守恒，小球上升到最高点时，有 $2M\\nu+m\\nu_{0}=(2M+m)\\nu$ 该过程中，系统的机械能守恒，则有 ${\\frac{1}{2}}\\times2M v^{2}+{\\frac{1}{2}}m v_{0}^{2}={\\frac{1}{2}}\\left(2M+m\\right)v^{2}+m g h$ 解得 $h=1\\mathrm{m}$ D 正确。 故选 D 。 ",
+          "value": "D",
+          "order": 1
+        }
+      ],
+      "resources": []
+    },
+    "source_traceable": true,
+    "qs_diff": 0.65,
+    "bank_categories": [
+      "famous_school_bank"
+    ],
+    "classification_basis": [
+      "school_source_detected"
+    ],
+    "es_id": "1277364523734099",
+    "qs_stem": "<div class=\"qml-stem\"><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">如图所示，在光滑水平面上，质量为</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">M</span><span style=\"font-family: 宋体;\">＝</span><span style=\"font-family: 'Times New Roman';\">2 kg</span><span style=\"font-family: 宋体;\">的带有光滑半圆形槽（半径足够大）的滑块</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">a</span><span style=\"font-family: 宋体;\">，在槽底部有一质量为</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">m</span><span style=\"font-family: 宋体;\">＝</span><span style=\"font-family: 'Times New Roman';\">1 kg</span><span style=\"font-family: 宋体;\">的小球，滑块</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">a</span><span style=\"font-family: 宋体;\">和小球一起以速度</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">v</span><span style=\"font-family: 'Times New Roman';\"><sub>0</sub></span><span style=\"font-family: 宋体;\">＝</span><span style=\"font-family: 'Times New Roman';\">10 m/s</span><span style=\"font-family: 宋体;\">向右滑动。另一质量也为</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">M</span><span style=\"font-family: 宋体;\">＝</span><span style=\"font-family: 'Times New Roman';\">2 kg</span><span style=\"font-family: 宋体;\">的滑块</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">b</span><span style=\"font-family: 宋体;\">静止于滑块</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">a</span><span style=\"font-family: 宋体;\">的右侧。两滑块相撞（碰撞时间极短）后，粘在一起向右运动，</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">g</span><span style=\"font-family: 宋体;\">取</span><span style=\"font-family: 'Times New Roman';\"><span>10 m/s</span><sup>2</sup></span><span style=\"font-family: 宋体;\">，则下列说法正确的是（　　）</span></p><p style=\"text-align: left;\"><img height=\"98\" src=\"https://resource.malongtech.cn/questions/img/3054132841865216/6da11921-4918-4e70-931b-1a93c6fee104.png\" width=\"264\"/></p><div class=\"qml-og\"><table class=\"qml-og\" style=\"width:100%\"><tr><td>A. <span class=\"qml-op\"><span style=\"font-family: 宋体;\">碰撞过程中，小球、滑块</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">a</span><span style=\"font-family: 宋体;\">、滑块</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">b</span><span style=\"font-family: 宋体;\">组成的系统水平动量不守恒</span></span></td></tr><tr><td>B. <span class=\"qml-op\"><span style=\"font-family: 宋体;\">两滑块碰撞过程中损失的机械能为</span><span style=\"font-family: 'Times New Roman';\">75 J</span></span></td></tr><tr><td>C. <span class=\"qml-op\"><span style=\"font-family: 宋体;\">碰撞过程中，滑块</span><span style=\"font-style: italic;font-family: 'Times New Roman';\">b</span><span style=\"font-family: 宋体;\">受到的冲量大小为</span><span style=\"font-family: 'Times New Roman';\">12 N·s</span></span></td></tr><tr><td colspan=\"1\">D. <span class=\"qml-op\"><span style=\"font-family: 宋体;\">小球能够上升的最大高度是</span><span style=\"font-family: 'Times New Roman';\">1 m</span></span></td></tr></table></div></div>",
+    "paper_type_ids": [
+      1,
+      3,
+      4
+    ],
+    "qs_knowpoint_ids": [
+      16382
+    ],
+    "qs_answer": "<div class=\"qml-answer\"><span class=\"qml-an-sq\"><span class=\"qml-an qml-isop\">D</span></span></div>",
+    "years": [
+      2022,
+      2023
+    ],
+    "qs_chapter_ids": [
+      "202700",
+      "210028",
+      "220826",
+      "230537",
+      "195216"
+    ],
+    "source_papers": [
+      {
+        "area": {
+          "name": "全国",
+          "id": "1"
+        },
+        "type_name": "课后作业",
+        "grade_id": 11,
+        "year": 2022,
+        "type_id": 1,
+        "term": "ALL",
+        "title": "2023版 步步高人教版选择性必修第一册  模块综合试卷(一)"
+      },
+      {
+        "area": {
+          "name": "湖南省",
+          "id": "430000"
+        },
+        "type_name": "期中",
+        "grade_id": 11,
+        "year": 2022,
+        "type_id": 4,
+        "term": "LAST",
+        "title": "湖南省长沙市四校2022-2023学年高二上学期期中联考物理试题"
+      },
+      {
+        "area": {
+          "name": "江苏省",
+          "id": "320000"
+        },
+        "type_name": "期中",
+        "grade_id": 11,
+        "year": 2023,
+        "type_id": 4,
+        "term": "LAST",
+        "title": "江苏省盐城市响水中学2023-2024学年高二上学期期中考试物理（选修）试题"
+      },
+      {
+        "area": {
+          "name": "湖南省",
+          "id": "430000"
+        },
+        "type_name": "月考",
+        "grade_id": 11,
+        "year": 2022,
+        "type_id": 3,
+        "term": "LAST",
+        "title": "湖南省长沙市雅礼实验中学2022-2023学年高二上学期第三次月考物理试题"
+      }
+    ],
+    "quality": {
+      "metadata_score": 1.0,
+      "review_status": "machine_normalized",
+      "content_score": 1.0
+    },
+    "qs_diff_level": 19,
+    "area_ids": [
+      "1",
+      "320000",
+      "430000"
+    ],
+    "schools": [
+      {
+        "raw_name": "江苏省盐城市响水中学",
+        "normalized_name": "江苏省盐城市响水中学"
+      },
+      {
+        "raw_name": "湖南省长沙市雅礼实验中学",
+        "normalized_name": "湖南省长沙市雅礼实验中学"
+      }
+    ],
+    "qs_explanation": "<div class=\"qml-explanation\"><div class=\"qml-seg\" seg-name=\"详解\">【详解】<p style=\"text-align: left;\"><span style=\"font-family: 'Times New Roman';\">A</span><span style=\"font-family: 宋体;\">．两滑块相撞过程，由于碰撞时间极短，小球及滑块</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">a</span><span style=\"font-family: 宋体;\">、</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">b</span><span style=\"font-family: 宋体;\">在水平方向上不受外力，故系统在水平方向动量守恒，</span><span style=\"font-family: 'Times New Roman';\">A</span><span style=\"font-family: 宋体;\">错误；</span></p><p style=\"text-align: left;\"><span style=\"font-family: 'Times New Roman';\">B</span><span style=\"font-family: 宋体;\">．滑块</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">a</span><span style=\"font-family: 宋体;\">和</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">b</span><span style=\"font-family: 宋体;\">发生完全非弹性碰撞，碰后具有共同速度，由动量守恒定律有</span></p><p style=\"text-align: center;\"><img src=\"https://resource.malongtech.cn/questions/img/3054132841865216/dfba7c1c1c31ecdc457ae16db3dcf8a6.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">解得</span></p><p style=\"text-align: center;\"><img src=\"https://resource.malongtech.cn/questions/img/3054132841865216/71ec1c318e614f9568b51e61ca742599.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">该过程中，损失的机械能为</span></p><p style=\"text-align: center;\"><img src=\"https://resource.malongtech.cn/questions/img/3054132841865216/b00708577f116d83c7518a603b189aeb.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 'Times New Roman';\">B</span><span style=\"font-family: 宋体;\">错误；</span></p><p style=\"text-align: left;\"><span style=\"font-family: 'Times New Roman';\">C</span><span style=\"font-family: 宋体;\">．根据动量定理，碰撞过程中滑块</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">b</span><span style=\"font-family: 宋体;\">受到的冲量等于滑块</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">b</span><span style=\"font-family: 宋体;\">的动量变化量，即</span></p><p style=\"text-align: center;\"><img src=\"https://resource.malongtech.cn/questions/img/3054132841865216/39d5557d6aeca4bbe32d4158ad0627aa.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 'Times New Roman';\">C</span><span style=\"font-family: 宋体;\">错误；</span></p><p style=\"text-align: left;\"><span style=\"font-family: 'Times New Roman';\">D</span><span style=\"font-family: 宋体;\">．滑块</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">a</span><span style=\"font-family: 宋体;\">和</span><span style=\"font-family: 'Times New Roman';font-style: italic;\">b</span><span style=\"font-family: 宋体;\">碰撞完毕至小球上升到最高点的过程，系统在水平方向上所受合外力为零，水平方向动量守恒，小球上升到最高点时，有</span></p><p style=\"text-align: center;\"><img src=\"https://resource.malongtech.cn/questions/img/3054132841865216/a763feafdd0c2e4c6183654510a4718e.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">该过程中，系统的机械能守恒，则有</span></p><p style=\"text-align: center;\"><img src=\"https://resource.malongtech.cn/questions/img/3054132841865216/e56e47af997383ae54f91b36260e38bf.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">解得</span></p><p style=\"text-align: center;\"><img src=\"https://resource.malongtech.cn/questions/img/3054132841865216/e9007344b2c8d74ec5a00c4222196221.svg\"/></p><p style=\"text-align: left;\"><span style=\"font-family: 'Times New Roman';\">D</span><span style=\"font-family: 宋体;\">正确。</span></p><p style=\"text-align: left;\"><span style=\"font-family: 宋体;\">故选</span><span style=\"font-family: 'Times New Roman';\">D</span><span style=\"font-family: 宋体;\">。</span></p></div></div>",
+    "id": "1277364523734099",
+    "qs_subject_id": 29,
+    "qs_type_id": "290101",
+    "qs_paper_types": [
+      1,
+      3,
+      4
+    ]
+  }
+]
