@@ -94,16 +94,6 @@ export function toStudentAnalysis(analysis, problem) {
   };
 }
 
-/** 教师投影：完整解析 + 知识点↔步骤的双向对应 */
-export function toTeacherAnalysis(analysis) {
-  if (!analysis) return null;
-  return {
-    summary: analysis.summary,
-    variables: analysis.variables,
-    keyConditions: analysis.keyConditions,
-    knowledgeGraph: analysis.knowledgeGraph.teacher,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // ① 关键变量
@@ -569,36 +559,6 @@ export function buildKnowledgeGraph(problem, model) {
     studentEdges = deriveEdges(studentNodes);
   }
 
-  // ---- 教师节点：学生节点 + 步骤里的概念，并把概念挂到步骤上 ----
-  const teacherNodes = studentNodes.map((n) => ({ ...n, kind: 'topic', steps: [] }));
-  const teacherEdges = [...studentEdges];
-  const conceptIndex = new Map();
-
-  for (const g of problem.solutionGraphs ?? []) {
-    for (const s of g.steps ?? []) {
-      for (const c of s.concepts ?? []) {
-        const name = String(c ?? '').trim();
-        if (!name) continue;
-        if (!conceptIndex.has(name)) {
-          const id = slugId(`concept-${name}`, `c${conceptIndex.size + 1}`);
-          conceptIndex.set(name, id);
-          teacherNodes.push({
-            id,
-            name,
-            role: 'concept',
-            level: 3,
-            note: '',
-            kind: 'concept',
-            steps: [],
-          });
-        }
-        const id = conceptIndex.get(name);
-        const node = teacherNodes.find((n) => n.id === id);
-        if (node && !node.steps.includes(s.index)) node.steps.push(s.index);
-      }
-    }
-  }
-
   return {
     student: {
       nodes: studentNodes,
@@ -607,12 +567,6 @@ export function buildKnowledgeGraph(problem, model) {
       edgeSource,
       /** 如实告诉 UI：学生图里没有步骤信息，这是设计而不是缺失 */
       scope: 'topics-only',
-    },
-    teacher: {
-      nodes: teacherNodes,
-      edges: teacherEdges,
-      edgeSource,
-      scope: 'topics+concepts+steps',
     },
   };
 }

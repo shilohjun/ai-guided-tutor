@@ -17,7 +17,6 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, it, assert, assertEquals, assertIncludes, assertNotIncludes } from './runner.js';
 import { loadEnvFile, ROOT } from '../src/core/env.js';
-import { teacherMode, checkTeacherAuth } from '../src/server/router.js';
 
 const html = readFileSync(join(ROOT, 'public/classic.html'), 'utf8');
 const appJs = readFileSync(join(ROOT, 'public/app.js'), 'utf8');
@@ -50,14 +49,9 @@ function referencedIds() {
 const DYNAMIC_IDS = new Set([
   'chat-empty', // renderEmptyState() 每次重建消息区时创建
   'btn-goto-chat-2', // loadReport() 的空状态里创建
-  'btn-run-eval', // renderTeacherEval() 的模板里创建
-  'eval-result', // 同上，评测结果的容器
   'toast', // toast() 首次调用时创建
   'kg-wrap', // renderAnalysis() 的解析面板里创建，知识图谱的挂载点
-  'kg-wrap-teacher', // renderTeacherProblem() 的教师解析区里创建
   'kg-detail', // renderKnowledgeGraph() 内部创建，点节点后的详情气泡
-  'teacher-path', // renderTeacherSession() 的"路径进度"卡里创建
-  'teacher-path-track', // renderPathList() 内部创建，教师版路径轨道
 ]);
 
 describe('前端 · DOM 契约（防止"点了没反应"）', () => {
@@ -83,82 +77,8 @@ describe('前端 · DOM 契约（防止"点了没反应"）', () => {
     assertNotIncludes(chatSection, '答案泄漏', '学生对话页不应出现"答案泄漏"字样');
   });
 
-  it('学生页与教师页是两个独立页面，学生页不内嵌教研数据容器', () => {
-    assertIncludes(html, 'id="page-teacher"', '教师视图必须是独立页面');
-    assertIncludes(html, 'id="teacher-key"', '教师视图必须有口令入口');
-    // 教师口令绝不能写死在页面里
-    assertNotIncludes(html, 'TEACHER_KEY=', '口令不能写进 HTML');
-  });
 });
 
-describe('视图隔离 · 教师端点鉴权（三种形态）', () => {
-  const save = { key: process.env.TEACHER_KEY, lock: process.env.DSH_FORCE_TEACHER_LOCK };
-  const restore = () => {
-    if (save.key === undefined) delete process.env.TEACHER_KEY;
-    else process.env.TEACHER_KEY = save.key;
-    if (save.lock === undefined) delete process.env.DSH_FORCE_TEACHER_LOCK;
-    else process.env.DSH_FORCE_TEACHER_LOCK = save.lock;
-  };
-  const req = (key) => ({ headers: key ? { 'x-teacher-key': key } : {} });
-  const url = new URL('http://localhost/api/teacher/overview');
-
-  it('本地未配口令 ⇒ open：不带口令也能进（演示时"点一下直接进"）', () => {
-    process.env.TEACHER_KEY = '';
-    delete process.env.DSH_FORCE_TEACHER_LOCK;
-    assertEquals(teacherMode(), 'open', '本地默认应为开放模式');
-    assert(checkTeacherAuth(req(), url).ok, 'open 模式下不带口令应放行');
-    restore();
-  });
-
-  it('配了口令 ⇒ key：不带口令 401，带对口令放行', () => {
-    process.env.TEACHER_KEY = 'unit-test-key';
-    delete process.env.DSH_FORCE_TEACHER_LOCK;
-    assertEquals(teacherMode(), 'key');
-    const denied = checkTeacherAuth(req(), url);
-    assert(!denied.ok && denied.status === 401, `不带口令应 401，实际 ${JSON.stringify(denied)}`);
-    const wrong = checkTeacherAuth(req('nope'), url);
-    assert(!wrong.ok && wrong.status === 401, '错口令应 401');
-    assert(checkTeacherAuth(req('unit-test-key'), url).ok, '对口令应放行');
-    restore();
-  });
-
-  it('公网形态（强制锁死）⇒ off：即使没配口令也一律 403', () => {
-    process.env.TEACHER_KEY = '';
-    process.env.DSH_FORCE_TEACHER_LOCK = '1';
-    assertEquals(teacherMode(), 'off', '公网部署应锁死教师视图');
-    const denied = checkTeacherAuth(req(), url);
-    assert(!denied.ok && denied.status === 403, `应 403，实际 ${JSON.stringify(denied)}`);
-    assert(
-      String(denied.hint ?? '').includes('TEACHER_KEY'),
-      '拒绝时要说清怎么才能开 —— 否则线上没人知道该配什么',
-    );
-    restore();
-  });
-
-  it('公网形态但配了口令 ⇒ 回到 key 模式（留一条正经的开放路径）', () => {
-    process.env.TEACHER_KEY = 'unit-test-key';
-    process.env.DSH_FORCE_TEACHER_LOCK = '1';
-    assertEquals(teacherMode(), 'key', '配了口令应回到口令模式，而不是继续锁死');
-    assert(checkTeacherAuth(req('unit-test-key'), url).ok);
-    restore();
-  });
-
-  it('公网入口会在没有口令时强制锁死（这条是"部署时忘了配"的唯一防线）', () => {
-    /**
-     * 判定逻辑在 src/server/demo-gate.js，两个入口（Vercel / Cloudflare）共用。
-     * 这里同时钉住"规则本身在"和"两个入口都引用了它"，
-     * 免得以后有人为了省事在某个入口里手写一套 —— 那一定会漂移。
-     */
-    const gate = readFileSync(join(ROOT, 'src/server/demo-gate.js'), 'utf8');
-    assertIncludes(gate, 'DSH_FORCE_TEACHER_LOCK', '公网入口必须显式锁死教师视图');
-    assertIncludes(gate, 'TEACHER_KEY', '锁死逻辑必须给"配了口令"留出口');
-
-    for (const entry of ['api/index.js', 'api/worker.js']) {
-      const source = readFileSync(join(ROOT, entry), 'utf8');
-      assertIncludes(source, 'buildRequestContext', `${entry} 必须复用共享判定`);
-    }
-  });
-});
 
 describe('前端 · 布局不许出现"钉住的面板遮挡内容"', () => {
   /**

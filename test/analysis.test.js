@@ -18,7 +18,6 @@ import { describe, it, assert, assertEquals, assertNotIncludes } from './runner.
 import {
   buildProblemAnalysis,
   toStudentAnalysis,
-  toTeacherAnalysis,
   parseVariable,
   CONDITION_MARKERS,
 } from '../src/core/analysis.js';
@@ -139,22 +138,10 @@ describe('解析 · 知识图谱（防泄题的核心断言）', () => {
     }
   });
 
-  it('教师图谱才有步骤里的概念，并且标出它出现在第几步', () => {
-    const a = buildProblemAnalysis(P1);
-    const concepts = a.knowledgeGraph.teacher.nodes.filter((n) => n.kind === 'concept');
-    assert(concepts.length > 0, '教师图谱应包含步骤概念');
-    assert(
-      concepts.some((c) => c.steps.length > 0),
-      '概念节点必须带上"出现在第几步"',
-    );
-    // 这个具体概念是本题的解法要点，绝不能出现在学生图里
-    const studentNames = a.knowledgeGraph.student.nodes.map((n) => n.name);
-    assert(!studentNames.includes('电源与内阻'), '「电源与内阻」是解法要点，不能在学生图谱里');
-  });
 
   it('图谱的边都指向存在的节点（不会画出悬空的线）', () => {
     const a = buildProblemAnalysis(P1);
-    for (const scope of ['student', 'teacher']) {
+    for (const scope of ['student']) {
       const ids = new Set(a.knowledgeGraph[scope].nodes.map((n) => n.id));
       for (const e of a.knowledgeGraph[scope].edges) {
         assert(ids.has(e.from), `${scope} 图的边 from 指向了不存在的节点：${e.from}`);
@@ -178,20 +165,16 @@ describe('解析 · 知识图谱（防泄题的核心断言）', () => {
   });
 });
 
-describe('解析 · 两个投影的边界', () => {
-  it('会剧透的条件：学生拿到提问，教师拿到完整含义', () => {
+describe('解析 · 学生投影的边界', () => {
+  it('会剧透的条件：学生只拿到提问，拿不到含义', () => {
     const a = buildProblemAnalysis(P1);
     const student = toStudentAnalysis(a, P1);
-    const teacher = toTeacherAnalysis(a);
 
     const s = student.keyConditions.find((c) => c.revealsInsight);
-    const t = teacher.keyConditions.find((c) => c.reveals);
-    assert(s && t, '应有一条会剧透的条件');
+    assert(s, '应有一条会剧透的条件');
 
     assertEquals(s.meaning, null, '学生版不得返回会剧透的含义');
     assert(s.question && s.question.length > 4, '学生版必须给出一句可回答的提问');
-    assert(t.meaning.length > 6, '教师版必须保留完整含义，否则教研无法核对');
-    assertNotIncludes(JSON.stringify(student), t.meaning, '教师含义不得出现在学生载荷里');
   });
 
   it('不剧透的条件：学生直接看到含义', () => {

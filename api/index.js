@@ -44,7 +44,6 @@ export default async function handler(req, res) {
    * 这一行同时决定了三件事：
    *   · 真模型 / 离线桩（见 demo-gate 的 PUBLIC_DEMO_FORCE_OFFLINE 与口令门）
    *   · 拍照识题开不开（OCR 按次计费，默认摘掉凭据）
-   *   · 教师视图锁不锁（公网默认锁死，配了 TEACHER_KEY 才开）
    */
   const { gateState, env } = buildRequestContext({
     headers: req.headers,

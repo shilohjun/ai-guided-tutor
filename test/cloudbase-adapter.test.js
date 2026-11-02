@@ -41,11 +41,10 @@ describe('CloudBase 适配层 · 基本形状', () => {
     assertIncludes(res.headers['content-type'] ?? '', 'application/json', '响应应是 JSON');
   });
 
-  it('默认形态（无凭据）→ 离线桩 + 教师视图锁死', async () => {
+  it('默认形态（无凭据）→ 离线桩', async () => {
     const res = await call(get('/api/health'));
     assertEquals(res.json.demoGate, 'off', '没配口令门时应报 off');
     assertEquals(res.json.engine, 'offline-stub', '没凭据必须走离线桩');
-    assertEquals(res.json.teacherView, 'off', '公网必须锁死教师视图');
     assertEquals(res.json.ocr.configured, false, '没凭据时 OCR 必须关闭');
   });
 
@@ -115,7 +114,6 @@ describe('CloudBase 适配层 · 与另外两端同一份判定', () => {
     assertEquals(res.json.engine, 'llm', '显式放行后应走真模型');
     assertEquals(res.json.model, 'test-model', '模型名应透出');
     assertEquals(res.json.ocr.configured, true, '显式放行后 OCR 应可用');
-    assertEquals(res.json.teacherView, 'off', '口令门不放行教师视图');
   });
 
   it('配了口令门但没带 → 回到离线桩', async () => {
