@@ -17,10 +17,10 @@
 仓库地址：<https://github.com/shilohjun/ai-guided-tutor>
 
 <p align="center">
-  <img src="docs/screenshots/01-start.png" width="49%" alt="题目录入：粘贴题干或从题库选题" />
-  <img src="docs/screenshots/02-demo.png" width="49%" alt="对话研讨：步骤进度与提示" />
+  <img src="docs/screenshots/01-start.png" width="49%" alt="页一 · 自己贴题干，或从题库挑一道" />
+  <img src="docs/screenshots/02-solving.png" width="49%" alt="页三 · 解题对话：左边题目，右边只给提示" />
   <br />
-  <img src="docs/screenshots/03-report.png" width="49%" alt="学习报告" />
+  <img src="docs/screenshots/03-report.png" width="49%" alt="页四 · 学习报告：掌握 / 待巩固 / 薄弱三档" />
 </p>
 
 ---

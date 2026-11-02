@@ -2114,7 +2114,11 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
 
     $('#durNum').textContent = String(durationMinutes());
     $('#mCount').textContent = String(S.ledger.length || 1);
-    $('#mAcc').textContent = rep ? String(acc) : '—';
+    // 自主训练里 AI 不出题、不收答案，ledger 为空是常态：
+    // 这时候写 0% 会被读成"全错"，所以只在真有可判定作答时才给数字
+    $('#mAcc').textContent = (rep && expected) ? String(acc) : '—';
+    var accUnit = $('#mAcc').parentNode.querySelector('em');
+    if (accUnit) accUnit.hidden = !(rep && expected);
     $('#rcTag').textContent = S.problem
       ? (S.problem.subject === 'physics' ? '物理' : '') + ' · ' + ((S.problem.topics || [])[0] || '')
       : '—';

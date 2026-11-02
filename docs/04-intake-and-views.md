@@ -285,8 +285,8 @@ npm start                       # 打开 http://127.0.0.1:5173
 - **模式可点性**：第 2 页哪些模式可点由 `/api/health` 的 `capabilities.modes` 决定，
   不在清单里的必须禁用并标「暂未更新」（见 §2.3）；服务端对未上线模式返回 400。
 
-> `test/ui.test.js` 里还有几条旧契约（`app.js` + `classic.html` 那一代的选择器与
-> DOM 断言）随旧视图一起待迁移，不计入新五页的验收。
+> 旧的 `app.js` + `classic.html` 那一代契约已经整批迁移完：`test/ui.test.js` 现在直接读
+> `public/index.html` 及其内联脚本做断言，不再依赖任何外部 app.js（311 个用例全绿）。
 
 ---
 
@@ -529,7 +529,8 @@ ALIYUN_OCR_APPCODE=你的_appcode
 服务端同样不留后门：传 `mode: "ai_companion"` 会得到 400 `MODE_UNAVAILABLE`。
 
 「当前模式」仍是**单一状态**：页二的长条与页三顶栏的开关读的是同一个 `S.mode`。
-`test/ui.test.js` 里旧的模式选择器断言仍守着这条，随选择器改名待迁移。
+`test/ui.test.js` 的「五页流程契约」守着这条：页二长条与页三顶栏读同一个 `S.mode`，
+且 `S.mode` 只能是 `'self'`（AI 伴学没上线）。
 
 ### 6.5 页三：解题工作台
 
