@@ -641,12 +641,11 @@ body.resizing *{cursor:col-resize !important}
 .msg:last-child{margin-bottom:4px}
 @keyframes msgIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 .msg .av{
-  width:32px;height:32px;border-radius:var(--r-inner);flex:none;
+  width:32px;height:32px;flex:none;
   display:grid;place-items:center;
-  background:var(--brand);color:#fff;
   margin-top:2px;
 }
-.msg .av svg{width:16px;height:16px}
+.msg .av img{width:26px;height:26px;display:block}
 .bubble{
   max-width:min(84%,460px);
   padding:8px 16px;border-radius:var(--r-sub);
@@ -1247,7 +1246,7 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var SVG_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l4.5 4.5L20 7"/></svg>';
-  var SVG_MARK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M15.5 8.5l-2.3 5.2-4.7 1.8 2.3-5.2z"></path></svg>';
+  var AVATAR = '<img src="/brand.png" alt="" width="26" height="26">';
 
   var PAGES = ['题目', '方式', '解题', '报告', '巩固'];
 
@@ -1814,7 +1813,7 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
       return '<div class="msg err" data-i="' + i + '"><div class="bubble">' +
         '<p>' + esc(m.text) + '</p></div></div>';
     }
-    var av = m.role === 'ai' ? '<span class="av">' + SVG_MARK + '</span>' : '';
+    var av = m.role === 'ai' ? '<span class="av">' + AVATAR + '</span>' : '';
     var next = m.next ? '<div class="next-ask">' + esc(m.next) + '</div>' : '';
     return '<div class="msg ' + (m.role === 'ai' ? 'ai' : 'me') + '" data-i="' + i + '">' + av +
       '<div class="bubble">' + paraHtml(m.text) + next + '</div></div>';
@@ -1838,7 +1837,7 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
       html = S.turns.map(msgHtml).join('');
     }
     if (S.busy) {
-      html += '<div class="msg ai"><span class="av">' + SVG_MARK + '</span>' +
+      html += '<div class="msg ai"><span class="av">' + AVATAR + '</span>' +
         '<div class="bubble dots"><i></i><i></i><i></i></div></div>';
     }
     if (S.done) {
