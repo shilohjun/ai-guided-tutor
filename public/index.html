@@ -924,10 +924,6 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
   .tag.muted{background:var(--surface-2);color:var(--ink-3);border-color:var(--line)}
   /* 空态：五页都能点到，没数据时在这里说清楚下一步做什么 */
   .pane-empty{padding:32px 24px;text-align:center;color:var(--ink-3);font-size:var(--fs-body);line-height:1.9}
-  .bar-row.static{cursor:default}
-  .bar-row.static:hover .bar-title{color:inherit}
-  .weak-list{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px}
-  .weak-list .k-chip.bad{background:var(--coral-tint);color:var(--coral);border-color:var(--coral-line)}
 </style>
 </head>
 <body data-page="1">
@@ -1237,21 +1233,6 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
           </button>
           <ul class="drop-list scroller" id="dropList"></ul>
         </div>
-
-        <div class="bar-card" id="weakCard">
-          <div class="bar-row static">
-            <span class="bar-ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 3.5l9 16H3z"></path><path d="M12 10.5v3.5"></path><path d="M12 17.2h.01"></path>
-              </svg>
-            </span>
-            <span class="bar-copy">
-              <span class="bar-title">薄弱点清单</span>
-              <span class="bar-desc">这次卡住过的知识点，按"要不要回头补"排序</span>
-            </span>
-          </div>
-          <div class="weak-list" id="weakList"></div>
-        </div>
       </div>
 
       <div class="p5-foot">
@@ -1390,7 +1371,7 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
       if (S.sessionId) loadReport();
       else { S.report = null; S.reportErr = '还没有开始做题。先在第 1 页选题，到第 3 页对话，报告会自动生成。'; renderReport(); }
     }
-    if (n === 5) { loadRelated(); renderP5Note(); renderWeak(); }
+    if (n === 5) { loadRelated(); renderP5Note(); }
   }
 
   document.addEventListener('click', function (e) {
@@ -2250,20 +2231,6 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
     }).join('');
     var cur = S.related[S.relatedIdx];
     $('#dropCur').textContent = (cur.topics || []).slice(0, 2).join(' · ') + ' — ' + (cur.stemPreview || '');
-  }
-
-  /** 巩固页第三卡：这次卡住过的知识点，按"要不要回头补"排序 */
-  function renderWeak() {
-    var box = $('#weakList');
-    if (!box) return;
-    if (!S.problem) { box.innerHTML = '<span class="k-chip muted">还没有题目</span>'; return; }
-    var buckets = levelBuckets(S.report || {});
-    var list = buckets.bad.concat(buckets.warn);
-    box.innerHTML = list.length
-      ? list.slice(0, 6).map(function (t) {
-          return '<span class="k-chip bad" title="这次卡在这里">' + esc(t) + '</span>';
-        }).join('')
-      : '<span class="k-chip muted">这次没有卡住的知识点 —— 直接做一道同类题就行</span>';
   }
 
   function renderP5Note() {

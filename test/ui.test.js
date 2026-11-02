@@ -191,7 +191,6 @@ describe('前端 · 五页流程契约（新版单文件）', () => {
     assertIncludes(appJs, '还没有题目', '空态要写清"现在没有题"');
     assertIncludes(appJs, '还没有开始做题', '第 4 页空态要写清先去哪一步');
     assertIncludes(appJs, '题库里没有同知识点的其他题目', '第 5 页同类题为空时也要说清楚');
-    assertIncludes(appJs, 'renderWeak()', '薄弱点清单要能被渲染（哪怕是空态）');
   });
 
   it('第 3 页左侧显示"做到第几步"，且只翻译走过的步骤（防泄题）', () => {
@@ -202,13 +201,19 @@ describe('前端 · 五页流程契约（新版单文件）', () => {
     assertIncludes(router, 'safeStepRef', '步骤只允许翻译已经走过的，防提前泄题');
   });
 
-  it('第 5 页是三张卡：重做 / 同类题 / 薄弱点清单', () => {
-    for (const id of ['redoBtn', 'startRelated', 'weakCard', 'weakList']) {
+  it('第 5 页是两张卡：重做 / 同类题', () => {
+    for (const id of ['redoBtn', 'startRelated']) {
       assertIncludes(html, 'id="' + id + '"', '第 5 页缺少 ' + id);
     }
     assertIncludes(html, '重做这道题', '缺少"重做"卡');
     assertIncludes(html, '同类题再练', '缺少"同类题"卡');
-    assertIncludes(html, '薄弱点清单', '缺少"薄弱点清单"卡');
+
+    const seg = html.slice(
+      html.indexOf('<section class="page" data-page="5"'),
+      html.indexOf('<section class="page" data-page="5"') + 4000
+    );
+    const cards = (seg.match(/class="bar-card"/g) || []).length;
+    assert(cards === 2, '第 5 页只保留两张卡，实际 ' + cards + ' 张');
   });
 
   it('同类题由服务端给，不是前端拿题库凑', () => {
