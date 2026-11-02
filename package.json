@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "步步解 —— 面向中学生重难题的 AI 引导解题助手：看懂学生思路，只给提示不给答案；另有现场演示模式",
+  "description": "步步解 —— 面向中学生重难题的 AI 引导解题助手：看懂学生思路，只给提示不给答案",
   "engines": {
     "node": ">=20"
   },
@@ -14,10 +14,15 @@
     "eval": "node scripts/eval.js",
     "eval:llm": "node scripts/eval.js --adapter llm",
     "ocr:path": "node scripts/ocr-path-probe.js",
-    "all": "node test/run.js && node scripts/eval.js",
     "test:reply-policy": "node --test test/reply-policy.test.mjs",
     "prompts:export": "node scripts/export-prompts.js",
-    "prompts:check": "node scripts/export-prompts.js --check"
+    "prompts:check": "node scripts/export-prompts.js --check",
+    "ui:audit": "node scripts/audit-ui-style.js",
+    "ui:shots": "node scripts/shoot-ui.cjs",
+    "preview:capture": "node scripts/capture-demo.cjs",
+    "preview:build": "node scripts/build-preview.cjs",
+    "preview:verify": "node scripts/verify-preview.cjs",
+    "all": "node test/run.js && node scripts/eval.js"
   },
   "keywords": [
     "education",

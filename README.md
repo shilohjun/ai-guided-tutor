@@ -170,6 +170,33 @@ npm start
 
 然后打开 <http://127.0.0.1:5173>。
 
+### 填 Key
+
+复制 `.env.example` 为 `.env`，把需要的项填上（改完重启 `npm start` 生效）：
+
+```bash
+cp .env.example .env
+```
+
+`.env` 已在 `.gitignore` 里，不会被提交。
+
+两个入口：
+
+| 路径 | 内容 |
+|---|---|
+| `/` | 新版五页界面（`public/index.html`），已接真实接口 |
+| `/classic.html` | 上一版界面，功能等价，样式旧 |
+
+新版五页与接口的对应关系：
+
+| 页面 | 接口 | 说明 |
+|---|---|---|
+| ① 题目输入 | `GET /api/problems`、`POST /api/problem/import`、`POST /api/ocr` | 题库与预览来自注册表；粘贴文字走读题；拍照识别未配凭据时按钮变灰并说明原因 |
+| ② 模式选择 | — | `AI 伴学` / `自主训练` 映射为 `ai_companion` / `self_training` |
+| ③ 解题对话 | `GET /api/problem`、`POST /api/chat` | 题干、已知、所求、图示说明来自学生版题目；每轮回复、步骤进度、已完成步骤名都来自引擎 |
+| ④ 学习报告 | `GET /api/report` | 卡点、错因、知识点三档、建议全部来自报告；会话过期时给出明确提示而不是空白 |
+| ⑤ 迁移练习 | `GET /api/problems` | 「举一反三」按共享知识点筛题，选中即开新会话 |
+
 没有配置模型 Key 也能完整跑通——引擎会自动降级到**离线规则桩**，
 页面、测试、评测全部可用，只是提示文案来自规则而不是模型。
 
@@ -201,16 +228,18 @@ LLM_MODEL=deepseek-chat
 
 ### 拍照识题
 
-拍照识题需要阿里云 OCR 云市场服务的 **AppCode**（不是 AppKey/AppSecret）：
+需要 **AppCode**（是 AppCode，不是 AppKey / AppSecret），改完 `.env` 重启：
 
 ```env
 ALIYUN_OCR_APPCODE=你的AppCode
 ALIYUN_OCR_PROVIDER=marketplace
 ```
 
-图片识别**按成功调用次数计费**，且没有“额度用完自动停”的保护。
-OCR 只识别题干文字，**不会自动理解受力图、电路图或几何图**；
-流程刻意做成「识别 → 回填输入框 → 学生确认 → 再读题」，避免识别错误悄悄带偏整条链路。
+计费按**成功调用次数**（题目识别约 0.083 元/次），且没有“额度用完自动停”的保护。
+没配凭据时，首页相机图标变灰、`title` 写明缺哪个变量。
+
+图片识别**按次计费**，所以流程刻意做成「识别 → 回填输入框 → 学生确认 → 再读题」，
+避免识别错误悄悄带偏整条链路。
 
 ---
 
@@ -224,7 +253,35 @@ npm run eval       # 离线评测（19 场景，无需 Key）
 npm run eval:llm   # 使用 .env 中配置的模型重跑评测
 npm run ocr:path   # 探测 OCR 链路连通性
 npm run all        # 测试 + 离线评测
+
+npm run ui:audit      # 样式规范审计（字号/字重/间距/嵌套圆角/饱和度）
+npm run ui:shots      # 5 页 + 深色截图，输出到 preview/
+
+npm run preview:build   # 打包单文件离线预览版 → preview/preview.html
+npm run preview:verify  # 用 file:// 打开预览版跑一遍链路验收
+npm run preview:capture # 重新抓取演示数据（需先 npm start）
 ```
+
+---
+
+## 分享预览版
+
+`preview/preview.html` 是**单文件、零依赖**的演示版：发给别人后双击就能看，
+不需要 `npm start`，也不需要联网。
+
+```bash
+npm start                 # 先起服务，供抓取真实返回
+npm run preview:capture   # 抓一份真实会话 → scripts/demo-data.json
+npm run preview:build     # 内联数据 + 拦截 fetch → preview/preview.html
+npm run preview:verify    # file:// 打开验收
+```
+
+- 业务代码与线上是同一份（`public/index.html`），预览版只在主脚本前加了一层
+  `fetch` 拦截，把 `/api/*` 用内置数据就地应答 —— 所以不会出现"演示能点、线上不能点"。
+- 支持深链：`preview.html?p=3` 直达解题页；`preview.html?p=3&auto=1` 自动把 5 轮对话
+  演完并跳到报告页（适合投屏或录屏）。
+- 演示数据来自真实服务（`engine=offline-stub`）：5 轮对话、报告卡点、题库列表都是
+  抓下来的原始返回，不是手写文案。接入真模型后重跑上面三步即可换成真实 AI 输出。
 
 ---
 
@@ -236,7 +293,6 @@ npm test
 
 当前注册 **312 个用例**；**305 通过，7 条旧页面契约待迁移**：
 
-- 2 条 OCR 路由契约（旧页面入口位置）；
 - 3 条 DOM 契约（仍按旧 `app.js` 检查）；
 - 2 条模式卡同步契约（v3 已改为单一模式选择器）。
 

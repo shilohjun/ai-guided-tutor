@@ -358,7 +358,7 @@ interface Diagnosis {
 | `message` | 学生可见的完整文本（复述 + 提示 + 下一步）。**唯一应该渲染给学生看的字段。** |
 | `hint.text` | 仅提示部分，不含复述。用于 UI 分行着色 |
 | `hint.levelNote` | 层级的人话版本（"我在问你一个前提"）。给学生的不是 `L1 条件追问` 这种教研语言 |
-| `progress` | `{ stepIndex, stepCount, confidenceLabel }` —— 只给"第几步 / 共几步 / 把握粗档" |
+| `progress` | `{ stepIndex, stepCount, completed, stepLabels, confidenceLabel }`。`stepIndex` 是当前定位，`completed` 是推断出的"已走过"步号，`stepLabels` 只给**已走过**步骤的名字（走 `safeStepRef`，推导/结论类退化为"第 N 步（推导）"），未走到的步骤一律只有编号；`confidenceLabel` 只给"高/中/低"粗档 |
 | `enginePath` | 引擎判断链路的**学生版投影**（见 §4.6） |
 | `understood` | 学生已经想对的地方（正面反馈，报告与鼓励都从这里出） |
 | `refusal` | 非空表示本轮走的是"拒绝给答案"路径，`count` 是累计次数（话术递进） |
