@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title>步步解 · 引导解题工作台</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>">
+<link rel="icon" type="image/png" href="/brand.png">
 <script>
 /* 上色放在样式之前，避免首屏闪白 */
 (function(){
@@ -164,11 +164,10 @@ img{display:block;max-width:100%}
 .brand{display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:var(--r-inner);transition:background .18s}
 .brand:hover{background:var(--surface-2)}
 .brand-mark{
-  width:32px;height:32px;border-radius:var(--r-inner);flex:none;
-  background:var(--brand);
-  display:grid;place-items:center;color:#fff;
+  width:30px;height:30px;flex:none;
+  display:grid;place-items:center;
 }
-.brand-mark svg{width:16px;height:16px}
+.brand-mark img{width:30px;height:30px;display:block}
 .brand-name{font-weight:700;font-size:var(--fs-lead);letter-spacing:.02em}
 .brand-sub{font-size:var(--fs-meta);color:var(--ink-3);font-weight:400}
 
@@ -219,8 +218,8 @@ img{display:block;max-width:100%}
 /* 页面三：紧凑顶栏 */
 body[data-page="3"]{--topbar:46px}
 body[data-page="3"] .topbar{padding:0 16px;gap:8px}
-body[data-page="3"] .brand-mark{width:24px;height:24px}
-body[data-page="3"] .brand-mark svg{width:14px;height:14px}
+body[data-page="3"] .brand-mark{width:26px;height:26px}
+body[data-page="3"] .brand-mark img{width:26px;height:26px}
 body[data-page="3"] .brand-name{font-size:var(--fs-body)}
 body[data-page="3"] .brand{padding:2px 4px}
 body[data-page="3"] .brand-sub{display:none}
@@ -324,11 +323,10 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
   padding:24px 0;
 }
 .hero-mark{
-  width:40px;height:40px;flex:none;border-radius:var(--r-inner);
-  background:var(--brand);
-  display:grid;place-items:center;color:#fff;
+  width:40px;height:40px;flex:none;
+  display:grid;place-items:center;
 }
-.hero-mark svg{width:20px;height:20px}
+.hero-mark img{width:40px;height:40px;display:block}
 .hero-text{min-width:0}
 .p1-hero h1{font-size:var(--fs-sub);font-weight:700;line-height:var(--lh-sub);letter-spacing:0}
 .p1-hero h1 span{color:var(--brand)}
@@ -934,9 +932,7 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
   <div class="tb-left">
     <button class="brand" id="homeBtn" type="button" title="回到首页">
       <span class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="9"></circle><path d="M15.5 8.5l-2.3 5.2-4.7 1.8 2.3-5.2z"></path>
-        </svg>
+        <img src="/brand.png" alt="" width="32" height="32">
       </span>
       <span class="brand-name">步步解</span>
       <span class="brand-sub">引导解题</span>
@@ -963,9 +959,7 @@ html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
     <div class="p1">
       <div class="p1-hero">
         <div class="hero-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="9"></circle><path d="M15.5 8.5l-2.3 5.2-4.7 1.8 2.3-5.2z"></path>
-          </svg>
+          <img src="/brand.png" alt="" width="40" height="40">
         </div>
         <div class="hero-text">
           <h1>你好，把<span>卡住的题</span>发给我</h1>

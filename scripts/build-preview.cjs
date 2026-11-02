@@ -216,6 +216,13 @@ html = html.replace(
   '<title>步步解 · 引导解题工作台（演示预览）</title>'
 );
 
+// 单文件预览打不开相对路径：品牌图标内联成 data URI
+const brandPath = path.join(ROOT, 'public', 'brand.png');
+if (fs.existsSync(brandPath)) {
+  const brandUri = 'data:image/png;base64,' + fs.readFileSync(brandPath).toString('base64');
+  html = html.split('/brand.png').join(brandUri);
+}
+
 fs.mkdirSync(OUT_DIR, { recursive: true });
 fs.writeFileSync(OUT, html, 'utf8');
 
