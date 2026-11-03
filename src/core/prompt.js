@@ -229,8 +229,8 @@ export function composeConfirmation({ verdict, problem }) {
 
 /** 确认轮的"接着做什么"—— 不催促，只给一个抓手 */
 export function confirmationNextAsk(verdict) {
-  if (verdict.complete) return '把这道题的思路用一句话总结给自己听，然后看学习报告。';
-  return '先挑一个你最有把握的待求量算出来，告诉我结果。';
+  if (verdict.complete) return '这道题最关键的一步，你会怎么用自己的话讲一遍？';
+  return '剩下的待求量里，你打算先处理哪一个？';
 }
 
 /**

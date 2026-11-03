@@ -294,20 +294,22 @@ describe('引擎 · 教学质量护栏（两次真实事故的固化）', () => 
     }
   });
 
-  it('L3 示范动作必须匹配当前步骤类型（不能让学生去列受力）', async () => {
+  it('L3 解释必须匹配当前步骤，且不追加动作指令', async () => {
     const engine = createEngine({ adapter: createOfflineAdapter(), problem: P1 });
     const history = [];
     let l3Text = '';
+    const firstUtterance = '我用欧姆定律算电流，电流我直接用 I=E/R 算就行了，电阻只有R';
     for (let i = 0; i < 4; i += 1) {
+      const utterance = i === 0 ? firstUtterance : '还是不会';
       const res = await engine.handleTurn({
         problemId: P1.id,
-        utterance: i === 0 ? '我用欧姆定律算电流，电流我直接用 I=E/R 算就行了，电阻只有R' : '还是不会',
+        utterance,
         history,
         mode: 'ai_companion',
         explicitHelpSeeking: true,
       });
       if (res.hint.level === 3) l3Text = res.hint.text;
-      history.push({ role: 'student', text: '还是不会', at: '' });
+      history.push({ role: 'student', text: utterance, at: '' });
       history.push({
         role: 'ai',
         text: res.hint.text,
@@ -317,12 +319,13 @@ describe('引擎 · 教学质量护栏（两次真实事故的固化）', () => 
         metaGraphId: res.diagnosis.position.graphId,
       });
     }
-    assert(l3Text, '应能到达 L3 以检查示范内容');
-    // 本题第 4 步是 apply（套用公式），示范动作应是"写关系式左边"，而非"列受力"
-    assertNotIncludes(l3Text, '按方向列出', 'L3 示范与步骤类型不匹配');
+    assert(l3Text, '应能到达 L3 以检查解释内容');
+    // 新规范：解释当前这一步，允许说到关键关系，但不再追加"你去找/你试着"这类动作。
+    assertNotIncludes(l3Text, '你去找', '新规范不允许追加动作指令');
+    assertNotIncludes(l3Text, '你试着', '新规范不允许追加动作指令');
     assert(
-      /关系式|左边|左边留空|给定|量列/.test(l3Text),
-      `L3 示范应针对"套用公式"这一步，实际：${l3Text}`,
+      /总电阻|外电阻|导体棒自身|闭合电路欧姆定律/.test(l3Text),
+      `L3 解释应针对"算电流"这一步，实际：${l3Text}`,
     );
   });
 

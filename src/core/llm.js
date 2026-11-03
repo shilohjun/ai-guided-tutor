@@ -12,6 +12,8 @@
  */
 
 import { canonicalize, clip, containsAny, matchAll, matchSignatures, normalize } from './text.js';
+import { personaPromptBlock } from './personas.js';
+import { composeSkillDraft } from './skill-dialog.js';
 
 // ---------------------------------------------------------------------------
 // 观测提示词（Prompt 规范的可执行版本，见 docs/02-prompt-spec.md）
@@ -48,6 +50,13 @@ export const OBSERVE_SYSTEM_PROMPT = `你是物理教研助手的"思路听写�
   "probeQuestion": "信息不足时你想向学生追问的那一个问题；信息充足则 null",
   "restatement": "仅内部记录学生已表达的内容，可为空，不强制评价或复述前缀"
 }
+
+【candidateStepIndex 的定位口径 —— 不要因为学生提到后面的量就跳到后面】
+学生说出某个量（如"功率"）只说明他在关注这个量，不代表他已经完成前面的步骤。
+如果题目要求依次求多个量，而学生只提到后面的量、没有前面步骤的完成证据：
+  · candidateStepIndex 取**最早未完成的那一步**，而不是他提到的量所在的那一步；
+  · 例如题目依次求电动势、电流、外力、功率，学生只说"是电功率"时，定位到电动势那一步，不要定位到功率。
+只有学生明确写出了前面步骤的式子或结果，才可以把位置放在更后面的步骤。
 
 【sufficientInfo 怎么判 —— 宁可说"不足"，不要硬猜】
 只有在学生**真的说出了可诊断的内容**时才填 true，例如：
@@ -111,7 +120,9 @@ ${historyText}
 【学生本轮的原话】
 ${utterance}
 
-请输出 JSON 观察结果。不自行计算或补全公式；学生已经说出的数值与公式可作为未核实陈述记录。有历史语境的简短追问应结合历史判断，不抹去原定位。restatement仅供内部诊断，不要求输出给学生。`;
+请输出 JSON 观察结果。不自行计算或补全公式；学生已经说出的数值与公式可作为未核实陈述记录。有历史语境的简短追问应结合历史判断，不抹去原定位。restatement仅供内部诊断，不要求输出给学生。
+
+【定位提醒】学生只提到后面的量（例如"是电功率"），不等于他已经完成前面的步骤。没有前面步骤的式子或结果作为证据时，candidateStepIndex 取最早未完成的那一步，不要取他提到的量所在的那一步。`;
 }
 
 /** draft 阶段的系统提示：把"只给提示"写成硬约束 + 反例 + 说话方式 */
@@ -143,21 +154,37 @@ L2仍说“匀速对应什么条件”：没有新增信息。
 
 export function buildDraftUserPrompt({ problem, diagnosis, level, allowedConcepts, forbidden, strategy, history = [], utterance = '' }) {
   const step = findStep(problem, diagnosis.position);
+  const graph = problem.solutionGraphs.find((g) => g.id === diagnosis.position.graphId) ?? problem.solutionGraphs[0];
+  const graphSteps = graph?.steps ?? [];
   const recent = history.slice(-10).map(t => `${t.role}: ${t.text}`).join('\n');
   return `【题目】${problem.stem}
 
 【学生当前状态（内部信息，不要复述给学生）】
-- 已定位到：${step ? `路径「${diagnosis.position.graphId}」第 ${step.index} 步 —— ${step.title}` : '尚未定位到具体步骤'}
+- 学生提到的位置：${step ? `路径「${diagnosis.position.graphId}」第 ${step.index} 步 —— ${step.title}` : '尚未定位到具体步骤'}
+- 这个位置只代表"学生提到了这个量"，不代表他已经完成前面的步骤。
+- 教学上从哪里开始：如果学生没有给出前面步骤的完成证据，从第 1 步开始，不要从第 ${step?.index ?? '?'} 步开始。
 - 定位置信度：${diagnosis.position.confidence.toFixed(2)}
 - 卡点性质：${diagnosis.stuckKind}
 - 判定错因：${diagnosis.misconceptions.map((m) => m.label).join('；') || '（无明确错因，属于尚未想到）'}
 - 学生不确定处：${diagnosis.evidenceQuotes.map((q) => clip(q, 60)).join(' / ') || '（无）'}
 
-【本轮指定层级】L${level}
-【本轮策略】${strategy}
+【本轮层级（只决定信息量，不决定是否追加任务）】L${level}
+【旧策略提示（只作背景；与下面的最新规范冲突时，以最新规范为准）】${strategy}
+【本题路径顺序（内部信息，不要复述步骤标题或编号）】
+${graphSteps.map((s) => `${s.index}. [${s.kind}] ${(s.concepts ?? []).join('、') || '（无概念）'}`).join('\n')}
+【最新对话规范（本轮必须遵守）】
+- 物理题有依赖顺序，不能让学生任意选一个量入手，也不要问"你想先做哪一个"。
+- 学生提到的量如果在当前步骤之后，先说明它依赖前面的哪一步，再把他带回最早未完成的步骤。
+- 学生没有给出前面步骤的完成证据时，不要跳到后面的量；从最早未完成的那一步开始。
+- 学生刚说完，先判断他是在回答、在问、还是在写；先接住，不要因为"没显式求助"就沉默。
+- 学生给出答案或式子：先核验；对了就具体肯定，错了只指出或追问一个具体位置。
+- 学生说"不会/没思路"：给当前一步的核心规律，或公式的物理意义；给完就停。
+- 学生说"我先算/我试试"：不打断，一句"好，你先写"即可。
+- 不追加"你去找/你试着/你去算/把…列出来"这类动作；nextAsk 只用于探进度或澄清，不需要就填 null。
+- 长度：方向 60–70 字；公式解释 120–150 字；局部示范不超过 250 字。
 【可以引用的概念白名单】${allowedConcepts.join('、') || '（无，请只做澄清）'}
 【必须回避的内容】${forbidden.join('；') || '（无）'}
-【该步的知识位置提示】这一步的"动作类型"是 ${step?.kind ?? 'unknown'}，涉及概念：${step?.concepts.join('、') ?? '无'}
+【该步的知识位置提示（仅当学生已完成前面步骤时才使用）】这一步的"动作类型"是 ${step?.kind ?? 'unknown'}，涉及概念：${step?.concepts.join('、') ?? '无'}
 
 【此前已给出的提示与学生反馈，必须避免重复并增加实质信息】
 ${recent || '（无）'}
@@ -460,9 +487,11 @@ export function createOpenAIAdapter(config = readLLMConfig()) {
     },
 
     async draftHint(input) {
-      const { content: raw, finishReason } = await chat(DRAFT_SYSTEM_PROMPT, buildDraftUserPrompt(input), {
-        temperature: 0.3,
-      });
+      const { content: raw, finishReason } = await chat(
+        `${DRAFT_SYSTEM_PROMPT}\n\n${personaPromptBlock(input?.persona)}`,
+        buildDraftUserPrompt(input),
+        { temperature: 0.3 },
+      );
       if (finishReason === 'length') throw truncatedError('draft 阶段', raw);
       const parsed = extractJson(raw);
       if (!parsed) {
@@ -706,187 +735,17 @@ export function createOfflineAdapter() {
      *
      * 返回形状必须与真模型一致：**JSON 字符串**。
      */
-    async draftHint({ problem, diagnosis, level, allowedConcepts, history = [], l3Count = 0 }) {
+    async draftHint({ problem, diagnosis, level, allowedConcepts, history = [], utterance = '' }) {
       const step = findStep(problem, diagnosis.position);
-      const graph = problem.solutionGraphs.find((g) => g.id === diagnosis.position.graphId);
-      const concept = allowedConcepts[0] ?? step?.concepts[0] ?? '这一步';
-      const seedMis = problem.misconceptions.find((m) =>
-        diagnosis.misconceptions.some((x) => x.id === m.id),
-      );
-      const seeds = seedMis?.hintSeeds ?? [];
-      /** 该步涉及、但当前未被点名的量：方向提示的天然素材 */
-      const openConcepts = (step?.concepts ?? []).filter((c) => c !== concept);
-      const preconditions = graph?.preconditions ?? [];
-
-      // 变量选择：以"该步骤上已给出的 AI 轮次"为轮换依据
-      const priorAiTurns = history.filter((t) => t.role === 'ai').length;
-      const stepTurns = history.filter(
-        (t) => t.role === 'ai' && t.metaStep === diagnosis.position.stepIndex,
-      ).length;
-      const rotate = (arr, idx) => arr[(idx + arr.length) % arr.length];
-
-      let payload;
-      if (level === 0) {
-        payload = rotate(
-          [
-            {
-              text: '先不用急着算。你能用一句话说说：这道题给了哪些条件？说完我们再定方向。',
-              nextAsk: '把题干里的已知条件用自己的话列一遍。',
-              concepts: [],
-            },
-            {
-              text: '我们先把问题说清楚：这道题最后要你求的是哪个量？',
-              nextAsk: '用一句话说明这道题要求什么。',
-              concepts: [],
-            },
-            {
-              text: '你先说说，这道题让你觉得眼熟的地方是什么？',
-              nextAsk: '指出题目里让你想起某个学过内容的地方。',
-              concepts: [],
-            },
-          ],
-          stepTurns,
-        );
-      } else if (level === 1) {
-        const variants = [
-          {
-            text: seeds[0] ?? '你打算用的这个规律，它成立需要满足什么前提？',
-            nextAsk: '只检查前提，先别往下算 —— 说出一条你认为最可能不满足的条件。',
-            concepts: allowedConcepts.slice(0, 2),
-          },
-          {
-            text:
-              seeds[1] ??
-              (preconditions.length
-                ? `这一步用的关系要成立，前提里有一条是「${preconditions[0]}」。题目给的条件满足它吗？`
-                : '题干里的条件你都用上了吗？有没有哪一条看起来"用不上"，其实正是某个规律的前提？'),
-            nextAsk: '把题干条件逐条列出来，标出哪一条还没用上。',
-            concepts: allowedConcepts.slice(0, 2),
-          },
-          {
-            text: `先别写式子。你打算用的这个规律，在你面前的这个情境里成立吗？`,
-            nextAsk: '先说"成立"或"不成立"，再说一句理由。',
-            concepts: allowedConcepts.slice(0, 2),
-          },
-        ];
-        payload = rotate(variants, priorAiTurns);
-      } else if (level === 2) {
-        /**
-         * 方向提示：只指出"该关注哪两个量之间的关系"，绝不给出关系式。
-         *
-         * 两个变体的分工：
-         *   变体1 顺着学生当前的规律往下指（他快通了，只差一个连接）
-         *   变体2 提示"换个工具"（他当前这条路走不通了）
-         * 用 step.kind 决定优先给哪个 —— 停在 precondition/identify 这类
-         * "选择工具"的步骤上时，换工具的提示更有用。
-         */
-        const other = openConcepts[0] ?? '题目里的另一个条件';
-        const switchToolVariant = {
-          text: `换个角度：你现在这条路上的未知量，靠已经选的那个规律能全部定下来吗？如果定不下来，缺的就不是算术，而是另一个能建立新关系的工具。`,
-          nextAsk: '数一数你现在有几个未知量、几个方程，把这两个数说出来。',
-          concepts: allowedConcepts.slice(0, 3),
-        };
-        const connectVariant = {
-          text: `方向给你一点：这一步的关键不在${concept}本身，而在它和「${other}」之间是怎么互相影响的。先把这条影响链说清楚，不要急着代公式。`,
-          nextAsk: `用一句话说出「${concept}」与「${other}」之间的联系。`,
-          concepts: allowedConcepts.slice(0, 3),
-        };
-        const considerVariant = {
-          text: `换个角度：你把「${other}」也一起考虑进来了吗？这一步卡住，往往是因为只盯着${concept}，忽略了它对${other}的影响。`,
-          nextAsk: `说明「${other}」在这一步起了什么作用。`,
-          concepts: allowedConcepts.slice(0, 3),
-        };
-        // 在"选择规律/检查前提"类步骤上，或学生已明确表示这条路走不通时，
-        // 优先给"换工具"的方向 —— 对一个已经在死胡同里的学生，
-        // 顺着原路继续指（"你考虑恒力做功了吗"）是无效帮助。
-        const preferSwitch =
-          ['identify', 'precondition', 'setup'].includes(step?.kind) || diagnosis.stuckKind === 'dead_end_path';
-        payload = rotate(
-          preferSwitch ? [switchToolVariant, connectVariant, considerVariant] : [connectVariant, considerVariant, switchToolVariant],
-          stepTurns,
-        );
-        if (diagnosis.stuckKind === 'dead_end_path') payload = switchToolVariant;
-      } else {
-        /**
-         * L3 降级示范：只示范一个"动作"，不含任何数值。
-         *
-         * 关键：示范的动作必须匹配**这一步在做什么**（step.kind），否则会出现
-         * "学生在算电流，AI 却让他列受力"这种明显错位。
-         * 这是第二次踩同一个坑（第一次是 L2 硬编码动量定理话术），
-         * 所以这里按 kind 分派，而不是用一套固定话术。
-         */
-        const other = openConcepts[0] ?? '相关的量';
-        const byKind = {
-          // 建模 / 识别规律：示范"怎么把研究对象和条件摆出来"
-          setup: [
-            {
-              text: `我示范一个动作，你接着做：先把这道题的回路（或研究对象）画出来，在图上标出每个量的名字，不写数值。标完告诉我：哪一部分是提供能量的、哪一部分是消耗能量的。`,
-              nextAsk: '把回路/研究对象画出来并标出各量的名字，指出能量从哪里来到哪里去。',
-              concepts: allowedConcepts.slice(0, 3),
-            },
-          ],
-          identify: [
-            {
-              text: `我示范一个动作，你接着做：先不选公式。你把题目里"发生了什么过程"用一句话写下来（比如"某个量在某个范围内发生了变化"），写完我们再决定用哪个规律。`,
-              nextAsk: '用一句话描述题目里的物理过程。',
-              concepts: allowedConcepts.slice(0, 3),
-            },
-          ],
-          // 前提检查：示范"把前提逐条写出来再对照条件"
-          precondition: [
-            {
-              text: `我示范一个动作，你接着做：把你要用的这条关系成立所需要的条件，逐条写成清单（只写条件，不写公式），然后再把题干的每个条件对上去，看哪一条没对上。`,
-              nextAsk: '写出该关系成立的条件清单，并逐条对照题干条件。',
-              concepts: allowedConcepts.slice(0, 3),
-            },
-          ],
-          // 套用公式：示范"只写式子左边，右边留空"
-          apply: [
-            {
-              text: `我示范一个动作，你接着做：把这一步要用的关系式的左边先写出来，右边留空。只写左边这一个动作，写完告诉我右边应该放哪个量。`,
-              nextAsk: '只写出关系式的左边，并说明右边应该放哪个量。',
-              concepts: allowedConcepts.slice(0, 3),
-            },
-            {
-              text: `我示范一个动作，你接着做：先把你手上已有的量列成两列——"题目给的"和"我要用的"。列完之后圈出还缺的那一个，那才是这一步真正要解决的。`,
-              nextAsk: '列出"已知的量"和"要用的量"两列，圈出还缺的那个。',
-              concepts: allowedConcepts.slice(0, 3),
-            },
-          ],
-          // 代数推导：示范"把符号关系写成一条链"
-          derive: [
-            {
-              text: `我示范一个动作，你接着做：先不代数值，只用文字写出「${concept} → ${other} → 结果」这条影响链，写三步就够。`,
-              nextAsk: '用文字写出三步影响链（谁变 → 影响谁 → 再影响谁）。',
-              concepts: allowedConcepts.slice(0, 3),
-            },
-          ],
-          interpret: [
-            {
-              text: `我示范一个动作，你接着做：先不看数字，用一句话回答"这一步算出来的量在物理上代表什么"。说不清楚就说明式子还没选对。`,
-              nextAsk: '用一句话说明这一步求出的量在物理上的含义。',
-              concepts: allowedConcepts.slice(0, 3),
-            },
-          ],
-          conclude: [
-            {
-              text: `我示范一个动作，你接着做：把前面每一步得到的量按顺序列出来，检查单位对不对。数值计算留给你自己完成。`,
-              nextAsk: '按顺序列出每一步得到的量并检查单位。',
-              concepts: allowedConcepts.slice(0, 3),
-            },
-          ],
-        };
-        const pool = byKind[step?.kind] ?? [
-          {
-            text: `我示范一个动作，你接着做：先只把研究对象单独拎出来，按方向逐一列出它受到的各个力或参与的量（只写方向和名字，不写数值）。`,
-            nextAsk: '列出研究对象涉及的量（只写名字和方向）。',
-            concepts: allowedConcepts.slice(0, 3),
-          },
-        ];
-        payload = rotate(pool, l3Count);
-      }
-      // 离线桩用于机制测试；已有完整提问时不再附加第二个任务。
-      if (/[？?]/.test(payload.text)) payload.nextAsk = null;
+      const payload = composeSkillDraft({
+        problem,
+        diagnosis,
+        level,
+        allowedConcepts,
+        history,
+        utterance,
+        step,
+      });
       return JSON.stringify(payload);
     },
   };

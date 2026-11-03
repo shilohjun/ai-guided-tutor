@@ -55,8 +55,8 @@ copyDir(join(ROOT, 'src'), join(FN_DIR, 'src'));
  *
  * 为什么页面也由函数出：CloudBase 的静态托管域名（*.tcloudbaseapp.com）
  * 与 HTTP 访问服务域名（*.service.tcloudbase.com）是两个域，
- * 拆开就要跨域 + CORS + 前端记绝对地址。整站一共 8 个文件、0.33 MB，
- * 塞进函数包换来单域与零跨域，对演示站是划算的交换。
+ * 拆开就要跨域 + CORS + 前端记绝对地址。静态资源整体打包，
+ * 换来单域与零跨域，对演示站是划算的交换。
  */
 copyDir(join(ROOT, 'public'), join(FN_DIR, 'public'));
 

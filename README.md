@@ -11,7 +11,7 @@
 
 [![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](package.json)
 [![依赖](https://img.shields.io/badge/dependencies-0-brightgreen)](package.json)
-[![测试](https://img.shields.io/badge/tests-324%2F324-brightgreen)](test/run.js)
+[![测试](https://img.shields.io/badge/tests-333%2F333-brightgreen)](test/run.js)
 [![许可](https://img.shields.io/badge/license-UNLICENSED-lightgrey)](LICENSE)
 
 仓库地址：<https://github.com/shilohjun/ai-guided-tutor>
@@ -58,6 +58,43 @@
 - **巩固页**：重做本题 / 用 `GET /api/related` 挑同知识点的题。
 - **只有自主训练**：`/api/health` 的 `capabilities.modes` 只登记 `self_training`；AI 伴学禁用并标「暂未更新」，服务端收到 `ai_companion` 直接返回 400。
 - **设置**：顶栏齿轮打开面板 —— 主题三选（浅色 / 深色 / 跟随系统）、字号三档（小 / 中 / 大，拖到哪档停哪档）。盒子跟着字一起放大，间距与圆角一律不动；偏好记在本机，`?theme=` `?ux=` 只影响这一次。
+- **四位陪学老师**：派蒙（软萌亲切）、赫敏（毒舌学姐）、诸葛亮（运筹帷幄）、建华教授（严谨治学）。第 2 页选方式卡片的下方可选，默认派蒙；进入对话后也能从「对话」旁的头像换。老师决定对话头像、开场空态和措辞，不改变提示层级、信息量与保密边界。
+- **开场页**：`/` 先落在四位老师与春日校园的主视觉上，点「点击进入」（或点画面任意处）才开始；左上角是品牌标，其余文字一律不加，花瓣只做氛围。自动化截图可用 `?entrance=0` 跳过。
+
+---
+
+## 四位陪学老师
+
+| 老师 | 一句话 | 语言规范 |
+|---|---|---|
+| 派蒙 | 软萌亲切，温柔陪学 | `personas.data.js` 的 `paimon` |
+| 赫敏 | 毒舌学姐，精准点拨 | `personas.data.js` 的 `hermione` |
+| 诸葛亮 | 运筹帷幄，纵观全局 | `personas.data.js` 的 `zhuge` |
+| 建华教授 | 严谨治学，一丝不苟 | `personas.data.js` 的 `jianhua` |
+
+- 选择结果存在 `localStorage` 的 `bsj-mentor`，默认 `paimon`；请求 `/api/chat` 时带 `persona`。
+- 接真模型时，`src/core/personas.js` 把「共同基调 + 该老师的语言规范 + 交互字数」拼进 draft 系统提示词；离线桩则在可见投影层做同义改写，保证没有 API Key 也能看出四位老师的区别。
+- 头像与全身像都在 `public/characters/`，已去底并压到网页尺寸；开场背景是 `public/entrance-page.jpg`。
+
+<p align="center">
+  <img src="docs/screenshots/04-entrance.jpg" width="49%" alt="开场页 · 四位老师与春日校园" />
+  <img src="docs/screenshots/05-mentor.jpg" width="49%" alt="选老师 · 全身像、名字与一句简介" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/06-mentor-chat.jpg" width="72%" alt="对话里的老师头像与语气" />
+</p>
+
+### 最新对话 skill（2026-11）
+
+从这一版起，对话不再走"学生不求助就静默"的旧节奏，而是按 `/languages` 的最新规范：
+
+- **老师先开口**：进入对话先问"这道题你的思路是什么"。
+- **学生回答必须被接住**：答"是电功率"这类内容时，先纠正是"外力功率"，不再回一句"我在旁边看着"。
+- **只给方向或肯定，给完就停**：不再追加"你去找/你试着/把条件列出来"这类动作，也不再挂"试一试"任务。
+- **学生明确说"我先算/我试试"**：才退回静默，把时间还给他。
+- **学生说不会**：先给当前这一步的核心规律；同一处再追问，才逐步补条件、补解释。
+
+离线桩的内容在 `src/core/skill-dialog.js`；真模型在 DRAFT 之后追加 `src/core/personas.js` 的人格块，并在本轮用户提示里把"最新对话规范"标成优先于旧策略。回归见 `test/skill-dialog.test.js`。
 
 ---
 
@@ -237,7 +274,7 @@ ALIYUN_OCR_PROVIDER=marketplace
 ```bash
 npm start          # 启动本地服务
 npm run dev        # 监听文件变化并重启
-npm test           # 全部单元测试 + UI 令牌审计（当前 324 个注册用例）
+npm test           # 全部单元测试 + UI 令牌审计（当前 333 个注册用例）
 npm run eval       # 离线评测（19 场景，无需 Key）
 npm run eval:llm   # 使用 .env 中配置的模型重跑评测
 npm run ocr:path   # 探测 OCR 链路连通性
@@ -280,7 +317,7 @@ npm run preview:verify    # file:// 打开验收
 npm test
 ```
 
-当前注册 **324 个用例，全部通过**。`npm test` 跑完测试后会接着跑
+当前注册 **333 个用例，全部通过**。`npm test` 跑完测试后会接着跑
 `scripts/audit-ui-style.js`：它把设计令牌（间距 2/4/6/8/12/16/24/32、字号三档、
 嵌套圆角、语义色）做成可执行规则，样式一跑偏就报出来 —— 只靠人眼看不住。
 字号与控件尺寸参考 LeetCode 做题页后，再按中文密度收一档（中档题干 13/18.9、标签 11、按钮高 32、顶栏 52）。
@@ -467,7 +504,7 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 
 | 限制 | 说明 |
 |---|---|
-| 测试状态 | 324 个注册用例全部通过（含 UI 令牌审计） |
+| 测试状态 | 333 个注册用例全部通过（含 UI 令牌审计） |
 | AI 伴学 | 未上线：`capabilities.modes` 只有 `self_training`，接口对 `ai_companion` 返回 400 `MODE_UNAVAILABLE` |
 | 公式卡范围 | 按知识点表匹配；导入题的知识点不在表内时不发卡 |
 | 场景集规模 | 19 个场景且由人编写，覆盖不了真实学生的表达多样性 |

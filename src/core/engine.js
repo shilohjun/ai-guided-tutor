@@ -150,6 +150,8 @@ export function createEngine({ adapter, problem, logger } = {}) {
     const trace = [];
     const sessionKey = request.sessionId ?? 'default';
     const history = request.history ?? [];
+    /** 老师人格只影响"怎么说"；没传就按产品默认的派蒙。 */
+    const persona = request.persona ?? 'paimon';
     /**
      * 这道题是不是"现场读出来的"（intake 导入）。
      * 用途只有一个：学生版判断链路里要不要加一句"读题"。
@@ -188,7 +190,7 @@ export function createEngine({ adapter, problem, logger } = {}) {
           concepts: [],
           touchesFinalAnswer: false,
           rationale: '反捷径策略：直接索取答案时不进入生成流程，改用确定性拒绝并把学生推回思考',
-          nextAsk: '说出这道题给了哪些条件、要求什么。',
+          nextAsk: '你最不确定的是哪一步？',
         },
         /**
          * 复述留空：拒绝路径下 diagnosis.restatement 装的是**给教研看的内部说明**，
@@ -349,6 +351,7 @@ export function createEngine({ adapter, problem, logger } = {}) {
           allowedConcepts: routing.allowedConcepts,
           forbidden,
           strategy: routing.strategyInstruction,
+          persona,
           /** 传层级统计给适配器：离线桩用它轮换话术，真模型也可用作 few-shot 选择依据 */
           l3Count: routing.l3Count ?? 0,
           history,
@@ -671,22 +674,13 @@ function formOfLevel(level) {
   return { 0: 'clarify', 1: 'condition_question', 2: 'direction', 3: 'worked_step' }[level] ?? 'clarify';
 }
 
-function routingNextAsk(level) {
-  return {
-    0: '把已知条件和目标各说一遍。',
-    1: '检查这个规律的前提，然后告诉我哪一条最可疑。',
-    2: '用一句话说出这一步涉及的两个量之间是什么关系。',
-    3: '按示范的动作自己往下做一步，把结果说给我听。',
-  }[level];
-}
-
 /**
  * 引擎层的安全兜底。
  *
  * 为什么不在这里另写一套文案：guard 的 safeFallbackHint 已经是
  * "不依赖题目数值、按 step.kind 分派 L3"的兜底模板，两处各写一套必然漂移 ——
  * 漂移的表现是"守卫重写出来的话"和"引擎兜底的话"风格不一致，
- * 而这两句对学生的可见度完全一样。所以这里只补上 nextAsk，文案一律复用。
+ * 而这两句对学生的可见度完全一样。所以这里只复用文案，不再附加任务。
  */
 function composeSafeFallback({ problem, level, step, allowedConcepts }) {
   const text = safeFallbackHint(problem, level, {
@@ -694,7 +688,7 @@ function composeSafeFallback({ problem, level, step, allowedConcepts }) {
     conceptWhitelist: allowedConcepts,
     other: (step?.concepts ?? []).find((c) => c !== allowedConcepts?.[0]),
   });
-  return { text, nextAsk: routingNextAsk(level) };
+  return { text, nextAsk: null };
 }
 
 function range(from, to) {

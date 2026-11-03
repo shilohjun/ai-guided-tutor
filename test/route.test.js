@@ -108,30 +108,32 @@ describe('路由 · 抑制过度帮助', () => {
     assertEquals(d.level, null);
   });
 
-  it('自主训练模式 + 未求助 + 无高置信卡点 ⇒ 静默', () => {
-    const d = decideLevel({
-      problem: P1,
-      diagnosis: diag({ confidence: 0.5 }),
-      history: [],
-      explicitHelpSeeking: false,
-      mode: 'self_training',
-    });
-    assert(d.suppressed, '自主训练模式应保持静默');
+  it('自主训练模式 + 学生只是说"我先算算/嗯" ⇒ 静默', () => {
+    for (const text of ['我先算算', '嗯']) {
+      const d = decideLevel({
+        problem: P1,
+        diagnosis: diag({ confidence: 0.5 }),
+        history: [turn('student', text)],
+        explicitHelpSeeking: false,
+        mode: 'self_training',
+      });
+      assert(d.suppressed, `学生只是在写/应声时不应抢话：${text}`);
+    }
   });
 
-  it('自主训练模式 + 高置信卡点但未求助 ⇒ 仍然静默', () => {
+  it('自主训练模式 + 学生给出答案但没显式求助 ⇒ 也要接话', () => {
     const d = decideLevel({
       problem: P1,
       diagnosis: diag({
         confidence: 0.9,
-        mis: [{ id: 'm-ignore-equilibrium', label: '忽略平衡条件', evidence: '不知道力怎么求', confidence: 0.9 }],
+        mis: [{ id: 'm-ignore-equilibrium', label: '忽略平衡条件', evidence: '是电功率', confidence: 0.9 }],
       }),
-      history: [],
+      history: [turn('student', '是电功率')],
       explicitHelpSeeking: false,
       mode: 'self_training',
     });
-    assert(d.suppressed, '自主训练必须由学生主动求助触发');
-    assertEquals(d.level, null);
+    assert(!d.suppressed, '老师问完思路后，学生回答必须被接住，不能静默');
+    assert(d.level != null, '接话时要给出一个层级');
   });
 
   it('定位置信度过低时退到 L1 以确认位置', () => {

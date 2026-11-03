@@ -1051,9 +1051,218 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   .set-mask{display:block;background:rgba(17,17,22,.40)}
   @keyframes setUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 }
+
+/* =====================================================================
+   12. 开场页 · 老师选择 · 对话头像
+   ---------------------------------------------------------------------
+   开场页是产品第一次呼吸：背景图已经由四位老师和春日校园构成，
+   文字与花瓣只做“让画面能读、能点”的加法，不再另画一套插画。
+   ===================================================================== */
+body.entrance-on{overflow:hidden}
+.entrance{
+  position:fixed;inset:0;z-index:90;
+  overflow:hidden;cursor:pointer;
+  background:#0E1220;color:#fff;
+  transition:opacity .55s ease,transform .55s ease;
+}
+.entrance.is-out{opacity:0;transform:scale(1.015);pointer-events:none}
+.entrance-bg{
+  position:absolute;inset:0;
+  background:url("/entrance-page.jpg") center/cover no-repeat;
+  transform:scale(1.02);
+  animation:entranceDrift 22s ease-out both;
+}
+@keyframes entranceDrift{from{transform:scale(1.02)}to{transform:scale(1.08)}}
+.entrance-veil{
+  position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(8,12,24,.28) 0%,rgba(8,12,24,0) 24%,rgba(8,12,24,0) 62%,rgba(8,12,24,.52) 100%);
+}
+.petals{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+.petal{
+  position:absolute;top:-8%;width:12px;height:12px;
+  border-radius:50% 0 50% 50%;
+  background:rgba(255,214,224,.78);
+  animation:petalFall linear infinite;
+}
+@keyframes petalFall{
+  0%{transform:translate3d(0,-10vh,0) rotate(0deg);opacity:0}
+  12%{opacity:.8}
+  100%{transform:translate3d(var(--drift,40px),110vh,0) rotate(360deg);opacity:0}
+}
+.entrance-logo{
+  position:absolute;left:32px;top:32px;z-index:2;
+  display:inline-flex;align-items:center;gap:8px;
+  padding:6px 12px 6px 6px;
+  border-radius:var(--r-pill);
+  background:rgba(12,16,28,.42);
+  border:1px solid rgba(255,255,255,.24);
+  backdrop-filter:blur(10px);
+  font-size:var(--fs-body);font-weight:700;letter-spacing:.08em;
+}
+.entrance-logo img{width:28px;height:28px;border-radius:var(--r-inner);background:rgba(255,255,255,.94)}
+.entrance-enter{
+  position:absolute;left:50%;bottom:48px;z-index:2;
+  transform:translateX(-50%);
+  display:inline-flex;align-items:center;gap:8px;
+  height:48px;padding:0 32px;
+  border-radius:var(--r-pill);
+  background:rgba(255,255,255,.94);color:#1A1A1A;
+  font-size:var(--fs-body);font-weight:600;
+  box-shadow:0 12px 32px rgba(8,12,24,.30);
+  backdrop-filter:blur(8px);
+  transition:transform .2s ease,background .2s ease,box-shadow .2s ease;
+}
+.entrance-enter:hover{background:#fff;transform:translateX(-50%) translateY(-2px);box-shadow:0 16px 40px rgba(8,12,24,.38)}
+.entrance-enter svg{width:16px;height:16px}
+
+/* —— 老师配色：只做低饱和点缀，不覆盖全站主色 —— */
+[data-mentor="paimon"]{--mc:#5B7FBF;--mc-soft:#EEF3FB;--mc-line:#D6E2F3}
+[data-mentor="hermione"]{--mc:#8E3B3B;--mc-soft:#FBEDED;--mc-line:#EDC9C9}
+[data-mentor="zhuge"]{--mc:#2F6B5A;--mc-soft:#EAF4F0;--mc-line:#C9E2D9}
+[data-mentor="jianhua"]{--mc:#4A5A6A;--mc-soft:#F0F2F5;--mc-line:#D3D6DC}
+html[data-theme="dark"] [data-mentor="paimon"]{--mc:#8FB0E8;--mc-soft:#1E2738;--mc-line:#3A4A6A}
+html[data-theme="dark"] [data-mentor="hermione"]{--mc:#D98A8A;--mc-soft:#2E1D1D;--mc-line:#553030}
+html[data-theme="dark"] [data-mentor="zhuge"]{--mc:#7FBFA9;--mc-soft:#14261F;--mc-line:#265042}
+html[data-theme="dark"] [data-mentor="jianhua"]{--mc:#9FB0C2;--mc-soft:#222831;--mc-line:#3D4855}
+
+/* —— 页面二：模式卡下面的老师入口 —— */
+.p2-teacher{display:flex;flex-direction:column;gap:8px}
+.p2-teacher-head{display:flex;align-items:center;gap:8px;font-size:var(--fs-meta);color:var(--ink-3);font-weight:600}
+.p2-teacher-head .tag{margin-left:auto}
+.teacher-pick{
+  display:flex;align-items:center;gap:12px;width:100%;
+  padding:12px 16px;text-align:left;
+  background:var(--surface);
+  border:1px solid var(--mc-line,var(--line));
+  border-radius:var(--r-card);
+  box-shadow:var(--shadow-1);
+  transition:.2s;
+}
+.teacher-pick:hover{border-color:var(--mc,var(--line-strong));box-shadow:var(--shadow-2)}
+.tp-av{
+  width:48px;height:48px;flex:none;overflow:hidden;
+  display:grid;place-items:center;
+  border-radius:50%;
+  background:var(--mc-soft,var(--brand-tint));
+  border:1px solid var(--mc-line,var(--brand-line));
+}
+.tp-av img{width:44px;height:44px;border-radius:50%;object-fit:cover}
+.tp-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.tp-name{font-size:var(--fs-lead);font-weight:700;line-height:1.3}
+.tp-desc{font-size:var(--fs-body);color:var(--ink-3);font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tp-cta{flex:none;display:inline-flex;align-items:center;gap:4px;font-size:var(--fs-meta);font-weight:600;color:var(--mc,var(--brand-ink))}
+.tp-cta svg{width:14px;height:14px}
+
+/* —— 选老师弹层：像选角色一样看全身、名字和一句简介 —— */
+.mentor-mask{position:fixed;inset:0;z-index:80;background:rgba(12,16,28,.52);backdrop-filter:blur(4px)}
+.mentor{
+  position:fixed;z-index:81;left:50%;top:50%;
+  transform:translate(-50%,-50%);
+  width:min(980px,calc(100vw - 48px));max-height:calc(100% - 48px);
+  display:flex;flex-direction:column;overflow:hidden;
+  background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r-card);box-shadow:var(--shadow-2);
+}
+.mentor-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:24px 24px 16px}
+.mentor-head h2{font-size:var(--fs-title);font-weight:700;line-height:var(--lh-title)}
+.mentor-head p{margin-top:8px;font-size:var(--fs-body);color:var(--ink-3)}
+.mentor-grid{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:16px;padding:8px 24px 24px;overflow:auto;
+}
+.mentor-card{
+  display:flex;flex-direction:column;gap:12px;
+  padding:8px;text-align:left;
+  background:var(--surface-2);
+  border:1px solid var(--line);
+  border-radius:var(--r-inner);
+  transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease;
+}
+.mentor-card:hover{transform:translateY(-2px);border-color:var(--mc);box-shadow:var(--shadow-1)}
+.mentor-card[aria-pressed="true"]{border-color:var(--mc);background:var(--mc-soft);box-shadow:0 0 0 2px color-mix(in srgb,var(--mc) 24%,transparent)}
+.mc-stage{
+  display:flex;align-items:flex-end;justify-content:center;
+  height:190px;overflow:hidden;border-radius:4px;
+  background:linear-gradient(180deg,var(--mc-soft),var(--surface));
+}
+.mc-stage img{max-height:184px;max-width:100%;object-fit:contain;filter:drop-shadow(0 8px 16px rgba(26,26,26,.10))}
+.mc-body{display:flex;flex-direction:column;gap:4px;padding:0 4px 8px}
+.mc-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.mc-name{font-size:var(--fs-lead);font-weight:700;line-height:1.3}
+.mc-check{
+  width:20px;height:20px;flex:none;display:grid;place-items:center;
+  border-radius:50%;border:1px solid var(--line-strong);
+  background:var(--surface);color:transparent;
+}
+.mc-check svg{width:12px;height:12px}
+.mentor-card[aria-pressed="true"] .mc-check{background:var(--mc);border-color:var(--mc);color:#fff}
+.mc-desc{font-size:var(--fs-body);color:var(--ink-3)}
+.mc-quote{
+  font-size:var(--fs-meta);line-height:1.5;color:var(--ink-3);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.mentor-foot{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:16px 24px;border-top:1px solid var(--line);background:var(--surface);
+}
+.mentor-note{flex:1;min-width:0;font-size:var(--fs-body);color:var(--ink-3);line-height:1.45}
+.mentor-note strong{color:var(--ink);font-weight:600}
+#mentorDone{flex:none}
+
+/* —— 页面三：对话里的老师标识与头像 —— */
+.chat-mentor{
+  display:inline-flex;align-items:center;gap:4px;flex:none;
+  padding:2px 8px 2px 2px;
+  border:1px solid var(--line);border-radius:var(--r-pill);
+  background:var(--surface-2);color:var(--ink-2);
+  font-size:var(--fs-meta);font-weight:600;
+  transition:.16s;
+}
+.chat-mentor:hover{border-color:var(--line-strong);color:var(--ink)}
+.chat-mentor img{width:20px;height:20px;border-radius:50%;object-fit:cover;background:var(--mc-soft,var(--brand-tint))}
+.msg .av img{border-radius:50%;object-fit:cover;border:1px solid var(--line);background:var(--mc-soft,var(--brand-tint))}
+
+@media (max-width:860px){
+  .mentor-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mentor{width:calc(100vw - 24px);max-height:calc(100% - 24px)}
+}
+@media (max-width:560px){
+  .mentor-grid{grid-template-columns:1fr;padding:8px 16px 16px}
+  .mentor-head{padding:16px 16px 8px}
+  .mentor-foot{padding:12px 16px}
+  .mc-stage{height:160px}
+  .mc-stage img{max-height:154px}
+  .entrance-logo{left:16px;top:16px}
+  .entrance-enter{bottom:32px}
+  .tp-desc{white-space:normal}
+}
+@media (max-height:760px){
+  .p2{overflow-y:auto}
+  .p2-col{justify-content:flex-start;padding:16px 0}
+}
+@media (prefers-reduced-motion:reduce){
+  .entrance-bg,.petal{animation:none}
+  .entrance,.entrance-enter,.mentor-card{transition:none}
+}
+
 </style>
 </head>
 <body data-page="1">
+
+<!-- ================= 开场页 ================= -->
+<div class="entrance" id="entrance" aria-label="进入步步解">
+  <div class="entrance-bg" aria-hidden="true"></div>
+  <div class="entrance-veil" aria-hidden="true"></div>
+  <div class="petals" id="petals" aria-hidden="true"></div>
+  <div class="entrance-logo" aria-label="步步解">
+    <img src="/brand.png" alt="" width="28" height="28">
+    <span>步步解</span>
+  </div>
+  <button class="entrance-enter" id="enterBtn" type="button">
+    <span>点击进入</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+  </button>
+</div>
 
 <header class="topbar">
   <div class="tb-left">
@@ -1172,7 +1381,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       <div class="p2-col">
         <div class="p2-head">
           <h2>选一种做题方式</h2>
-          <p>同一道题，两种陪法</p>
+          <p>同一道题，两种陪法 · 再挑一位合拍的老师</p>
         </div>
         <div class="p2-quote" id="p2quote">
           <span>当前题目</span>
@@ -1210,9 +1419,26 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
             </span>
           </button>
         </div>
+        <div class="p2-teacher">
+          <div class="p2-teacher-head">
+            <span>陪学老师</span>
+            <span class="tag" id="mentorTag">默认 · 派蒙</span>
+          </div>
+          <button class="teacher-pick" id="teacherPick" data-mentor="paimon" type="button" aria-haspopup="dialog" aria-controls="mentorDlg">
+            <span class="tp-av"><img id="tpAv" src="/characters/profile/paimon.png" alt="" width="44" height="44"></span>
+            <span class="tp-copy">
+              <span class="tp-name" id="tpName">派蒙</span>
+              <span class="tp-desc" id="tpDesc">软萌亲切，温柔陪学</span>
+            </span>
+            <span class="tp-cta">更换老师
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+            </span>
+          </button>
+        </div>
       </div>
       <div class="p2-foot">
         <button class="btn-ghost" id="back1" type="button">返回</button>
+        <button class="btn-primary" id="startBtn" type="button">开始做题</button>
       </div>
     </div>
   </section>
@@ -1235,6 +1461,10 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       <section class="pane">
         <div class="pane-head">
           <strong>对话</strong>
+          <button class="chat-mentor" id="chatMentor" type="button" data-mentor="paimon" aria-haspopup="dialog" aria-controls="mentorDlg" title="换一位老师">
+            <img id="chatMentorAv" src="/characters/profile/paimon.png" alt="" width="20" height="20">
+            <span id="chatMentorName">派蒙</span>
+          </button>
           <span class="tag" id="qIndexTag">0 个提问</span>
           <span class="tag" id="stepTag">第 1 / 5 步</span>
         </div>
@@ -1384,7 +1614,24 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
 
 </div>
 
-
+<!-- ================= 选老师 ================= -->
+<div class="mentor-mask" id="mentorMask" hidden></div>
+<div class="mentor" id="mentorDlg" role="dialog" aria-modal="true" aria-labelledby="mentorTitle" hidden>
+  <div class="mentor-head">
+    <div>
+      <h2 id="mentorTitle">选一位老师</h2>
+      <p>同一道题，四种讲法。看谁顺眼就选谁，之后还能换。</p>
+    </div>
+    <button class="icon-btn" id="mentorClose" type="button" aria-label="关闭">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="mentor-grid" id="mentorGrid"></div>
+  <div class="mentor-foot">
+    <span class="mentor-note" id="mentorNote">当前：<strong>派蒙</strong></span>
+    <button class="btn-primary" id="mentorDone" type="button">就选这位老师</button>
+  </div>
+</div>
 
 <script>
 (function () {
@@ -1392,7 +1639,27 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var SVG_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l4.5 4.5L20 7"/></svg>';
-  var AVATAR = '<img src="/brand.png" alt="" width="26" height="26">';
+
+  /**
+   * 四位老师的前端投影。
+   * 文案与服务端 src/core/personas.js 保持一致；头像/全身图是同一套去底素材。
+   * 之所以在前端留一份：开场页与第 2 页要在 /api/health 返回前就能画出来。
+   */
+  var MENTORS = {
+    paimon: { id: 'paimon', name: '派蒙', tagline: '软萌亲切，温柔陪学', intro: '不催你，也不替你算；先把这一步的方向轻轻递过来。', opening: '诶，先跟派蒙说说：这道题你的思路是什么呀？', quote: '诶，这一问用动能定理就能搞定哦～', avatar: '/characters/profile/paimon.png', body: '/characters/body/paimon.png' },
+    hermione: { id: 'hermione', name: '赫敏', tagline: '毒舌学姐，精准点拨', intro: '嘴上不饶人，指的地方却总是最省时间的那一处。', opening: '别急着写。先说说，这道题你打算怎么想？', quote: '啧，这一问用动能定理就完事了，别绕远路。', avatar: '/characters/profile/hermione.png', body: '/characters/body/hermione.png' },
+    zhuge: { id: 'zhuge', name: '诸葛亮', tagline: '运筹帷幄，纵观全局', intro: '先替你看清这一局的关窍，再让你自己落子。', opening: '小友，先说说这一局你打算如何落子？', quote: '亮以为，此问之势，非动能定理不可。', avatar: '/characters/profile/zhuge.png', body: '/characters/body/zhuge.png' },
+    jianhua: { id: 'jianhua', name: '建华教授', tagline: '严谨治学，一丝不苟', intro: '不夸你聪明，只在你站得住的时候点一下头。', opening: '同学，先说说你对这道题的思路。', quote: '嗯。这一问用动能定理，依据是只有重力和摩擦力做功。', avatar: '/characters/profile/jianhua.png', body: '/characters/body/jianhua.png' }
+  };
+  var MENTOR_ORDER = ['paimon', 'hermione', 'zhuge', 'jianhua'];
+  var MENTOR_KEY = 'bsj-mentor';
+  function mentorOf(id) { return MENTORS[id] || MENTORS.paimon; }
+  function readMentor() {
+    try {
+      var v = localStorage.getItem(MENTOR_KEY);
+      return MENTORS[v] ? v : 'paimon';
+    } catch (e) { return 'paimon'; }
+  }
 
   var PAGES = ['题目', '方式', '解题', '报告', '巩固'];
 
@@ -1464,7 +1731,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     done: false, busy: false,
     report: null, reportTurns: [], reportErr: null,
     related: [], relatedIdx: 0, relatedSource: null, relatedFor: null,
-    ledger: [], sessionStart: 0
+    ledger: [], sessionStart: 0,
+    mentor: readMentor()
   };
 
   var work = $('#work'), splitter = $('#splitter');
@@ -1546,6 +1814,135 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   });
   uxRange.addEventListener('input', function () {
     paintUx(UXK[Number(uxRange.value)] || 'm');
+  });
+
+  /* ---------------- 老师：选择、弹层、开场页 ---------------- */
+  var mentorPending = S.mentor;
+  var mentorTrigger = null;
+
+  function avatarHtml(id) {
+    var m = mentorOf(id);
+    return '<img src="' + m.avatar + '" alt="" width="26" height="26">';
+  }
+
+  function paintMentor() {
+    var m = mentorOf(S.mentor);
+    var pick = $('#teacherPick');
+    if (pick) pick.setAttribute('data-mentor', m.id);
+    if ($('#tpAv')) $('#tpAv').src = m.avatar;
+    if ($('#tpName')) $('#tpName').textContent = m.name;
+    if ($('#tpDesc')) $('#tpDesc').textContent = m.tagline;
+    if ($('#mentorTag')) $('#mentorTag').textContent = (m.id === 'paimon' ? '默认 · ' : '已选 · ') + m.name;
+    if ($('#chatMentor')) $('#chatMentor').setAttribute('data-mentor', m.id);
+    if ($('#chatMentorAv')) $('#chatMentorAv').src = m.avatar;
+    if ($('#chatMentorName')) $('#chatMentorName').textContent = m.name;
+    if ($('#input3')) $('#input3').placeholder = '和' + m.name + '说说你的下一步…';
+  }
+
+  /** 换老师只影响之后的对话；已经说过的话保留当时的头像，不追溯改写历史。 */
+  function setMentor(id) {
+    var m = mentorOf(id);
+    S.mentor = m.id;
+    try { localStorage.setItem(MENTOR_KEY, m.id); } catch (e) {}
+    // 还没开始回答时，开场那句也跟着新老师换；已经聊过就不追溯改写历史。
+    if (S.turns.length === 1 && S.turns[0].opening) {
+      S.turns[0] = { role: 'ai', teacher: S.mentor, text: m.opening, opening: true, at: S.turns[0].at };
+    }
+    paintMentor();
+    renderChat();
+  }
+
+  function mentorCardHtml(m, selected) {
+    return '<button class="mentor-card" type="button" data-mentor="' + m.id + '" aria-pressed="' + selected + '">' +
+      '<span class="mc-stage"><img src="' + m.body + '" alt=""></span>' +
+      '<span class="mc-body">' +
+        '<span class="mc-top"><span class="mc-name">' + esc(m.name) + '</span>' +
+        '<span class="mc-check" aria-hidden="true">' + SVG_CHECK + '</span></span>' +
+        '<span class="mc-desc">' + esc(m.tagline) + '</span>' +
+        '<span class="mc-quote">“' + esc(m.quote) + '”</span>' +
+      '</span></button>';
+  }
+
+  function renderMentorGrid() {
+    var grid = $('#mentorGrid');
+    if (!grid) return;
+    grid.innerHTML = MENTOR_ORDER.map(function (id) {
+      var m = MENTORS[id];
+      return mentorCardHtml(m, id === mentorPending);
+    }).join('');
+    var m = mentorOf(mentorPending);
+    if ($('#mentorNote')) $('#mentorNote').innerHTML = '当前：<strong>' + esc(m.name) + '</strong> · ' + esc(m.intro);
+  }
+
+  function openMentor(trigger) {
+    mentorTrigger = trigger || null;
+    mentorPending = S.mentor;
+    renderMentorGrid();
+    $('#mentorMask').hidden = false;
+    $('#mentorDlg').hidden = false;
+    setTimeout(function () { if ($('#mentorDone')) $('#mentorDone').focus(); }, 0);
+  }
+
+  function closeMentor() {
+    $('#mentorMask').hidden = true;
+    $('#mentorDlg').hidden = true;
+    if (mentorTrigger && mentorTrigger.focus) mentorTrigger.focus();
+  }
+
+  function selectMentorPending(id) {
+    mentorPending = mentorOf(id).id;
+    renderMentorGrid();
+  }
+
+  $('#teacherPick').addEventListener('click', function () { openMentor(this); });
+  $('#chatMentor').addEventListener('click', function () { openMentor(this); });
+  $('#mentorClose').addEventListener('click', closeMentor);
+  $('#mentorMask').addEventListener('click', closeMentor);
+  $('#mentorGrid').addEventListener('click', function (e) {
+    var el = e.target.closest('[data-mentor]');
+    if (el) selectMentorPending(el.getAttribute('data-mentor'));
+  });
+  $('#mentorDone').addEventListener('click', function () {
+    setMentor(mentorPending);
+    closeMentor();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || $('#mentorDlg').hidden) return;
+    closeMentor();
+  });
+
+  /* ---------------- 开场页：点击进入 + 花瓣 ---------------- */
+  var entranceEl = $('#entrance');
+
+  function renderPetals() {
+    var wrap = $('#petals');
+    if (!wrap) return;
+    var html = '';
+    for (var i = 0; i < 12; i += 1) {
+      var left = (i * 37 + 7) % 100;
+      var dur = 9 + (i % 5) * 1.6;
+      var delay = -(i * 1.7);
+      var drift = -40 + (i % 4) * 26;
+      var size = 8 + (i % 3) * 4;
+      html += '<span class="petal" style="left:' + left + '%;width:' + size + 'px;height:' + size + 'px;' +
+        'animation-duration:' + dur + 's;animation-delay:' + delay + 's;--drift:' + drift + 'px"></span>';
+    }
+    wrap.innerHTML = html;
+  }
+
+  function enterApp() {
+    if (!entranceEl || entranceEl.hidden || entranceEl.classList.contains('is-out')) return;
+    entranceEl.classList.add('is-out');
+    document.body.classList.remove('entrance-on');
+    setTimeout(function () { entranceEl.hidden = true; }, 560);
+  }
+
+  $('#enterBtn').addEventListener('click', enterApp);
+  entranceEl.addEventListener('click', enterApp);
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || !entranceEl || entranceEl.hidden) return;
+    if (e.target && e.target.closest && e.target.closest('button')) return;
+    enterApp();
   });
 
   /* ---------------- 页面切换 / 步骤回溯 ---------------- */
@@ -1862,10 +2259,11 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   $('#modeList').addEventListener('click', function (e) {
     var el = e.target.closest('[data-mode]');
     if (!el || el.disabled) return;
+    // 选方式不再直接跳页：下面还有老师要选，确认由「开始做题」统一完成。
     S.mode = el.dataset.mode;
     paintMode();
-    enterSolving();
   });
+  $('#startBtn').addEventListener('click', enterSolving);
   $('#back1').addEventListener('click', function () { setPage(1); });
 
   /** 进对话页：没有题就先回第一页选题（空态不假装能开始） */
@@ -1885,7 +2283,9 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   /* ---------------- 会话 ---------------- */
   function startSession() {
     S.sessionId = 'ui-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
-    S.turns = [];
+    // 老师先开口问思路：这一步不经过模型，固定话术由选中的老师给出。
+    var opener = mentorOf(S.mentor);
+    S.turns = [{ role: 'ai', teacher: S.mentor, text: opener.opening, opening: true, at: Date.now() }];
     S.done = false;
     S.busy = false;
     S.report = null;
@@ -2024,7 +2424,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       return '<div class="msg err" data-i="' + i + '"><div class="bubble">' +
         '<p>' + esc(m.text) + '</p></div></div>';
     }
-    var av = m.role === 'ai' ? '<span class="av">' + AVATAR + '</span>' : '';
+    var av = m.role === 'ai' ? '<span class="av" data-mentor="' + (m.teacher || S.mentor) + '">' + avatarHtml(m.teacher || S.mentor) + '</span>' : '';
     var next = m.next ? '<div class="next-ask">' + esc(m.next) + '</div>' : '';
     return '<div class="msg ' + (m.role === 'ai' ? 'ai' : 'me') + '" data-i="' + i + '">' + av +
       '<div class="bubble">' + paraHtml(m.text) + next + '</div></div>';
@@ -2041,14 +2441,16 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       return;
     }
     var html = '';
+    var m = mentorOf(S.mentor);
     if (!S.turns.length) {
-      html = '<div class="chat-empty"><p>从你的思路开始：这道题你打算先处理哪一部分？</p>' +
-        '<p class="sub">AI 不会替你做，只会接着你的想法往下问。</p></div>';
+      var opening = m.opening;
+      html = '<div class="chat-empty"><p>' + opening + '</p>' +
+        '<p class="sub">' + esc(m.name) + '不会替你做，只会接着你的想法往下问。</p></div>';
     } else {
       html = S.turns.map(msgHtml).join('');
     }
     if (S.busy) {
-      html += '<div class="msg ai"><span class="av">' + AVATAR + '</span>' +
+      html += '<div class="msg ai"><span class="av" data-mentor="' + S.mentor + '">' + avatarHtml(S.mentor) + '</span>' +
         '<div class="bubble dots"><i></i><i></i><i></i></div></div>';
     }
     if (S.done) {
@@ -2092,6 +2494,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     $('#input3').value = '';
     autosize();
     S.busy = true;
+    var turnMentor = S.mentor;
     renderChat();
 
     API.chat({
@@ -2099,7 +2502,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       problemId: S.problem.id,
       utterance: text,
       mode: S.mode === 'self' ? 'self_training' : 'ai_companion',
-      explicitHelpSeeking: helpFlag
+      explicitHelpSeeking: helpFlag,
+      persona: turnMentor
     }).then(function (r) {
       var p = r.progress || {};
       S.progress = {
@@ -2111,6 +2515,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       var hint = r.hint || {};
       S.turns.push({
         role: 'ai',
+        teacher: turnMentor,
         text: hint.text || r.message || '（本轮没有返回内容）',
         next: hint.nextAsk || null,
         concepts: hint.concepts || [],
@@ -2499,8 +2904,18 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   renderBank();
   syncP1();
   renderXP();
+  renderPetals();
+  paintMentor();
   renderChat();
   paintMode();
+
+  /* 开场页默认每次打开都出现；截图/自动化可用 ?entrance=0 直接进工作台 */
+  if (new URLSearchParams(location.search).get('entrance') === '0') {
+    entranceEl.hidden = true;
+  } else {
+    document.body.classList.add('entrance-on');
+    setTimeout(function () { if ($('#enterBtn')) $('#enterBtn').focus(); }, 60);
+  }
 
   API.health().then(function (h) {
     S.health = h;

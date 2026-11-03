@@ -85,8 +85,18 @@ export function looksLikeHelpRequest(utterance = '') {
 
 export function decideLevel({ problem, diagnosis, history, explicitHelpSeeking, mode }) {
   const reasons = [];
-  if (mode === 'self_training' && !explicitHelpSeeking) {
-    return { level: null, reason: '自主训练：学生未主动求助，保持静默观测', suppressed: true };
+  /**
+   * 最新对话 skill 把"老师先问思路"放在第一位：老师开口之后，学生回一句
+   * "是电功率""这一步用什么规律"都属于在回答，必须接话。
+   * 只有学生明确表示"我先算/我试试/嗯"时，才退回静默，把时间还给他。
+   */
+  const lastStudentText = [...history].reverse().find((t) => t.role === 'student')?.text ?? '';
+  const onlyTrying =
+    !/[？?]/.test(lastStudentText) &&
+    /(我先|我试试|让我想|我先算|我先写|等等|我在算)/.test(lastStudentText);
+  const filler = /^(嗯|哦|好|行|知道了|明白了|收到|ok)[。！!.\s]*$/i.test(lastStudentText.trim());
+  if (mode === 'self_training' && !explicitHelpSeeking && (onlyTrying || filler)) {
+    return { level: null, reason: '自主训练：学生表示自己在写/只是应声，先不打断', suppressed: true };
   }
   const hasPriorContext = history.some(t => t.role === 'ai' && !t.suppressed && t.metaStep != null);
   // 仅当前路径、步骤、卡点的已交付提示支撑升级；兼容旧会话缺失的元数据。

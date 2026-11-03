@@ -329,6 +329,8 @@ export interface HintRequest {
   mode: 'self_training' | 'ai_companion';
   /** 学生是否显式求助 */
   explicitHelpSeeking?: boolean;
+  /** 本轮由哪位老师说话；缺省为派蒙（只影响措辞，不影响层级与保密） */
+  persona?: string;
 }
 
 export interface HintResponse {
@@ -618,6 +620,8 @@ export interface EnginePathEntry {
 /** 学生在对话中能拿到的一切。注意这里没有任何教研字段。 */
 export interface StudentTurnPayload {
   message: string;
+  /** 本轮学生看到的老师（前端据此换头像；旧消息保留当时的老师） */
+  persona: { id: string; name: string; avatar: string };
   hint: {
     level: HintLevel;
     levelName: string;
@@ -714,6 +718,8 @@ export interface DraftInput {
   forbidden: string[];
   /** 学生卡点性质的提示策略骨架 */
   strategy: string;
+  /** 老师人格 id；真模型据此拼接语言规范，离线桩忽略 */
+  persona?: string;
 }
 
 // ---------------------------------------------------------------------------

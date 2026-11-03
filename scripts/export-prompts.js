@@ -1,5 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { OBSERVE_SYSTEM_PROMPT, DRAFT_SYSTEM_PROMPT, INTAKE_SYSTEM_PROMPT } from '../src/core/llm.js';
+import { PERSONAS, personaPromptBlock } from '../src/core/personas.js';
 
 const target = new URL('../docs/02-prompt-spec.md', import.meta.url);
 const content = `# Prompt 规范（2026-10-25）
@@ -37,6 +38,19 @@ ${DRAFT_SYSTEM_PROMPT}
 \`\`\`text
 ${INTAKE_SYSTEM_PROMPT}
 \`\`\`
+
+## 老师人格：DRAFT 之后追加
+
+接真模型时，在 DRAFT 系统提示词之后追加学生所选老师的人格块；离线桩不追加，
+改在 "/api/chat" 的可见投影层做同义改写，保证没有 Key 也能看出四位的区别。
+人格只改"怎么说"，不改变提示层级、信息量与保密边界。
+
+${Object.values(PERSONAS).map((p) => `### ${p.name}（${p.tagline}）
+
+\`\`\`text
+${personaPromptBlock(p.id)}
+\`\`\`
+`).join('\n')}
 
 ## 变更记录
 

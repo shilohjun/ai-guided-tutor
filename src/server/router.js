@@ -44,6 +44,7 @@ import { looksLikeHelpRequest } from '../core/route.js';
 import { runEvaluation, formatEvaluation } from '../core/eval.js';
 import { STUDENT_LEVEL_NOTE, inspectVoice } from '../core/prompt.js';
 import { PROBLEMS } from '../core/problems.data.js';
+import { normalizePersona, personaById, stylePersonaReply } from '../core/personas.js';
 
 loadEnvFile();
 
@@ -328,22 +329,40 @@ function stepLabelsFor(problem, graphId, completed) {
  * 这个函数是"学生拿不到教研数据"的**唯一执行点** ——
  * 想确认某个字段有没有外泄，只看这里就够了。
  */
-export function buildStudentTurn(response, mode, problem) {
+export function buildStudentTurn(response, mode, problem, personaValue = 'paimon', turn = 0) {
   const d = response.diagnosis;
   const guardBlocked = (response.meta.guardHistory ?? []).filter((g) => !g.passed).length;
   const stepCount = response.stepCount ?? 0;
+  const personaId = normalizePersona(personaValue);
+  const persona = personaById(personaId);
+  /**
+   * 离线桩没有收到人格提示词，所以在可见投影层补一层措辞。
+   * 真模型已经按 personaPromptBlock 写过，再套会重复。
+   * 这一层只改说法、不动物理结论，且会按 150 字上限自动退让。
+   */
+  const visible =
+    String(response.meta.engine).startsWith('offline')
+      ? stylePersonaReply(personaId, {
+          text: response.hint.text,
+          nextAsk: response.hint.nextAsk,
+          form: response.suppressed ? 'silent' : response.hint.form,
+          level: response.hint.level,
+          turn,
+        })
+      : { text: response.hint.text, nextAsk: response.hint.nextAsk };
 
   return {
     message: response.message,
+    persona: { id: personaId, name: persona.name, avatar: persona.avatar },
     hint: {
       level: response.hint.level,
       levelName: LEVEL_NAMES[response.hint.level] ?? '-',
       /** 给学生的人话版本（教研名对学生只会造成"我被分类了"的观感） */
       levelNote: STUDENT_LEVEL_NOTE[response.hint.level] ?? '',
       form: response.hint.form,
-      text: response.hint.text,
+      text: visible.text,
       concepts: response.hint.concepts,
-      nextAsk: response.hint.nextAsk,
+      nextAsk: visible.nextAsk,
     },
     progress: {
       stepIndex: d.position.stepIndex,
@@ -377,7 +396,7 @@ export function buildStudentTurn(response, mode, problem) {
     enginePath: response.enginePath ?? [],
     /** 学生已经想对的地方 —— 学习反馈的主角 */
     understood: d.strengths ?? [],
-    nextStep: response.hint.nextAsk ?? null,
+    nextStep: visible.nextAsk ?? null,
     mode,
     /** 本轮是否经过复核重写（只说"复核过"，不说违规类型） */
     reviewed: guardBlocked > 0,
@@ -670,7 +689,7 @@ export async function handleApi(req, res, url) {
   // ---- POST /api/chat ----
   if (path === '/api/chat' && req.method === 'POST') {
     const body = await readJson(req);
-    const { sessionId, problemId, utterance, mode, explicitHelpSeeking } = body ?? {};
+    const { sessionId, problemId, utterance, mode, explicitHelpSeeking, persona } = body ?? {};
     if (!problemId || typeof utterance !== 'string') {
       sendJson(res, 400, { error: '需要 problemId 与 utterance' });
       return true;
@@ -690,6 +709,7 @@ export async function handleApi(req, res, url) {
 
     const session = getSession(sessionId || 'demo', problemId);
     const normalizedMode = 'self_training';
+    const personaId = normalizePersona(persona);
 
     let response;
     try {
@@ -702,6 +722,7 @@ export async function handleApi(req, res, url) {
         // 免得"自主训练"退化成"每句都算求助"或"问破喉咙也没人理"
         explicitHelpSeeking: Boolean(explicitHelpSeeking) || looksLikeHelpRequest(utterance),
         sessionId: session.id,
+        persona: personaId,
       });
     } catch (error) {
       if (!['OBSERVATION_UNAVAILABLE', 'REPLY_UNAVAILABLE'].includes(error.code)) throw error;
@@ -724,7 +745,7 @@ export async function handleApi(req, res, url) {
     appendTurn(session.record, { utterance, response, problem });
 
     // 学生载荷 —— 只走白名单投影
-    sendJson(res, 200, buildStudentTurn({ ...response, stepCount: totalSteps(problem, response.diagnosis.position.graphId) }, normalizedMode, problem));
+    sendJson(res, 200, buildStudentTurn({ ...response, stepCount: totalSteps(problem, response.diagnosis.position.graphId) }, normalizedMode, problem, personaId, Math.floor(session.history.length / 2)));
     return true;
   }
 
