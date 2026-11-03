@@ -861,6 +861,30 @@ body.resizing *{cursor:col-resize !important}
 .wrong-empty{padding:16px 0;color:var(--ink-3);font-size:var(--fs-body)}
 .report-alert{margin-bottom:8px;padding:8px 16px;border-radius:var(--r-inner);background:var(--amber-tint);border:1px solid var(--amber-line);color:var(--amber);font-size:var(--fs-body);line-height:var(--lh-body)}
 
+/* 报告页专用：精简知识与方法，不影响其他四页。 */
+.p4 .report-card{flex-shrink:0}
+.p4 .review-note{font-size:var(--fs-meta);line-height:var(--lh-body);color:var(--ink-3);margin:8px 0 0}
+.p4 .review-part+.review-part{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.p4 .review-part h3{font-size:var(--fs-sub);line-height:var(--lh-sub);font-weight:600;margin-bottom:8px}
+.p4 .review-knowledge{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.p4 .review-item{padding:12px 16px;border:1px solid var(--line);border-radius:var(--r-inner);background:var(--surface-2)}
+.p4 .review-title{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;font-size:var(--fs-body);font-weight:600;line-height:var(--lh-body)}
+.p4 .review-formula{font-family:var(--font-mono);color:var(--ink);font-weight:400;overflow-wrap:anywhere}
+.p4 .review-copy{font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink-2);margin-top:4px}
+.p4 .review-methods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.p4 .review-method{padding:16px;border:1px solid var(--line);border-radius:var(--r-inner);min-width:0}
+.p4 .review-method h4{font-size:var(--fs-body);font-weight:600;line-height:var(--lh-body);margin:0 0 8px;color:var(--ink)}
+.p4 .review-method p{font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink-2)}
+.p4 .review-method p+p{margin-top:8px}
+.p4 .review-detail{margin-top:8px;font-size:var(--fs-body);line-height:var(--lh-body)}
+.p4 .review-detail summary{cursor:pointer;color:var(--brand-ink);font-size:var(--fs-meta);font-weight:600;width:fit-content}
+.p4 .review-detail p{margin-top:8px;color:var(--ink-2)}
+.p4 .review-detail summary:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.p4 .level.ok{background:var(--surface-2);border-color:var(--line)}
+.p4 .level.ok .lv,.p4 .level.ok .k-chip{color:var(--ink-2);border-color:var(--line)}
+.p4 .level[hidden]{display:none}
+@media(max-width:760px){.p4 .review-methods,.p4 .review-knowledge{grid-template-columns:1fr}.p4 .metrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.p4 .metric{padding:12px 8px}}
+
 .p4-foot{
   flex:none;display:flex;align-items:center;justify-content:space-between;
   gap:8px;padding:16px 0;width:min(860px,100%);
@@ -1291,23 +1315,29 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
           <div class="metrics">
             <div class="metric"><span>本次练习</span><strong><span id="mCount">—</span> <em>题</em></strong></div>
             <div class="metric"><span>正确率</span><strong><span id="mAcc">—</span> <em>%</em></strong></div>
-            <div class="metric warn"><span>薄弱知识点</span><strong id="mWeak" class="metric-weak">—</strong></div>
+            <div class="metric warn"><span>优先回看</span><strong id="mWeak" class="metric-weak">—</strong></div>
           </div>
           <div class="levels">
             <div class="level ok">
-              <span class="lv">✓ 掌握</span>
+              <span class="lv">本题涉及</span>
               <div class="lv-body" id="lvOk"></div>
             </div>
             <div class="level warn">
-              <span class="lv">! 待巩固</span>
+              <span class="lv">建议回看</span>
               <div class="lv-body" id="lvWarn"></div>
             </div>
             <div class="level bad">
-              <span class="lv">✕ 薄弱</span>
+              <span class="lv">需核对</span>
               <div class="lv-body" id="lvBad"></div>
             </div>
           </div>
+          <p class="review-note">依据本次提问整理，不直接判定知识掌握或长期能力。</p>
         </div>
+
+        <section class="report-card" aria-labelledby="reviewHeading">
+          <div class="rc-head"><h2 id="reviewHeading">本题的知识与方法</h2><span class="tag">要点复盘</span></div>
+          <div id="reportReview"><p class="review-copy">生成报告后，查看本题的知识和方法要点。</p></div>
+        </section>
 
         <div class="report-card">
           <div class="rc-head">
@@ -2272,25 +2302,50 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     });
   }
 
-  /** 知识点三档：用"提问里出现过的知识点标签"归到对应步骤的判定上 */
+  /** 题目涉及不等于掌握；只把本轮提问关联的概念列为回看线索。 */
   function levelBuckets(rep) {
-    var weakSteps = {}, warnSteps = {};
-    (rep && rep.stuckPoints ? rep.stuckPoints : []).forEach(function (sp) {
+    var warn = [], bad = [];
+    (rep && rep.stuckPoints || []).forEach(function (sp) {
       if (sp.stepIndex == null) return;
-      if ((sp.misconceptionLabels || []).length) weakSteps[sp.stepIndex] = 1;
-      else warnSteps[sp.stepIndex] = 1;
+      var bucket = (sp.misconceptionLabels || []).length ? bad : warn;
+      S.turns.forEach(function (t) {
+        if (t.role !== 'ai' || t.stepIndex !== sp.stepIndex) return;
+        (t.concepts || []).forEach(function (c) { if (bucket.indexOf(c) < 0) bucket.push(c); });
+      });
     });
-    var ok = [], warn = [], bad = [];
-    S.turns.forEach(function (t) {
-      if (t.role !== 'ai' || !t.concepts || !t.concepts.length) return;
-      var bucket = (t.stepIndex != null && weakSteps[t.stepIndex]) ? bad
-        : (t.stepIndex != null && warnSteps[t.stepIndex]) ? warn : ok;
-      t.concepts.forEach(function (c) { if (bucket.indexOf(c) < 0) bucket.push(c); });
-    });
-    ((S.problem && S.problem.topics) || []).forEach(function (tp) {
-      if (bad.indexOf(tp) < 0 && warn.indexOf(tp) < 0 && ok.indexOf(tp) < 0) ok.push(tp);
-    });
-    return { ok: ok.slice(0, 4), warn: warn.slice(0, 3), bad: bad.slice(0, 3) };
+    warn = warn.filter(function (c) { return bad.indexOf(c) < 0; });
+    return { ok: ((S.problem && S.problem.topics) || []).slice(0, 4), warn: warn.slice(0, 3), bad: bad.slice(0, 3) };
+  }
+
+  /** 内容来自报告接口的配套卡，不从参考答案或步骤标题拼出“方法”。 */
+  function renderReportReview(rep) {
+    var review = rep && rep.review;
+    var host = $('#reportReview');
+    if (!review) {
+      host.innerHTML = '<p class="review-copy">' + (rep
+        ? '当前服务尚未提供新版知识卡，请重启本项目服务后重新生成报告。'
+        : '生成报告后，查看本题的知识和方法要点。') + '</p>';
+      return;
+    }
+    if (review.status !== 'available') {
+      host.innerHTML = '<p class="review-copy">' + esc(review.note || '这道题暂未配置配套知识与方法卡。') + '</p>';
+      return;
+    }
+    var knowledge = (review.knowledge || []).slice(0, 3);
+    var methods = (review.methods || []).slice(0, 2);
+    host.innerHTML = '<section class="review-part"><h3>知识点梳理</h3><div class="review-knowledge">' +
+      knowledge.map(function (k) {
+        return '<article class="review-item"><div class="review-title"><span>' + esc(k.title) + '</span>' +
+          (k.formula ? '<span class="review-formula">' + esc(k.formula) + '</span>' : '') + '</div>' +
+          '<p class="review-copy">' + esc(k.meaning) + '</p>' +
+          '<details class="review-detail"><summary>适用条件</summary><p>' + esc(k.condition) + '</p></details></article>';
+      }).join('') + '</div></section><section class="review-part"><h3>思路点拨</h3><div class="review-methods">' +
+      methods.map(function (m) {
+        return '<article class="review-method"><h4>' + esc(m.title) + '</h4><p>' + esc(m.principle) + '</p>' +
+          '<p><strong>本题：</strong>' + esc(m.use) + '</p>' +
+          '<details class="review-detail"><summary>何时用 · 别照搬</summary><p><strong>何时用：</strong>' + esc(m.when) +
+          '</p><p><strong>别照搬：</strong>' + esc(m.boundary) + '</p></details></article>';
+      }).join('') + '</div></section><p class="review-note">' + esc(review.note || '') + '</p>';
   }
 
   /** 步骤标题常带冒号后缀，塞进指标卡会溢出，取主干并截断 */
@@ -2316,6 +2371,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
 
   function renderReport() {
     var rep = S.report;
+    renderReportReview(rep);
     var expected = 0, matched = 0;
     S.ledger.forEach(function (x) {
       expected += x.expected || 0;
@@ -2346,6 +2402,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       $('#lvOk').innerHTML = chips([], '—');
       $('#lvWarn').innerHTML = chips([], '—');
       $('#lvBad').innerHTML = chips([], '—');
+      $('#lvWarn').parentNode.hidden = true;
+      $('#lvBad').parentNode.hidden = true;
       $('#wrongList').innerHTML = '<div class="wrong-empty">还没有可归纳的卡点：先回到解题页多问几轮。</div>';
       $('#wrongCount').textContent = '0 条';
       return;
@@ -2354,11 +2412,13 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     var buckets = levelBuckets(rep);
     $('#mWeak').textContent = buckets.bad[0]
       || (rep.stuckPoints[0] ? shortLabel(rep.stuckPoints[0].stepTitle) : '')
-      || '暂未出现明显薄弱点';
+      || buckets.warn[0] || '暂未记录具体卡点';
     $('#mWeak').parentNode.classList.toggle('warn', buckets.bad.length > 0);
     $('#lvOk').innerHTML = chips(buckets.ok, '暂无');
     $('#lvWarn').innerHTML = chips(buckets.warn, '暂无');
     $('#lvBad').innerHTML = chips(buckets.bad, '暂无');
+    $('#lvWarn').parentNode.hidden = !buckets.warn.length;
+    $('#lvBad').parentNode.hidden = !buckets.bad.length;
 
     var seen = {}, items = [];
     (rep.stuckPoints || []).forEach(function (sp) {
@@ -2383,8 +2443,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
           }
           return '<div class="wrong-item">' +
             '<div class="wrong-line"><span class="k">题目片段</span><span class="v">「' + esc(sp.stepTitle) + '」</span>' +
-            '<span class="k">错因</span><span class="cause">' + esc(cause) + '</span></div>' +
-            '<div class="wrong-formula"><span>涉及规律</span><code>' + esc(concept || ((S.problem.topics || [])[1] || '—')) + '</code>' +
+            '<span class="k">待核对</span><span class="cause">' + esc(cause) + '</span></div>' +
+            '<div class="wrong-formula"><span>涉及规律</span><code>' + esc(concept || '依据尚不足') + '</code>' +
             '<span>所属板块</span><span class="tag">' + esc((S.problem.topics || [])[0] || '—') + '</span></div>' +
             '</div>';
         }).join('')
