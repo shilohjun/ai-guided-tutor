@@ -464,13 +464,9 @@ body[data-page="bank"] .home-only{opacity:0;pointer-events:none}
 
 
 /* 宿主内嵌：浮动的切轴与工具条 */
-.is-embed .sheet{padding-top:46px}
+.is-embed .sheet{padding-top:10px}
 .is-embed #navBank{display:none}
-.is-embed .top{
-  position:fixed;left:16px;right:16px;top:12px;z-index:30;
-  height:auto;padding:0;background:transparent;border:0;backdrop-filter:none;
-  display:flex;align-items:center;gap:8px;pointer-events:none;
-}
+.is-embed .top{display:none}   /* 内嵌时控件交给宿主顶栏 */
 .is-embed .top>*{pointer-events:auto}
 .is-embed .top .brand{display:none}
 .is-embed .seg{
@@ -1401,6 +1397,9 @@ body[data-page="bank"] .home-only{opacity:0;pointer-events:none}
     for (var i = 0; i < tabs.length; i++) tabs[i].setAttribute('aria-selected', String(tabs[i].getAttribute('data-view') === v));
     render();
     syncPanel();
+    if (window.parent !== window) {
+      try { window.parent.postMessage({ type: 'qbank:viewstate', view: v }, location.origin); } catch (err) { }
+    }
   }
   for (var t = 0; t < tabs.length; t++) {
     (function (b) {
@@ -1409,7 +1408,7 @@ body[data-page="bank"] .home-only{opacity:0;pointer-events:none}
     })(tabs[t]);
   }
 
-  $('#collapse').addEventListener('click', function () {
+  function collapseBranches() {
     var set = S.open[S.view];
     set.clear();
     set.add(S.view === 'kg' ? 'kg:root' : 'th:root');
@@ -1417,8 +1416,8 @@ body[data-page="bank"] .home-only{opacity:0;pointer-events:none}
     S.keepCam = true;           /* 只收分支，视角留在原地 */
     render();
     syncPanel();
-  });
-  $('#reset').addEventListener('click', function () {
+  }
+  function resetBranches() {
     S.open.kg.clear();
     S.open.th.clear();
     S.open.kg.add('kg:root');
@@ -1428,7 +1427,9 @@ body[data-page="bank"] .home-only{opacity:0;pointer-events:none}
     S.forceScale = 1;           /* 真·回到初始视角：100% 并居中 */
     render();
     syncPanel();
-  });
+  }
+  $('#collapse').addEventListener('click', collapseBranches);
+  $('#reset').addEventListener('click', resetBranches);
   $('#all').addEventListener('click', function () {
     S.sel = null;
     render();
@@ -1439,6 +1440,9 @@ body[data-page="bank"] .home-only{opacity:0;pointer-events:none}
   window.addEventListener('message', function (e) {
     if (e.origin !== location.origin) return;
     var d = e.data || {};
+    if (d.type === 'qbank:view') { setView(d.view === 'kg' ? 'kg' : 'th'); return; }
+    if (d.type === 'qbank:collapse') { collapseBranches(); return; }
+    if (d.type === 'qbank:reset') { resetBranches(); return; }
     if (d.type !== 'qbank:theme') return;
     var t = d.theme === 'dark' ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', t);

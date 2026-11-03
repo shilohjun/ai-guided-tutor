@@ -261,6 +261,29 @@ img{display:block;max-width:100%}
 
 .tb-center{display:flex;justify-content:center;min-width:0;justify-self:center}
 .tb-right{display:flex;align-items:center;gap:8px;flex:none;justify-self:end}
+.bank-tools{display:none;align-items:center;gap:6px}
+body[data-bank="1"] .bank-tools{display:flex}
+body[data-bank="1"] #modeSwitch{display:none!important}
+.bt{
+  display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 10px;
+  border:1px solid var(--line);border-radius:var(--r-pill);background:var(--surface);
+  color:var(--ink-2);font-size:var(--fs-meta);line-height:1;cursor:pointer;white-space:nowrap;
+  transition:border-color .18s,color .18s,background .18s;
+}
+.bt:hover{border-color:var(--brand-line);color:var(--brand-ink);background:var(--brand-tint)}
+.bt-seg{padding:2px}
+.bt-seg button{height:24px;padding:0 10px;font-size:var(--fs-meta)}
+.lbl-mini{display:none}
+@media (max-width:720px){
+  .bt{padding:0 7px;height:26px}
+  .bt-seg button{padding:0 7px;height:22px}
+  .lbl-full{display:none}
+  .lbl-mini{display:inline}
+  .bank-tools{gap:4px}
+  .tb-right{gap:4px}
+  .brand-sub{display:none}
+  .brand-name{display:none}
+}
 
 .icon-btn{
   width:var(--ctl);height:var(--ctl);border-radius:var(--r-inner);
@@ -1210,6 +1233,15 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   </div>
 
   <div class="tb-right">
+    <div class="bank-tools" id="bankTools">
+      <button class="bt" id="bankBack" type="button" aria-label="返回首页"><span aria-hidden="true">←</span><span class="lbl-full"> 返回</span></button>
+      <div class="seg bt-seg" id="bankSeg" role="group" aria-label="分类视角">
+        <button type="button" data-view="th" aria-pressed="true">思路</button>
+        <button type="button" data-view="kg" aria-pressed="false">知识点</button>
+      </div>
+      <button class="bt" id="bankCollapse" type="button"><span class="lbl-full">收起分支</span><span class="lbl-mini">收起</span></button>
+      <button class="bt" id="bankReset" type="button">复位</button>
+    </div>
     <div class="seg" id="modeSwitch" hidden role="group" aria-label="模式">
       <button type="button" data-mode="self" aria-pressed="true">自主训练</button>
       <button type="button" data-mode="ai" aria-pressed="false" disabled title="AI 伴学暂未上线">AI 伴学</button>
@@ -2666,7 +2698,10 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     /* 抬升：地图进入视口时浮上来，离开时沉下去 */
     if (mapSec && 'IntersectionObserver' in window) {
       new IntersectionObserver(function (rows) {
-        rows.forEach(function (r) { mapSec.classList.toggle('is-in', r.isIntersecting); });
+        rows.forEach(function (r) {
+          mapSec.classList.toggle('is-in', r.isIntersecting);
+          document.body.setAttribute('data-bank', r.isIntersecting ? '1' : '0');
+        });
       }, { root: p1, threshold: 0.18 }).observe(mapSec);
     } else if (mapSec) {
       mapSec.classList.add('is-in');
@@ -2678,6 +2713,27 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     });
     var goodBar = $('#goodBar');
     if (goodBar) goodBar.addEventListener('click', openMap);
+
+    /* 题库控件：宿主顶栏发指令，地图在 iframe 里照做 */
+    function toMap(msg) {
+      if (!frame || !frame.contentWindow) return;
+      try { frame.contentWindow.postMessage(msg, location.origin); } catch (err) { }
+    }
+    var bankTools = $('#bankTools');
+    if (bankTools) {
+      $('#bankBack').addEventListener('click', closeMap);
+      var bankSeg = $('#bankSeg');
+      Array.prototype.forEach.call(bankSeg.children, function (b) {
+        b.addEventListener('click', function () {
+          Array.prototype.forEach.call(bankSeg.children, function (o) {
+            o.setAttribute('aria-pressed', String(o === b));
+          });
+          toMap({ type: 'qbank:view', view: b.getAttribute('data-view') });
+        });
+      });
+      $('#bankCollapse').addEventListener('click', function () { toMap({ type: 'qbank:collapse' }); });
+      $('#bankReset').addEventListener('click', function () { toMap({ type: 'qbank:reset' }); });
+    }
     var fillBtn = document.querySelectorAll('.p1-chips [data-fill]');
     for (var fi = 0; fi < fillBtn.length; fi++) {
       (function (b) {
@@ -2721,6 +2777,13 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     window.addEventListener('message', function (e) {
       if (e.origin !== location.origin) return;
       if (e.data?.type === 'qbank:close') { closeMap(); return; }
+      if (e.data?.type === 'qbank:viewstate') {
+        var bseg = document.getElementById('bankSeg');
+        if (bseg) Array.prototype.forEach.call(bseg.children, function (o) {
+          o.setAttribute('aria-pressed', String(o.getAttribute('data-view') === e.data.view));
+        });
+        return;
+      }
       if (e.data?.type === 'qbank:scroll') {
         /* 地图里的滚轮/上滑转成首页滚动，滚回顶端就是首页 */
         var dy = Number(e.data.dy) || 0;
