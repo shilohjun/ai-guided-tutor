@@ -488,6 +488,17 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
   font-weight:600;letter-spacing:.01em;
 }
 .p1-chips{display:none}
+.composer.is-picked .composer-main textarea{display:none}
+.picked{padding:2px 2px 2px;max-height:36dvh;overflow:auto}
+.picked-body{font-size:var(--fs-body);line-height:1.7;color:var(--ink)}
+.picked-body .qstem p{margin:0 0 .5em}
+.picked-body .qstem p:last-child{margin-bottom:0}
+.picked-loading{color:var(--ink-3);font-size:var(--fs-body);margin:2px 0}
+.picked-clear{
+  height:22px;padding:0 8px;border-radius:var(--r-pill);border:1px solid var(--line);
+  background:var(--surface);color:var(--ink-3);font-size:var(--fs-meta);cursor:pointer;
+}
+.picked-clear:hover{border-color:var(--brand-line);color:var(--brand-ink)}
 .composer .c-chip,.composer .c-hint{display:none}
 /* ===== 题库在地图里，下滑就上来：悬浮抬升，不换页 ===== */
 .p1{overflow-y:auto;overscroll-behavior:contain}
@@ -1294,6 +1305,9 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
         <div class="composer" id="composer1">
           <div class="composer-main">
             <textarea id="input1" placeholder="粘贴题目，或说说你卡在哪一步…" aria-label="题目内容"></textarea>
+            <div class="picked" id="picked1" hidden>
+              <div class="picked-body q-rich" id="pickedBody"></div>
+            </div>
             <div class="shot" id="shot1" hidden>
               <img id="ocrImg" alt="题目照片预览" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
               <button class="shot-x" id="ocrClose" type="button" aria-label="移除图片">
@@ -1308,6 +1322,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
                 物理 · 高中
               </span>
               <span class="c-hint" id="pickHint">支持文字、拍照识别</span>
+              <button class="picked-clear" id="pickedClear" type="button" hidden>重新输入</button>
               <button class="ocr-retry" id="ocrRetry" type="button" hidden>重新识别</button>
             </div>
             <div class="c-right">
@@ -1794,8 +1809,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     $('#go2').disabled = !ready;
     $('#send1').disabled = !ready;
     if (!ready) { setNote(''); return; }
-    if (S.picked) setNote('已选：' + ((S.picked.topics || [])[0] || '题库题目'));
-    else setNote('将按你输入的文字读题');
+    setNote('');
   }
 
   function setNote(text, bad) {
@@ -1804,7 +1818,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     el.classList.toggle('bad', !!bad);
   }
 
-  $('#input1').addEventListener('input', function () {
+  $('#input1').addEventListener('input', function (e) {
+    if (e.isTrusted) clearPickedView();
     if (this.value.trim()) {
       S.picked = null;
       S.pickedBank = null;
@@ -2768,6 +2783,53 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && p1 && p1.scrollTop > 40) { e.stopPropagation(); closeMap(); }
     });
+    /* 题库题：输入框位置直接摊开带公式图的题干；引擎仍读 textarea 里的纯文本 */
+    function renderPicked(q) {
+      var comp = $('#composer1'), box = $('#picked1'), body = $('#pickedBody'), clear = $('#pickedClear');
+      if (!comp || !box || !body) return;
+      comp.classList.add('is-picked');
+      box.hidden = false;
+      if (clear) clear.hidden = false;
+      body.innerHTML = '<p class="picked-loading">正在展开题目…</p>';
+      var i = q && q.i;
+      if (!i) { body.innerHTML = ''; return; }
+      fetch('/qbank/q/' + i + '.json').then(function (r) {
+        return r.ok ? r.json() : null;
+      }).then(function (det) {
+        if (!det) throw new Error('no-detail');
+        var html = '<div class="qstem">' + (det.stemHtml || esc(det.stemText || '')) + '</div>';
+        if (det.options && det.options.length) {
+          html += '<ol class="q-opts-r">';
+          det.options.forEach(function (o) {
+            html += '<li><b>' + esc(o.l || '') + '</b><span>' + (o.html || esc(o.text || '')) + '</span></li>';
+          });
+          html += '</ol>';
+        }
+        body.innerHTML = html;
+      }).catch(function () {
+        body.innerHTML = '<p>' + esc((q && q.stem) || '') + '</p>';
+      });
+    }
+
+    function clearPickedView() {
+      var comp = $('#composer1'), box = $('#picked1'), clear = $('#pickedClear');
+      if (comp) comp.classList.remove('is-picked');
+      if (box) { box.hidden = true; }
+      if (clear) clear.hidden = true;
+    }
+
+    var pickedClearBtn = $('#pickedClear');
+    if (pickedClearBtn) pickedClearBtn.addEventListener('click', function () {
+      clearPickedView();
+      var input = $('#input1');
+      input.value = '';
+      S.picked = null;
+      S.pickedBank = null;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      syncP1();
+      input.focus();
+    });
+
     function landPickedQuestion(q) {
       if (!q) return;
       var text = String(q.stem || '').trim();
@@ -2783,8 +2845,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       setTimeout(function () { input.focus(); }, 260);
       input.setSelectionRange(0, 0);
       input.scrollTop = 0;
+      renderPicked(q);
       syncP1();
-      setNote('已选入高考真题，按 ↑ 开始学习。');
     }
     try {
       var pick = sessionStorage.getItem('qbank.pick');
