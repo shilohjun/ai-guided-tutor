@@ -339,9 +339,22 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
    ===================================================================== */
 #app{position:relative;flex:1;min-height:0}
 .page{position:absolute;inset:0;display:none;flex-direction:column;min-height:0}
-.page.is-active{display:flex;animation:pageIn .28s ease both}
-@keyframes pageIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){.page.is-active{animation:none}}
+.page.is-active{display:flex;z-index:2;animation:pageIn .32s cubic-bezier(.22,.61,.36,1) both}
+/* 离开的那一页继续可见一小会儿，交叉淡出，换页不再是硬切 */
+.page.is-leaving{display:flex;z-index:1;pointer-events:none;animation:pageOut .16s ease both}
+@keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes pageOut{from{opacity:1;transform:none}to{opacity:0;transform:scale(.994)}}
+/* 首屏像 deepseek 那样一层一层浮上来：标 → 标题 → 输入框 → 底条 */
+@keyframes softIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes softFade{from{opacity:0}to{opacity:1}}
+.p1-ready .hero-mark{animation:softIn .5s cubic-bezier(.22,.61,.36,1) both}
+.p1-ready .hero-text{animation:softIn .58s .06s cubic-bezier(.22,.61,.36,1) both}
+.p1-ready .composer{animation:softIn .62s .14s cubic-bezier(.22,.61,.36,1) both}
+.p1-ready .goodbar{animation:softFade .5s .3s ease both}  /* 底条靠 translateX(-50%) 居中，不能动 transform */
+@media (prefers-reduced-motion:reduce){
+  .page.is-active,.page.is-leaving{animation:none}
+  .p1-ready .hero-mark,.p1-ready .hero-text,.p1-ready .composer,.p1-ready .goodbar{animation:none}
+}
 
 .btn-primary{
   display:inline-flex;align-items:center;gap:8px;
@@ -1697,12 +1710,25 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     }).join('');
   }
 
+  var REDUCED_MQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+
   function setPage(n) {
     // 五页随时可以切：没有数据就进空态，而不是把人弹回第 1 页
     if (n > S.max) S.max = n;
     S.page = n;
     document.body.setAttribute('data-page', String(n));
-    $$('.page').forEach(function (p) { p.classList.toggle('is-active', Number(p.dataset.page) === n); });
+    var allPages = $$('.page');
+    var prevPage = null, nextPage = null;
+    allPages.forEach(function (p) {
+      if (p.classList.contains('is-active')) prevPage = p;
+      if (Number(p.dataset.page) === n) nextPage = p;
+    });
+    var softSwitch = prevPage && nextPage && prevPage !== nextPage && !REDUCED_MQ.matches;
+    if (softSwitch) {
+      prevPage.classList.add('is-leaving');
+      setTimeout(function () { prevPage.classList.remove('is-leaving'); }, 240);
+    }
+    allPages.forEach(function (p) { p.classList.toggle('is-active', Number(p.dataset.page) === n); });
 
     // 页面进度条全站统一放在顶栏正中，页三也不例外
     $('#modeSwitch').hidden = n !== 3;
@@ -2732,6 +2758,12 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     }).catch(function (err) { S.bankErr = err.message; });
   }
   loadQBankList();
+
+  /* 首屏分层淡入：只跑一次，prefers-reduced-motion 下由 CSS 关掉 */
+  var p1El = document.getElementById('p1');
+  if (p1El) {
+    requestAnimationFrame(function () { p1El.classList.add('p1-ready'); });
+  }
 
   /* 便于逐页评审：/?p=3 之类直接落到某一页（会真实跑一遍读题与会话） */
   function maybeReviewJump() {
