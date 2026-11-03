@@ -7,7 +7,7 @@
  */
 
 import { describe, it, assert, assertEquals } from './runner.js';
-import { decideLevel, buildStrategy, buildForbidden, route } from '../src/core/route.js';
+import { decideLevel, buildStrategy, buildForbidden, route, looksLikeHelpRequest } from '../src/core/route.js';
 import { getProblem } from '../src/core/problems.data.js';
 
 const P1 = getProblem('phy-emi-01');
@@ -208,5 +208,35 @@ describe('路由 · 策略与禁止项', () => {
     assert(r.suppressed, '应抑制');
     assertEquals(r.level, null, '抑制时 level 必须为 null');
     assertEquals(r.allowedConcepts.length, 0);
+  });
+});
+
+
+describe('自主训练 · 什么话才算在求助', () => {
+  /**
+   * 这条判据决定 AI 要不要开口：
+   * 判宽了，自主训练变成每句都有人接话；判窄了，学生问破喉咙也没人理。
+   */
+  it('带问号的话算求助', () => {
+    assertEquals(looksLikeHelpRequest('这一步该用哪条规律？'), true);
+    assertEquals(looksLikeHelpRequest('为什么方向是逆时针?'), true);
+  });
+
+  it('常见的求助说法算求助（不带问号也算）', () => {
+    for (const t of ['我不会', '看不懂这一步', '卡在第二问', '能给我点提示吗', '这个该怎么下手']) {
+      assertEquals(looksLikeHelpRequest(t), true, t);
+    }
+  });
+
+  it('自己在推演的话不算求助', () => {
+    for (const t of ['我先算感应电动势', 'F=ma，所以 a=2', '让我想想', '我觉得应该是 0.4V']) {
+      assertEquals(looksLikeHelpRequest(t), false, t);
+    }
+  });
+
+  it('空输入不算求助', () => {
+    assertEquals(looksLikeHelpRequest(''), false);
+    assertEquals(looksLikeHelpRequest('   '), false);
+    assertEquals(looksLikeHelpRequest(undefined), false);
   });
 });

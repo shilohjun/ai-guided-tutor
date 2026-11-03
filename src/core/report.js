@@ -15,6 +15,8 @@
 import { findStepByPosition, findGraph, totalSteps } from './locate.js';
 import { inspectVoice } from './prompt.js';
 import { safeStepRef } from './guard.js';
+import { buildReportReview } from './report-review.js';
+import { buildPersonalFeedback } from './report-feedback.js';
 
 /**
  * 从引擎响应累积一条会话记录（服务端维护）。
@@ -167,11 +169,14 @@ export function buildReport(problem, record, meta) {
 
   // ---- 6. 下一步行动 ----
   const nextActions = buildNextActions(stuckPoints, independence, deeperIssues);
+  const review = buildReportReview(problem);
 
   return {
     problemId: problem.id,
     problemTitle: `${problem.subject === 'physics' ? '物理' : ''} · ${problem.topics.slice(0, 2).join('/')}（难度 ${problem.difficulty}/5）`,
     stuckPoints,
+    review,
+    personalFeedback: buildPersonalFeedback(problem, record, review),
     hintStats,
     formulaCards: record.formulaCards?.length ?? 0,
     independence,

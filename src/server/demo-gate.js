@@ -103,9 +103,6 @@ export function buildRequestEnv(gate, source) {
     delete env.ALIYUN_OCR_APPCODE;
   }
 
-  if (!String(env.TEACHER_KEY ?? '').trim()) {
-    env.DSH_FORCE_TEACHER_LOCK = '1';
-  }
 
   return env;
 }

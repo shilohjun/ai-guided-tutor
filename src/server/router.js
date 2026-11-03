@@ -10,20 +10,13 @@
  *   而重复的代码一定会跟主逻辑漂移，最后线上和本地行为不一致。
  *
  * ============================================================================
- * 本轮最重要的结构变化：**学生视图与教师视图在服务端分流**
+ * 学生视图 = 白名单投影
  * ============================================================================
- * 以前 /api/chat 把 diagnosis.teacherView（错因标签、证据原话、完整 trace）
- * 和学生消息一起返回，靠前端的一个 checkbox 决定显不显示。
- * 那是"前端不显示"，不是"学生拿不到" —— 打开 F12 就能看到。
+ * /api/chat 返回的每一个字段都是"挑出来给学生看的"，而不是"把内部数据打码后再发"。
+ * 学生载荷里没有解题路径、没有答案指纹、没有错因标签、没有完整解析。
  *
- * 现在：
- *   /api/chat            只返回学生可见内容（见 buildStudentTurn）
- *                        没有错因标签、没有置信度、没有路径名、没有守卫细节、没有 rationale
- *   /api/teacher/*       必须带 TEACHER_KEY，才返回完整图谱、参考答案、指纹、trace
- *
- * 为什么用"白名单投影"而不是"给教师数据打码"：
- *   打码依赖"记得打哪里"，漏一处就是泄题，而且每加一个字段都要重新审一遍；
- *   白名单投影依赖"允许说什么"，漏一处只是少说一句话。
+ * 为什么用"白名单投影"而不是"打码"：打码依赖"记得打哪里"，漏一处就是泄题；
+ * 白名单反过来 —— 漏一处只是少说一句话，不会多说一句不该说的话。
  *   这个取舍与 guard 用封闭词表而不是黑名单是同一条思路。
  *
  * 关于会话状态（serverless 下的已知局限，写在明处）：
@@ -40,13 +33,14 @@ import { loadEnvFile, maskSecret } from '../core/env.js';
 import { createAdapter, readLLMConfig } from '../core/llm.js';
 import { readOcrConfig, recognizeProblemImage, ocrStatus } from '../core/ocr.js';
 import { createEngine } from '../core/engine.js';
-import { totalSteps } from '../core/locate.js';
+import { totalSteps, findStepByPosition } from '../core/locate.js';
+import { safeStepRef } from '../core/guard.js';
 import { understandProblem } from '../core/intake.js';
 import { getProblemById, listProblems, getImportMeta, getProblemAnalysis, registerImportedProblem, registryStats } from '../core/registry.js';
-import { toStudentAnalysis, toTeacherAnalysis } from '../core/analysis.js';
+import { toStudentAnalysis } from '../core/analysis.js';
 import { createSessionRecord, appendTurn, buildReport } from '../core/report.js';
 import { formulaCardFor } from '../core/formula-cards.js';
-import { demoAnswerFor } from '../core/demo-answers.js';
+import { looksLikeHelpRequest } from '../core/route.js';
 import { runEvaluation, formatEvaluation } from '../core/eval.js';
 import { STUDENT_LEVEL_NOTE, inspectVoice } from '../core/prompt.js';
 import { PROBLEMS } from '../core/problems.data.js';
@@ -184,84 +178,6 @@ function getSession(sessionId, problemId) {
 }
 
 // ---------------------------------------------------------------------------
-// 教师视图鉴权
-// ---------------------------------------------------------------------------
-
-/**
- * 教师视图的三种形态。
- *
- *   'key'  配了 TEACHER_KEY ⇒ 必须带对口令才能取教研数据
- *   'open' 没配口令，且不是公网部署 ⇒ 本机开发模式，直接进
- *   'off'  没配口令，但被强制锁死（公网部署）⇒ 一律 403
- *
- * 为什么要有 'off' 这一档，而不是"没配口令就一律开放"：
- *   教师接口返回的是**完整解题路径 + 参考答案 + 答案指纹**。
- *   如果"没配口令 = 开放"这个默认值跟着代码上了 Vercel，
- *   那份公开链接就等于把答案挂在网上 —— 而这恰恰是最容易发生的疏忽：
- *   本地跑得好好的，部署时没人会想起来"还得去配个口令"。
- *
- *   所以默认值由**部署形态**决定，而不是由"有没有配"决定：
- *     server/server.js（本地）      → open
- *     api/index.js（Vercel / 公网） → off，除非显式配了口令
- *   这条规则写在代码里，不依赖部署时"记得"。
- */
-function readTeacherKey() {
-  return String(envFor().TEACHER_KEY ?? '').trim();
-}
-
-/**
- * 公网入口会在请求级 env 里把它设为 '1'，强制锁死教师视图。
- *
- * 为什么读 envFor() 而不是 process.env：
- *   这条锁原来靠 api/index.js 去改 process.env 来置位。加上口令门之后，
- *   请求级配置已经统一走 AsyncLocalStorage 了 —— 而 Cloudflare Workers 里
- *   process.env 并不映射到绑定的 Secret，靠改它根本不生效。
- *   所以这里跟着一起读请求级 env，两个平台才有一致的行为。
- */
-export function teacherMode() {
-  const env = envFor();
-  if (String(env.TEACHER_KEY ?? '').trim()) return 'key';
-  if (String(env.DSH_FORCE_TEACHER_LOCK ?? '') === '1') return 'off';
-  return 'open';
-}
-
-/** 定时安全比较：避免用 === 逐字符短路比较口令 */
-function safeEqual(a, b) {
-  const sa = String(a);
-  const sb = String(b);
-  if (sa.length !== sb.length) return false;
-  let diff = 0;
-  for (let i = 0; i < sa.length; i += 1) diff |= sa.charCodeAt(i) ^ sb.charCodeAt(i);
-  return diff === 0;
-}
-
-/** @returns {{ok: true} | {ok: false, status: number, error: string, hint?: string}} */
-export function checkTeacherAuth(req, url) {
-  const mode = teacherMode();
-
-  if (mode === 'off') {
-    return {
-      ok: false,
-      status: 403,
-      error: '教师视图在本部署形态下已关闭',
-      hint:
-        '公网部署默认关闭教师视图 —— 它包含完整解题路径与参考答案。' +
-        '确实需要开放时，在部署环境里设置 TEACHER_KEY，然后带口令访问。',
-    };
-  }
-
-  // 本地开发模式：不设口令，直接进
-  if (mode === 'open') return { ok: true };
-
-  const expected = readTeacherKey();
-  const provided = req.headers?.['x-teacher-key'] || url.searchParams.get('key') || '';
-  if (!safeEqual(provided, expected)) {
-    return { ok: false, status: 401, error: '教师口令不正确' };
-  }
-  return { ok: true };
-}
-
-// ---------------------------------------------------------------------------
 // 响应工具（统一封装，本地与 serverless 共用）
 // ---------------------------------------------------------------------------
 
@@ -388,32 +304,22 @@ export function toStudentProblem(problem) {
   };
 }
 
-/** 教师可见的题目：完整图谱 + 参考答案 + 指纹 + 完整解析（只有带对口令才走到这里） */
-export function toTeacherProblem(problem) {
-  if (!problem) return null;
-  const importMeta = getImportMeta(problem.id);
-  const analysis = getProblemAnalysis(problem);
-  return {
-    id: problem.id,
-    source: problem.source ?? 'library',
-    subject: problem.subject,
-    difficulty: problem.difficulty,
-    topics: problem.topics,
-    stem: problem.stem,
-    givens: problem.givens,
-    asked: problem.asked,
-    figure: problem.figure ?? null,
-    solutionGraphs: problem.solutionGraphs,
-    misconceptions: problem.misconceptions,
-    referenceAnswer: problem.referenceAnswer,
-    answerFingerprints: problem.answerFingerprints ?? [],
-    formulaFingerprints: problem.formulaFingerprints ?? [],
-    solutionInsights: problem.solutionInsights ?? [],
-    /** 完整解析：关键条件带 meaning 与 reveals 标记；知识图谱含步骤里的概念 */
-    analysis: toTeacherAnalysis(analysis),
-    /** 导入题的生成质量元数据：路径概览、关键关节、生成告警、创建时间 */
-    importMeta,
-  };
+
+/**
+ * 把"已走过的步骤号"翻译成学生可读的步骤名。
+ *
+ * 单一出口：所有名字都过 safeStepRef，不在这里自己拼标题 ——
+ * 一旦这里自己拼，就会出现"界面比提示更早说出结论"的口子。
+ */
+function stepLabelsFor(problem, graphId, completed) {
+  const out = {};
+  if (!problem || !Array.isArray(completed)) return out;
+  for (const index of completed) {
+    const step = findStepByPosition(problem, { graphId, stepIndex: index });
+    const ref = safeStepRef(problem, step);
+    if (ref) out[index] = ref.replace(/^「|」$/g, '');
+  }
+  return out;
 }
 
 /**
@@ -422,7 +328,7 @@ export function toTeacherProblem(problem) {
  * 这个函数是"学生拿不到教研数据"的**唯一执行点** ——
  * 想确认某个字段有没有外泄，只看这里就够了。
  */
-export function buildStudentTurn(response, mode) {
+export function buildStudentTurn(response, mode, problem) {
   const d = response.diagnosis;
   const guardBlocked = (response.meta.guardHistory ?? []).filter((g) => !g.passed).length;
   const stepCount = response.stepCount ?? 0;
@@ -453,6 +359,18 @@ export function buildStudentTurn(response, mode) {
        * UI 上因此写的是"已走过"而不是"已做对"。
        */
       completed: d.position.completedSteps ?? [],
+      /**
+       * 已走过步骤的**可公开名字**（键 = 步号，值 = 这一句在做什么）。
+       *
+       * 为什么只给"已走过"的：未走到的步骤标题等于提前泄题 ——
+       * 学生看到"第 6 步：用匀速条件做受力平衡"，就等于拿到了下一步该干什么。
+       * 已走完的步骤再告诉他叫什么，是复盘，不是剧透。
+       *
+       * 取值一律走 safeStepRef（与提示文案、学习报告同一条出口规则）：
+       * 推导 / 结论类步骤会自动退化成"第 N 步（推导）"，
+       * 因此这里**没有新增任何暴露面**，只是把同一套规则再用一次。
+       */
+      stepLabels: stepLabelsFor(problem, d.position.graphId, d.position.completedSteps ?? []),
       /** 只给"有多确定"的粗档，不给 0.55 这种数字（学生会追问 0.55 是什么） */
       confidenceLabel: d.position.confidence >= 0.7 ? '高' : d.position.confidence >= 0.5 ? '中' : '低',
     },
@@ -522,18 +440,17 @@ export async function handleApi(req, res, url) {
       problemCount: PROBLEMS.length,
       registry: registryStats(),
       /**
-       * 只报告形态，绝不回传口令本身。
-       * 'open' = 本地开发模式（点一下就能进教师视图）
-       * 'key'  = 需要口令
-       * 'off'  = 公网部署下强制关闭
-       */
-      teacherView: teacherMode(),
-      /**
        * 拍照识题状态：只报"配没配 / 走哪个通道"，**绝不回传 AppCode**。
        * 与 llmConfigured 同一口径 —— 健康检查是用来判断可用性的，不是用来泄密的。
        */
       ocr: ocrStatus(env),
       capabilities: {
+        /**
+         * 本部署支持的学习方式。
+         * 只列真实上线的：AI 伴学（陪着一步步想）尚未上线，前端按这份清单
+         * 渲染 —— 不在清单里的模式显示为禁用并标「暂未更新」，而不是假装能点。
+         */
+        modes: ['self_training'],
         intake: typeof adapter.understandProblem === 'function',
         intakeFallback: true,
         /** 拍图识题：配了凭据才为 true；前端据此决定是否显示拍照入口 */
@@ -559,6 +476,23 @@ export async function handleApi(req, res, url) {
   // ---- GET /api/problems ----
   if (path === '/api/problems' && req.method === 'GET') {
     sendJson(res, 200, { problems: listProblems() });
+    return true;
+  }
+
+  // ---- GET /api/related?id=xxx（巩固页：同一知识点的同类题） ----
+  /**
+   * 为什么放在服务端而不是前端从题库里筛：
+   *   题库以后会变成"导入题 + 校本题 + 爬取题"的混合体，筛选规则一旦写进前端，
+   *   每接一个来源就要改一次界面代码。规则只留一处，界面只负责渲染。
+   */
+  if (path === '/api/related' && req.method === 'GET') {
+    const id = url.searchParams.get('id');
+    const base = getProblemById(id);
+    if (!base) {
+      sendJson(res, 404, { error: `未找到题目 ${id}` });
+      return true;
+    }
+    sendJson(res, 200, { problems: relatedProblems(base) });
     return true;
   }
 
@@ -648,8 +582,10 @@ export async function handleApi(req, res, url) {
         detail: result.detail ?? null,
         charged: result.charged,
         hint: result.charged
-          ? '这次调用可能已经计费，建议先确认照片是否清晰、是否确实是题目，再决定要不要重试。'
-          : '这次请求没有到达识别服务（未计费），可以直接重试。',
+          ? '这次调用可能已经产生费用，建议先确认照片是否清晰、是否确实是题目，再决定要不要重试。'
+          : result.reason === 'http'
+            ? '请求已被服务拒绝，没有可用结果；可以直接重试，或先检查拍照识题的配置。'
+            : '这次请求没有到达识别服务（未计费），可以直接重试。',
       });
       return true;
     }
@@ -731,21 +667,6 @@ export async function handleApi(req, res, url) {
     return true;
   }
 
-  // ---- GET /api/demo-scripts ----
-  if (path === '/api/demo-scripts' && req.method === 'GET') {
-    const { SCENARIOS } = await import('../core/eval.js');
-    const id = url.searchParams.get('id');
-    const list = SCENARIOS.filter((s) => !id || s.problemId === id).map((s) => ({
-      id: s.id,
-      problemId: s.problemId,
-      title: s.title,
-      kind: s.kind,
-      utterances: s.utterances,
-    }));
-    sendJson(res, 200, { scripts: list });
-    return true;
-  }
-
   // ---- POST /api/chat ----
   if (path === '/api/chat' && req.method === 'POST') {
     const body = await readJson(req);
@@ -760,8 +681,15 @@ export async function handleApi(req, res, url) {
       return true;
     }
 
+    if (mode === 'ai_companion') {
+      // 只上线了自主训练：能力位（/api/health 的 capabilities.modes）里没有的模式，
+      // 前端点不到、服务端也不接 —— 免得改漏一处就悄悄跑出一个没验收过的模式。
+      sendJson(res, 400, { error: 'AI 伴学暂未上线，目前只支持自主训练。', code: 'MODE_UNAVAILABLE' });
+      return true;
+    }
+
     const session = getSession(sessionId || 'demo', problemId);
-    const normalizedMode = mode === 'self_training' ? 'self_training' : 'ai_companion';
+    const normalizedMode = 'self_training';
 
     let response;
     try {
@@ -770,7 +698,9 @@ export async function handleApi(req, res, url) {
         utterance,
         history: session.history,
         mode: normalizedMode,
-        explicitHelpSeeking: Boolean(explicitHelpSeeking),
+        // 前端只负责"点了快捷问句"这种显式信号；自由输入由服务端按这句话本身判定，
+        // 免得"自主训练"退化成"每句都算求助"或"问破喉咙也没人理"
+        explicitHelpSeeking: Boolean(explicitHelpSeeking) || looksLikeHelpRequest(utterance),
         sessionId: session.id,
       });
     } catch (error) {
@@ -794,28 +724,7 @@ export async function handleApi(req, res, url) {
     appendTurn(session.record, { utterance, response, problem });
 
     // 学生载荷 —— 只走白名单投影
-    sendJson(res, 200, buildStudentTurn({ ...response, stepCount: totalSteps(problem, response.diagnosis.position.graphId) }, normalizedMode));
-    return true;
-  }
-
-  // ---- POST /api/demo/answer ----
-  /**
-   * 演示模式专用：只在演示者点击“我已做出答案（演示）”时返回最终结果。
-   * 不是学生端接口 —— 必须显式带 demo:true，避免被普通页面误用。
-   */
-  if (path === '/api/demo/answer' && req.method === 'POST') {
-    const body = await readJson(req).catch(() => ({}));
-    if (body?.demo !== true) {
-      sendJson(res, 403, { error: '这个接口只用于演示模式。' });
-      return true;
-    }
-    const problemId = String(body?.problemId ?? '');
-    const answer = demoAnswerFor(problemId);
-    if (!answer) {
-      sendJson(res, 404, { error: '这道题暂时没有演示答案。' });
-      return true;
-    }
-    sendJson(res, 200, answer);
+    sendJson(res, 200, buildStudentTurn({ ...response, stepCount: totalSteps(problem, response.diagnosis.position.graphId) }, normalizedMode, problem));
     return true;
   }
 
@@ -908,225 +817,20 @@ export async function handleApi(req, res, url) {
     return true;
   }
 
-  // =========================================================================
-  // 以下为教师视图端点：全部需要 TEACHER_KEY
-  // =========================================================================
-
-  // ---- GET /api/teacher/problem?id=xxx ----
-  if (path === '/api/teacher/problem' && req.method === 'GET') {
-    const auth = checkTeacherAuth(req, url);
-    if (!auth.ok) return sendAuthError(res, auth);
-    const id = url.searchParams.get('id');
-    const problem = getProblemById(id);
-    if (!problem) {
-      sendJson(res, 404, { error: `未找到题目 ${id}` });
-      return true;
-    }
-    sendJson(res, 200, { problem: toTeacherProblem(problem), teacherView: true });
-    return true;
-  }
-
-  // ---- GET /api/teacher/session?sessionId=xxx ----
-  if (path === '/api/teacher/session' && req.method === 'GET') {
-    const auth = checkTeacherAuth(req, url);
-    if (!auth.ok) return sendAuthError(res, auth);
-    const sessionId = url.searchParams.get('sessionId') || 'demo';
-    const session = sessions.get(sessionId);
-    if (!session) {
-      sendJson(res, 404, { error: '该会话不存在或已过期' });
-      return true;
-    }
-    const problem = getProblemById(session.problemId);
-    sendJson(res, 200, buildTeacherPayload(session, problem));
-    return true;
-  }
-
-  // ---- GET /api/teacher/overview（教学与学习成果汇总） ----
-  if (path === '/api/teacher/overview' && req.method === 'GET') {
-    const auth = checkTeacherAuth(req, url);
-    if (!auth.ok) return sendAuthError(res, auth);
-    sendJson(res, 200, buildTeacherOverview());
-    return true;
-  }
-
   return false;
 }
 
-function sendAuthError(res, auth) {
-  sendJson(res, auth.status, { error: auth.error, hint: auth.hint ?? null });
-  return true;
-}
-
-// ---------------------------------------------------------------------------
-// 教师载荷
-// ---------------------------------------------------------------------------
-
 /**
- * 单个会话的教研视图。
+ * 同类题：先按知识点重合挑，重合的没有才退化成"题库里除它之外的题"。
  *
- * 这里**故意包含**参考答案与指纹：
- *   教师需要拿它来核对"AI 给的提示有没有真的贴近这道题"。
- *   它之所以安全，是因为它只在口令正确时才被构造出来 ——
- *   不带口令的请求根本走不到这个函数。
+ * 不按难度排序 —— 巩固的目标是"换个情境把同一条规律再用一次"，
+ * 难度跳太多就变成做新题了，反而练不到刚卡住的那一步。
  */
-export function buildTeacherPayload(session, problem) {
-  const hintLog = session.record.hintLog ?? [];
-  const byLevel = { 0: 0, 1: 0, 2: 0, 3: 0 };
-  for (const l of hintLog) byLevel[l.deliveredLevel] = (byLevel[l.deliveredLevel] ?? 0) + 1;
-
-  const hitCount = new Map();
-  for (const l of hintLog) {
-    for (const id of l.misconceptionIds ?? []) hitCount.set(id, (hitCount.get(id) ?? 0) + 1);
-  }
-
-  /**
-   * 路径进度：这一节课里学生走到过哪些步骤。
-   *
-   * 与"最后一次定位"不同 —— 学生可能先走到第 5 步、又退回来问第 2 步，
-   * 只记最后位置会把中间的轨迹全丢掉。教研复盘要看的恰恰是**轨迹**：
-   * "他在第 4 步来回三次"比"他停在第 4 步"信息量大得多。
-   */
-  const graphId = hintLog.find((l) => l.graphId)?.graphId ?? problem.solutionGraphs[0]?.id ?? null;
-  const graph = problem.solutionGraphs.find((g) => g.id === graphId) ?? problem.solutionGraphs[0];
-  const stepTotal = graph?.steps?.length ?? 0;
-  const reached = new Set();
-  const visitsByStep = new Map();
-  for (const l of hintLog) {
-    if (typeof l.stepIndex !== 'number') continue;
-    for (let i = 1; i < l.stepIndex; i += 1) reached.add(i); // 走过的（推断）
-    reached.add(l.stepIndex);
-    visitsByStep.set(l.stepIndex, (visitsByStep.get(l.stepIndex) ?? 0) + 1);
-  }
-  const lastLocated = [...hintLog].reverse().find((l) => typeof l.stepIndex === 'number')?.stepIndex ?? null;
-
-  return {
-    sessionId: session.id,
-    createdAt: session.createdAt,
-    problem: {
-      id: problem.id,
-      source: problem.source ?? 'library',
-      subject: problem.subject,
-      topics: problem.topics,
-      difficulty: problem.difficulty,
-      stem: problem.stem,
-      givens: problem.givens,
-      asked: problem.asked,
-      solutionGraphs: problem.solutionGraphs,
-      misconceptions: (problem.misconceptions ?? []).map((m) => ({
-        id: m.id,
-        label: m.label,
-        rootCause: m.rootCause,
-        hitCount: hitCount.get(m.id) ?? 0,
-      })),
-      referenceAnswer: problem.referenceAnswer,
-      answerFingerprints: problem.answerFingerprints ?? [],
-      formulaFingerprints: problem.formulaFingerprints ?? [],
-      solutionInsights: problem.solutionInsights ?? [],
-      importMeta: getImportMeta(problem.id),
-    },
-    turns: hintLog.map((l, i) => ({
-      index: i + 1,
-      utterance: l.utterance ?? '',
-      hintText: l.hintText ?? '',
-      studentMessage: l.message ?? '',
-      deliveredLevel: l.deliveredLevel,
-      levelName: LEVEL_NAMES[l.deliveredLevel] ?? '-',
-      stuckKind: l.stuckKind,
-      stepIndex: l.stepIndex ?? null,
-      stepTitle: l.stepTitle ?? null,
-      graphId: l.graphId ?? null,
-      misconceptionIds: l.misconceptionIds ?? [],
-      misconceptionLabels: (l.misconceptionIds ?? [])
-        .map((id) => problem.misconceptions?.find((m) => m.id === id)?.label)
-        .filter(Boolean),
-      guardPassed: l.guardPassed,
-      repairStrategy: l.repairStrategy ?? null,
-      violationKinds: l.violationKinds ?? [],
-      guardViolations: l.guardViolations ?? [],
-      evidenceQuotes: l.evidenceQuotes ?? [],
-      rationale: l.rationale ?? '',
-      voice: l.voice ?? null,
-      trace: l.trace ?? [],
-    })),
-    summary: {
-      totalTurns: hintLog.length,
-      byLevel,
-      guardBlocked: hintLog.filter((l) => !l.guardPassed).length,
-      levelProgression: hintLog.map((l) => l.deliveredLevel),
-      /** 路径进度图用：这条路径有几步、走到过哪几步、最后停在哪 */
-      pathProgress: {
-        graphId,
-        graphName: graph?.name ?? null,
-        stepCount: stepTotal,
-        reachedSteps: [...reached].sort((a, b) => a - b),
-        lastLocatedStep: lastLocated,
-        /** 每一步被问了几轮 —— 数值大的那一步就是真正的卡点 */
-        visitsByStep: [...visitsByStep.entries()].map(([stepIndex, count]) => ({ stepIndex, count })).sort((a, b) => a.stepIndex - b.stepIndex),
-        steps: (graph?.steps ?? []).map((s) => ({
-          index: s.index,
-          title: s.title,
-          kind: s.kind,
-          reached: reached.has(s.index),
-          isCurrent: s.index === lastLocated,
-          visits: visitsByStep.get(s.index) ?? 0,
-        })),
-      },
-      /** 给教研的一句提醒：这个数是"帮助强度"，不是学生水平 */
-      locateAccuracyNote:
-        '定位为双通道交叉校验结果：关键词通道（学生原话）优先于语义通道（模型推断）。冲突时会显式记录在 trace 里。',
-    },
-  };
-}
-
-/** 教学总览：跨会话的聚合成果（教师页顶部用） */
-export function buildTeacherOverview() {
-  const now = Date.now();
-  const live = [...sessions.values()].filter((s) => now - s.touchedAt <= SESSION_TTL_MS);
-
-  const byLevel = { 0: 0, 1: 0, 2: 0, 3: 0 };
-  const stuckKinds = new Map();
-  const misHits = new Map();
-  let turns = 0;
-  let blocked = 0;
-
-  for (const s of live) {
-    for (const l of s.record.hintLog ?? []) {
-      turns += 1;
-      byLevel[l.deliveredLevel] = (byLevel[l.deliveredLevel] ?? 0) + 1;
-      if (!l.guardPassed) blocked += 1;
-      stuckKinds.set(l.stuckKind, (stuckKinds.get(l.stuckKind) ?? 0) + 1);
-      for (const id of l.misconceptionIds ?? []) misHits.set(id, (misHits.get(id) ?? 0) + 1);
-    }
-  }
-
-  return {
-    registry: registryStats(),
-    sessions: live.length,
-    sessionsDetail: live.map((s) => {
-      const p = getProblemById(s.problemId);
-      return {
-        sessionId: s.id,
-        problemId: s.problemId,
-        problemSource: p?.source ?? 'unknown',
-        topics: p?.topics?.slice(0, 3) ?? [],
-        turns: (s.record.hintLog ?? []).length,
-        startedAt: s.createdAt,
-        lastActiveAt: new Date(s.touchedAt).toISOString(),
-      };
-    }),
-    summary: {
-      turns,
-      byLevel,
-      guardBlocked: blocked,
-      /** 卡点性质分布：教研最关心的"学生普遍卡在哪一类" */
-      stuckKindDistribution: [...stuckKinds.entries()].map(([kind, count]) => ({ kind, count })).sort((a, b) => b.count - a.count),
-      topMisconceptions: [...misHits.entries()]
-        .map(([id, count]) => ({ id, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 8),
-    },
-    note: '统计口径：内存中的活跃会话（TTL 2 小时）。冷启动会清零 —— 这是 PoC 的存储取舍，不是数据丢失 bug。',
-  };
+function relatedProblems(base) {
+  const mine = new Set(base.topics ?? []);
+  const rest = listProblems().filter((p) => p.id !== base.id);
+  const same = rest.filter((p) => (p.topics ?? []).some((t) => mine.has(t)));
+  return (same.length ? same : rest).slice(0, 6);
 }
 
 export { sessions, SESSION_TTL_MS, MAX_SESSIONS, sendJson, sendText, readJson, getAdapter, getSession, adapterTagFor };

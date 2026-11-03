@@ -434,7 +434,7 @@ export interface ProblemAnalysis {
     qualitative: string[];
   };
   keyConditions: KeyCondition[];
-  knowledgeGraph: KnowledgeGraphPair;
+  knowledgeGraph: KnowledgeGraphView;
 }
 
 export interface AnalysisVariable {
@@ -475,16 +475,16 @@ export interface KeyCondition {
 }
 
 /**
- * 知识图谱的两层。
+ * 知识图谱 —— 只有学生层。
  *
- * 学生层只有 topics（章节级知识点）；教师层多一层 steps[].concepts。
- * 为什么必须分开：concepts 就是解法本身 ——
- * 实测漏过一次，把 concepts 汇总发给学生，而里面有「电源与内阻」
- * 和「匀速直线运动合力为零」，恰好是那道题的两个 solutionInsight。
+ * 学生层只有 topics（章节级知识点），没有 steps[].concepts ——
+ * concepts 就是解法本身：曾经漏过一次，把 concepts 汇总发给学生，
+ * 而里面有「电源与内阻」和「匀速直线运动合力为零」，恰好是那道题的两个 solutionInsight。
+ *
+ * 外面包一层 { student } 是历史形状，消费方都按 knowledgeGraph.student 取，保持不动。
  */
-export interface KnowledgeGraphPair {
+export interface KnowledgeGraphView {
   student: KnowledgeGraph;
-  teacher: KnowledgeGraph;
 }
 
 export interface KnowledgeGraph {
@@ -598,7 +598,6 @@ export interface CompletionPayload {
  * 关键设计：**同一条链路的"学生版"和"教师版"是两次不同的投影，不是一次投影加打码。**
  *   学生版：只说"我做了什么判断"（读懂了你的思路 / 定位到你在哪一步 / 决定给几级提示）
  *          绝不含错因标签、置信度、守卫违规类型、答案指纹。
- *   教师版：完整 trace + 内部字段 + 教程标签（见 TeacherPayload）。
  *
  * 为什么不做"打码"：打码依赖"记得打哪里"，漏一处就是泄题。
  * 白名单投影只依赖"允许说什么"，漏一处只是少说一句话。
@@ -613,7 +612,7 @@ export interface EnginePathEntry {
 }
 
 // ---------------------------------------------------------------------------
-// 学生视图 / 教师视图载荷（服务端分流）
+// 学生视图载荷
 // ---------------------------------------------------------------------------
 
 /** 学生在对话中能拿到的一切。注意这里没有任何教研字段。 */
@@ -648,51 +647,6 @@ export interface StudentTurnPayload {
   reviewed: boolean;
 }
 
-/**
- * 教师视图载荷 —— 只在带对 TEACHER_KEY 时返回。
- * 包含：知识点、完整路径图谱、错因统计、引擎完整 trace、答案指纹命中记录。
- */
-export interface TeacherPayload {
-  sessionId: string;
-  problem: {
-    id: string;
-    source: 'library' | 'imported';
-    subject: string;
-    topics: string[];
-    difficulty: number;
-    stem: string;
-    givens: string[];
-    asked: string[];
-    /** 完整解题路径（学生视图永远拿不到） */
-    solutionGraphs: SolutionGraph[];
-    misconceptions: { id: string; label: string; rootCause: string; hitCount: number }[];
-    /** 仅在教师视图返回：用于教研核对提示是否贴近参考答案 */
-    referenceAnswer: string;
-    answerFingerprints: string[];
-    formulaFingerprints: string[];
-    solutionInsights: string[];
-  };
-  /** 逐轮统计 */
-  turns: {
-    index: number;
-    utterance: string;
-    deliveredLevel: HintLevel;
-    stuckKind: StuckKind;
-    stepIndex: number | null;
-    misconceptionIds: string[];
-    guardPassed: boolean;
-    violationKinds: string[];
-    evidenceQuotes: string[];
-  }[];
-  /** 引擎完整判断链路（每一轮的 trace 合并） */
-  trace: { turn: number; entries: TraceEntry[] }[];
-  summary: {
-    totalTurns: number;
-    byLevel: Record<HintLevel, number>;
-    guardBlocked: number;
-    locateAccuracyNote: string;
-  };
-}
 
 // ---------------------------------------------------------------------------
 // LLM 适配层契约
