@@ -1838,11 +1838,15 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   function autosizeInput() {
     var ta = $('#input1');
     if (!ta || ta.offsetParent === null) return;
-    ta.style.height = 'auto';
     var cap = Math.round((window.innerHeight || 800) * 0.38);
     var empty = !ta.value.trim();
-    ta.style.height = empty ? 'var(--input-h)' : Math.min(ta.scrollHeight, cap) + 'px';
-    ta.style.overflowY = ta.scrollHeight > cap ? 'auto' : 'hidden';
+    /* 量之前先把 min-height 摘掉，否则一行文字也会被撑成 48px */
+    ta.style.minHeight = '0px';
+    ta.style.height = '0px';
+    var need = ta.scrollHeight;
+    ta.style.minHeight = empty ? '' : '0px';
+    ta.style.height = empty ? 'var(--input-h)' : Math.min(Math.max(need, 34), cap) + 'px';
+    ta.style.overflowY = need > cap ? 'auto' : 'hidden';
   }
   window.addEventListener('resize', autosizeInput);
 
