@@ -869,21 +869,21 @@ body.resizing *{cursor:col-resize !important}
 .p4 .review-knowledge{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .p4 .review-item{padding:12px 16px;border:1px solid var(--line);border-radius:var(--r-inner);background:var(--surface-2)}
 .p4 .review-title{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;font-size:var(--fs-body);font-weight:600;line-height:var(--lh-body)}
-.p4 .review-formula{font-family:var(--font-mono);color:var(--ink);font-weight:400;overflow-wrap:anywhere}
+.p4 .review-formula{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:4px;color:var(--ink);font-weight:400;font-family:"Cambria Math","STIX Two Math","Noto Sans Math",var(--font-sans);line-height:1.8}
+.p4 .review-formula math{font-family:"Cambria Math","STIX Two Math","Noto Sans Math",serif;font-size:var(--fs-sub)}
+.p4 .review-formula mtext{font-family:var(--font-sans)}
 .p4 .review-copy{font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink-2);margin-top:4px}
 .p4 .review-methods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .p4 .review-method{padding:16px;border:1px solid var(--line);border-radius:var(--r-inner);min-width:0}
 .p4 .review-method h4{font-size:var(--fs-body);font-weight:600;line-height:var(--lh-body);margin:0 0 8px;color:var(--ink)}
+.p4 .review-family{font-size:var(--fs-meta);line-height:var(--lh-body);color:var(--ink-3);margin-bottom:8px}
 .p4 .review-method p{font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink-2)}
 .p4 .review-method p+p{margin-top:8px}
 .p4 .review-detail{margin-top:8px;font-size:var(--fs-body);line-height:var(--lh-body)}
 .p4 .review-detail summary{cursor:pointer;color:var(--brand-ink);font-size:var(--fs-meta);font-weight:600;width:fit-content}
 .p4 .review-detail p{margin-top:8px;color:var(--ink-2)}
 .p4 .review-detail summary:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
-.p4 .level.ok{background:var(--surface-2);border-color:var(--line)}
-.p4 .level.ok .lv,.p4 .level.ok .k-chip{color:var(--ink-2);border-color:var(--line)}
-.p4 .level[hidden]{display:none}
-@media(max-width:760px){.p4 .review-methods,.p4 .review-knowledge{grid-template-columns:1fr}.p4 .metrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.p4 .metric{padding:12px 8px}}
+@media(max-width:760px){.p4 .review-methods,.p4 .review-knowledge{grid-template-columns:1fr}}
 
 .p4-foot{
   flex:none;display:flex;align-items:center;justify-content:space-between;
@@ -1315,27 +1315,26 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
           <div class="metrics">
             <div class="metric"><span>本次练习</span><strong><span id="mCount">—</span> <em>题</em></strong></div>
             <div class="metric"><span>正确率</span><strong><span id="mAcc">—</span> <em>%</em></strong></div>
-            <div class="metric warn"><span>优先回看</span><strong id="mWeak" class="metric-weak">—</strong></div>
+            <div class="metric warn"><span>薄弱知识点</span><strong id="mWeak" class="metric-weak">—</strong></div>
           </div>
           <div class="levels">
             <div class="level ok">
-              <span class="lv">本题涉及</span>
+              <span class="lv">✓ 掌握</span>
               <div class="lv-body" id="lvOk"></div>
             </div>
             <div class="level warn">
-              <span class="lv">建议回看</span>
+              <span class="lv">! 待巩固</span>
               <div class="lv-body" id="lvWarn"></div>
             </div>
             <div class="level bad">
-              <span class="lv">需核对</span>
+              <span class="lv">✕ 薄弱</span>
               <div class="lv-body" id="lvBad"></div>
             </div>
           </div>
-          <p class="review-note">依据本次提问整理，不直接判定知识掌握或长期能力。</p>
         </div>
 
         <section class="report-card" aria-labelledby="reviewHeading">
-          <div class="rc-head"><h2 id="reviewHeading">本题的知识与方法</h2><span class="tag">要点复盘</span></div>
+          <div class="rc-head"><h2 id="reviewHeading">本题知识与方法</h2><span class="tag">要点复盘</span></div>
           <div id="reportReview"><p class="review-copy">生成报告后，查看本题的知识和方法要点。</p></div>
         </section>
 
@@ -2302,19 +2301,42 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     });
   }
 
-  /** 题目涉及不等于掌握；只把本轮提问关联的概念列为回看线索。 */
+  /** 知识点三档：用"提问里出现过的知识点标签"归到对应步骤的判定上 */
   function levelBuckets(rep) {
-    var warn = [], bad = [];
-    (rep && rep.stuckPoints || []).forEach(function (sp) {
+    var weakSteps = {}, warnSteps = {};
+    (rep && rep.stuckPoints ? rep.stuckPoints : []).forEach(function (sp) {
       if (sp.stepIndex == null) return;
-      var bucket = (sp.misconceptionLabels || []).length ? bad : warn;
-      S.turns.forEach(function (t) {
-        if (t.role !== 'ai' || t.stepIndex !== sp.stepIndex) return;
-        (t.concepts || []).forEach(function (c) { if (bucket.indexOf(c) < 0) bucket.push(c); });
-      });
+      if ((sp.misconceptionLabels || []).length) weakSteps[sp.stepIndex] = 1;
+      else warnSteps[sp.stepIndex] = 1;
     });
-    warn = warn.filter(function (c) { return bad.indexOf(c) < 0; });
-    return { ok: ((S.problem && S.problem.topics) || []).slice(0, 4), warn: warn.slice(0, 3), bad: bad.slice(0, 3) };
+    var ok = [], warn = [], bad = [];
+    S.turns.forEach(function (t) {
+      if (t.role !== 'ai' || !t.concepts || !t.concepts.length) return;
+      var bucket = (t.stepIndex != null && weakSteps[t.stepIndex]) ? bad
+        : (t.stepIndex != null && warnSteps[t.stepIndex]) ? warn : ok;
+      t.concepts.forEach(function (c) { if (bucket.indexOf(c) < 0) bucket.push(c); });
+    });
+    ((S.problem && S.problem.topics) || []).forEach(function (tp) {
+      if (bad.indexOf(tp) < 0 && warn.indexOf(tp) < 0 && ok.indexOf(tp) < 0) ok.push(tp);
+    });
+    return { ok: ok.slice(0, 4), warn: warn.slice(0, 3), bad: bad.slice(0, 3) };
+  }
+
+  /** 仅渲染预定义公式；未知值转义为文本，不接受接口返回的任意HTML。 */
+  function reportFormula(k) {
+    var formulas = {
+      cutting: ['感应电动势 E 等于 B 乘 L 乘 v', '<mi>E</mi><mo>=</mo><mi>B</mi><mi>L</mi><mi>v</mi>'],
+      circuit: ['电流 I 等于 E 除以 R 与 r 之和', '<mi>I</mi><mo>=</mo><mfrac><mi>E</mi><mrow><mi>R</mi><mo>+</mo><mi>r</mi></mrow></mfrac>'],
+      ampere: ['安培力等于 BIL，合力等于 ma', '<msub><mi>F</mi><mtext>安</mtext></msub><mo>=</mo><mi>B</mi><mi>I</mi><mi>L</mi><mtext>；</mtext><msub><mi>F</mi><mtext>合</mtext></msub><mo>=</mo><mi>m</mi><mi>a</mi>'],
+      flux: ['磁通量等于 BS，平均电动势的绝对值等于匝数乘磁通量平均变化率的绝对值', '<mi>Φ</mi><mo>=</mo><mi>B</mi><mi>S</mi><mtext>；</mtext><mo>|</mo><msub><mi>E</mi><mtext>平均</mtext></msub><mo>|</mo><mo>=</mo><mi>n</mi><mo>|</mo><mfrac><mrow><mi>Δ</mi><mi>Φ</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac><mo>|</mo>'],
+      charge: ['恒定电流时，电荷量等于电流乘时间，热量等于电流平方乘电阻乘时间', '<mi>q</mi><mo>=</mo><mi>I</mi><mi>t</mi><mtext>；</mtext><mi>Q</mi><mo>=</mo><msup><mi>I</mi><mn>2</mn></msup><mi>R</mi><mi>t</mi><mtext>（恒流）</mtext>'],
+      momentum: ['动量变化等于合力对时间的累计', '<mi>Δ</mi><mi>p</mi><mo>=</mo><mo>∫</mo><msub><mi>F</mi><mtext>合</mtext></msub><mi mathvariant="normal">d</mi><mi>t</mi>'],
+      energy: ['外力做功等于动能变化加焦耳热', '<msub><mi>W</mi><mtext>外</mtext></msub><mo>=</mo><mi>Δ</mi><msub><mi>E</mi><mi>k</mi></msub><mo>+</mo><mi>Q</mi>'],
+      power: ['外力功率等于 Fv，电阻 R 的功率等于电流平方乘 R', '<msub><mi>P</mi><mtext>外</mtext></msub><mo>=</mo><mi>F</mi><mi>v</mi><mtext>；</mtext><msub><mi>P</mi><mi>R</mi></msub><mo>=</mo><msup><mi>I</mi><mn>2</mn></msup><mi>R</mi>'],
+      capacitor: ['电容器电荷量等于 CU，棒中电流等于电阻支路电流加电容器支路电流', '<msub><mi>q</mi><mi>C</mi></msub><mo>=</mo><mi>C</mi><mi>U</mi><mtext>；</mtext><msub><mi>I</mi><mtext>棒</mtext></msub><mo>=</mo><msub><mi>I</mi><mi>R</mi></msub><mo>+</mo><msub><mi>I</mi><mi>C</mi></msub>']
+    };
+    var f = Object.prototype.hasOwnProperty.call(formulas, k.formulaKey) ? formulas[k.formulaKey] : null;
+    return f ? '<math xmlns="http://www.w3.org/1998/Math/MathML" aria-label="' + esc(f[0]) + '"><mrow>' + f[1] + '</mrow></math>' : esc(k.formula || '');
   }
 
   /** 内容来自报告接口的配套卡，不从参考答案或步骤标题拼出“方法”。 */
@@ -2336,15 +2358,15 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     host.innerHTML = '<section class="review-part"><h3>知识点梳理</h3><div class="review-knowledge">' +
       knowledge.map(function (k) {
         return '<article class="review-item"><div class="review-title"><span>' + esc(k.title) + '</span>' +
-          (k.formula ? '<span class="review-formula">' + esc(k.formula) + '</span>' : '') + '</div>' +
+          (k.formula ? '<span class="review-formula">' + reportFormula(k) + '</span>' : '') + '</div>' +
           '<p class="review-copy">' + esc(k.meaning) + '</p>' +
           '<details class="review-detail"><summary>适用条件</summary><p>' + esc(k.condition) + '</p></details></article>';
       }).join('') + '</div></section><section class="review-part"><h3>思路点拨</h3><div class="review-methods">' +
       methods.map(function (m) {
-        return '<article class="review-method"><h4>' + esc(m.title) + '</h4><p>' + esc(m.principle) + '</p>' +
-          '<p><strong>本题：</strong>' + esc(m.use) + '</p>' +
-          '<details class="review-detail"><summary>何时用 · 别照搬</summary><p><strong>何时用：</strong>' + esc(m.when) +
-          '</p><p><strong>别照搬：</strong>' + esc(m.boundary) + '</p></details></article>';
+        return '<article class="review-method"><h4>' + esc(m.title) + '</h4>' + (m.family ? '<div class="review-family">' + esc(m.family) + '</div>' : '') + '<p><strong>核心原理：</strong>' + esc(m.principle) + '</p>' +
+          '<p><strong>本题应用：</strong>' + esc(m.use) + '</p>' +
+          '<details class="review-detail"><summary>适用范围与易错点</summary><p><strong>适用范围：</strong>' + esc(m.when) +
+          '</p><p><strong>适用限制与易错点：</strong>' + esc(m.boundary) + '</p></details></article>';
       }).join('') + '</div></section><p class="review-note">' + esc(review.note || '') + '</p>';
   }
 
@@ -2402,8 +2424,6 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       $('#lvOk').innerHTML = chips([], '—');
       $('#lvWarn').innerHTML = chips([], '—');
       $('#lvBad').innerHTML = chips([], '—');
-      $('#lvWarn').parentNode.hidden = true;
-      $('#lvBad').parentNode.hidden = true;
       $('#wrongList').innerHTML = '<div class="wrong-empty">还没有可归纳的卡点：先回到解题页多问几轮。</div>';
       $('#wrongCount').textContent = '0 条';
       return;
@@ -2412,13 +2432,11 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     var buckets = levelBuckets(rep);
     $('#mWeak').textContent = buckets.bad[0]
       || (rep.stuckPoints[0] ? shortLabel(rep.stuckPoints[0].stepTitle) : '')
-      || buckets.warn[0] || '暂未记录具体卡点';
+      || '暂未出现明显薄弱点';
     $('#mWeak').parentNode.classList.toggle('warn', buckets.bad.length > 0);
     $('#lvOk').innerHTML = chips(buckets.ok, '暂无');
     $('#lvWarn').innerHTML = chips(buckets.warn, '暂无');
     $('#lvBad').innerHTML = chips(buckets.bad, '暂无');
-    $('#lvWarn').parentNode.hidden = !buckets.warn.length;
-    $('#lvBad').parentNode.hidden = !buckets.bad.length;
 
     var seen = {}, items = [];
     (rep.stuckPoints || []).forEach(function (sp) {
