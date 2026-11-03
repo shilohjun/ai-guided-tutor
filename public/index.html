@@ -541,12 +541,12 @@ body[data-page="1"] .tb-center,body[data-page="2"] .tb-center{opacity:0;pointer-
   box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 12%,transparent),var(--shadow-1);
 }
 .composer textarea{
-  width:100%;height:var(--input-h);border:0;outline:none;resize:none;
+  width:100%;min-height:var(--input-h);height:var(--input-h);border:0;outline:none;resize:none;overflow-y:hidden;
   background:transparent;color:var(--ink);
   font-family:inherit;font-size:var(--fs-body);line-height:var(--lh-body);
 }
 .composer textarea::placeholder{color:var(--ink-3)}
-.composer-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px}
+.composer-bar{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-top:10px}
 .c-left{display:flex;align-items:center;gap:8px;min-width:0}
 .c-chip{
   display:inline-flex;align-items:center;gap:4px;flex:none;white-space:nowrap;
@@ -1834,7 +1834,20 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   $('#homeBtn').addEventListener('click', function () { setPage(1); });
   $('#homeBtn2').addEventListener('click', function () { setPage(1); });
 
+  /* 输入框跟着内容长高，长题干不会挤在一条缝里，发送键始终贴着文字底部 */
+  function autosizeInput() {
+    var ta = $('#input1');
+    if (!ta || ta.offsetParent === null) return;
+    ta.style.height = 'auto';
+    var cap = Math.round((window.innerHeight || 800) * 0.38);
+    var empty = !ta.value.trim();
+    ta.style.height = empty ? 'var(--input-h)' : Math.min(ta.scrollHeight, cap) + 'px';
+    ta.style.overflowY = ta.scrollHeight > cap ? 'auto' : 'hidden';
+  }
+  window.addEventListener('resize', autosizeInput);
+
   function syncP1() {
+    autosizeInput();
     var typed = $('#input1').value.trim();
     var ready = !!S.picked || !!typed;
     $('#go2').disabled = !ready;
@@ -1955,6 +1968,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
         S.picked = null;
         S.problem = null;
         hint.textContent = '拍照识别 · 请核对文字';
+        autosizeInput();
       } else {
         hint.textContent = '没读到文字，可重拍或直接输入';
         retry.hidden = false;
