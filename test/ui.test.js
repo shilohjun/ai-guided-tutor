@@ -216,12 +216,12 @@ describe('前端 · 五页流程契约（新版单文件）', () => {
     assert(cards === 2, '第 5 页只保留两张卡，实际 ' + cards + ' 张');
   });
 
-  it('同类题由服务端给，不是前端拿题库凑', () => {
-    assertIncludes(appJs, "API.req('/api/related?id='", '同类题要走 /api/related');
-    assertIncludes(appJs, 'function loadRelated(', '缺少 loadRelated()');
-    const relatedFn = appJs.slice(appJs.indexOf('function loadRelated('), appJs.indexOf('function renderRelated('));
-    assertNotIncludes(relatedFn, '.filter(', '前端不该再自己按 topics 筛同类题');
-    assertIncludes(router, "'/api/related'", '服务端要提供 /api/related');
+  it('同类题按题库的真实双轴标签筛，不再用 topics 字符串猜', () => {
+    assertIncludes(html, 'id="relDrawer"', '第 5 页要有同类题抽屉');
+    assertIncludes(appJs, 'function relCandidates(', '缺少同类题筛选函数');
+    assertIncludes(appJs, 'q.leafId === cur.leafId', '同知识点要按叶子 id 对齐，不能按 topics 文字');
+    assertIncludes(appJs, 'q.th2Id === cur.th2Id', '同思路要按思路方法 id 对齐');
+    assertNotIncludes(appJs, "API.req('/api/related", '页五已经不再走服务端的 related 接口');
   });
 
   it('报告页的下一步是"巩固"，不是"迁移"', () => {

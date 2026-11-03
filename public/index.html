@@ -596,6 +596,68 @@ body[data-page="1"] .tb-center,body[data-page="2"] .tb-center{opacity:0;pointer-
 @keyframes viewerIn{from{opacity:0}to{opacity:1}}
 html[data-theme="dark"] .viewer{background:rgba(0,0,0,.72)}
 html[data-theme="dark"] .viewer img{background:#111}
+
+/* ---- 同类题抽屉（页五） ---- */
+.rel-scrim{
+  position:fixed;inset:0;z-index:55;background:rgba(20,20,22,.32);
+  animation:viewerIn .2s ease both;
+}
+.rel-scrim[hidden]{display:none}
+.rel-drawer{
+  position:fixed;top:0;right:0;bottom:0;z-index:56;width:min(430px,100%);
+  display:flex;flex-direction:column;background:var(--surface);
+  border-left:1px solid var(--line);box-shadow:-18px 0 44px rgba(20,20,22,.14);
+  transform:translateX(102%);visibility:hidden;
+  transition:transform .28s cubic-bezier(.22,.61,.36,1),visibility .28s;
+}
+.rel-drawer.on{transform:none;visibility:visible}
+.rel-head{display:flex;align-items:flex-start;gap:12px;padding:18px 18px 12px}
+.rel-title h2{margin:0;font-size:var(--fs-sub);font-weight:600;color:var(--ink)}
+.rel-title p{margin:4px 0 0;font-size:var(--fs-meta);color:var(--ink-3)}
+.rel-x{
+  margin-left:auto;flex:none;width:30px;height:30px;border-radius:50%;
+  display:grid;place-items:center;color:var(--ink-3);background:var(--surface-2);transition:.16s;
+}
+.rel-x:hover{background:var(--surface-3);color:var(--ink)}
+.rel-tabs{display:flex;gap:6px;padding:0 18px 12px}
+.rel-tabs button{
+  height:28px;padding:0 12px;border-radius:var(--r-pill);border:1px solid var(--line);
+  font-size:var(--fs-meta);color:var(--ink-2);background:var(--surface);transition:.16s;
+}
+.rel-tabs button[aria-selected="true"]{
+  background:var(--brand-tint);border-color:var(--brand-line);color:var(--brand-ink);font-weight:600;
+}
+.rel-ctx{
+  margin:0 18px 10px;padding:9px 12px;border-radius:var(--r-inner);
+  background:var(--surface-2);border:1px solid var(--line);
+  font-size:var(--fs-meta);color:var(--ink-2);line-height:1.5;
+}
+.rel-ctx b{color:var(--brand-ink);font-weight:600}
+.rel-list{flex:1;min-height:0;overflow:auto;padding:0 12px 12px;display:flex;flex-direction:column;gap:8px}
+.rel-item{
+  display:block;width:100%;text-align:left;padding:11px 12px;border-radius:var(--r-inner);
+  border:1px solid var(--line);background:var(--surface);transition:.16s;
+}
+.rel-item:hover{border-color:var(--brand-line);background:var(--brand-tint)}
+.rel-item .m{font-size:var(--fs-meta);color:var(--ink-3);display:flex;gap:8px;flex-wrap:wrap}
+.rel-item .m b{color:var(--brand-ink);font-weight:600}
+.rel-item .s{
+  margin-top:5px;font-size:var(--fs-body);color:var(--ink-2);line-height:1.5;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.rel-foot{
+  flex:none;display:flex;align-items:center;gap:12px;padding:12px 18px;
+  border-top:1px solid var(--line);font-size:var(--fs-meta);color:var(--ink-3);
+}
+.rel-foot .btn-ghost{margin-left:auto}
+@media (max-width:720px){
+  .rel-drawer{
+    top:auto;left:0;right:0;width:100%;height:76dvh;
+    border-left:0;border-top:1px solid var(--line);border-radius:18px 18px 0 0;
+    transform:translateY(102%);box-shadow:0 -18px 44px rgba(20,20,22,.18);
+  }
+  .rel-drawer.on{transform:none}
+}
 @media (max-width:720px){
   .viewer{padding:14px}
   .viewer img{max-width:96vw;max-height:72vh;border-radius:10px}
@@ -1106,30 +1168,6 @@ body.resizing *{cursor:col-resize !important}
 .bar-row:disabled .bar-ico{background:var(--surface-2);color:var(--ink-3);border-color:var(--line)}
 .bar-row:disabled .bar-title{color:var(--ink-3)}
 
-.drop-trigger{
-  display:flex;align-items:center;gap:8px;
-  width:100%;margin-top:16px;
-  padding:8px 16px;border-radius:var(--r-inner);
-  background:var(--surface-2);border:1px solid var(--line);
-  text-align:left;transition:.18s;
-}
-.drop-trigger:hover{border-color:var(--line-strong);background:var(--surface-3)}
-.drop-trigger .cur{
-  flex:1;min-width:0;font-size:var(--fs-body);color:var(--ink-2);font-weight:400;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-}
-.drop-trigger .caret{flex:none;color:var(--ink-3);transition:.2s}
-.drop-trigger .caret svg{width:16px;height:16px;display:block}
-.bar-card.open .caret{transform:rotate(180deg)}
-.drop-list{
-  margin-top:8px;max-height:176px;
-  padding:4px;
-  border:1px solid var(--line);border-radius:var(--r-inner);
-  background:var(--surface);
-  display:none;flex-direction:column;gap:2px;
-}
-.bar-card.open .drop-list{display:flex;animation:pop .18s ease both}
-.drop-list .q-item{padding:8px 16px;border-radius:4px}
 .p5-foot{
   flex:none;display:flex;align-items:center;justify-content:space-between;
   gap:8px;padding:16px 0;width:min(748px,100%);
@@ -1588,13 +1626,6 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
             </span>
           </button>
 
-          <button class="drop-trigger" id="dropTrigger" type="button" aria-expanded="false">
-            <span class="cur" id="dropCur">计算题 · 摩擦力 — 质量 3 kg 木箱在粗糙水平面，μ = 0.25，F = 15 N，求加速度</span>
-            <span class="caret" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-            </span>
-          </button>
-          <ul class="drop-list scroller" id="dropList"></ul>
         </div>
       </div>
 
@@ -1609,6 +1640,30 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
 
 
 
+
+    <div class="rel-scrim" id="relScrim" hidden></div>
+    <aside class="rel-drawer" id="relDrawer" role="dialog" aria-modal="true" aria-labelledby="relTitle" aria-hidden="true">
+      <div class="rel-head">
+        <div class="rel-title">
+          <h2 id="relTitle">同类题再练</h2>
+          <p>同知识点或同思路，换一道再走一遍</p>
+        </div>
+        <button class="rel-x" id="relClose" type="button" aria-label="关闭同类题">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="rel-tabs" role="tablist" aria-label="同类题的范围">
+        <button type="button" role="tab" data-reltab="kg" aria-selected="true">同知识点</button>
+        <button type="button" role="tab" data-reltab="th" aria-selected="false">同思路</button>
+        <button type="button" role="tab" data-reltab="all" aria-selected="false">全部</button>
+      </div>
+      <div class="rel-ctx" id="relCtx"></div>
+      <div class="rel-list scroller" id="relList"></div>
+      <div class="rel-foot">
+        <span id="relCount"></span>
+        <button class="btn-ghost" id="relShuffle" type="button">换一换</button>
+      </div>
+    </aside>
 
     <div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-label="题目照片">
       <img id="viewerImg" alt="题目照片">
@@ -1694,7 +1749,6 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     turns: [], progress: { index: null, count: 0, done: [], labels: {} },
     done: false, busy: false,
     report: null, reportTurns: [], reportErr: null,
-    related: [], relatedIdx: 0, relatedSource: null, relatedFor: null,
     ledger: [], sessionStart: 0
   };
 
@@ -2656,72 +2710,42 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
    * 同类题由服务端按知识点重合给出（/api/related）。
    * 规则只存在于一处：题库以后混进导入题、校本题，界面代码不用跟着改。
    */
+  /* 页五的同类题只面向 152 道题库：不再问 /api/related（那边的题没有双轴标签） */
   function loadRelated() {
-    if (!S.problem) { S.relatedSource = []; S.relatedFor = null; renderRelated(); return; }
-    if (S.relatedFor === S.problem.id) { renderRelated(); return; }
-    var wantId = S.problem.id;
-    API.req('/api/related?id=' + encodeURIComponent(wantId)).then(function (res) {
-      if (S.problem && S.problem.id === wantId) {
-        S.relatedSource = (res && res.problems) || [];
-        S.relatedFor = wantId;
-      }
-      renderRelated();
-    }).catch(function () {
-      S.relatedSource = [];
-      S.relatedFor = wantId;
-      renderRelated();
-    });
+    if (!S.bank && !S.bankErr) {
+      /* 题库索引还在路上：等它落地再刷一次 */
+      setTimeout(function () { if (S.bank) { renderRelated(); loadRelated(); } }, 600);
+      return;
+    }
+    renderRelated();
   }
 
-  function relatedProblems() { return S.relatedSource || []; }
-
   function renderRelated() {
-    S.related = relatedProblems();
-    var list = $('#dropList');
-    if (!S.problem) {
-      list.innerHTML = '<li><div class="bank-empty"><p>还没有题目 —— 先在第 1 页选一道，或粘贴你自己的题。</p></div></li>';
-      $('#dropCur').textContent = '还没有题目';
-      $('#startRelated').disabled = true;
-      return;
+    if (!REL.open) return;
+    var cur = currentBankRecord();
+    var list = relCandidates();
+    var ctx = $('#relCtx');
+    if (REL.tab === 'all' || !cur) {
+      ctx.innerHTML = '全部题目，按难度排';
+    } else if (REL.tab === 'kg') {
+      ctx.innerHTML = '同知识点 · <b>' + esc(leafName(cur)) + '</b>';
+    } else {
+      ctx.innerHTML = '同思路 · <b>' + esc(thName(cur)) + '</b>';
     }
-    if (!S.related.length) {
-      list.innerHTML = '<li><div class="bank-empty"><p>题库里没有同知识点的其他题目。</p></div></li>';
-      $('#dropCur').textContent = '题库暂无同类题';
-      $('#startRelated').disabled = true;
-      return;
-    }
-    $('#startRelated').disabled = false;
-    if (S.relatedIdx >= S.related.length) S.relatedIdx = 0;
-    list.innerHTML = S.related.map(function (q, i) {
-      var topics = (q.topics || []).slice(0, 2).join(' · ');
-      return '<li><button class="q-item" type="button" data-rel="' + i + '" aria-pressed="' + (i === S.relatedIdx) + '">' +
-        '<span class="q-body"><span class="q-meta"><span class="kind">难度 ' + (q.difficulty || '—') + '/5</span>' + esc(topics) + '</span>' +
-        '<span class="q-text">' + esc(q.stemPreview || '') + '</span></span>' +
-        '<span class="q-check">' + SVG_CHECK + '</span></button></li>';
-    }).join('');
-    var cur = S.related[S.relatedIdx];
-    $('#dropCur').textContent = (cur.topics || []).slice(0, 2).join(' · ') + ' — ' + (cur.stemPreview || '');
+    $('#relCount').textContent = list.length + ' 道可选';
+    $('#relList').innerHTML = list.length
+      ? list.map(function (q) {
+          return '<button class="rel-item" type="button" data-relpick="' + q.bankId + '">' +
+            '<span class="m"><b>' + esc(q.type || '题') + '</b> 难度 ' + (q.difficulty || '—') + '/5 · ' + esc(q.province || '') + '</span>' +
+            '<span class="s">' + esc(q.sub || '') + '</span></button>';
+        }).join('')
+      : '<div class="bank-empty"><p>' + emptyRelText() + '换个范围试试。</p></div>';
   }
 
   function renderP5Note() {
     var doneCount = S.ledger.filter(function (x) { return x.done; }).length;
     $('#p5note').textContent = '本轮共 ' + (S.ledger.length || 1) + ' 题 · ' + durationMinutes() + ' 分钟 · 独立完成 ' + doneCount + ' 题';
   }
-
-  $('#dropTrigger').addEventListener('click', function () {
-    var card = $('#relatedCard');
-    var open = card.classList.toggle('open');
-    this.setAttribute('aria-expanded', String(open));
-  });
-
-  $('#dropList').addEventListener('click', function (e) {
-    var el = e.target.closest('[data-rel]');
-    if (!el) return;
-    S.relatedIdx = Number(el.dataset.rel);
-    renderRelated();
-    $('#relatedCard').classList.remove('open');
-    $('#dropTrigger').setAttribute('aria-expanded', 'false');
-  });
 
   $('#redoBtn').addEventListener('click', function () {
     if (!S.problem) return;
@@ -2730,27 +2754,129 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   });
 
   $('#startRelated').addEventListener('click', function () {
-    var target = S.related[S.relatedIdx];
-    if (!target) return;
-    // 整块是按钮，不能像 .btn-ghost 那样改 textContent（会把图标与文案一起抹掉），
-    // 所以用 aria-busy + disabled 表达"正在载入"
-    var row = $('#startRelated');
-    row.setAttribute('aria-busy', 'true');
-    row.disabled = true;
-    API.problem(target.id).then(function (res) {
-      S.problem = res.problem;
-      S.picked = target;
-      S.relatedIdx = 0;
-      startSession();
-      setPage(3);
-    }).catch(function (err) {
-      // 停在第 5 页把原因说清楚，而不是跳到一个没有题目的会话里
-      $('#dropCur').textContent = '载入失败：' + err.message;
-    }).then(function () {
-      row.removeAttribute('aria-busy');
-      row.disabled = false;
-    });
+    if (!S.problem) return;
+    openRelDrawer();
   });
+
+  /* ---------------- 页五：同类题抽屉 ---------------- */
+  var REL = { open: false, tab: 'kg', seen: {} };
+
+  function currentBankRecord() {
+    if (S.pickedBank == null || !S.bank) return null;
+    for (var i = 0; i < S.bank.length; i++) {
+      if (S.bank[i].bankId === S.pickedBank) return S.bank[i];
+    }
+    return null;
+  }
+  function leafName(q) { return (S.kgNames && S.kgNames[q.leafId]) || q.topics.join(' · '); }
+  function thName(q) { return (S.thNames && (S.thNames[q.th2Id] || S.thNames[q.thId])) || '同一思路'; }
+
+  function emptyRelText() {
+    if (REL.tab === 'kg') return '题库里没有同知识点的其他题目。';
+    if (REL.tab === 'th') return '题库里没有同思路的其他题目。';
+    return '题库暂时没有别的题。';
+  }
+
+  function relCandidates(tab) {
+    var all = S.bank || [];
+    var cur = currentBankRecord();
+    var t = tab || REL.tab;
+    if (!cur) return all.slice(0, 40);
+    if (t === 'kg') {
+      return all.filter(function (q) { return q.leafId === cur.leafId && q.bankId !== cur.bankId; });
+    }
+    if (t === 'th') {
+      return all.filter(function (q) { return q.th2Id === cur.th2Id && q.bankId !== cur.bankId; });
+    }
+    return all.filter(function (q) { return q.bankId !== cur.bankId; }).slice(0, 40);
+  }
+
+  function openRelDrawer() {
+    REL.open = true;
+    var cur = currentBankRecord();
+    /* 默认落在"有题可练"的那一档：同知识点 → 同思路 → 全部 */
+    if (!cur) REL.tab = 'all';
+    else if (relCandidates('kg').length) REL.tab = 'kg';
+    else if (relCandidates('th').length) REL.tab = 'th';
+    else REL.tab = 'all';
+    $$('#relDrawer [data-reltab]').forEach(function (b) {
+      b.setAttribute('aria-selected', String(b.dataset.reltab === REL.tab));
+    });
+    var d = $('#relDrawer');
+    d.classList.add('on');
+    d.setAttribute('aria-hidden', 'false');
+    $('#relScrim').hidden = false;
+    renderRelated();
+    d.setAttribute('tabindex', '-1');
+    d.focus({ preventScroll: true });
+  }
+  function closeRelDrawer() {
+    REL.open = false;
+    var d = $('#relDrawer');
+    d.classList.remove('on');
+    d.setAttribute('aria-hidden', 'true');
+    $('#relScrim').hidden = true;
+  }
+
+  $('#relClose').addEventListener('click', closeRelDrawer);
+  $('#relScrim').addEventListener('click', closeRelDrawer);
+  $('#relDrawer').addEventListener('click', function (e) {
+    var pick = e.target.closest('[data-relpick]');
+    if (pick) {
+      var id = Number(pick.dataset.relpick);
+      var q = (S.bank || []).filter(function (x) { return x.bankId === id; })[0];
+      if (q) { closeRelDrawer(); startBankPractice(q, pick); }
+      return;
+    }
+    var tab = e.target.closest('[data-reltab]');
+    if (tab) {
+      REL.tab = tab.dataset.reltab;
+      $$('#relDrawer [data-reltab]').forEach(function (b) {
+        b.setAttribute('aria-selected', String(b.dataset.reltab === REL.tab));
+      });
+      renderRelated();
+    }
+  });
+  $('#relShuffle').addEventListener('click', function () {
+    var list = relCandidates();
+    if (list.length < 2) return;
+    REL.seen[REL.tab] = true;
+    list.push(list.shift());
+    var box = $('#relList');
+    box.innerHTML = list.map(function (q) {
+      return '<button class="rel-item" type="button" data-relpick="' + q.bankId + '">' +
+        '<span class="m"><b>' + esc(q.type || '题') + '</b> 难度 ' + (q.difficulty || '—') + '/5 · ' + esc(q.province || '') + '</span>' +
+        '<span class="s">' + esc(q.sub || '') + '</span></button>';
+    }).join('');
+  });
+
+  /* 从题库挑一道题直接开练：先按纯文本读题，再进第 3 页 */
+  function startBankPractice(q, btn) {
+    if (btn) btn.disabled = true;
+    fetch('/qbank/q/' + q.bankId + '.json').then(function (r) {
+      if (!r.ok) throw new Error('题库读取失败');
+      return r.json();
+    }).then(function (det) {
+      var opts = (det.options || []).map(function (o) { return o.l + ' ' + o.text; }).join('\n');
+      var text = (det.stemText || q.sub) + (opts ? '\n' + opts : '');
+      $('#input1').value = text;
+      S.picked = null;
+      S.pickedBank = q.bankId;
+      S.problem = null;
+      return API.importProblem(text.trim()).then(function (res) {
+        S.problem = res.problem;
+        hydrateBankDetail();
+        $('#p2text').textContent = S.problem.stem;
+        $('#p1note').textContent = '';
+        startSession();
+        setPage(3);
+      });
+    }).catch(function (err) {
+      setNote('无法开始这道题：' + err.message, true);
+    }).then(function () {
+      if (btn) btn.disabled = false;
+    });
+  }
 
   /* ---------------- 初始化 ---------------- */
   renderStepper();
@@ -2978,10 +3104,18 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
           (c.children || []).forEach(function (leaf) { kgNames[leaf.id] = leaf.name; });
         });
       });
+      var thNames = {};
+      (data.think || []).forEach(function (t) {
+        thNames[t.id] = t.name;
+        (t.children || []).forEach(function (c) { thNames[c.id] = c.name; });
+      });
+      S.thNames = thNames;
+      S.kgNames = kgNames;
       S.bank = qs.map(function (q) {
         var kg = [q.m, kgNames[q.k], kgNames[q.l]].filter(Boolean);
-        return { id: 'qbank-' + q.i, source: 'qbank', subject: 'physics', type: q.ty,
-          difficulty: q.d, province: q.p, topics: kg, stemPreview: q.s, stem: q.stem || q.s, opt: q.opt || '' };
+        return { id: 'qbank-' + q.i, bankId: q.i, source: 'qbank', subject: 'physics', type: q.ty,
+          difficulty: q.d, province: q.p, topics: kg, stemPreview: q.s, stem: q.stem || q.s, opt: q.opt || '',
+          moduleName: q.m, chapId: q.k, leafId: q.l, thId: q.t, th2Id: q.t2, sub: q.s };
       });
       S.bankErr = null;
     }).catch(function (err) { S.bankErr = err.message; });
