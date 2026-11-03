@@ -489,7 +489,26 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
 }
 .p1-chips{display:none}
 .composer.is-picked .composer-main textarea{display:none}
-.picked{padding:2px 2px 2px;max-height:36dvh;overflow:auto}
+/* 读题中：把输入区换成一行加载态，原地等，不闪屏 */
+.composer.is-reading .composer-main textarea,
+.composer.is-reading .picked,
+.composer.is-reading .shot,
+.composer.is-reading .composer-bar{display:none}
+.reading{display:none;align-items:center;gap:12px;padding:14px 2px}
+.composer.is-reading .reading{display:flex}
+.reading .spin{
+  flex:none;width:18px;height:18px;border-radius:50%;
+  border:2px solid var(--brand-line);border-top-color:var(--brand);
+  animation:spin .8s linear infinite;
+}
+.reading div{display:flex;flex-direction:column;gap:3px}
+.reading b{font-size:var(--fs-lead);font-weight:600;color:var(--ink);line-height:1.2}
+.reading em{font-style:normal;font-size:var(--fs-meta);color:var(--ink-3);line-height:1.3}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.reading .spin{animation:none;border-top-color:var(--brand-line)}.reading .spin::after{content:"";display:block;width:100%;height:100%;border-radius:50%;background:var(--brand);transform:scale(.45)}}
+.picked{padding:2px 2px 2px;max-height:min(36dvh,calc(100dvh - var(--topbar) - 320px));overflow:auto}
+/* 首屏内容与底部「好题精练」之间留出固定呼吸位，卡片再长也不会压到它 */
+#p1Home{padding-bottom:104px}
 .picked-body{font-size:var(--fs-body);line-height:1.7;color:var(--ink)}
 .picked-body .qstem p{margin:0 0 .5em}
 .picked-body .qstem p:last-child{margin-bottom:0}
@@ -1367,6 +1386,10 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
         <div class="composer" id="composer1">
           <div class="composer-main">
             <textarea id="input1" placeholder="粘贴题目，或说说你卡在哪一步…" aria-label="题目内容"></textarea>
+            <div class="reading" id="reading1">
+              <span class="spin" aria-hidden="true"></span>
+              <div><b id="readingTitle">正在读题…</b><em id="readingHint">AI 正在理解题干与公式，几秒钟</em></div>
+            </div>
             <div class="picked" id="picked1" hidden>
               <div class="picked-body q-rich" id="pickedBody"></div>
             </div>
@@ -2103,13 +2126,34 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     }).catch(function () {});
   }
 
+  /* 读题要等大模型（几秒），这段时间把输入区换成一行加载态 */
+  var readingTimer = 0;
+  function beginReading() {
+    S.reading = true;
+    var c = $('#composer1'); if (c) c.classList.add('is-reading');
+    var title = $('#readingTitle'), hint = $('#readingHint');
+    if (title) title.textContent = '正在读题…';
+    if (hint) hint.textContent = 'AI 正在理解题干与公式，几秒钟';
+    clearTimeout(readingTimer);
+    readingTimer = setTimeout(function () {
+      if (hint) hint.textContent = '题目有点长，正在逐句读…';
+    }, 6000);
+  }
+  function endReading() {
+    S.reading = false;
+    clearTimeout(readingTimer);
+    var c = $('#composer1'); if (c) c.classList.remove('is-reading');
+  }
+
   function goPage2() {
+    if (S.reading) return;
     if (S.problem && S.picked) { setPage(2); return; }
     var typed = $('#input1').value.trim();
     if (!S.picked && !typed) return;
 
     busyBtn($('#go2'), true, S.picked ? '载入中…' : '正在读题…');
     setNote('');
+    beginReading();
     var task = S.picked ? API.problem(S.picked.id) : API.importProblem(typed);
 
     task.then(function (res) {
@@ -2122,6 +2166,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     }).catch(function (err) {
       setNote(err.message, true);
     }).then(function () {
+      endReading();
       busyBtn($('#go2'), false);
       syncP1();
     });
