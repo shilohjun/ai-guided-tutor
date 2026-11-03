@@ -576,7 +576,31 @@ body[data-page="1"] .tb-center,body[data-page="2"] .tb-center{opacity:0;pointer-
   background:var(--surface-2);border:1px solid var(--line);
   animation:pop .2s ease both;
 }
+.shot{cursor:zoom-in}
 .shot img{width:100%;height:100%;object-fit:cover}
+.viewer{
+  position:fixed;inset:0;z-index:70;display:grid;place-items:center;padding:36px;
+  background:rgba(20,20,22,.6);animation:viewerIn .18s ease both;
+}
+.viewer[hidden]{display:none}
+.viewer img{
+  max-width:min(92vw,760px);max-height:78vh;border-radius:14px;object-fit:contain;
+  background:#fff;box-shadow:0 24px 64px rgba(0,0,0,.32);
+}
+.viewer-x{
+  position:absolute;top:calc(var(--topbar) + 18px);right:18px;width:36px;height:36px;border-radius:50%;
+  display:grid;place-items:center;background:rgba(255,255,255,.94);color:#1a1a1a;
+  box-shadow:0 6px 18px rgba(0,0,0,.22);cursor:pointer;transition:.16s;
+}
+.viewer-x:hover{background:#fff;transform:scale(1.04)}
+@keyframes viewerIn{from{opacity:0}to{opacity:1}}
+html[data-theme="dark"] .viewer{background:rgba(0,0,0,.72)}
+html[data-theme="dark"] .viewer img{background:#111}
+@media (max-width:720px){
+  .viewer{padding:14px}
+  .viewer img{max-width:96vw;max-height:72vh;border-radius:10px}
+  .viewer-x{top:calc(var(--topbar) + 10px);right:12px;width:32px;height:32px}
+}
 .shot-x{
   position:absolute;top:2px;right:2px;
   width:16px;height:16px;border-radius:var(--r-circle);
@@ -1586,6 +1610,13 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
 
 
 
+    <div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-label="题目照片">
+      <img id="viewerImg" alt="题目照片">
+      <button class="viewer-x" id="viewerClose" type="button" aria-label="关闭照片">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+
 <script>
 (function () {
   'use strict';
@@ -1875,11 +1906,34 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
    */
   var ocrShot = ''; // 最近一张图，供「重新识别」复用，不用重拍
 
+  var viewerEl = $('#viewer'), viewerImg = $('#viewerImg');
+  function openViewer() {
+    var src = $('#ocrImg').getAttribute('src');
+    if (!viewerEl || !src) return;
+    viewerImg.src = src;
+    viewerEl.hidden = false;
+    viewerEl.setAttribute('tabindex', '-1');
+    viewerEl.focus({ preventScroll: true });
+  }
+  function closeViewer() {
+    if (!viewerEl || viewerEl.hidden) return;
+    viewerEl.hidden = true;
+    viewerImg.removeAttribute('src');
+  }
+  if (viewerEl) {
+    $('#viewerClose').addEventListener('click', closeViewer);
+    viewerEl.addEventListener('click', function (e) {
+      if (e.target === viewerEl) closeViewer();
+    });
+  }
+
   function setShot(dataUrl) {
     if (dataUrl) {
       $('#ocrImg').src = dataUrl;
       $('#shot1').hidden = false;
+      openViewer();          /* 传完先摊开看一眼 */
     } else {
+      closeViewer();
       $('#shot1').hidden = true;
       $('#ocrImg').removeAttribute('src');
     }
@@ -1934,6 +1988,13 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
 
   $('#ocrRetry').addEventListener('click', function () {
     if (ocrShot) runOcr(ocrShot).catch(function () {});
+  });
+
+  /* 点缩略图再看一次大图 */
+  $('#ocrImg').addEventListener('click', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    openViewer();
   });
 
   /* 移除图片只撤图，不动已经填进输入框的文字 */
@@ -2743,7 +2804,9 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     window.__openBank = openMap;
     window.__closeBank = closeMap;
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && p1 && p1.scrollTop > 40) { e.stopPropagation(); closeMap(); }
+      if (e.key !== 'Escape') return;
+      if (viewerEl && !viewerEl.hidden) { e.stopPropagation(); closeViewer(); return; }
+      if (p1 && p1.scrollTop > 40) { e.stopPropagation(); closeMap(); }
     });
     var goodBar = $('#goodBar');
     if (goodBar) goodBar.addEventListener('click', openMap);
