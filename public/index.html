@@ -2949,6 +2949,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     window.__closeBank = closeMap;
     document.addEventListener('keydown', function (e) {
       if (e.key !== 'Escape') return;
+      if (REL.open) { e.stopPropagation(); closeRelDrawer(); return; }
       if (viewerEl && !viewerEl.hidden) { e.stopPropagation(); closeViewer(); return; }
       if (p1 && p1.scrollTop > 40) { e.stopPropagation(); closeMap(); }
     });
