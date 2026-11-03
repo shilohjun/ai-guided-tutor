@@ -2826,14 +2826,14 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     var all = S.bank || [];
     var cur = currentBankRecord();
     var t = tab || REL.tab;
-    if (!cur) return all.slice(0, 40);
+    if (!cur) return all.slice(0, 300);
     if (t === 'kg') {
       return all.filter(function (q) { return q.leafId === cur.leafId && q.bankId !== cur.bankId; });
     }
     if (t === 'th') {
       return all.filter(function (q) { return q.th2Id === cur.th2Id && q.bankId !== cur.bankId; });
     }
-    return all.filter(function (q) { return q.bankId !== cur.bankId; }).slice(0, 40);
+    return all.filter(function (q) { return q.bankId !== cur.bankId; }).slice(0, 300);
   }
 
   function openRelDrawer() {
