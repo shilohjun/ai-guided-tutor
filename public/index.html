@@ -738,6 +738,14 @@ body.is-qb{overflow:hidden}
 .pane-body{flex:1;min-height:0;padding:16px}
 
 /* 左栏题目 */
+.q-rich img.qf{display:inline-block;vertical-align:-0.22em;margin:0 1px;max-width:100%;height:auto}
+.q-rich img.qfig{display:block;margin:12px auto;max-width:100%;height:auto;border:1px solid var(--line);border-radius:10px}
+.q-opts-r{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:9px}
+.q-opts-r li{display:flex;gap:10px;align-items:center;font-size:var(--fs-body);line-height:1.6;color:var(--ink-2)}
+.q-opts-r li b{flex:none;width:19px;height:19px;border-radius:50%;background:var(--brand-tint);color:var(--brand-ink);
+  font-size:var(--fs-meta);font-weight:600;display:flex;align-items:center;justify-content:center}
+.q-opts-r img.qf{vertical-align:-0.2em;max-width:100%}
+.q-opts-r img.qfig{max-width:100%;border-radius:8px;margin:4px 0}
 .q-text-full{font-size:var(--fs-lead);line-height:var(--lh-body);color:var(--ink)}
 .fig{
   margin:16px 0;
@@ -1734,6 +1742,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   $('#input1').addEventListener('input', function () {
     if (this.value.trim()) {
       S.picked = null;
+      S.pickedBank = null;
       S.problem = null;
       var hint = $('#pickHint'); if (hint) hint.textContent = '文字输入';
     }
@@ -1865,6 +1874,22 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     }
   }
 
+  /* 题库题的完整题干（含公式图）按需取；只用于显示，引擎仍读纯文本 */
+  function hydrateBankDetail() {
+    var i = S.pickedBank, q = S.problem;
+    if (!i || !q || q.stemHtml) return;
+    fetch('/qbank/q/' + i + '.json').then(function (r) {
+      if (!r.ok) throw new Error('no');
+      return r.json();
+    }).then(function (det) {
+      if (S.problem !== q) return;
+      q.stemHtml = det.stemHtml;
+      q.richOptions = det.options;
+      q.qbMeta = { ty: det.ty, d: det.d, p: det.p, mod: det.mod, chap: det.chap, leaf: det.leaf };
+      renderLeft();
+    }).catch(function () {});
+  }
+
   function goPage2() {
     if (S.problem && S.picked) { setPage(2); return; }
     var typed = $('#input1').value.trim();
@@ -1876,6 +1901,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
 
     task.then(function (res) {
       S.problem = res.problem;
+      hydrateBankDetail();
       if (!S.picked) S.picked = { id: res.problem.id, topics: res.problem.topics, source: 'imported' };
       $('#p2text').textContent = S.problem.stem;
       setNote('');
@@ -1976,9 +2002,21 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
 
     var topics = q.topics || [];
     $('#qKind').textContent = '难度 ' + (q.difficulty || '—') + '/5';
-    $('#qTopic').textContent = (q.source === 'imported' ? '导入 · ' : '') + (topics[0] || '物理');
+    var origin = S.pickedBank ? '高考真题 · ' : (q.source === 'imported' ? '导入 · ' : '');
+    $('#qTopic').textContent = origin + ((q.qbMeta && q.qbMeta.leaf) || topics[0] || '物理');
 
-    var html = '<p class="q-text-full">' + esc(q.stem) + '</p>';
+    var html;
+    if (q.stemHtml) {
+      /* 题库题：题干里的公式与图形都按原图渲染，纯文本仍留给引擎 */
+      html = '<div class="q-rich">' + q.stemHtml + '</div>';
+      if (q.richOptions && q.richOptions.length) {
+        html += '<ol class="q-opts-r">' + q.richOptions.map(function (o) {
+          return '<li><b>' + esc(o.l) + '</b><span>' + o.html + '</span></li>';
+        }).join('') + '</ol>';
+      }
+    } else {
+      html = '<p class="q-text-full">' + esc(q.stem) + '</p>';
+    }
 
     if (q.figure) {
       html += '<div class="fig"><div class="fig-note"><b>图示</b><p>' + esc(q.figure) + '</p></div></div>';
@@ -2642,6 +2680,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       S.picked = null;
       S.problem = null;
       input.dispatchEvent(new Event('input', { bubbles: true }));
+      /* 输入事件会清掉选中态，这里再落一次题库题号（只影响显示层） */
+      S.pickedBank = q.i || null;
       closeMap();
       setTimeout(function () { input.focus(); }, 260);
       input.setSelectionRange(0, 0);

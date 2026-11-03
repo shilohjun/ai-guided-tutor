@@ -312,6 +312,17 @@ main{display:grid;grid-template-columns:1fr 340px;height:calc(100vh - var(--topb
   transition:background .16s;
 }
 .primary:hover{background:var(--brand-strong)}
+/* 公式与图形按原图渲染 */
+.qstem img.qf{display:inline-block;vertical-align:-0.22em;margin:0 1px;max-width:100%;height:auto}
+.qstem img.qfig{display:block;margin:10px auto;max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px}
+.qopts{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}
+.qdetail .tags{margin-top:16px}
+.qopts li{display:flex;gap:9px;align-items:center;font-size:var(--fs-body);line-height:1.55;color:var(--ink-2)}
+.qopts li b{flex:none;width:18px;height:18px;border-radius:50%;background:var(--brand-tint);color:var(--brand-ink);
+  font-size:var(--fs-meta);font-weight:600;display:flex;align-items:center;justify-content:center}
+.qopts img.qf{vertical-align:-0.2em;margin:0 1px;max-width:100%}
+.qopts img.qfig{max-width:100%;border-radius:6px;margin:4px 0}
+.qloading{color:var(--ink-3);font-size:var(--fs-body)}
 .qdetail .stem{font-size:13.5px;line-height:1.72;color:var(--ink);margin:0 0 12px}
 .tags{display:flex;flex-wrap:wrap;gap:6px}
 .tags span{
@@ -1151,6 +1162,21 @@ body[data-page="bank"] .home-only{opacity:0;pointer-events:none}
     });
   }
 
+  /* 题干详情按需取：/qbank/q/{i}.json 里带公式图与原图的 data URL */
+  var qCache = {};
+  function qBody(q, det, tags) {
+    var stem = det
+      ? '<div class="stem qstem">' + det.stemHtml + '</div>'
+      : '<div class="stem qstem"><span class="qloading">正在取题…</span></div>';
+    var opts = '';
+    if (det && det.options && det.options.length) {
+      opts = '<ol class="qopts">' + det.options.map(function (o) {
+        return '<li><b>' + esc(o.l) + '</b><span>' + o.html + '</span></li>';
+      }).join('') + '</ol>';
+    }
+    return '<div class="qdetail" data-i="' + q.i + '">' + stem + opts +
+      '<div class="tags">' + tags.join('') + '</div></div>';
+  }
   function openQuestion(q) {
     S.cur = q;
     var kp = KG_LEAF.get(q.l);
@@ -1161,12 +1187,25 @@ body[data-page="bank"] .home-only{opacity:0;pointer-events:none}
     tags.push('<span>' + esc(q.ty) + '</span>');
     tags.push('<span>' + q.d + ' 难度</span>');
     tags.push('<span>' + esc(q.p) + '</span>');
+    var det = qCache[q.i];
     showModal({
-      title: '第 ' + q.i + ' 题',
+      title: q.no ? ('第 ' + q.no + ' 题') : ('第 ' + q.i + ' 题'),
       sub: '先看原题，进入后不给答案',
-      body: '<div class="qdetail"><div class="stem">' + esc(q.s) + '</div><div class="tags">' + tags.join('') + '</div></div>',
+      body: qBody(q, det, tags),
       back: S.sel ? S.sel.id : null,
       primary: '用这道题开始'
+    });
+    if (det) return;
+    fetch('/qbank/q/' + q.i + '.json').then(function (r) {
+      if (!r.ok) throw new Error('no');
+      return r.json();
+    }).then(function (d) {
+      qCache[q.i] = d;
+      var box = document.querySelector('.qdetail[data-i="' + q.i + '"]');
+      if (box && S.modal && S.cur === q) box.outerHTML = qBody(q, d, tags);
+    }).catch(function () {
+      var box = document.querySelector('.qdetail[data-i="' + q.i + '"] .qloading');
+      if (box) box.textContent = '题目暂时取不到，请稍后再试。';
     });
   }
 
@@ -1516,8 +1555,22 @@ body[data-page="bank"] .home-only{opacity:0;pointer-events:none}
     cnt.textContent = '第 ' + (idx + 1) + ' 题 · 共 ' + DATA.qs.length + ' 道';
     cardEl.innerHTML =
       '<div class="pr-meta"><span>' + esc(q.ty) + '</span><span>难度 ' + q.d + '</span><span>' + esc(q.p) + '</span></div>' +
-      '<p class="pr-stem">' + esc(dec(q.s)) + '</p>' +
+      '<div class="pr-stem qstem" id="prStem"><p>' + esc(dec(q.s)) + '</p></div>' +
       '<div class="pr-actions"><button class="primary" id="prGo" type="button">开始一步一步解</button></div>';
+    fetch('/qbank/q/' + q.i + '.json').then(function (r) {
+      if (!r.ok) throw new Error('no');
+      return r.json();
+    }).then(function (d) {
+      if (cur !== q) return;
+      var box = document.querySelector('#prStem');
+      if (!box) return;
+      var opts = (d.options || []).length
+        ? '<ol class="qopts">' + d.options.map(function (o) {
+            return '<li><b>' + esc(o.l) + '</b><span>' + o.html + '</span></li>';
+          }).join('') + '</ol>'
+        : '';
+      box.innerHTML = d.stemHtml + opts;
+    }).catch(function () { });
     prac.hidden = false;
     sheet.style.overflow = 'hidden';
     prac.setAttribute('tabindex', '-1');
