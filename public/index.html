@@ -883,24 +883,6 @@ body.resizing *{cursor:col-resize !important}
 .p4 .review-detail summary{cursor:pointer;color:var(--brand-ink);font-size:var(--fs-meta);font-weight:600;width:fit-content}
 .p4 .review-detail p{margin-top:8px;color:var(--ink-2)}
 .p4 .review-detail summary:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
-.p4 .feedback-meta{font-size:var(--fs-meta);color:var(--ink-3);line-height:var(--lh-body);margin:0 0 12px}
-.p4 #personalFeedback{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-.p4 #personalFeedback>.feedback-item:only-child,.p4 #personalFeedback>.review-copy{grid-column:1/-1}
-.p4 .feedback-item{padding:16px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-inner);min-width:0}
-.p4 .feedback-status{display:inline-block;font-size:var(--fs-meta);font-weight:600;color:var(--amber);margin-bottom:4px}
-.p4 .feedback-status.revised{color:var(--mint)}
-.p4 .feedback-item h3{font-size:var(--fs-sub);line-height:var(--lh-sub);font-weight:600;margin:0 0 8px}
-.p4 .feedback-action{font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink-2)}
-.p4 .feedback-links{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px 16px;margin-top:8px;font-size:var(--fs-meta)}
-.p4 .feedback-links a{color:var(--brand-ink);text-decoration:underline;text-underline-offset:2px}
-.p4 .feedback-evidence{min-width:0}
-.p4 .feedback-evidence summary{cursor:pointer;color:var(--ink-2);font-size:var(--fs-meta);width:fit-content}
-.p4 .feedback-evidence[open]{flex-basis:100%}
-.p4 .feedback-evidence blockquote{margin:8px 0 0;padding:8px 12px;border-left:2px solid var(--line-strong);background:var(--surface);border-radius:4px;overflow-wrap:anywhere}
-.p4 .feedback-evidence blockquote span{color:var(--ink-3);font-size:var(--fs-meta)}
-.p4 .feedback-evidence blockquote p{margin-top:4px;font-size:var(--fs-body);color:var(--ink-2);line-height:var(--lh-body)}
-.p4 .feedback-evidence summary:focus-visible,.p4 .feedback-links a:focus-visible,.p4 .review-item:focus{outline:2px solid var(--brand);outline-offset:2px}
-@media(max-width:760px){.p4 #personalFeedback{grid-template-columns:1fr}}
 @media(max-width:760px){.p4 .review-methods,.p4 .review-knowledge{grid-template-columns:1fr}}
 
 .p4-foot{
@@ -1325,17 +1307,44 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       <div class="p4-scroll scroller">
         <div class="report-alert" id="reportAlert" hidden></div>
 
-        <section class="report-card" aria-labelledby="feedbackHeading">
-          <div class="rc-head"><h2 id="feedbackHeading">本次学习反馈</h2><span class="tag" id="rcTag">—</span></div>
-          <p class="feedback-meta" id="feedbackMeta">当前题目</p>
-          <div id="personalFeedback"><p class="review-copy">本次记录暂不足以形成具体反馈。</p></div>
-        </section>
+        <div class="report-card">
+          <div class="rc-head">
+            <h2>本次学习小结</h2>
+            <span class="tag" id="rcTag">—</span>
+          </div>
+          <div class="metrics">
+            <div class="metric"><span>本次练习</span><strong><span id="mCount">—</span> <em>题</em></strong></div>
+            <div class="metric"><span>正确率</span><strong><span id="mAcc">—</span> <em>%</em></strong></div>
+            <div class="metric warn"><span>薄弱知识点</span><strong id="mWeak" class="metric-weak">—</strong></div>
+          </div>
+          <div class="levels">
+            <div class="level ok">
+              <span class="lv">✓ 掌握</span>
+              <div class="lv-body" id="lvOk"></div>
+            </div>
+            <div class="level warn">
+              <span class="lv">! 待巩固</span>
+              <div class="lv-body" id="lvWarn"></div>
+            </div>
+            <div class="level bad">
+              <span class="lv">✕ 薄弱</span>
+              <div class="lv-body" id="lvBad"></div>
+            </div>
+          </div>
+        </div>
 
         <section class="report-card" aria-labelledby="reviewHeading">
           <div class="rc-head"><h2 id="reviewHeading">本题知识与方法</h2><span class="tag">要点复盘</span></div>
           <div id="reportReview"><p class="review-copy">生成报告后，查看本题的知识和方法要点。</p></div>
         </section>
 
+        <div class="report-card">
+          <div class="rc-head">
+            <h2>错题摘要</h2>
+            <span class="tag" id="wrongCount">—</span>
+          </div>
+          <div class="wrong" id="wrongList"></div>
+        </div>
       </div>
 
       <div class="p4-foot">
@@ -2292,6 +2301,27 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     });
   }
 
+  /** 知识点三档：用"提问里出现过的知识点标签"归到对应步骤的判定上 */
+  function levelBuckets(rep) {
+    var weakSteps = {}, warnSteps = {};
+    (rep && rep.stuckPoints ? rep.stuckPoints : []).forEach(function (sp) {
+      if (sp.stepIndex == null) return;
+      if ((sp.misconceptionLabels || []).length) weakSteps[sp.stepIndex] = 1;
+      else warnSteps[sp.stepIndex] = 1;
+    });
+    var ok = [], warn = [], bad = [];
+    S.turns.forEach(function (t) {
+      if (t.role !== 'ai' || !t.concepts || !t.concepts.length) return;
+      var bucket = (t.stepIndex != null && weakSteps[t.stepIndex]) ? bad
+        : (t.stepIndex != null && warnSteps[t.stepIndex]) ? warn : ok;
+      t.concepts.forEach(function (c) { if (bucket.indexOf(c) < 0) bucket.push(c); });
+    });
+    ((S.problem && S.problem.topics) || []).forEach(function (tp) {
+      if (bad.indexOf(tp) < 0 && warn.indexOf(tp) < 0 && ok.indexOf(tp) < 0) ok.push(tp);
+    });
+    return { ok: ok.slice(0, 4), warn: warn.slice(0, 3), bad: bad.slice(0, 3) };
+  }
+
   /** 仅渲染预定义公式；未知值转义为文本，不接受接口返回的任意HTML。 */
   function reportFormula(k) {
     var formulas = {
@@ -2327,7 +2357,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     var methods = (review.methods || []).slice(0, 2);
     host.innerHTML = '<section class="review-part"><h3>知识点梳理</h3><div class="review-knowledge">' +
       knowledge.map(function (k) {
-        return '<article class="review-item"' + (/^[a-z0-9-]+$/.test(k.formulaKey || '') ? ' id="review-knowledge-' + esc(k.formulaKey) + '" tabindex="-1"' : '') + '><div class="review-title"><span>' + esc(k.title) + '</span>' +
+        return '<article class="review-item"><div class="review-title"><span>' + esc(k.title) + '</span>' +
           (k.formula ? '<span class="review-formula">' + reportFormula(k) + '</span>' : '') + '</div>' +
           '<p class="review-copy">' + esc(k.meaning) + '</p>' +
           '<details class="review-detail"><summary>适用条件</summary><p>' + esc(k.condition) + '</p></details></article>';
@@ -2338,6 +2368,17 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
           '<details class="review-detail"><summary>适用范围与易错点</summary><p><strong>适用范围：</strong>' + esc(m.when) +
           '</p><p><strong>适用限制与易错点：</strong>' + esc(m.boundary) + '</p></details></article>';
       }).join('') + '</div></section><p class="review-note">' + esc(review.note || '') + '</p>';
+  }
+
+  /** 步骤标题常带冒号后缀，塞进指标卡会溢出，取主干并截断 */
+  function shortLabel(s) {
+    var t = String(s || '').split(/[：:（(]/)[0].trim();
+    return t.length > 14 ? t.slice(0, 14) + '…' : t;
+  }
+
+  function chips(list, emptyText) {
+    if (!list.length) return '<span class="k-chip muted">' + emptyText + '</span>';
+    return list.map(function (t) { return '<span class="k-chip">' + esc(t) + '</span>'; }).join('');
   }
 
   function durationMinutes() {
@@ -2353,55 +2394,80 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   function renderReport() {
     var rep = S.report;
     renderReportReview(rep);
+    var expected = 0, matched = 0;
+    S.ledger.forEach(function (x) {
+      expected += x.expected || 0;
+      matched += Math.min(x.matched || 0, x.expected || 0);
+    });
+    var acc = expected ? Math.round((matched / expected) * 100) : 0;
+
     $('#durNum').textContent = String(durationMinutes());
+    $('#mCount').textContent = String(S.ledger.length || 1);
+    // 自主训练里 AI 不出题、不收答案，ledger 为空是常态：
+    // 这时候写 0% 会被读成"全错"，所以只在真有可判定作答时才给数字
+    $('#mAcc').textContent = (rep && expected) ? String(acc) : '—';
+    var accUnit = $('#mAcc').parentNode.querySelector('em');
+    if (accUnit) accUnit.hidden = !(rep && expected);
     $('#rcTag').textContent = S.problem
-      ? (S.problem.subject === 'physics' ? '物理' : '') + ' · ' + ((S.problem.topics || [])[0] || '') : '—';
-    var host = $('#personalFeedback');
+      ? (S.problem.subject === 'physics' ? '物理' : '') + ' · ' + ((S.problem.topics || [])[0] || '')
+      : '—';
+
     if (S.reportErr || !rep) {
       var alert = $('#reportAlert');
       alert.hidden = false;
-      alert.textContent = S.reportErr ? '学习报告未能生成：' + S.reportErr : '学习报告尚未生成。';
-      $('#feedbackMeta').textContent = '暂无可汇总的本次对话';
-      host.innerHTML = '<p class="review-copy">本次记录暂不足以形成具体反馈。</p>';
+      alert.textContent = S.reportErr
+        ? '学习报告未能生成：' + S.reportErr
+        : '学习报告尚未生成。';
+      // 没有报告就没有"薄弱"可言：题目主题不是薄弱点，别拿它顶上
+      $('#mWeak').textContent = '—';
+      $('#mWeak').parentNode.classList.remove('warn');
+      $('#lvOk').innerHTML = chips([], '—');
+      $('#lvWarn').innerHTML = chips([], '—');
+      $('#lvBad').innerHTML = chips([], '—');
+      $('#wrongList').innerHTML = '<div class="wrong-empty">还没有可归纳的卡点：先回到解题页多问几轮。</div>';
+      $('#wrongCount').textContent = '0 条';
       return;
     }
-    $('#reportAlert').hidden = true;
-    var feedback = rep.personalFeedback;
-    $('#feedbackMeta').textContent = '当前题目 · ' + (feedback ? feedback.questionCount : 0) + ' 次提问';
-    if (!feedback) {
-      host.innerHTML = '<p class="review-copy">当前服务尚未提供新版反馈，请重启本项目服务后重新生成报告。</p>';
-      return;
-    }
-    var items = (feedback.items || []).slice(0, 2);
-    if (!items.length) {
-      host.innerHTML = '<p class="review-copy">' + esc(feedback.emptyMessage || '本次记录暂不足以形成具体反馈。') + '</p>';
-      return;
-    }
-    host.innerHTML = items.map(function (item) {
-      var revised = item.status === 'revised';
-      var key = item.knowledgeKey;
-      var linked = /^[a-z0-9-]+$/.test(key || '') && ((rep.review || {}).knowledge || []).some(function (k) { return k.formulaKey === key; });
-      return '<article class="feedback-item"><span class="feedback-status' + (revised ? ' revised' : '') + '">' +
-        (revised ? '本轮已修正' : '建议关注') + '</span><h3>' + esc(item.title) + '</h3>' +
-        '<p class="feedback-action">' + esc(item.action) + '</p>' +
-        '<div class="feedback-links">' + (linked ? '<a href="#review-knowledge-' + esc(key) + '" data-feedback-knowledge="' + esc(key) + '">查看相关知识 ↗</a>' : '') +
-        '<details class="feedback-evidence"><summary>查看对话依据</summary>' + (item.evidence || []).map(function (e) {
-          return '<blockquote>' + (e.question ? '<span>此前AI提问' + (e.questionExcerpt ? '（节选）' : '') + '</span><p>' + esc(e.question) + '</p>' : '') + '<span>第 ' + esc(e.round) + ' 轮学生原话' + (e.excerpt ? '（节选）' : '') + '</span><p>' + esc(e.quote) + '</p></blockquote>';
-        }).join('') + '</details></div></article>';
-    }).join('');
-  }
 
-  $('#personalFeedback').addEventListener('click', function (event) {
-    var link = event.target.closest('[data-feedback-knowledge]');
-    if (!link) return;
-    var target = document.getElementById('review-knowledge-' + link.getAttribute('data-feedback-knowledge'));
-    if (!target) return;
-    event.preventDefault();
-    var detail = target.querySelector('details');
-    if (detail) detail.open = true;
-    target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
-    target.focus({ preventScroll: true });
-  });
+    var buckets = levelBuckets(rep);
+    $('#mWeak').textContent = buckets.bad[0]
+      || (rep.stuckPoints[0] ? shortLabel(rep.stuckPoints[0].stepTitle) : '')
+      || '暂未出现明显薄弱点';
+    $('#mWeak').parentNode.classList.toggle('warn', buckets.bad.length > 0);
+    $('#lvOk').innerHTML = chips(buckets.ok, '暂无');
+    $('#lvWarn').innerHTML = chips(buckets.warn, '暂无');
+    $('#lvBad').innerHTML = chips(buckets.bad, '暂无');
+
+    var seen = {}, items = [];
+    (rep.stuckPoints || []).forEach(function (sp) {
+      if (sp.stepIndex == null) return;
+      if (sp.kind === 'knowledge_gap' && !(sp.misconceptionLabels || []).length) return;
+      if (seen[sp.stepIndex]) return;
+      seen[sp.stepIndex] = 1;
+      items.push(sp);
+    });
+    items = items.slice(0, 3);
+
+    $('#wrongCount').textContent = items.length + ' 条';
+    $('#wrongList').innerHTML = items.length
+      ? items.map(function (sp) {
+          var cause = (sp.misconceptionLabels || []).join('、') || KIND_LABEL[sp.kind] || '卡在这一步';
+          var concept = '';
+          for (var i = 0; i < S.turns.length; i++) {
+            var t = S.turns[i];
+            if (t.role === 'ai' && t.stepIndex === sp.stepIndex && t.concepts && t.concepts.length) {
+              concept = t.concepts[0]; break;
+            }
+          }
+          return '<div class="wrong-item">' +
+            '<div class="wrong-line"><span class="k">题目片段</span><span class="v">「' + esc(sp.stepTitle) + '」</span>' +
+            '<span class="k">待核对</span><span class="cause">' + esc(cause) + '</span></div>' +
+            '<div class="wrong-formula"><span>涉及规律</span><code>' + esc(concept || '依据尚不足') + '</code>' +
+            '<span>所属板块</span><span class="tag">' + esc((S.problem.topics || [])[0] || '—') + '</span></div>' +
+            '</div>';
+        }).join('')
+      : '<div class="wrong-empty">本轮没有留下具体卡点。</div>';
+  }
 
   $('#go5').addEventListener('click', function () { setPage(5); });
 
