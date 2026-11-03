@@ -1091,7 +1091,18 @@ body[data-page="bank"] .home-only{opacity:0;pointer-events:none}
   });
 
   var drag = null, moved = false;
+  /* 内嵌 + 触屏：单指纵向滑动交给宿主滚动（否则一进题库就被地图吃掉，回不去首页） */
+  var touchScroll = null;
+  var EMBED_MODE = /[?&]embedded=1/.test(location.search);
+  function postScroll(dy) {
+    if (!EMBED_MODE || !dy) return;
+    try { window.parent.postMessage({ type: 'qbank:scroll', dy: dy }, location.origin); } catch (err) { }
+  }
   svg.addEventListener('pointerdown', function (e) {
+    if (EMBED_MODE && e.pointerType === 'touch' && !e.target.closest('.node')) {
+      touchScroll = { y: e.clientY };
+      return;
+    }
     if (e.target.closest('.node')) return;
     drag = { x: e.clientX, y: e.clientY, cx: S.cam.x, cy: S.cam.y };
     moved = false;
@@ -1099,6 +1110,12 @@ body[data-page="bank"] .home-only{opacity:0;pointer-events:none}
     try { svg.setPointerCapture(e.pointerId); } catch (err) { }
   });
   svg.addEventListener('pointermove', function (e) {
+    if (touchScroll) {
+      var d = touchScroll.y - e.clientY;   /* 手指上移 d>0 → 页面往下滚 */
+      touchScroll.y = e.clientY;
+      postScroll(d);
+      return;
+    }
     var rc = svg.getBoundingClientRect();
     if (!S.par) S.par = { x: 0, y: 0, tx: 0, ty: 0 };
     if (!drag) {
@@ -1116,6 +1133,7 @@ body[data-page="bank"] .home-only{opacity:0;pointer-events:none}
     paintCam();
   });
   svg.addEventListener('pointerup', function (e) {
+    if (touchScroll) { touchScroll = null; return; }
     if (!drag) return;
     drag = null;
     svg.classList.remove('dragging');
@@ -1124,8 +1142,11 @@ body[data-page="bank"] .home-only{opacity:0;pointer-events:none}
   });
 
   svg.addEventListener('wheel', function (e) {
-    /* 落在滚动页面里：只有按住 Ctrl/⌘ 才缩放，其余交给页面滚动 */
-    if (!e.ctrlKey && !e.metaKey) return;
+    /* 落在滚动页面里：只有按住 Ctrl/⌘ 才缩放，其余把滚动量转给宿主页面 */
+    if (!e.ctrlKey && !e.metaKey) {
+      if (EMBED_MODE && window.parent !== window && e.deltaY) postScroll(e.deltaY);
+      return;
+    }
     e.preventDefault();
     var r = svg.getBoundingClientRect();
     var px = e.clientX - r.left, py = e.clientY - r.top;

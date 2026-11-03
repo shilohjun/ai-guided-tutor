@@ -2721,6 +2721,14 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     window.addEventListener('message', function (e) {
       if (e.origin !== location.origin) return;
       if (e.data?.type === 'qbank:close') { closeMap(); return; }
+      if (e.data?.type === 'qbank:scroll') {
+        /* 地图里的滚轮/上滑转成首页滚动，滚回顶端就是首页 */
+        var dy = Number(e.data.dy) || 0;
+        var max = home ? home.offsetHeight : 0;
+        var next = Math.max(0, Math.min(max, p1.scrollTop + dy));
+        p1.scrollTo({ top: next, behavior: 'instant' });
+        return;
+      }
       if (e.data?.type === 'qbank:theme') {
         var t = e.data.theme === 'dark' ? 'dark' : 'light';
         if (document.documentElement.getAttribute('data-theme') !== t) paintTheme(t);
