@@ -372,13 +372,24 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
 /* =====================================================================
    4. 页面一：题目输入
    ===================================================================== */
-.p1{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;padding:0 24px}
+.p1{flex:1;min-height:0;display:block;overflow-y:auto;overflow-x:hidden;scroll-behavior:smooth}
+.p1-screen{
+  position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:calc(100dvh - var(--topbar));padding:0 24px;
+}
+.p1-map{padding:0;min-height:calc(100dvh - var(--topbar))}
+.p1-map iframe{display:block;width:100%;height:calc(100dvh - var(--topbar));border:0;background:var(--paper)}
+.p1-list{
+  min-height:calc(100dvh - var(--topbar));display:flex;align-items:center;justify-content:center;
+  padding:24px;
+}
+.p1-list .bank{flex:none;width:min(748px,100%);height:min(72dvh,640px);margin-top:0}
 /* 标题区：图标与标题并排（同一行），整组在栏内水平居中 */
 .p1-hero{
-  flex:none;
-  width:min(748px,100%);
-  display:flex;align-items:center;justify-content:center;gap:16px;
-  padding:24px 0;
+  flex:none;width:min(748px,100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  text-align:center;padding:0 0 20px;
+  transition:opacity .28s ease,transform .28s ease;
 }
 .hero-mark{
   width:var(--ico-lg);height:var(--ico-lg);flex:none;
@@ -388,13 +399,78 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
 .hero-text{min-width:0}
 .p1-hero h1{font-size:var(--fs-sub);font-weight:700;line-height:var(--lh-sub);letter-spacing:0}
 .p1-hero h1 span{color:var(--brand)}
+
+/* ===== 首页改成 deepseek 式首屏 ===== */
+.p1-hero{
+  flex-direction:column;gap:10px;text-align:center;padding:26px 0 18px;
+}
+.hero-mark{width:var(--ico-lg);height:var(--ico-lg)}
+.hero-mark img{width:var(--ico-lg);height:var(--ico-lg)}
+.p1-hero h1{
+  font-size:clamp(24px,3.2vw,32px);line-height:1.28;font-weight:600;letter-spacing:-.012em;
+}
+.p1-hero p{margin-top:8px;font-size:var(--fs-lead);color:var(--ink-3)}
+
+.p1-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:14px 0 0}
+.p1-chips button{
+  height:30px;padding:0 13px;border-radius:var(--r-pill);border:1px solid var(--line);
+  background:var(--surface);color:var(--ink-3);font-size:var(--fs-meta);cursor:pointer;
+  transition:color .18s ease,border-color .18s ease;
+}
+.p1-chips button:hover{color:var(--ink);border-color:var(--line-strong)}
+
+.goodbar{
+  position:absolute;left:50%;bottom:22px;transform:translateX(-50%);
+  width:min(748px,calc(100% - 48px));display:flex;align-items:center;gap:12px;
+  padding:12px 16px;text-align:left;cursor:pointer;
+  background:var(--surface);border:1px solid var(--brand-line);border-radius:var(--r-pill);
+  transition:border-color .2s ease,transform .2s ease;
+}
+.goodbar:hover{border-color:var(--brand);transform:translateY(-1px)}
+.gb-ico{
+  flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
+  background:var(--brand-tint);color:var(--brand-ink);font-size:12px;
+}
+.gb-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.gb-txt b{font-size:var(--fs-lead);font-weight:600;color:var(--ink)}
+.gb-txt em{font-style:normal;font-size:var(--fs-meta);color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gb-go{margin-left:auto;flex:none;font-size:var(--fs-meta);color:var(--ink-3)}
+.goodbar + .bank{margin-top:14px}
+.bank-head .bank-map{display:none}
+@media (prefers-reduced-motion:reduce){.goodbar{transition:none}.p1-hero{transition:none}}
+/* ===== 首屏极简：宋体标题，去掉示例与提示语 ===== */
+/* ===== 首屏标题字体：思源宋体子集（仅标题用到的 12 个字，3.4KB）===== */
+@font-face{
+  font-family:"SH Serif Title";
+  src:url("/fonts/serif-title-600.woff2") format("woff2");
+  font-weight:600;font-display:swap;
+}
+.p1-hero h1{
+  font-family:"SH Serif Title","Source Han Serif SC","Source Han Serif CN","Noto Serif SC","Songti SC",SimSun,serif;
+  font-weight:600;letter-spacing:.01em;
+}
+.p1-chips{display:none}
+.composer .c-chip,.composer .c-hint{display:none}
+/* ===== 题库在地图里，下滑就上来：悬浮抬升，不换页 ===== */
+.p1{overflow-y:auto;overscroll-behavior:contain}
+.p1-map{
+  opacity:0;transform:translateY(34px) scale(.995);
+  transition:opacity .42s cubic-bezier(.22,.61,.36,1),transform .42s cubic-bezier(.22,.61,.36,1);
+}
+.p1-map.is-in{opacity:1;transform:none}
+.p1-map iframe{height:calc(100dvh - var(--topbar))}
+@media (prefers-reduced-motion:reduce){.p1-map{transition:none;opacity:1;transform:none}}
+/* 点「好题精练」时，那一条自己先抬一下 */
+.goodbar.lift{animation:barLift .42s cubic-bezier(.22,.61,.36,1)}
+@keyframes barLift{40%{transform:translateX(-50%) translateY(-7px)}100%{transform:translateX(-50%) translateY(0)}}
+/* 顶栏步骤条只在真正做题时出现 */
+.tb-center{transition:opacity .2s ease}
+body[data-page="1"] .tb-center,body[data-page="2"] .tb-center{opacity:0;pointer-events:none}
+
+
 .p1-hero p{margin-top:4px;font-size:var(--fs-body);color:var(--ink-3);font-weight:400}
 
-.p1-col{
-  width:min(748px,100%);
-  flex:1;min-height:0;
-  display:flex;flex-direction:column;
-}
+.p1-col{width:min(748px,100%);flex:none;display:flex;flex-direction:column}
 
 /* 输入框 */
 .composer{
@@ -512,14 +588,55 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
 .q-item[aria-pressed="true"] .q-check{background:var(--brand);border-color:var(--brand);color:#fff}
 
 .p1-foot{
-  flex:none;display:flex;align-items:center;justify-content:flex-end;
-  gap:8px;padding:16px 0;width:min(748px,100%);
+  flex:none;margin-top:2px;display:flex;align-items:center;justify-content:center;
+  gap:8px;padding:10px 0 0;width:min(748px,100%);min-height:18px;
 }
-.p1-foot .note{font-size:var(--fs-meta);color:var(--ink-3);font-weight:400;margin-right:auto}
+/* 首屏只留一行提示，确认动作交给输入框里的 ↑，避免两只同样的按钮 */
+.p1-foot .btn-primary{display:none}
+.p1-foot{justify-content:center}
+.p1-foot .note{margin-right:0;text-align:center}
+.p1-foot .note{font-size:var(--fs-meta);color:var(--ink-3);font-weight:400;margin-right:0}
 .note.bad{color:var(--coral)}
 
 .bank-empty{padding:24px 16px;text-align:center;color:var(--ink-3);font-size:var(--fs-body);line-height:var(--lh-body)}
 .bank-empty p{margin:0 0 16px}
+
+/* 题库地图：主应用里以 sheet 形式打开 public/qbank/map.html */
+.bank-head .bank-map{
+  margin-left:auto;display:inline-flex;align-items:center;gap:4px;
+  height:24px;padding:0 8px;border-radius:var(--r-pill);
+  border:1px solid var(--brand-line);background:var(--brand-tint);color:var(--brand-ink);
+  font-size:var(--fs-meta);font-weight:600;cursor:pointer;white-space:nowrap;
+}
+.bank-head .bank-map:hover{background:var(--brand);border-color:var(--brand);color:#fff}
+.bank-head .bank-map + .tag{margin-left:8px}
+.bank-search{width:100%;height:32px;margin:0 0 8px;padding:0 12px;border:1px solid var(--line);border-radius:var(--r-inner);background:var(--surface);color:var(--ink);font:inherit}
+.bank-search:focus{border-color:var(--brand-line)}
+.qb-mask{
+  position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;
+  padding:24px;background:rgba(18,18,24,.36);
+}
+.qb-mask[hidden]{display:none}
+.qb-sheet{
+  width:100%;height:100%;max-width:1400px;overflow:hidden;
+  border-radius:var(--r-card);background:var(--surface);box-shadow:0 30px 90px rgba(16,16,28,.35);
+  animation:qbIn .18s ease-out both;
+}
+#qbFrame{display:block;width:100%;height:calc(100dvh - var(--topbar));border:0;background:var(--paper)}
+.qb-close{
+  position:absolute;top:16px;left:16px;z-index:2;width:32px;height:32px;border-radius:50%;
+  border:1px solid var(--line);background:var(--surface);color:var(--ink-3);cursor:pointer;
+  font-size:13px;line-height:1;display:grid;place-items:center;box-shadow:var(--shadow-1);
+}
+.qb-close:hover{color:var(--ink);border-color:var(--line-strong)}
+.qb-sheet{position:relative}
+@keyframes qbIn{from{opacity:0;transform:translateY(8px) scale(.995)}to{opacity:1;transform:none}}
+body.is-qb{overflow:hidden}
+@media (max-width:760px){
+  .qb-mask{padding:0}
+  .qb-sheet{max-width:none;border-radius:0;box-shadow:none}
+}
+@media (prefers-reduced-motion:reduce){.qb-sheet{animation:none}}
 
 /* =====================================================================
    5. 页面二：模式选择（上下两个长条）
@@ -569,7 +686,7 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
 .mode-copy{flex:1;min-width:0}
 .mode-title{display:flex;align-items:center;gap:8px;font-size:var(--fs-sub);font-weight:700;line-height:var(--lh-sub)}
 .mode-desc{margin-top:4px;font-size:var(--fs-body);color:var(--ink-3);font-weight:400}
-.mode-arrow{color:var(--ink-4);flex:none;transition:.2s}
+.mode-arrow{color:var(--ink-3);flex:none;transition:.2s}
 .mode-arrow svg{width:16px;height:16px}
 .mode-bar[aria-pressed="true"] .mode-arrow{color:var(--brand);transform:translateX(2px)}
 .p2-foot{
@@ -895,7 +1012,7 @@ body.resizing *{cursor:col-resize !important}
 /* 整块可点：悬停反馈与页面二的方式长条保持一致 */
 .bar-card:hover{border-color:var(--brand-line)}
 .bar-row:hover .bar-title{color:var(--brand)}
-.bar-arrow{color:var(--ink-4);flex:none;transition:.2s}
+.bar-arrow{color:var(--ink-3);flex:none;transition:.2s}
 .bar-arrow svg{width:16px;height:16px;display:block}
 .bar-card:hover .bar-arrow{color:var(--brand);transform:translateX(2px)}
 .bar-row[aria-busy="true"]{opacity:.6;cursor:progress}
@@ -1101,7 +1218,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
 
   <!-- ================= 页面一 ================= -->
   <section class="page is-active" data-page="1">
-    <div class="p1">
+    <div class="p1" id="p1">
+      <div class="p1-screen" id="p1Home">
       <div class="p1-hero">
         <div class="hero-mark" aria-hidden="true">
           <img src="/brand.png" alt="" width="40" height="40">
@@ -1117,7 +1235,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
           <div class="composer-main">
             <textarea id="input1" placeholder="粘贴题目，或说说你卡在哪一步…" aria-label="题目内容"></textarea>
             <div class="shot" id="shot1" hidden>
-              <img id="ocrImg" alt="题目照片预览">
+              <img id="ocrImg" alt="题目照片预览" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
               <button class="shot-x" id="ocrClose" type="button" aria-label="移除图片">
                 <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
               </button>
@@ -1149,20 +1267,26 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
           </div>
         </div>
 
-        <div class="bank">
-          <div class="bank-head">
-            <strong>题库</strong>
-            <span class="tag" id="bankScope">题库</span>
-            <span class="tag" id="bankCount">6 道</span>
-          </div>
-          <ul class="bank-list scroller" id="bankList"></ul>
-        </div>
-      </div>
+
+              </div>
 
       <div class="p1-foot">
         <span class="note" id="p1note"></span>
         <button class="btn-primary" id="go2" type="button" disabled>确认</button>
       </div>
+
+      <button class="goodbar" id="goodBar" type="button">
+        <span class="gb-ico" aria-hidden="true">✦</span>
+        <span class="gb-txt"><b>好题精练</b><em>按知识点与思路，挑一道真正吃透</em></span>
+        <span class="gb-go">进入题库 →</span>
+      </button>
+    </div>
+
+    <div class="p1-screen p1-map" id="p1Map">
+      <iframe id="qbFrame" title="题库地图" loading="lazy"></iframe>
+    </div>
+
+
     </div>
   </section>
 
@@ -1386,6 +1510,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
 
 
 
+
 <script>
 (function () {
   'use strict';
@@ -1490,6 +1615,10 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     Array.prototype.forEach.call(themeSeg.children, function (b) {
       b.setAttribute('aria-checked', b.getAttribute('data-theme-set') === pref ? 'true' : 'false');
     });
+    var fr = document.getElementById('qbFrame');
+    if (fr && fr.contentWindow) {
+      try { fr.contentWindow.postMessage({ type: 'qbank:theme', theme: dark ? 'dark' : 'light' }, location.origin); } catch (e) { }
+    }
   }
   function paintUx(ux, persist) {
     if (UXK.indexOf(ux) < 0) ux = 'm';
@@ -1586,56 +1715,6 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   $('#homeBtn').addEventListener('click', function () { setPage(1); });
   $('#homeBtn2').addEventListener('click', function () { setPage(1); });
 
-  /* ---------------- 页面一：题库（/api/problems） ---------------- */
-  function bankItem(q, i, selected) {
-    var topics = (q.topics || []).slice(0, 2).join(' · ');
-    return '<li><button class="q-item" type="button" data-q="' + i + '" aria-pressed="' + (selected ? 'true' : 'false') + '">' +
-      '<span class="q-body"><span class="q-meta"><span class="kind">难度 ' + (q.difficulty || '—') + '/5</span>' + esc(topics) + '</span>' +
-      '<span class="q-text">' + esc(q.stemPreview || '') + '</span></span>' +
-      '<span class="q-check">' + SVG_CHECK + '</span></button></li>';
-  }
-
-  function renderBank() {
-    var list = $('#bankList');
-    if (S.bankErr) {
-      list.innerHTML = '<li><div class="bank-empty"><p>' + esc(S.bankErr) + '</p>' +
-        '<button class="btn-ghost sm" type="button" id="bankRetry">重试</button></div></li>';
-      $('#bankCount').textContent = '—';
-      var retry = $('#bankRetry');
-      if (retry) retry.addEventListener('click', loadBank);
-      return;
-    }
-    if (!S.bank.length) {
-      list.innerHTML = '<li><div class="bank-empty"><p>正在读取题库…</p></div></li>';
-      $('#bankCount').textContent = '…';
-      return;
-    }
-    var SUBJ = { physics: '物理', math: '数学', chemistry: '化学' };
-    var names = [];
-    S.bank.forEach(function (q) {
-      var n = SUBJ[q.subject] || q.subject || '其他';
-      if (names.indexOf(n) < 0) names.push(n);
-    });
-    $('#bankScope').textContent = names.join(' · ') || '题库';
-    $('#bankCount').textContent = S.bank.length + ' 道';
-    list.innerHTML = S.bank.map(function (q, i) {
-      return bankItem(q, i, S.picked && S.picked.id === q.id);
-    }).join('');
-  }
-
-  function loadBank() {
-    S.bankErr = null;
-    renderBank();
-    API.problems().then(function (d) {
-      S.bank = d.problems || [];
-      renderBank();
-      maybeReviewJump();
-    }).catch(function (err) {
-      S.bankErr = err.message;
-      renderBank();
-    });
-  }
-
   function syncP1() {
     var typed = $('#input1').value.trim();
     var ready = !!S.picked || !!typed;
@@ -1652,28 +1731,11 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     el.classList.toggle('bad', !!bad);
   }
 
-  function pickBank(i) {
-    S.picked = S.bank[i];
-    S.problem = null; // 换题必须让上一次读题结果失效，否则会拿着旧题进会话
-    $$('#bankList .q-item').forEach(function (el, k) {
-      el.setAttribute('aria-pressed', String(k === i));
-    });
-    $('#input1').value = '';
-    $('#pickHint').textContent = (S.picked.topics || []).slice(0, 2).join(' · ');
-    syncP1();
-  }
-
-  $('#bankList').addEventListener('click', function (e) {
-    var el = e.target.closest('[data-q]');
-    if (el) pickBank(Number(el.dataset.q));
-  });
-
   $('#input1').addEventListener('input', function () {
     if (this.value.trim()) {
       S.picked = null;
       S.problem = null;
-      $$('#bankList .q-item').forEach(function (el) { el.setAttribute('aria-pressed', 'false'); });
-      $('#pickHint').textContent = '文字输入';
+      var hint = $('#pickHint'); if (hint) hint.textContent = '文字输入';
     }
     syncP1();
   });
@@ -1749,7 +1811,6 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
         input.value = t;
         S.picked = null;
         S.problem = null;
-        $$('#bankList .q-item').forEach(function (el) { el.setAttribute('aria-pressed', 'false'); });
         hint.textContent = '拍照识别 · 请核对文字';
       } else {
         hint.textContent = '没读到文字，可重拍或直接输入';
@@ -2496,7 +2557,6 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
 
   /* ---------------- 初始化 ---------------- */
   renderStepper();
-  renderBank();
   syncP1();
   renderXP();
   renderChat();
@@ -2519,7 +2579,119 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     }
   }).catch(function () {});
 
-  loadBank();
+  /* ---------- 双轴题库：快速列表和独立地图共用公开题库数据 ---------- */
+  (function () {
+    var root = document.documentElement;
+    var p1 = $('#p1'), home = $('#p1Home'), mapSec = $('#p1Map'), frame = $('#qbFrame');
+    var mapLoaded = false;
+    function loadMap() {
+      if (mapLoaded) return;
+      mapLoaded = true;
+      var theme = root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+      frame.src = '/qbank/map.html?embedded=1&theme=' + theme;
+    }
+    function openMap() {
+      loadMap();
+      if (!home) return;
+      p1.scrollTo({ top: home.offsetHeight, behavior: 'smooth' });
+    }
+    function closeMap() {
+      p1.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    /* 抬升：地图进入视口时浮上来，离开时沉下去 */
+    if (mapSec && 'IntersectionObserver' in window) {
+      new IntersectionObserver(function (rows) {
+        rows.forEach(function (r) { mapSec.classList.toggle('is-in', r.isIntersecting); });
+      }, { root: p1, threshold: 0.18 }).observe(mapSec);
+    } else if (mapSec) {
+      mapSec.classList.add('is-in');
+    }
+    window.__openBank = openMap;
+    window.__closeBank = closeMap;
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && p1 && p1.scrollTop > 40) { e.stopPropagation(); closeMap(); }
+    });
+    var goodBar = $('#goodBar');
+    if (goodBar) goodBar.addEventListener('click', function () {
+      goodBar.classList.remove('lift');
+      void goodBar.offsetWidth;
+      goodBar.classList.add('lift');
+      openMap();
+    });
+    var fillBtn = document.querySelectorAll('.p1-chips [data-fill]');
+    for (var fi = 0; fi < fillBtn.length; fi++) {
+      (function (b) {
+        b.addEventListener('click', function () {
+          var box = $('#input1');
+          box.value = b.getAttribute('data-fill');
+          box.dispatchEvent(new Event('input', { bubbles: true }));
+          box.focus();
+          box.setSelectionRange(box.value.length, box.value.length);
+        });
+      })(fillBtn[fi]);
+    }
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && p1 && p1.scrollTop > 40) { e.stopPropagation(); closeMap(); }
+    });
+    function landPickedQuestion(q) {
+      if (!q) return;
+      var text = String(q.stem || '').trim();
+      if (q.opt) text += '\n\n' + q.opt;
+      var input = $('#input1');
+      input.value = text;
+      S.picked = null;
+      S.problem = null;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      closeMap();
+      setTimeout(function () { input.focus(); }, 260);
+      input.setSelectionRange(0, 0);
+      input.scrollTop = 0;
+      syncP1();
+      setNote('已选入高考真题，按 ↑ 开始学习。');
+    }
+    try {
+      var pick = sessionStorage.getItem('qbank.pick');
+      if (pick) {
+        sessionStorage.removeItem('qbank.pick');
+        landPickedQuestion(JSON.parse(pick));
+      }
+    } catch (e) {}
+    window.addEventListener('message', function (e) {
+      if (e.origin !== location.origin) return;
+      if (e.data?.type === 'qbank:close') { closeMap(); return; }
+      if (e.data?.type === 'qbank:theme') {
+        var t = e.data.theme === 'dark' ? 'dark' : 'light';
+        if (document.documentElement.getAttribute('data-theme') !== t) paintTheme(t);
+        return;
+      }
+      if (e.data?.type !== 'qbank:pick') return;
+      landPickedQuestion(e.data.q);
+    });
+  })();
+
+  function loadQBankList() {
+    fetch('/qbank/data.json').then(function (r) {
+      if (!r.ok) throw new Error('题库暂时无法读取');
+      return r.json();
+    }).then(function (data) {
+      var qs = data.qs || [];
+      var kgNames = {};
+      (data.kg || []).forEach(function (m) {
+        kgNames[m.id] = m.name;
+        (m.children || []).forEach(function (c) {
+          kgNames[c.id] = c.name;
+          (c.children || []).forEach(function (leaf) { kgNames[leaf.id] = leaf.name; });
+        });
+      });
+      S.bank = qs.map(function (q) {
+        var kg = [q.m, kgNames[q.k], kgNames[q.l]].filter(Boolean);
+        return { id: 'qbank-' + q.i, source: 'qbank', subject: 'physics', type: q.ty,
+          difficulty: q.d, province: q.p, topics: kg, stemPreview: q.s, stem: q.stem || q.s, opt: q.opt || '' };
+      });
+      S.bankErr = null;
+    }).catch(function (err) { S.bankErr = err.message; });
+  }
+  loadQBankList();
 
   /* 便于逐页评审：/?p=3 之类直接落到某一页（会真实跑一遍读题与会话） */
   function maybeReviewJump() {
