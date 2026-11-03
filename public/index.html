@@ -390,6 +390,8 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
   position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
   min-height:calc(100dvh - var(--topbar));padding:0 24px;
 }
+/* 首页中段整体上移 1/5 屏高：居中块下侧多留两倍，视觉重心就抬起 lift 那么多 */
+#p1Home{padding-bottom:clamp(56px,calc((100dvh - var(--topbar)) * 0.4),460px)}
 .p1-map{padding:0;min-height:calc(100dvh - var(--topbar))}
 .p1-map iframe{display:block;width:100%;height:calc(100dvh - var(--topbar));border:0;background:var(--paper)}
 .p1-list{
