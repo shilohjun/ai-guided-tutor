@@ -441,7 +441,8 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
   background:var(--surface);border:1px solid var(--brand-line);border-radius:var(--r-pill);
   transition:border-color .2s ease,transform .2s ease;
 }
-.goodbar:hover{border-color:var(--brand);transform:translateY(-1px)}
+.goodbar:hover{border-color:var(--brand);transform:translate(-50%,-1px)}
+.goodbar:active{transform:translate(-50%,0);background:var(--brand-tint)}
 .gb-ico{
   flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
   background:var(--brand-tint);color:var(--brand-ink);font-size:12px;
@@ -476,8 +477,6 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
 .p1-map iframe{height:calc(100dvh - var(--topbar))}
 @media (prefers-reduced-motion:reduce){.p1-map{transition:none;opacity:1;transform:none}}
 /* 点「好题精练」时，那一条自己先抬一下 */
-.goodbar.lift{animation:barLift .42s cubic-bezier(.22,.61,.36,1)}
-@keyframes barLift{40%{transform:translateX(-50%) translateY(-7px)}100%{transform:translateX(-50%) translateY(0)}}
 /* 顶栏步骤条只在真正做题时出现 */
 .tb-center{transition:opacity .2s ease}
 body[data-page="1"] .tb-center,body[data-page="2"] .tb-center{opacity:0;pointer-events:none}
@@ -2678,12 +2677,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       if (e.key === 'Escape' && p1 && p1.scrollTop > 40) { e.stopPropagation(); closeMap(); }
     });
     var goodBar = $('#goodBar');
-    if (goodBar) goodBar.addEventListener('click', function () {
-      goodBar.classList.remove('lift');
-      void goodBar.offsetWidth;
-      goodBar.classList.add('lift');
-      openMap();
-    });
+    if (goodBar) goodBar.addEventListener('click', openMap);
     var fillBtn = document.querySelectorAll('.p1-chips [data-fill]');
     for (var fi = 0; fi < fillBtn.length; fi++) {
       (function (b) {
