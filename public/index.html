@@ -261,26 +261,26 @@ img{display:block;max-width:100%}
 
 .tb-center{display:flex;justify-content:center;min-width:0;justify-self:center}
 .tb-right{display:flex;align-items:center;gap:8px;flex:none;justify-self:end}
-.bank-tools{display:none;align-items:center;gap:6px}
+.bank-tools{display:none;align-items:center;gap:12px;margin-right:6px}
 body[data-bank="1"] .bank-tools{display:flex}
 body[data-bank="1"] #modeSwitch{display:none!important}
 .bt{
-  display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 10px;
+  display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 14px;
   border:1px solid var(--line);border-radius:var(--r-pill);background:var(--surface);
-  color:var(--ink-2);font-size:var(--fs-meta);line-height:1;cursor:pointer;white-space:nowrap;
+  color:var(--ink-2);font-size:12px;line-height:1;cursor:pointer;white-space:nowrap;
   transition:border-color .18s,color .18s,background .18s;
 }
 .bt:hover{border-color:var(--brand-line);color:var(--brand-ink);background:var(--brand-tint)}
-.bt-seg{padding:2px}
-.bt-seg button{height:24px;padding:0 10px;font-size:var(--fs-meta)}
+.bt-seg{padding:2px;gap:2px}
+.bt-seg button{height:26px;padding:0 14px;font-size:12px}
 .lbl-mini{display:none}
 @media (max-width:720px){
-  .bt{padding:0 7px;height:26px}
-  .bt-seg button{padding:0 7px;height:22px}
+  .bt{padding:0 9px;height:26px}
+  .bt-seg button{padding:0 9px;height:22px}
   .lbl-full{display:none}
   .lbl-mini{display:inline}
-  .bank-tools{gap:4px}
-  .tb-right{gap:4px}
+  .bank-tools{gap:6px}
+  .tb-right{gap:6px}
   .brand-sub{display:none}
   .brand-name{display:none}
 }
@@ -413,8 +413,7 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
   position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
   min-height:calc(100dvh - var(--topbar));padding:0 24px;
 }
-/* 首页中段整体上移 1/5 屏高：居中块下侧多留两倍，视觉重心就抬起 lift 那么多 */
-#p1Home{padding-bottom:clamp(56px,calc((100dvh - var(--topbar)) * 0.4),460px)}
+/* 首页回到垂直居中（上移 1/5 已撤回） */
 .p1-map{padding:0;min-height:calc(100dvh - var(--topbar))}
 .p1-map iframe{display:block;width:100%;height:calc(100dvh - var(--topbar));border:0;background:var(--paper)}
 .p1-list{
