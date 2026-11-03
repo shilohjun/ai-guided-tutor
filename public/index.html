@@ -496,6 +496,13 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
   transition:opacity .42s cubic-bezier(.22,.61,.36,1),transform .42s cubic-bezier(.22,.61,.36,1);
 }
 .p1-map.is-in{opacity:1;transform:none}
+.p1-map{position:relative}
+.p1-map::after{
+  content:"正在铺开题库…";position:absolute;inset:0;display:grid;place-items:center;
+  background:var(--paper);color:var(--ink-3);font-size:var(--fs-body);
+  opacity:1;transition:opacity .3s ease;
+}
+.p1-map.is-ready::after{opacity:0;pointer-events:none}
 .p1-map iframe{height:calc(100dvh - var(--topbar))}
 @media (prefers-reduced-motion:reduce){.p1-map{transition:none;opacity:1;transform:none}}
 /* 点「好题精练」时，那一条自己先抬一下 */
@@ -2684,6 +2691,10 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       if (mapLoaded) return;
       mapLoaded = true;
       var theme = root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+      frame.addEventListener('load', function once() {
+        frame.removeEventListener('load', once);
+        if (mapSec) mapSec.classList.add('is-ready');
+      });
       frame.src = '/qbank/map.html?embedded=1&theme=' + theme;
     }
     function openMap() {
@@ -2699,12 +2710,21 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       new IntersectionObserver(function (rows) {
         rows.forEach(function (r) {
           mapSec.classList.toggle('is-in', r.isIntersecting);
-          document.body.setAttribute('data-bank', r.isIntersecting ? '1' : '0');
+          /* 滑到这儿就装载，别等点击 */
+          if (r.isIntersecting) loadMap();
         });
       }, { root: p1, threshold: 0.18 }).observe(mapSec);
     } else if (mapSec) {
       mapSec.classList.add('is-in');
     }
+    /* 顶栏的题库控件只在真正进到地图里才出现（滚过半屏） */
+    function syncBankUi() {
+      var on = p1.scrollTop > (home ? home.offsetHeight * 0.55 : 200);
+      document.body.setAttribute('data-bank', on ? '1' : '0');
+    }
+    p1.addEventListener('scroll', syncBankUi, { passive: true });
+    syncBankUi();
+
     window.__openBank = openMap;
     window.__closeBank = closeMap;
     document.addEventListener('keydown', function (e) {
