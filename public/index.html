@@ -1995,6 +1995,14 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   }
   window.addEventListener('resize', autosizeInput);
 
+  /* 撤掉「已经选进输入框的那道题库题」，恢复成可编辑的 textarea */
+  function clearPickedView() {
+    var comp = $('#composer1'), box = $('#picked1'), clear = $('#pickedClear');
+    if (comp) comp.classList.remove('is-picked');
+    if (box) box.hidden = true;
+    if (clear) clear.hidden = true;
+  }
+
   function syncP1() {
     autosizeInput();
     syncMathPreview();
@@ -3239,13 +3247,6 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       }).catch(function () {
         body.innerHTML = '<p>' + esc((q && q.stem) || '') + '</p>';
       });
-    }
-
-    function clearPickedView() {
-      var comp = $('#composer1'), box = $('#picked1'), clear = $('#pickedClear');
-      if (comp) comp.classList.remove('is-picked');
-      if (box) { box.hidden = true; }
-      if (clear) clear.hidden = true;
     }
 
     var pickedClearBtn = $('#pickedClear');
