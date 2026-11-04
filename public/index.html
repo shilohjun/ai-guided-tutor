@@ -1801,9 +1801,21 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   };
 
   /* ---------------- 接口层 ---------------- */
+  /**
+   * 接口基址。
+   *
+   * 腾讯云静态托管域（*.tcloudbaseapp.com）只发静态文件，不会把 /api 转给云函数；
+   * 同一环境的 HTTP 访问服务在 *.service.tcloudbase.com 上，所以那一侧要跨域取。
+   * 本地、Vercel、Workers 都是同源，返回空串即可。
+   */
+  var API_BASE = (function () {
+    var m = /^([a-z0-9-]+?)-[0-9]+\.tcloudbaseapp\.com$/.exec(location.hostname);
+    return m ? 'https://' + m[1] + '.service.tcloudbase.com' : '';
+  })();
+
   var API = {
     req: function (path, opt) {
-      return fetch(path, opt).then(function (res) {
+      return fetch(API_BASE + path, opt).then(function (res) {
         return res.text().then(function (raw) {
           var data = null;
           try { data = raw ? JSON.parse(raw) : null; } catch (e) { data = null; }
