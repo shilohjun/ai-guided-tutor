@@ -74,6 +74,7 @@ const PROFILES = {
 };
 
 export function buildReportReview(problem) {
+  if (problem.source === 'qbank' && problem.reportReview) return structuredClone(problem.reportReview);
   const profile = PROFILES[problem.id];
   if (problem.subject === 'physics' && profile) {
     return { source: 'topic-cards', status: 'available',

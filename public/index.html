@@ -1182,6 +1182,8 @@ body.resizing *{cursor:col-resize !important}
 /* 报告页专用：精简知识与方法，不影响其他四页。 */
 .p4 .report-card{flex-shrink:0}
 .p4 .review-note{font-size:var(--fs-meta);line-height:var(--lh-body);color:var(--ink-3);margin:8px 0 0}
+.p4 .review-more{grid-column:1/-1}
+.p4 .review-more>div{margin-top:8px}
 .p4 .review-part+.review-part{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
 .p4 .review-part h3{font-size:var(--fs-sub);line-height:var(--lh-sub);font-weight:600;margin-bottom:8px}
 .p4 .review-knowledge{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
@@ -1835,7 +1837,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     problem: function (id) { return API.req('/api/problem?id=' + encodeURIComponent(id)); },
     importProblem: function (text, opt) { return API.post('/api/problem/import', { rawText: text }, opt); },
     chat: function (body) { return API.post('/api/chat', body); },
-    report: function (sid) { return API.req('/api/report?sessionId=' + encodeURIComponent(sid)); },
+    report: function (sid, pid) { return API.req('/api/report?sessionId=' + encodeURIComponent(sid) + '&problemId=' + encodeURIComponent(pid || '')); },
     ocr: function (image) { return API.post('/api/ocr', { image: image }); }
   };
 
@@ -2262,7 +2264,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     beginReading();
     if (S.readCtrl) { try { S.readCtrl.abort(); } catch (e) { } }
     S.readCtrl = (typeof AbortController === 'function') ? new AbortController() : null;
-    var task = S.picked ? API.problem(S.picked.id)
+    var task = S.pickedBank ? API.problem('qbank-' + S.pickedBank) : S.picked ? API.problem(S.picked.id)
       : API.importProblem(typed, S.readCtrl ? { signal: S.readCtrl.signal } : null);
 
     task.then(function (res) {
@@ -2734,7 +2736,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     if (!S.sessionId) return;
     S.reportLoading = true;
     renderReport();
-    API.report(S.sessionId).then(function (d) {
+    API.report(S.sessionId, S.problem && S.problem.id).then(function (d) {
       S.reportLoading = false;
       S.report = d.report;
       S.reportTurns = d.turns || [];
@@ -2789,20 +2791,20 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       host.innerHTML = '<p class="review-copy">' + esc(review.note || '这道题暂未配置配套知识与方法卡。') + '</p>';
       return;
     }
-    var knowledge = (review.knowledge || []).slice(0, 3);
-    var methods = (review.methods || []).slice(0, 2);
+    var knowledge = (review.knowledge || []);
+    var methods = (review.methods || []);
     host.innerHTML = '<section class="review-part"><h3>知识点梳理</h3><div class="review-knowledge">' +
-      knowledge.map(function (k) {
-        return '<article class="review-item"><div class="review-title"><span>' + esc(k.title) + '</span>' +
+      knowledge.map(function (k, ki) {
+        return (ki === 3 ? '<details class="review-more review-detail"><summary>展开其余知识点</summary><div class="review-knowledge">' : '') + '<article class="review-item"><div class="review-title"><span>' + esc(k.title) + '</span>' +
           (k.formula ? '<span class="review-formula">' + reportFormula(k) + '</span>' : '') + '</div>' +
           '<p class="review-copy">' + esc(k.meaning) + '</p>' +
-          '<details class="review-detail"><summary>适用条件</summary><p>' + esc(k.condition) + '</p></details></article>';
+          '<details class="review-detail"><summary>适用条件</summary><p>' + esc(k.condition) + '</p></details></article>' + (ki === knowledge.length - 1 && ki >= 3 ? '</div></details>' : '');
       }).join('') + '</div></section><section class="review-part"><h3>思路点拨</h3><div class="review-methods">' +
-      methods.map(function (m) {
-        return '<article class="review-method"><h4>' + esc(m.title) + '</h4>' + (m.family ? '<div class="review-family">' + esc(m.family) + '</div>' : '') + '<p><strong>核心原理：</strong>' + esc(m.principle) + '</p>' +
+      methods.map(function (m, mi) {
+        return (mi === 2 ? '<details class="review-more review-detail"><summary>展开其余方法</summary><div class="review-methods">' : '') + '<article class="review-method"><h4>' + esc(m.title) + '</h4>' + (m.family ? '<div class="review-family">' + esc(m.family) + '</div>' : '') + '<p><strong>核心原理：</strong>' + esc(m.principle) + '</p>' +
           '<p><strong>本题应用：</strong>' + esc(m.use) + '</p>' +
           '<details class="review-detail"><summary>适用范围与易错点</summary><p><strong>适用范围：</strong>' + esc(m.when) +
-          '</p><p><strong>适用限制与易错点：</strong>' + esc(m.boundary) + '</p></details></article>';
+          '</p><p><strong>适用限制与易错点：</strong>' + esc(m.boundary) + '</p></details></article>' + (mi === methods.length - 1 && mi >= 2 ? '</div></details>' : '');
       }).join('') + '</div></section><p class="review-note">' + esc(review.note || '') + '</p>';
   }
 
@@ -2863,6 +2865,10 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       return;
     }
 
+    if (rep.meta && rep.meta.recordMissing) {
+      $('#reportAlert').hidden = false;
+      $('#reportAlert').textContent = '尚无本题对话记录，以下展示题库配套知识与方法；暂不判断个人掌握情况。';
+    }
     var buckets = levelBuckets(rep);
     $('#mWeak').textContent = buckets.bad[0] || '证据不足，暂未确认';
     $('#mWeak').parentNode.classList.toggle('warn', buckets.bad.length > 0);
@@ -3101,7 +3107,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       S.picked = null;
       S.pickedBank = q.bankId;
       S.problem = null;
-      return API.importProblem(text.trim()).then(function (res) {
+      return API.problem('qbank-' + q.bankId).then(function (res) {
         S.problem = res.problem;
         hydrateBankDetail();
         $('#p2text').textContent = S.problem.stem;

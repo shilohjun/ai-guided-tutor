@@ -16,6 +16,7 @@
 
 import { PROBLEMS, PROBLEM_BY_ID } from './problems.data.js';
 import { buildProblemAnalysis } from './analysis.js';
+import { getQbankProblem } from './qbank.js';
 
 /** 导入题目的存活时间：超过即回收，避免内存无限增长 */
 export const IMPORT_TTL_MS = 6 * 60 * 60 * 1000;
@@ -77,6 +78,8 @@ export function registerImportedProblem(problem, analysis, warnings = [], modelR
 export function getProblemById(id) {
   if (!id) return null;
   if (PROBLEM_BY_ID.has(id)) return PROBLEM_BY_ID.get(id);
+  const bank = getQbankProblem(id);
+  if (bank) return bank;
   sweep();
   return imported.get(id)?.problem ?? null;
 }
