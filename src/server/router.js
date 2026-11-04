@@ -769,6 +769,17 @@ export async function handleApi(req, res, url) {
     const sessionId = url.searchParams.get('sessionId') || 'demo';
     const session = sessions.get(sessionId);
     if (!session) {
+      const bankId = url.searchParams.get('problemId');
+      const bank = bankId && bankId.startsWith('qbank-') ? getProblemById(bankId) : null;
+      if (bank) {
+        const report = buildReport(bank, createSessionRecord(bank.id), { engine: 'no-conversation' });
+        report.meta.recordMissing = true;
+        sendJson(res, 200, { report, turns: [] });
+        return true;
+      }
+    }
+
+    if (!session) {
       // serverless 冷启动会丢会话 —— 给出可操作的提示，而不是一个空白错误
       sendJson(res, 404, {
         error: '该会话不存在或已过期',
