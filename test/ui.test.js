@@ -190,7 +190,7 @@ describe('前端 · 五页流程契约（新版单文件）', () => {
     assertIncludes(appJs, 'pane-empty', '第 3 页左栏要有空态样式');
     assertIncludes(appJs, '还没有题目', '空态要写清"现在没有题"');
     assertIncludes(appJs, '还没有开始做题', '第 4 页空态要写清先去哪一步');
-    assertIncludes(appJs, '题库里没有同知识点的其他题目', '第 5 页同类题为空时也要说清楚');
+    assertIncludes(appJs, '这个范围里没有别的题', '第 5 页同类题为空时也要说清楚');
   });
 
   it('第 3 页左侧显示"做到第几步"，且只翻译走过的步骤（防泄题）', () => {
@@ -219,8 +219,11 @@ describe('前端 · 五页流程契约（新版单文件）', () => {
   it('同类题按题库的真实双轴标签筛，不再用 topics 字符串猜', () => {
     assertIncludes(html, 'id="relDrawer"', '第 5 页要有同类题抽屉');
     assertIncludes(appJs, 'function relCandidates(', '缺少同类题筛选函数');
-    assertIncludes(appJs, 'q.leafId === cur.leafId', '同知识点要按叶子 id 对齐，不能按 topics 文字');
-    assertIncludes(appJs, 'q.th2Id === cur.th2Id', '同思路要按思路方法 id 对齐');
+    assertIncludes(appJs, 'q.leafId === REL.kg', '知识点要按叶子 id 对齐，不能按 topics 文字');
+    assertIncludes(appJs, 'q.th2Id === REL.th', '思路要按思路方法 id 对齐');
+    assertIncludes(html, 'id="relKgSel"', '抽屉里要能直接筛知识点');
+    assertIncludes(html, 'id="relThSel"', '抽屉里要能直接筛思路');
+    assertIncludes(html, 'data-relquick="kg"', '「同知识点」要是一个快捷键');
     assertNotIncludes(appJs, "API.req('/api/related", '页五已经不再走服务端的 related 接口');
   });
 

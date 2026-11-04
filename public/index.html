@@ -648,13 +648,25 @@ html[data-theme="dark"] .viewer img{background:#111}
   display:grid;place-items:center;color:var(--ink-3);background:var(--surface-2);transition:.16s;
 }
 .rel-x:hover{background:var(--surface-3);color:var(--ink)}
-.rel-tabs{display:flex;gap:6px;padding:0 16px 12px}
-.rel-tabs button{
-  height:28px;padding:0 12px;border-radius:var(--r-pill);border:1px solid var(--line);
-  font-size:var(--fs-meta);color:var(--ink-2);background:var(--surface);transition:.16s;
+.rel-quick{display:flex;align-items:center;gap:8px;padding:0 16px 8px}
+.rel-seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line);border-radius:var(--r-pill);background:var(--paper)}
+.rel-seg button{
+  height:26px;padding:0 12px;border:0;border-radius:var(--r-pill);background:transparent;
+  font-size:var(--fs-meta);color:var(--ink-2);transition:.16s;
 }
-.rel-tabs button[aria-selected="true"]{
-  background:var(--brand-tint);border-color:var(--brand-line);color:var(--brand-ink);font-weight:600;
+.rel-seg button[aria-pressed="true"]{background:var(--brand-tint);color:var(--brand-ink);font-weight:600}
+.rel-seg button:disabled{opacity:.45;cursor:not-allowed}
+.rel-all{
+  margin-left:auto;flex:none;height:26px;padding:0 12px;border-radius:var(--r-pill);
+  border:1px solid var(--line);background:var(--surface);color:var(--ink-2);font-size:var(--fs-meta);
+}
+.rel-all[aria-pressed="true"]{border-color:var(--brand-line);color:var(--brand-ink);background:var(--brand-tint);font-weight:600}
+.rel-filters{display:flex;gap:8px;padding:0 16px 8px}
+.rel-f{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.rel-f>span{font-size:var(--fs-meta);color:var(--ink-3)}
+.rel-f select{
+  width:100%;height:30px;padding:0 8px;border-radius:var(--r-inner);
+  border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:var(--fs-meta);
 }
 .rel-ctx{
   margin:0 16px 12px;padding:8px 12px;border-radius:var(--r-inner);
@@ -1717,10 +1729,16 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </div>
-      <div class="rel-tabs" role="tablist" aria-label="同类题的范围">
-        <button type="button" role="tab" data-reltab="kg" aria-selected="true">同知识点</button>
-        <button type="button" role="tab" data-reltab="th" aria-selected="false">同思路</button>
-        <button type="button" role="tab" data-reltab="all" aria-selected="false">全部</button>
+      <div class="rel-quick">
+        <div class="rel-seg" role="group" aria-label="快捷筛选">
+          <button type="button" data-relquick="kg" aria-pressed="false">同知识点</button>
+          <button type="button" data-relquick="th" aria-pressed="false">同思路</button>
+        </div>
+        <button type="button" class="rel-all" id="relAll" aria-pressed="true">全部</button>
+      </div>
+      <div class="rel-filters">
+        <label class="rel-f"><span>知识点</span><select id="relKgSel"></select></label>
+        <label class="rel-f"><span>思路</span><select id="relThSel"></select></label>
       </div>
       <div class="rel-ctx" id="relCtx"></div>
       <div class="rel-list scroller" id="relList"></div>
@@ -2835,24 +2853,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
 
   function renderRelated() {
     if (!REL.open) return;
-    var cur = currentBankRecord();
-    var list = relCandidates();
-    var ctx = $('#relCtx');
-    if (REL.tab === 'all' || !cur) {
-      ctx.innerHTML = '全部题目，按难度排';
-    } else if (REL.tab === 'kg') {
-      ctx.innerHTML = '同知识点 · <b>' + esc(leafName(cur)) + '</b>';
-    } else {
-      ctx.innerHTML = '同思路 · <b>' + esc(thName(cur)) + '</b>';
-    }
-    $('#relCount').textContent = list.length + ' 道可选';
-    $('#relList').innerHTML = list.length
-      ? list.map(function (q) {
-          return '<button class="rel-item" type="button" data-relpick="' + q.bankId + '">' +
-            '<span class="m"><b>' + esc(q.type || '题') + '</b> 难度 ' + (q.difficulty || '—') + '/5 · ' + esc(q.province || '') + '</span>' +
-            '<span class="s">' + esc(q.sub || '') + '</span></button>';
-        }).join('')
-      : '<div class="bank-empty"><p>' + emptyRelText() + '换个范围试试。</p></div>';
+    buildRelFilters();
+    renderRelList();
   }
 
   function renderP5Note() {
@@ -2872,7 +2874,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   });
 
   /* ---------------- 页五：同类题抽屉 ---------------- */
-  var REL = { open: false, tab: 'kg', seen: {} };
+  var REL = { open: false, kg: '', th: '', seen: {}, built: false };
 
   function currentBankRecord() {
     if (S.pickedBank == null || !S.bank) return null;
@@ -2885,36 +2887,105 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   function thName(q) { return (S.thNames && (S.thNames[q.th2Id] || S.thNames[q.thId])) || '同一思路'; }
 
   function emptyRelText() {
-    if (REL.tab === 'kg') return '题库里没有同知识点的其他题目。';
-    if (REL.tab === 'th') return '题库里没有同思路的其他题目。';
+    if (REL.kg || REL.th) return '这个范围里没有别的题，换个筛选试试。';
     return '题库暂时没有别的题。';
   }
 
-  function relCandidates(tab) {
+  /* 下拉选项来自题库本身：知识点按 模块 · 章 分组到叶，思路按 类 分组到方法 */
+  function buildRelFilters() {
+    if (REL.built || !S.bank) return;
+    REL.built = true;
+    var kgSel = $('#relKgSel'), thSel = $('#relThSel');
+    var kgMap = {}, thMap = {};
+    S.bank.forEach(function (q) {
+      if (q.leafId) {
+        if (!kgMap[q.leafId]) kgMap[q.leafId] = { id: q.leafId, name: leafName(q), chap: (S.kgNames && S.kgNames[q.chapId]) || '' , n: 0 };
+        kgMap[q.leafId].n++;
+      }
+      if (q.th2Id) {
+        if (!thMap[q.th2Id]) thMap[q.th2Id] = { id: q.th2Id, name: thName(q), cat: (S.thNames && S.thNames[q.thId]) || '', n: 0 };
+        thMap[q.th2Id].n++;
+      }
+    });
+    function fill(sel, map, groupKey, allLabel) {
+      var groups = {};
+      Object.keys(map).forEach(function (k) {
+        var it = map[k];
+        var g = it[groupKey] || '其他';
+        (groups[g] = groups[g] || []).push(it);
+      });
+      var html = '<option value="">' + allLabel + '</option>';
+      Object.keys(groups).forEach(function (g) {
+        html += '<optgroup label="' + esc(g) + '">';
+        groups[g].sort(function (a, b) { return b.n - a.n; }).forEach(function (it) {
+          html += '<option value="' + esc(it.id) + '">' + esc(it.name) + '（' + it.n + '）</option>';
+        });
+        html += '</optgroup>';
+      });
+      sel.innerHTML = html;
+    }
+    fill(kgSel, kgMap, 'chap', '全部知识点');
+    fill(thSel, thMap, 'cat', '全部思路');
+  }
+
+  function relCandidates() {
     var all = S.bank || [];
     var cur = currentBankRecord();
-    var t = tab || REL.tab;
-    if (!cur) return all.slice(0, 300);
-    if (t === 'kg') {
-      return all.filter(function (q) { return q.leafId === cur.leafId && q.bankId !== cur.bankId; });
+    var out = all.filter(function (q) { return !cur || q.bankId !== cur.bankId; });
+    if (REL.kg) out = out.filter(function (q) { return q.leafId === REL.kg; });
+    if (REL.th) out = out.filter(function (q) { return q.th2Id === REL.th; });
+    return out.slice(0, 300);
+  }
+
+  function syncRelUi() {
+    var cur = currentBankRecord();
+    var kgSel = $('#relKgSel'), thSel = $('#relThSel');
+    if (kgSel) kgSel.value = REL.kg;
+    if (thSel) thSel.value = REL.th;
+    $$('#relDrawer [data-relquick]').forEach(function (b) {
+      var on = b.dataset.relquick === 'kg' ? !!REL.kg && !!cur && REL.kg === cur.leafId
+                                          : !!REL.th && !!cur && REL.th === cur.th2Id;
+      b.setAttribute('aria-pressed', String(on));
+      b.disabled = !cur;
+    });
+    var none = !REL.kg && !REL.th;
+    $('#relAll').setAttribute('aria-pressed', String(none));
+    var bits = [];
+    if (REL.kg) bits.push('知识点 <b>' + esc((S.kgNames && S.kgNames[REL.kg]) || '') + '</b>');
+    if (REL.th) bits.push('思路 <b>' + esc((S.thNames && S.thNames[REL.th]) || '') + '</b>');
+    $('#relCtx').innerHTML = bits.length ? bits.join(' 且 ') : '全部题目，按难度排';
+  }
+
+  function renderRelList() {
+    var list = relCandidates();
+    var box = $('#relList');
+    if (!list.length) {
+      box.innerHTML = '<p class="rel-empty">' + esc(emptyRelText()) + '</p>';
+    } else {
+      box.innerHTML = list.map(function (q) {
+        return '<button class="rel-item" type="button" data-relpick="' + q.bankId + '">' +
+          '<span class="m"><b>' + esc(q.type || '题') + '</b> 难度 ' + (q.difficulty || '—') + '/5 · ' + esc(q.province || '') + '</span>' +
+          '<span class="s">' + esc(q.sub || '') + '</span></button>';
+      }).join('');
     }
-    if (t === 'th') {
-      return all.filter(function (q) { return q.th2Id === cur.th2Id && q.bankId !== cur.bankId; });
-    }
-    return all.filter(function (q) { return q.bankId !== cur.bankId; }).slice(0, 300);
+    $('#relCount').textContent = list.length ? (list.length + ' 道可选') : '没有可选的题';
+    syncRelUi();
   }
 
   function openRelDrawer() {
     REL.open = true;
     var cur = currentBankRecord();
-    /* 默认落在"有题可练"的那一档：同知识点 → 同思路 → 全部 */
-    if (!cur) REL.tab = 'all';
-    else if (relCandidates('kg').length) REL.tab = 'kg';
-    else if (relCandidates('th').length) REL.tab = 'th';
-    else REL.tab = 'all';
-    $$('#relDrawer [data-reltab]').forEach(function (b) {
-      b.setAttribute('aria-selected', String(b.dataset.reltab === REL.tab));
-    });
+    buildRelFilters();
+    /* 默认落在"有题可练"的范围：同知识点 → 同思路 → 全部 */
+    REL.kg = ''; REL.th = '';
+    if (cur && cur.leafId) {
+      REL.kg = cur.leafId;
+      if (!relCandidates().length) REL.kg = '';
+    }
+    if (cur && !REL.kg && cur.th2Id) {
+      REL.th = cur.th2Id;
+      if (!relCandidates().length) REL.th = '';
+    }
     var d = $('#relDrawer');
     d.classList.add('on');
     d.setAttribute('aria-hidden', 'false');
@@ -2941,20 +3012,36 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       if (q) startBankPractice(q, pick);
       return;
     }
-    var tab = e.target.closest('[data-reltab]');
-    if (tab) {
-      REL.tab = tab.dataset.reltab;
-      $$('#relDrawer [data-reltab]').forEach(function (b) {
-        b.setAttribute('aria-selected', String(b.dataset.reltab === REL.tab));
-      });
-      renderRelated();
+    var quick = e.target.closest('[data-relquick]');
+    if (quick) {
+      var cur = currentBankRecord();
+      if (quick.dataset.relquick === 'kg') {
+        REL.kg = (cur && cur.leafId) || '';
+        REL.th = '';
+      } else {
+        REL.th = (cur && cur.th2Id) || '';
+        REL.kg = '';
+      }
+      renderRelList();
     }
+  });
+  $('#relAll').addEventListener('click', function () {
+    REL.kg = ''; REL.th = '';
+    renderRelList();
+  });
+  $('#relKgSel').addEventListener('change', function (e) {
+    REL.kg = e.target.value;
+    renderRelList();
+  });
+  $('#relThSel').addEventListener('change', function (e) {
+    REL.th = e.target.value;
+    renderRelList();
   });
   $('#relShuffle').addEventListener('click', function () {
     var list = relCandidates();
     if (list.length < 2) return;
-    REL.seen[REL.tab] = true;
-    list.push(list.shift());
+    var first = list.shift();
+    list.push(first);
     var box = $('#relList');
     box.innerHTML = list.map(function (q) {
       return '<button class="rel-item" type="button" data-relpick="' + q.bankId + '">' +
