@@ -508,6 +508,14 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
 .reading em{font-style:normal;font-size:var(--fs-meta);color:var(--ink-3);line-height:1.3}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.reading .spin{animation:none;border-top-color:var(--brand-line)}.reading .spin::after{content:"";display:block;width:100%;height:100%;border-radius:50%;background:var(--brand);transform:scale(.45)}}
+.mathprev{
+  flex:0 0 100%;order:9;padding-top:12px;border-top:1px solid var(--line);
+  max-height:32dvh;overflow:auto;font-size:var(--fs-body);line-height:1.55;color:var(--ink);
+}
+.mathprev p{margin:0 0 8px}
+.mathprev p:last-child{margin-bottom:0}
+.mathprev .katex{font-size:1.02em}
+.mathprev .katex-display{margin:8px 0}
 .picked{padding:2px 2px 2px;max-height:min(36dvh,calc(100dvh - var(--topbar) - 320px));overflow:auto}
 /* 首屏内容与底部「好题精练」之间留出固定呼吸位，卡片再长也不会压到它 */
 #p1Home{padding-bottom:32px}
@@ -589,7 +597,7 @@ body[data-page="1"] .tb-center,body[data-page="2"] .tb-center{opacity:0;pointer-
 .send-btn[disabled]{background:var(--surface-3);color:var(--ink-3);cursor:not-allowed}
 
 /* 识别成功：图挂在输入框右侧、文字直接落进输入框本体 */
-.composer-main{display:flex;align-items:flex-start;gap:16px}
+.composer-main{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
 .composer-main textarea{flex:1;min-width:0}
 .shot{
   position:relative;flex:none;
@@ -1008,6 +1016,8 @@ body.resizing *{cursor:col-resize !important}
 .msg.me .bubble code{background:rgba(255,255,255,.22);color:#fff}
 .msg.flash .bubble{box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 24%,transparent)}
 .msg.err .bubble{background:var(--coral-tint);border-color:var(--coral-line);color:var(--coral)}
+.bubble .katex{font-size:1.02em}
+.bubble .katex-display{margin:8px 0;overflow-x:auto;overflow-y:hidden;max-width:100%}
 .bubble.dots{display:flex;gap:4px;align-items:center;min-height:24px}
 .bubble.dots i{width:4px;height:4px;border-radius:var(--r-circle);background:var(--ink-3);animation:blink 1.1s infinite}
 .bubble.dots i:nth-child(2){animation-delay:.18s}
@@ -1314,6 +1324,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   @keyframes setUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 }
 </style>
+<link rel="stylesheet" href="/vendor/katex/katex.min.css">
 </head>
 <body data-page="1">
 
@@ -1388,6 +1399,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
         <div class="composer" id="composer1">
           <div class="composer-main">
             <textarea id="input1" placeholder="粘贴题目，或说说你卡在哪一步…" aria-label="题目内容"></textarea>
+            <div class="mathprev" id="mathPrev" hidden></div>
             <div class="reading" id="reading1">
               <span class="spin" aria-hidden="true"></span>
               <div><b id="readingTitle">正在读题…</b><em id="readingHint">AI 正在理解题干与公式，几秒钟</em></div>
@@ -1697,6 +1709,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       </button>
     </div>
 
+<script src="/vendor/katex/katex.min.js"></script>
+<script src="/math.js"></script>
 <script>
 (function () {
   'use strict';
@@ -1931,12 +1945,22 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
 
   function syncP1() {
     autosizeInput();
+    syncMathPreview();
     var typed = $('#input1').value.trim();
     var ready = !!S.picked || !!typed;
     $('#go2').disabled = !ready;
     $('#send1').disabled = !ready;
     if (!ready) { setNote(''); return; }
     setNote('');
+  }
+
+  /* 输入里有 LaTeX 就直接在框下面画出来；引擎读到的仍是原始文本 */
+  function syncMathPreview() {
+    var box = $('#mathPrev');
+    if (!box || !window.BsjMath || !window.BsjMath.renderBlock) return;
+    var picked = $('#composer1').classList.contains('is-picked');
+    if (picked) { box.hidden = true; return; }
+    window.BsjMath.renderBlock(box, $('#input1').value);
   }
 
   function setNote(text, bad) {
@@ -2414,6 +2438,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       html += '<div class="done-row"><button class="btn-primary" type="button" data-goto="4">查看学习报告</button></div>';
     }
     body.innerHTML = html;
+    if (window.BsjMath) window.BsjMath.renderMathIn(body);
 
     var asked = [];
     S.turns.forEach(function (m, i) { if (m.role === 'me') asked.push({ m: m, i: i }); });
