@@ -670,6 +670,19 @@ html[data-theme="dark"] .viewer img{background:#111}
 .rel-item:hover{border-color:var(--brand-line);background:var(--brand-tint)}
 .rel-item .m{font-size:var(--fs-meta);color:var(--ink-3);display:flex;gap:8px;flex-wrap:wrap}
 .rel-item .m b{color:var(--brand-ink);font-weight:600}
+.rel-busy{
+  position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:8px;text-align:center;
+  background:color-mix(in srgb,var(--surface) 94%,transparent);backdrop-filter:blur(2px);
+  border-radius:var(--r-card);
+}
+.rel-busy .spin{
+  width:22px;height:22px;border-radius:50%;
+  border:2px solid var(--brand-line);border-top-color:var(--brand);animation:spin .8s linear infinite;
+}
+.rel-busy b{font-size:var(--fs-lead);font-weight:600;color:var(--ink)}
+.rel-busy em{font-style:normal;font-size:var(--fs-meta);color:var(--ink-3)}
+@media (prefers-reduced-motion:reduce){.rel-busy .spin{animation:none;border-top-color:var(--brand-line)}}
 .rel-item .s{
   margin-top:6px;font-size:var(--fs-body);color:var(--ink-2);line-height:1.5;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
@@ -1020,6 +1033,8 @@ body.resizing *{cursor:col-resize !important}
 .msg.err .bubble{background:var(--coral-tint);border-color:var(--coral-line);color:var(--coral)}
 .bubble .katex{font-size:1.02em}
 .bubble .katex-display{margin:8px 0;overflow-x:auto;overflow-y:hidden;max-width:100%}
+.bubble.dots{gap:8px}
+.dots-label{font-size:var(--fs-meta);color:var(--ink-3)}
 .bubble.dots{display:flex;gap:4px;align-items:center;min-height:24px}
 .bubble.dots i{width:4px;height:4px;border-radius:var(--r-circle);background:var(--ink-3);animation:blink 1.1s infinite}
 .bubble.dots i:nth-child(2){animation-delay:.18s}
@@ -1157,6 +1172,9 @@ body.resizing *{cursor:col-resize !important}
   color:var(--brand-ink);padding:2px 8px;border-radius:4px;
 }
 .wrong-empty{padding:16px 0;color:var(--ink-3);font-size:var(--fs-body)}
+.report-load{display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:8px 16px;border-radius:var(--r-inner);background:var(--brand-tint);border:1px solid var(--brand-line);color:var(--brand-ink);font-size:var(--fs-body)}
+.report-load .spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--brand-line);border-top-color:var(--brand);animation:spin .8s linear infinite}
+@media (prefers-reduced-motion:reduce){.report-load .spin{animation:none;border-top-color:var(--brand-line)}}
 .report-alert{margin-bottom:8px;padding:8px 16px;border-radius:var(--r-inner);background:var(--amber-tint);border:1px solid var(--amber-line);color:var(--amber);font-size:var(--fs-body);line-height:var(--lh-body)}
 
 .p4-foot{
@@ -1585,6 +1603,10 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   <section class="page" data-page="4">
     <div class="p4">
       <div class="p4-scroll scroller">
+        <div class="report-load" id="reportLoad" hidden>
+          <span class="spin" aria-hidden="true"></span>
+          <span>正在生成学习报告…</span>
+        </div>
         <div class="report-alert" id="reportAlert" hidden></div>
 
         <div class="report-card">
@@ -1702,6 +1724,11 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       </div>
       <div class="rel-ctx" id="relCtx"></div>
       <div class="rel-list scroller" id="relList"></div>
+      <div class="rel-busy" id="relBusy" hidden>
+        <span class="spin" aria-hidden="true"></span>
+        <b>正在读题…</b>
+        <em>AI 正在理解题干与公式，几秒钟</em>
+      </div>
       <div class="rel-foot">
         <span id="relCount"></span>
         <button class="btn-ghost" id="relShuffle" type="button">换一换</button>
@@ -2439,7 +2466,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     }
     if (S.busy) {
       html += '<div class="msg ai"><span class="av">' + AVATAR + '</span>' +
-        '<div class="bubble dots"><i></i><i></i><i></i></div></div>';
+        '<div class="bubble dots"><i></i><i></i><i></i>' +
+        '<span class="dots-label">正在思考…</span></div></div>';
     }
     if (S.done) {
       html += '<div class="done-row"><button class="btn-primary" type="button" data-goto="4">查看学习报告</button></div>';
@@ -2651,12 +2679,16 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   function loadReport() {
     $('#reportAlert').hidden = true;
     if (!S.sessionId) return;
+    S.reportLoading = true;
+    renderReport();
     API.report(S.sessionId).then(function (d) {
+      S.reportLoading = false;
       S.report = d.report;
       S.reportTurns = d.turns || [];
       S.reportErr = null;
       renderReport();
     }).catch(function (err) {
+      S.reportLoading = false;
       S.report = null;
       S.reportErr = err.message;
       renderReport();
@@ -2725,6 +2757,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       ? (S.problem.subject === 'physics' ? '物理' : '') + ' · ' + ((S.problem.topics || [])[0] || '')
       : '—';
 
+    $('#reportLoad').hidden = !S.reportLoading;
+    if (S.reportLoading) { $('#reportAlert').hidden = true; return; }
     if (S.reportErr || !rep) {
       var alert = $('#reportAlert');
       alert.hidden = false;
@@ -2904,7 +2938,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     if (pick) {
       var id = Number(pick.dataset.relpick);
       var q = (S.bank || []).filter(function (x) { return x.bankId === id; })[0];
-      if (q) { closeRelDrawer(); startBankPractice(q, pick); }
+      if (q) startBankPractice(q, pick);
       return;
     }
     var tab = e.target.closest('[data-reltab]');
@@ -2932,6 +2966,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   /* 从题库挑一道题直接开练：先按纯文本读题，再进第 3 页 */
   function startBankPractice(q, btn) {
     if (btn) btn.disabled = true;
+    var busyEl = $('#relBusy');
+    if (busyEl) busyEl.hidden = false;
     fetch('/qbank/q/' + q.bankId + '.json').then(function (r) {
       if (!r.ok) throw new Error('题库读取失败');
       return r.json();
@@ -2948,12 +2984,14 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
         $('#p2text').textContent = S.problem.stem;
         $('#p1note').textContent = '';
         startSession();
+        closeRelDrawer();
         setPage(3);
       });
     }).catch(function (err) {
       setNote('无法开始这道题：' + err.message, true);
     }).then(function () {
       if (btn) btn.disabled = false;
+      if (busyEl) busyEl.hidden = true;
     });
   }
 
