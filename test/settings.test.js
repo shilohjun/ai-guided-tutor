@@ -22,7 +22,7 @@ import { join } from 'node:path';
 import { describe, it, assert, assertIncludes, assertNotIncludes } from './runner.js';
 import { ROOT } from '../src/core/env.js';
 
-const read = (p) => readFileSync(join(ROOT, p), 'utf8');
+const read = (p) => readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
 const html = read('public/index.html');
 
 /** 所有内联脚本拼起来 —— 设置面板的行为都在这里 */
