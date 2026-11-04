@@ -50,14 +50,15 @@
   }
 
   /* 就地渲染已经排进 DOM 的文字节点（对话气泡、题面等） */
-  function renderMathIn(root) {
+  function renderMathIn(root, opts) {
     if (!root) return;
+    var skip = (opts && opts.includeCode) ? 'pre, script, style, .katex' : 'code, pre, script, style, .katex';
     var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: function (node) {
         if (!node.nodeValue || !hasMath(node.nodeValue)) return NodeFilter.FILTER_REJECT;
         var p = node.parentElement;
         if (!p) return NodeFilter.FILTER_REJECT;
-        if (p.closest('code, pre, script, style, .katex')) return NodeFilter.FILTER_REJECT;
+        if (p.closest(skip)) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
       }
     });

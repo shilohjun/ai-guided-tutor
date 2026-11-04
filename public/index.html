@@ -2422,6 +2422,10 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       }).join('　') + '</p></div>';
     }
     body.innerHTML = html;
+    /* 左栏的题干 / 已知 / 求里也可能带 $...$，就地画出来（引擎读到的仍是原文） */
+    if (window.BsjMath && window.BsjMath.renderMathIn) {
+      window.BsjMath.renderMathIn(body, { includeCode: true });
+    }
   }
 
   /* ---------------- 页面三：解题进度 ----------------
