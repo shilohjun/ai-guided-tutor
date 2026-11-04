@@ -2400,16 +2400,31 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     if (q.figure) {
       html += '<div class="fig"><div class="fig-note"><b>图示</b><p>' + esc(q.figure) + '</p></div></div>';
     }
-    if (q.givens && q.givens.length) {
-      html += '<div class="left-block known"><h3>已知</h3><ul>' + q.givens.map(function (g) {
+    /* 模型偶尔会把整段题干当成「已知 / 求」回吐（题库题尤其容易，因为公式在纯文本里
+       是〔式〕占位）。这里收一道：去掉占位符、压掉空白、丢掉过长条目、最多 6 条。 */
+    function tidyItems(list) {
+      var out = [];
+      (list || []).forEach(function (raw) {
+        var t = String(raw == null ? '' : raw).replace(/〔式〕/g, '').replace(/\s+/g, ' ').trim();
+        if (!t || t.length > 40) return;
+        out.push(t);
+      });
+      return out.slice(0, 6);
+    }
+    var givens = tidyItems(q.givens);
+    if (givens.length) {
+      html += '<div class="left-block known"><h3>已知</h3><ul>' + givens.map(function (g) {
         return '<li><code>' + esc(g) + '</code></li>';
       }).join('') + '</ul></div>';
     }
-    var asked = Array.isArray(q.asked) ? q.asked : (q.asked ? [q.asked] : []);
+    var askedRaw = Array.isArray(q.asked) ? q.asked : (q.asked ? [q.asked] : []);
+    var asked = tidyItems(askedRaw);
     if (asked.length) {
       html += '<div class="left-block ask"><h3>求</h3><p>' + asked.map(function (a) {
         return '<code>' + esc(a) + '</code>';
       }).join('　') + '</p></div>';
+    } else if (askedRaw.length) {
+      html += '<div class="left-block ask"><h3>求</h3><p><code>见题干各小问</code></p></div>';
     }
     body.innerHTML = html;
     /* 左栏的题干 / 已知 / 求里也可能带 $...$，就地画出来（引擎读到的仍是原文） */
@@ -3110,10 +3125,14 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       var opts = (det.options || []).map(function (o) { return o.l + ' ' + o.text; }).join('\n');
       var text = (det.stemText || q.sub) + (opts ? '\n' + opts : '');
       $('#input1').value = text;
+      /* 题库题的公式在纯文本里是〔式〕占位，喂给读题模型会被当成正文回吐到
+         「已知 / 求」里；给模型一句说明，但不改用户看到的输入框内容。 */
+      var readText = '（说明：题干里的〔式〕与〔图〕是公式、图形的占位，请按题意理解，'
+        + '不要把占位符或整段题干抄进「已知 / 求」）' + String.fromCharCode(10) + text.trim();
       S.picked = null;
       S.pickedBank = q.bankId;
       S.problem = null;
-      return API.importProblem(text.trim()).then(function (res) {
+      return API.importProblem(readText).then(function (res) {
         S.problem = res.problem;
         hydrateBankDetail();
         $('#p2text').textContent = S.problem.stem;
