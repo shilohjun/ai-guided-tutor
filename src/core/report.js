@@ -16,6 +16,7 @@ import { findStepByPosition, findGraph, totalSteps } from './locate.js';
 import { inspectVoice } from './prompt.js';
 import { safeStepRef } from './guard.js';
 import { buildReportReview } from './report-review.js';
+import { assessLearning } from './report-assessment.js';
 
 /**
  * 从引擎响应累积一条会话记录（服务端维护）。
@@ -45,6 +46,7 @@ export function appendTurn(record, { utterance, response, problem }) {
   record.hintLog.push({
     at: now,
     utterance,
+    suppressed: Boolean(response.suppressed),
     requestedLevel: response.hint.level,
     deliveredLevel: response.hint.level,
     stuckKind: response.diagnosis.stuckKind,
@@ -173,6 +175,7 @@ export function buildReport(problem, record, meta) {
     problemId: problem.id,
     problemTitle: `${problem.subject === 'physics' ? '物理' : ''} · ${problem.topics.slice(0, 2).join('/')}（难度 ${problem.difficulty}/5）`,
     stuckPoints,
+    assessment: assessLearning(problem, record),
     review: buildReportReview(problem),
     hintStats,
     formulaCards: record.formulaCards?.length ?? 0,

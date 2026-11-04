@@ -861,6 +861,9 @@ body.resizing *{cursor:col-resize !important}
 .wrong-empty{padding:16px 0;color:var(--ink-3);font-size:var(--fs-body)}
 .report-alert{margin-bottom:8px;padding:8px 16px;border-radius:var(--r-inner);background:var(--amber-tint);border:1px solid var(--amber-line);color:var(--amber);font-size:var(--fs-body);line-height:var(--lh-body)}
 
+/* 卡点使用状态文字和图标，不只靠颜色区分；不影响学习小结布局。 */
+.p4 .wrong-item.is-pending{border-left-color:var(--amber)}
+.p4 .wrong-item.is-corrected{border-left-color:var(--mint)}
 /* 报告页专用：精简知识与方法，不影响其他四页。 */
 .p4 .report-card{flex-shrink:0}
 .p4 .review-note{font-size:var(--fs-meta);line-height:var(--lh-body);color:var(--ink-3);margin:8px 0 0}
@@ -1309,7 +1312,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
 
         <div class="report-card">
           <div class="rc-head">
-            <h2>本次学习小结</h2>
+            <h2>学习小结</h2>
             <span class="tag" id="rcTag">—</span>
           </div>
           <div class="metrics">
@@ -1340,7 +1343,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
 
         <div class="report-card">
           <div class="rc-head">
-            <h2>错题摘要</h2>
+            <h2>卡点与改进</h2>
             <span class="tag" id="wrongCount">—</span>
           </div>
           <div class="wrong" id="wrongList"></div>
@@ -2301,25 +2304,14 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     });
   }
 
-  /** 知识点三档：用"提问里出现过的知识点标签"归到对应步骤的判定上 */
+  /** 报告判断只使用服务端核验后的作答证据；缺少证据不补为掌握。 */
   function levelBuckets(rep) {
-    var weakSteps = {}, warnSteps = {};
-    (rep && rep.stuckPoints ? rep.stuckPoints : []).forEach(function (sp) {
-      if (sp.stepIndex == null) return;
-      if ((sp.misconceptionLabels || []).length) weakSteps[sp.stepIndex] = 1;
-      else warnSteps[sp.stepIndex] = 1;
-    });
-    var ok = [], warn = [], bad = [];
-    S.turns.forEach(function (t) {
-      if (t.role !== 'ai' || !t.concepts || !t.concepts.length) return;
-      var bucket = (t.stepIndex != null && weakSteps[t.stepIndex]) ? bad
-        : (t.stepIndex != null && warnSteps[t.stepIndex]) ? warn : ok;
-      t.concepts.forEach(function (c) { if (bucket.indexOf(c) < 0) bucket.push(c); });
-    });
-    ((S.problem && S.problem.topics) || []).forEach(function (tp) {
-      if (bad.indexOf(tp) < 0 && warn.indexOf(tp) < 0 && ok.indexOf(tp) < 0) ok.push(tp);
-    });
-    return { ok: ok.slice(0, 4), warn: warn.slice(0, 3), bad: bad.slice(0, 3) };
+    var list = rep && rep.assessment ? rep.assessment.knowledge || [] : [];
+    return {
+      ok: list.filter(function (x) { return x.status === 'mastered'; }).map(function (x) { return x.title; }),
+      warn: list.filter(function (x) { return x.status === 'consolidate'; }).map(function (x) { return x.title; }),
+      bad: list.filter(function (x) { return x.status === 'weak'; }).map(function (x) { return x.title; })
+    };
   }
 
   /** 仅渲染预定义公式；未知值转义为文本，不接受接口返回的任意HTML。 */
@@ -2394,20 +2386,16 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   function renderReport() {
     var rep = S.report;
     renderReportReview(rep);
-    var expected = 0, matched = 0;
-    S.ledger.forEach(function (x) {
-      expected += x.expected || 0;
-      matched += Math.min(x.matched || 0, x.expected || 0);
-    });
-    var acc = expected ? Math.round((matched / expected) * 100) : 0;
-
+    var assessment = rep && rep.assessment;
+    var accuracy = assessment && assessment.accuracy;
     $('#durNum').textContent = String(durationMinutes());
     $('#mCount').textContent = String(S.ledger.length || 1);
-    // 自主训练里 AI 不出题、不收答案，ledger 为空是常态：
-    // 这时候写 0% 会被读成"全错"，所以只在真有可判定作答时才给数字
-    $('#mAcc').textContent = (rep && expected) ? String(acc) : '—';
+    $('#mAcc').textContent = accuracy && accuracy.total ? String(accuracy.percent) : '—';
     var accUnit = $('#mAcc').parentNode.querySelector('em');
-    if (accUnit) accUnit.hidden = !(rep && expected);
+    if (accUnit) accUnit.hidden = !(accuracy && accuracy.total);
+    $('#mAcc').parentNode.title = accuracy && accuracy.total
+      ? '首次独立作答正确率：' + accuracy.correct + ' / ' + accuracy.total + ' 个可核验小问；改正后不回改首次结果。'
+      : '暂无可核验的首次独立作答，不将求助、未作答或无法判断计为错误。';
     $('#rcTag').textContent = S.problem
       ? (S.problem.subject === 'physics' ? '物理' : '') + ' · ' + ((S.problem.topics || [])[0] || '')
       : '—';
@@ -2430,43 +2418,32 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     }
 
     var buckets = levelBuckets(rep);
-    $('#mWeak').textContent = buckets.bad[0]
-      || (rep.stuckPoints[0] ? shortLabel(rep.stuckPoints[0].stepTitle) : '')
-      || '暂未出现明显薄弱点';
+    $('#mWeak').textContent = buckets.bad[0] || '证据不足，暂未确认';
     $('#mWeak').parentNode.classList.toggle('warn', buckets.bad.length > 0);
-    $('#lvOk').innerHTML = chips(buckets.ok, '暂无');
-    $('#lvWarn').innerHTML = chips(buckets.warn, '暂无');
-    $('#lvBad').innerHTML = chips(buckets.bad, '暂无');
+    $('#lvOk').innerHTML = chips(buckets.ok, '暂无充分证据');
+    $('#lvWarn').innerHTML = chips(buckets.warn, '暂无充分证据');
+    $('#lvBad').innerHTML = chips(buckets.bad, '暂无充分证据');
+    $('#lvOk').title = '仅指本题：无具体提示，独立作答正确且说明依据；不代表长期掌握。';
+    $('#lvWarn').title = '本题出现明确错误、提示后完成或尚缺独立解释；纠正后仍需巩固。';
+    $('#lvBad').title = '获得具体提示后，同一概念仍至少出现两次明确错误。';
 
-    var seen = {}, items = [];
-    (rep.stuckPoints || []).forEach(function (sp) {
-      if (sp.stepIndex == null) return;
-      if (sp.kind === 'knowledge_gap' && !(sp.misconceptionLabels || []).length) return;
-      if (seen[sp.stepIndex]) return;
-      seen[sp.stepIndex] = 1;
-      items.push(sp);
-    });
-    items = items.slice(0, 3);
-
+    var items = assessment ? (assessment.feedback || []).slice(0, 3) : [];
     $('#wrongCount').textContent = items.length + ' 条';
     $('#wrongList').innerHTML = items.length
-      ? items.map(function (sp) {
-          var cause = (sp.misconceptionLabels || []).join('、') || KIND_LABEL[sp.kind] || '卡在这一步';
-          var concept = '';
-          for (var i = 0; i < S.turns.length; i++) {
-            var t = S.turns[i];
-            if (t.role === 'ai' && t.stepIndex === sp.stepIndex && t.concepts && t.concepts.length) {
-              concept = t.concepts[0]; break;
-            }
-          }
-          return '<div class="wrong-item">' +
-            '<div class="wrong-line"><span class="k">题目片段</span><span class="v">「' + esc(sp.stepTitle) + '」</span>' +
-            '<span class="k">待核对</span><span class="cause">' + esc(cause) + '</span></div>' +
-            '<div class="wrong-formula"><span>涉及规律</span><code>' + esc(concept || '依据尚不足') + '</code>' +
-            '<span>所属板块</span><span class="tag">' + esc((S.problem.topics || [])[0] || '—') + '</span></div>' +
-            '</div>';
+      ? items.map(function (item) {
+          var fixed = item.status === 'corrected';
+          var evidence = (item.evidence || []).map(function (e) {
+            return '<p>学生原话：' + esc(e.quote) + '</p>';
+          }).join('');
+          return '<div class="wrong-item ' + (fixed ? 'is-corrected' : 'is-pending') + '">' +
+            '<div class="wrong-line"><strong>' + esc(item.title) + '</strong>' +
+            '<span class="tag">' + (fixed ? '✓ 本题已纠正' : '! 待继续') + '</span></div>' +
+            '<p class="review-copy"><strong>卡点：</strong>' + esc(item.finding) + '</p>' +
+            '<p class="review-copy"><strong>改进：</strong>' + esc(item.action) + '</p>' +
+            '<details class="review-detail"><summary>查看对话依据</summary>' + evidence + '</details></div>';
         }).join('')
-      : '<div class="wrong-empty">本轮没有留下具体卡点。</div>';
+      : '<div class="wrong-empty">暂无足够证据归纳具体卡点；未发现错误不等于已经掌握。</div>';
+
   }
 
   $('#go5').addEventListener('click', function () { setPage(5); });
