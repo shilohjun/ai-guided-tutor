@@ -9,6 +9,9 @@
 
 **当前只开放「自主训练」**：AI 伴学标着「暂未更新」，暂时点不了；任何方式都不给答案。
 
+**第一页是一句话 + 一个输入框**。粘贴题干、拍照，或者点底部「好题精练」下滑进题库地图——152 道高考真题按
+**知识点**（6 模块 / 22 章 / 75 叶）与**思路**（9 类 / 28 细分）两棵树排开，点最细那一支就弹出这批题目。
+
 [![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](package.json)
 [![依赖](https://img.shields.io/badge/dependencies-0-brightgreen)](package.json)
 [![测试](https://img.shields.io/badge/tests-324%2F324-brightgreen)](test/run.js)
@@ -17,10 +20,11 @@
 仓库地址：<https://github.com/shilohjun/ai-guided-tutor>
 
 <p align="center">
-  <img src="docs/screenshots/01-start.png" width="49%" alt="页一 · 自己贴题干，或从题库挑一道" />
-  <img src="docs/screenshots/02-solving.png" width="49%" alt="页三 · 解题对话：左边题目，右边只给提示" />
+  <img src="docs/screenshots/page1-home.png" width="49%" alt="页一 · 一句话 + 一个输入框" />
+  <img src="docs/screenshots/qbank-map.png" width="49%" alt="题库地图 · 知识点与思路两棵树，右侧是按分支筛过的题目" />
   <br />
-  <img src="docs/screenshots/03-report.png" width="49%" alt="页四 · 学习报告：掌握 / 待巩固 / 薄弱三档" />
+  <img src="docs/screenshots/page3-rich.png" width="49%" alt="页三 · 题干里的公式与图形保留原图" />
+  <img src="docs/screenshots/page5-drawer.png" width="49%" alt="页五 · 同类题再练：抽屉里按知识点/思路换一道" />
 </p>
 
 ---
@@ -51,11 +55,12 @@
 ## 现在是什么
 
 - **五页流程**：题目 → 方式 → 解题 → 报告 → 巩固。步骤条五页随时可点；某页还没数据就进空态并给一句提示，不会把人弹回上一页。
-- **真实题库**：6 道内置题；点选走 `/api/problem`，粘贴文字走 `/api/problem/import`，拍照走 `/api/ocr`。
+- **真实题库**：`public/qbank/` 下 152 道高考真题（19 套卷 × 8 题），题干里的公式与图形都是原图（公式 967 张、图形 192 张、选项图 349 张）；地图选中后把题干回填到第一页，粘贴文字走 `/api/problem/import`，拍照走 `/api/ocr`。
+- **题库地图**：`public/qbank/map.html`，以 iframe 内嵌在第一页下方。知识点是横向树（物理 → 6 模块 → 22 章 → 75 叶），思路是径向星图（核心 → 9 类 → 28 细分）；分支展开后不收回，点最细一支弹出这批题；右侧面板跟着选中分支过滤。地图里**不显示任何数量**，题号与总数只在第 3 页出现。
 - **真实对话**：`/api/chat` 接入真实模型；学生消息、AI 提示、对话进度、完成判定都来自服务端。
 - **真实报告**：`/api/report` 返回独立完成度、引导轮次、卡点、深层问题、推荐与行动建议。
 - **公式卡**：`/api/formula` 在 L3 之后按知识点下发；报告单独统计公式卡次数并扣独立完成度。
-- **巩固页**：重做本题 / 用 `GET /api/related` 挑同知识点的题。
+- **巩固页**：重做本题 / 同类题再练——右侧抽屉按「同知识点 / 同思路 / 全部」三档从 152 道题库里换一道，选中直接进第 3 页开练。
 - **只有自主训练**：`/api/health` 的 `capabilities.modes` 只登记 `self_training`；AI 伴学禁用并标「暂未更新」，服务端收到 `ai_companion` 直接返回 400。
 - **设置**：顶栏齿轮打开面板 —— 主题三选（浅色 / 深色 / 跟随系统）、字号三档（小 / 中 / 大，拖到哪档停哪档）。盒子跟着字一起放大，间距与圆角一律不动；偏好记在本机，`?theme=` `?ux=` 只影响这一次。
 
@@ -133,11 +138,11 @@
 
 ## 学习闭环
 
-1. **题目**：内置题库 / 文字导入 / 拍照识别；读题产出摘要、关键条件、知识点与知识图谱。
+1. **题目**：题库地图选一道 / 文字导入 / 拍照识别；读题产出摘要、关键条件、知识点与知识图谱。
 2. **方式**：点一下自主训练就进下一步（这页没有「确认」）；AI 伴学入口还在，标「暂未更新」。
 3. **解题**：学生先交出思路；服务端定位卡点、选层级、过守卫；左栏步骤条显示走到第几步，只给走过的步骤命名。
 4. **报告**：三色档（掌握 / 待巩固 / 薄弱）+ 错题摘要 + 学习时长；会话过期时给琥珀色提示而不是空白。
-5. **巩固**：重做这道题，或挑同知识点的题继续。
+5. **巩固**：重做这道题，或从抽屉里按知识点/思路换一道继续。
 
 引擎的默认是"先让学生自己写"：只有学生明确求助（点提示、说"卡住了"）才升级到 L1–L3 分层提示，
 只说出思路时保持沉默。第 3 页左侧的步骤条与右栏对话共用同一份 `progress`，
@@ -181,11 +186,11 @@ cp .env.example .env
 
 | 页面 | 接口 | 说明 |
 |---|---|---|
-| ① 题目 | `GET /api/problems`、`POST /api/problem/import`、`POST /api/ocr` | 题库与预览来自注册表；粘贴文字走读题；拍照只把图变成文字，学生核对后再导入；未配凭据时按钮变灰并说明原因 |
+| ① 题目 | `GET /api/problems`、`GET /qbank/data.json`、`POST /api/problem/import`、`POST /api/ocr` | 题库来自静态文件（地图与第一页共用一份）；选中题目走读题；粘贴文字走读题；拍照只把图变成文字，学生核对后再导入；未配凭据时按钮变灰并说明原因 |
 | ② 方式 | `GET /api/health`（`capabilities.modes`） | 当前只有 `self_training` 可点；`ai_companion` 禁用并标「暂未更新」，服务端收到也直接返回 400 |
 | ③ 解题 | `GET /api/problem`、`POST /api/chat` | 左栏题干/图示/已知/求 + 步骤条；每轮回复、步骤进度、已走过步骤名都来自引擎 |
 | ④ 报告 | `GET /api/report` | 三色档、错题摘要、学习时长；会话过期时给明确提示而不是空白 |
-| ⑤ 巩固 | `GET /api/related`、`GET /api/problem` | 重做本题 / 同类题再练（按共享知识点筛，最多 6 道）；选中同类题即开新会话 |
+| ⑤ 巩固 | `GET /qbank/data.json`、`GET /qbank/q/{id}.json` | 重做本题 / 同类题再练（抽屉按真实双轴标签从 152 道里筛）；选中后读该题详情，纯文本走读题、富文本用于展示，随即开新会话 |
 
 没有配置模型 Key 也能完整跑通——引擎会自动降级到**离线规则桩**，
 页面、测试、评测全部可用，只是提示文案来自规则而不是模型。
@@ -313,6 +318,11 @@ npm run eval:llm
 ```text
 public/
   index.html            新五页（单文件：markup + 内联 CSS + 内联 JS）
+  qbank/
+    map.html            题库地图（独立的单文件页面，以 iframe 内嵌）
+    data.json           152 道题的轻量索引（给地图与右栏用）
+    q/1.json … q/152.json  逐题详情：题干/选项/答案/解析，公式与图形内联为 data URL
+  fonts/serif-title-600.woff2  标题宋体子集（12 字，3.4KB）
   classic.html          旧壳保底副本，计划保留一个版本后下线
   app.js / styles.css   旧版页面代码，当前不引用，正在清理
   shell.js              旧壳入口脚本（只被 classic.html 加载）
@@ -333,6 +343,7 @@ docs/                   设计文档与截图
 api/                    Vercel Serverless API 入口
 showcase/               单文件成果展示页（独立于应用）
 v3.html                 设计参考稿
+PRODUCT.md              产品真源（定位 / 用户 / 硬约束 / 题库口径 / anti-goals）
 DESIGN-TOKENS.md        设计 token 与可访问性说明
 ```
 
@@ -347,7 +358,7 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 |---|---|---|
 | `GET` | `/api/health` | 健康检查、当前运行模式、`capabilities.modes`（哪些做题方式能点） |
 | `GET` | `/api/problems` | 内置题目列表 |
-| `GET` | `/api/related?id=` | 同知识点的同类题（最多 6 道；一道都没有时退化成题库其余题） |
+| `GET` | `/api/related?id=` | 同知识点的同类题（服务端注册表内，最多 6 道）。**前端已不再调用**：第 5 页改为从 152 道题库按双轴标签筛 |
 | `GET` | `/api/problem?id=` | 单个题目（学生可见版本） |
 | `POST` | `/api/problem/import` | 题目文字 → 结构化题目 |
 | `POST` | `/api/ocr` | 题目照片 → 题干文本 |
@@ -474,6 +485,9 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 | 长会话稳定性 | 场景集最长 3 轮，尚未做 10+ 轮疲劳测试 |
 | 跨学科泛化 | 主要验证物理电磁感应，数学覆盖有限 |
 | 图形类题目 | OCR 只识别文字，读不懂受力图、电路图与几何图 |
+| 题库题的读题 | 题库题与粘贴题走同一条读题链路，点进去要等大模型现读 3–8 秒；要秒开得先有解题图谱 |
+| 公式的形态 | 题库里的公式是**图片**（原卷截图），不是可排版的 LaTeX；引擎读到的仍是 `〔式〕` 占位文本 |
+| 题库数据 | 152 道题是静态 JSON（`public/qbank/`，约 16MB），暂未落服务端存储 |
 | 会话持久化 | 服务端会话存进程内存，重启后报告可能失效；浏览器不保存学习历史 |
 | 教学质量 | 未做教研盲评；这是下一阶段最重要的工作 |
 
@@ -492,7 +506,10 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 | [`07-prompt-upgrade.md`](docs/07-prompt-upgrade.md) | 回答规范升级与验收 |
 | [`08-branch-workflow.md`](docs/08-branch-workflow.md) | 分支使用说明 |
 | [`superpowers/specs/2026-11-02-设置面板-主题与字号-design.md`](docs/superpowers/specs/2026-11-02-设置面板-主题与字号-design.md) | 设置面板（主题三选 + 字号三档）设计书与实现踩坑 |
+| [`13-题库双轴选题-数据面与管线.md`](docs/13-题库双轴选题-数据面与管线.md) | 152 道题的数据面、离线管线与验收 |
+| [`14-题库双轴选题-接入与交互.md`](docs/14-题库双轴选题-接入与交互.md) | 题库地图与抽屉的接入口径、动效与降级 |
 | [`DESIGN-TOKENS.md`](DESIGN-TOKENS.md) | v3 设计 token 与可访问性说明 |
+| [`PRODUCT.md`](PRODUCT.md) | 产品真源：定位、用户、硬约束、题库口径、anti-goals |
 | [`showcase/`](showcase/) | 项目成果展示页 |
 
 ---

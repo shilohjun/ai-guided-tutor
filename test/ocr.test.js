@@ -500,8 +500,10 @@ describe('拍照识题 · 路由契约', () => {
     const composerIdx = newUi.lastIndexOf('class="composer"', camIdx);
     assert(composerIdx > 0, '拍照入口必须长在输入框里（它和文字输入是同一个入口）');
 
-    const bankIdx = newUi.indexOf('class="bank"', camIdx);
-    assert(bankIdx > camIdx, '拍照入口应排在题库之前 —— 题库是备选，拍照是主入口之一');
+    /* 首页不再内置一份题库列表：题库改成整屏地图，入口是底部那条「好题精练」。
+       判据仍然是"拍照排在题库入口之前" —— 题库是备选，拍照是主入口之一。 */
+    const bankIdx = newUi.indexOf('id="goodBar"', camIdx);
+    assert(bankIdx > camIdx, '拍照入口应排在题库入口（好题精练）之前 —— 题库是备选，拍照是主入口之一');
 
     const segment = newUi.slice(composerIdx, camIdx);
     assert(

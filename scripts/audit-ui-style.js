@@ -147,9 +147,8 @@ const NEST = [
   { outer: '.report-card', inner: '.metric', gap: 16 },
   { outer: '.report-card', inner: '.level', gap: 16 },
   { outer: '.report-card', inner: '.wrong-item', gap: 16 },
-  { outer: '.bar-card', inner: '.drop-trigger', gap: 16 },
   { outer: '.bar-card', inner: '.bar-ico', gap: 16 },
-  { outer: '.drop-list', inner: '.drop-list .q-item', gap: 4 },
+  /* 老的页五下拉（.drop-trigger / .drop-list）已换成右侧抽屉，这两对随之注销 */
   { outer: '.composer', inner: '.shot', gap: 16 },
   { outer: '.set', inner: '.set-seg', gap: 16 }
 ];
