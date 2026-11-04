@@ -503,6 +503,10 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
   border:2px solid var(--brand-line);border-top-color:var(--brand);
   animation:spin .8s linear infinite;
 }
+.reading-retry{
+  margin-left:auto;flex:none;height:28px;padding:0 12px;border-radius:var(--r-pill);
+  border:1px solid var(--brand-line);background:var(--surface);color:var(--brand-ink);font-size:var(--fs-meta);
+}
 .reading div{display:flex;flex-direction:column;gap:4px}
 .reading b{font-size:var(--fs-lead);font-weight:600;color:var(--ink);line-height:1.2}
 .reading em{font-style:normal;font-size:var(--fs-meta);color:var(--ink-3);line-height:1.3}
@@ -1433,6 +1437,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
             <div class="reading" id="reading1">
               <span class="spin" aria-hidden="true"></span>
               <div><b id="readingTitle">正在读题…</b><em id="readingHint">AI 正在理解题干与公式，几秒钟</em></div>
+              <button class="reading-retry" type="button" id="readingRetry" hidden>重试</button>
             </div>
             <div class="picked" id="picked1" hidden>
               <div class="picked-body q-rich" id="pickedBody"></div>
@@ -1807,17 +1812,19 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
         throw new Error('连不上本地服务：请确认终端里 npm start 仍在运行');
       });
     },
-    post: function (path, body) {
-      return API.req(path, {
+    post: function (path, body, opt) {
+      var init = {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body || {})
-      });
+      };
+      if (opt && opt.signal) init.signal = opt.signal;
+      return API.req(path, init);
     },
     health: function () { return API.req('/api/health'); },
     problems: function () { return API.req('/api/problems'); },
     problem: function (id) { return API.req('/api/problem?id=' + encodeURIComponent(id)); },
-    importProblem: function (text) { return API.post('/api/problem/import', { rawText: text }); },
+    importProblem: function (text, opt) { return API.post('/api/problem/import', { rawText: text }, opt); },
     chat: function (body) { return API.post('/api/chat', body); },
     report: function (sid) { return API.req('/api/report?sessionId=' + encodeURIComponent(sid)); },
     ocr: function (image) { return API.post('/api/ocr', { image: image }); }
@@ -2201,18 +2208,28 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   var readingTimer = 0;
   function beginReading() {
     S.reading = true;
+    S.readStart = Date.now();
     var c = $('#composer1'); if (c) c.classList.add('is-reading');
-    var title = $('#readingTitle'), hint = $('#readingHint');
+    var title = $('#readingTitle'), hint = $('#readingHint'), retry = $('#readingRetry');
     if (title) title.textContent = '正在读题…';
     if (hint) hint.textContent = 'AI 正在理解题干与公式，几秒钟';
-    clearTimeout(readingTimer);
-    readingTimer = setTimeout(function () {
-      if (hint) hint.textContent = '题目有点长，正在逐句读…';
-    }, 6000);
+    if (retry) retry.hidden = true;
+    clearInterval(readingTimer);
+    /* 等待期间把秒数亮出来：卡住也看得见是在等，而不是死了 */
+    readingTimer = setInterval(function () {
+      var s = Math.round((Date.now() - S.readStart) / 1000);
+      if (hint) {
+        hint.textContent = s >= 20
+          ? '已经 ' + s + ' 秒了，题目可能在排队，也可以点重试'
+          : s >= 8 ? '题目有点长，正在逐句读…（已 ' + s + ' 秒）'
+          : 'AI 正在理解题干与公式，几秒钟（已 ' + s + ' 秒）';
+      }
+      if (retry && s >= 20) retry.hidden = false;
+    }, 1000);
   }
   function endReading() {
     S.reading = false;
-    clearTimeout(readingTimer);
+    clearInterval(readingTimer);
     var c = $('#composer1'); if (c) c.classList.remove('is-reading');
   }
 
@@ -2225,7 +2242,10 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     busyBtn($('#go2'), true, S.picked ? '载入中…' : '正在读题…');
     setNote('');
     beginReading();
-    var task = S.picked ? API.problem(S.picked.id) : API.importProblem(typed);
+    if (S.readCtrl) { try { S.readCtrl.abort(); } catch (e) { } }
+    S.readCtrl = (typeof AbortController === 'function') ? new AbortController() : null;
+    var task = S.picked ? API.problem(S.picked.id)
+      : API.importProblem(typed, S.readCtrl ? { signal: S.readCtrl.signal } : null);
 
     task.then(function (res) {
       S.problem = res.problem;
@@ -2859,6 +2879,11 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     if (!S.problem) return;
     startSession();
     setPage(3);
+  });
+
+  $('#readingRetry').addEventListener('click', function () {
+    endReading();
+    goPage2();
   });
 
   $('#startRelated').addEventListener('click', function () {
