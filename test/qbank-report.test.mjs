@@ -66,7 +66,7 @@ test('both selection paths use registered IDs; report renderer preserves all car
   const start=html.indexOf('  function renderReportReview(rep)');
   const end=html.indexOf('  /** 步骤标题',start);
   const host={innerHTML:''};
-  const c=vm.createContext({$:()=>host,esc:s=>String(s).replaceAll('<','&lt;'),reportFormula:k=>k.formula});
+  const c=vm.createContext({practiceButton:()=>'', $:()=>host,esc:s=>String(s).replaceAll('<','&lt;'),reportFormula:k=>k.formula});
   vm.runInContext(html.slice(start,end),c);
   const example=QBANK_SOURCE.find(q=>q.knowledgeIds.length>3 && q.methodIds.length>2);
   assert.ok(example);
