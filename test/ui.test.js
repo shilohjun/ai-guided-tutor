@@ -223,7 +223,9 @@ describe('前端 · 五页流程契约（新版单文件）', () => {
     assertIncludes(appJs, 'q.th2Id === REL.th', '思路要按思路方法 id 对齐');
     assertIncludes(html, 'id="relKgSel"', '抽屉里要能直接筛知识点');
     assertIncludes(html, 'id="relThSel"', '抽屉里要能直接筛思路');
-    assertIncludes(html, 'data-relquick="kg"', '「同知识点」要是一个快捷键');
+    assertNotIncludes(html, 'data-relquick', '抽屉只用两个下拉筛选，不再有快捷开关');
+    assertIncludes(appJs, "REL.th = (cur && cur.th2Id) || ''", '打开抽屉要按本题的思路预填');
+    assertIncludes(appJs, "REL.kg = (cur && cur.leafId) || ''", '打开抽屉要按本题的知识点预填');
     assertNotIncludes(appJs, "API.req('/api/related", '页五已经不再走服务端的 related 接口');
   });
 

@@ -651,16 +651,7 @@ html[data-theme="dark"] .viewer img{background:#111}
   margin-left:auto;flex:none;width:30px;height:30px;border-radius:50%;
   display:grid;place-items:center;color:var(--ink-3);background:var(--surface-2);transition:.16s;
 }
-.rel-x:hover{background:var(--surface-3);color:var(--ink)}
-.rel-quick{display:flex;align-items:center;gap:8px;padding:0 16px 8px}
-.rel-seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line);border-radius:var(--r-pill);background:var(--paper)}
-.rel-seg button{
-  height:26px;padding:0 12px;border:0;border-radius:var(--r-pill);background:transparent;
-  font-size:var(--fs-meta);color:var(--ink-2);transition:.16s;
-}
-.rel-seg button[aria-pressed="true"]{background:var(--brand-tint);color:var(--brand-ink);font-weight:600}
-.rel-seg button:disabled{opacity:.45;cursor:not-allowed}
-.rel-all{
+.rel-x:hover{background:var(--surface-3);color:var(--ink)}.rel-seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line);border-radius:var(--r-pill);background:var(--paper)}.rel-seg button[aria-pressed="true"]{background:var(--brand-tint);color:var(--brand-ink);font-weight:600}.rel-all{
   margin-left:auto;flex:none;height:26px;padding:0 12px;border-radius:var(--r-pill);
   border:1px solid var(--line);background:var(--surface);color:var(--ink-2);font-size:var(--fs-meta);
 }
@@ -671,13 +662,7 @@ html[data-theme="dark"] .viewer img{background:#111}
 .rel-f select{
   width:100%;height:30px;padding:0 8px;border-radius:var(--r-inner);
   border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:var(--fs-meta);
-}
-.rel-ctx{
-  margin:0 16px 12px;padding:8px 12px;border-radius:var(--r-inner);
-  background:var(--surface-2);border:1px solid var(--line);
-  font-size:var(--fs-meta);color:var(--ink-2);line-height:1.5;
-}
-.rel-ctx b{color:var(--brand-ink);font-weight:600}
+}.rel-ctx b{color:var(--brand-ink);font-weight:600}
 .rel-list{flex:1;min-height:0;overflow:auto;padding:0 12px 12px;display:flex;flex-direction:column;gap:8px}
 .rel-item{
   display:block;width:100%;text-align:left;padding:12px 12px;border-radius:var(--r-inner);
@@ -1760,18 +1745,10 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </div>
-      <div class="rel-quick">
-        <div class="rel-seg" role="group" aria-label="快捷筛选">
-          <button type="button" data-relquick="kg" aria-pressed="false">同知识点</button>
-          <button type="button" data-relquick="th" aria-pressed="false">同思路</button>
-        </div>
-        <button type="button" class="rel-all" id="relAll" aria-pressed="true">全部</button>
-      </div>
       <div class="rel-filters">
         <label class="rel-f"><span>知识点</span><select id="relKgSel"></select></label>
         <label class="rel-f"><span>思路</span><select id="relThSel"></select></label>
       </div>
-      <div class="rel-ctx" id="relCtx"></div>
       <div class="rel-list scroller" id="relList"></div>
       <div class="rel-busy" id="relBusy" hidden>
         <span class="spin" aria-hidden="true"></span>
@@ -2237,6 +2214,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       return r.json();
     }).then(function (det) {
       if (S.problem !== q) return;
+      q.qbId = i;
       q.stemHtml = det.stemHtml;
       q.richOptions = det.options;
       q.qbMeta = { ty: det.ty, d: det.d, p: det.p, mod: det.mod, chap: det.chap, leaf: det.leaf };
@@ -2962,9 +2940,12 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   var REL = { open: false, kg: '', th: '', seen: {}, built: false };
 
   function currentBankRecord() {
-    if (S.pickedBank == null || !S.bank) return null;
+    if (!S.bank) return null;
+    /* pickedBank 在输入框被再次编辑时会被清掉，所以再兜一层：题目自己记着题号 */
+    var id = S.pickedBank != null ? S.pickedBank : (S.problem && S.problem.qbId);
+    if (id == null) return null;
     for (var i = 0; i < S.bank.length; i++) {
-      if (S.bank[i].bankId === S.pickedBank) return S.bank[i];
+      if (S.bank[i].bankId === id) return S.bank[i];
     }
     return null;
   }
@@ -3023,22 +3004,9 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   }
 
   function syncRelUi() {
-    var cur = currentBankRecord();
     var kgSel = $('#relKgSel'), thSel = $('#relThSel');
     if (kgSel) kgSel.value = REL.kg;
     if (thSel) thSel.value = REL.th;
-    $$('#relDrawer [data-relquick]').forEach(function (b) {
-      var on = b.dataset.relquick === 'kg' ? !!REL.kg && !!cur && REL.kg === cur.leafId
-                                          : !!REL.th && !!cur && REL.th === cur.th2Id;
-      b.setAttribute('aria-pressed', String(on));
-      b.disabled = !cur;
-    });
-    var none = !REL.kg && !REL.th;
-    $('#relAll').setAttribute('aria-pressed', String(none));
-    var bits = [];
-    if (REL.kg) bits.push('知识点 <b>' + esc((S.kgNames && S.kgNames[REL.kg]) || '') + '</b>');
-    if (REL.th) bits.push('思路 <b>' + esc((S.thNames && S.thNames[REL.th]) || '') + '</b>');
-    $('#relCtx').innerHTML = bits.length ? bits.join(' 且 ') : '全部题目，按难度排';
   }
 
   function renderRelList() {
@@ -3061,16 +3029,15 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     REL.open = true;
     var cur = currentBankRecord();
     buildRelFilters();
-    /* 默认落在"有题可练"的范围：同知识点 → 同思路 → 全部 */
-    REL.kg = ''; REL.th = '';
-    if (cur && cur.leafId) {
-      REL.kg = cur.leafId;
-      if (!relCandidates().length) REL.kg = '';
+    /* 默认按本题的两个轴预填；没有可练的就逐级放开：只知识点 → 只思路 → 全部 */
+    REL.kg = (cur && cur.leafId) || '';
+    REL.th = (cur && cur.th2Id) || '';
+    if (!relCandidates().length && REL.th) REL.th = '';
+    if (!relCandidates().length && REL.kg) {
+      REL.kg = '';
+      REL.th = (cur && cur.th2Id) || '';
     }
-    if (cur && !REL.kg && cur.th2Id) {
-      REL.th = cur.th2Id;
-      if (!relCandidates().length) REL.th = '';
-    }
+    if (!relCandidates().length) { REL.kg = ''; REL.th = ''; }
     var d = $('#relDrawer');
     d.classList.add('on');
     d.setAttribute('aria-hidden', 'false');
@@ -3097,22 +3064,6 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       if (q) startBankPractice(q, pick);
       return;
     }
-    var quick = e.target.closest('[data-relquick]');
-    if (quick) {
-      var cur = currentBankRecord();
-      if (quick.dataset.relquick === 'kg') {
-        REL.kg = (cur && cur.leafId) || '';
-        REL.th = '';
-      } else {
-        REL.th = (cur && cur.th2Id) || '';
-        REL.kg = '';
-      }
-      renderRelList();
-    }
-  });
-  $('#relAll').addEventListener('click', function () {
-    REL.kg = ''; REL.th = '';
-    renderRelList();
   });
   $('#relKgSel').addEventListener('change', function (e) {
     REL.kg = e.target.value;
