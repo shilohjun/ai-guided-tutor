@@ -827,6 +827,8 @@ body.is-qb{overflow:hidden}
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .p2-modes{display:flex;flex-direction:column;gap:16px}
+.p2-go{display:flex;align-items:center;gap:12px;margin-top:24px;flex-wrap:wrap}
+.p2-hint{font-size:var(--fs-meta);color:var(--ink-3)}
 .mode-bar{
   display:flex;align-items:center;gap:16px;
   width:100%;text-align:left;
@@ -1507,6 +1509,10 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
             </span>
           </button>
+        </div>
+        <div class="p2-go">
+          <button class="btn-primary" type="button" id="startSolve">开始解题</button>
+          <span class="p2-hint">默认「自主训练」：先自己写，卡住再叫 AI</span>
         </div>
       </div>
       <div class="p2-foot">
@@ -2238,6 +2244,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     enterSolving();
   });
   $('#back1').addEventListener('click', function () { setPage(1); });
+  $('#startSolve').addEventListener('click', function () { enterSolving(); });
 
   /** 进对话页：没有题就先回第一页选题（空态不假装能开始） */
   function enterSolving() {
