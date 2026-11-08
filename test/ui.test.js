@@ -4,7 +4,7 @@
  * 这个套件守的是两类"只有在浏览器里才会炸"的问题 ——
  * 而它们恰恰是最容易漏测的，因为它们不属于引擎逻辑：
  *
- *   ① **DOM 契约**：app.js 里 $('  #xxx  ') 引用的每个 id，index.html 里必须真的存在。
+ *   ① **DOM 契约**：app.js 里 $('  #xxx  ') 引用的每个 id，宿主页（classic.html）里必须真的存在。
  *      写错一个字母不会报错，只会静默地什么都不发生 ——
  *      表现为"点了按钮没反应"，而现场演示时才发现。
  *
@@ -17,14 +17,23 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, it, assert, assertEquals, assertIncludes, assertNotIncludes } from './runner.js';
 import { loadEnvFile, ROOT } from '../src/core/env.js';
-import { teacherMode, checkTeacherAuth } from '../src/server/router.js';
 
+/**
+ * 学生看到的就是这一个文件：五页版的 markup、样式、脚本全在 public/index.html 里。
+ * 旧壳 classic.html 只作为回退保留，不再参与契约核对。
+ */
 const html = readFileSync(join(ROOT, 'public/index.html'), 'utf8');
-const appJs = readFileSync(join(ROOT, 'public/app.js'), 'utf8');
-/** 去掉 HTML 注释后的版本 —— 注释里写"这里不放防泄题面板"是正常的，学生看不到注释 */
-const htmlVisible = html.replace(/<!--[\s\S]*?-->/g, '');
+/** 单文件里的所有内联脚本 —— 渲染逻辑都在这里 */
+const appJs = [...html.matchAll(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/g)]
+  .map((m) => m[1])
+  .join('\n');
+/** 去掉 HTML 注释与 style/script 后的可见文本 —— 注释里写"这里不放防泄题面板"是正常的，学生看不到 */
+const htmlVisible = html
+  .replace(/<!--[\s\S]*?-->/g, '')
+  .replace(/<style[\s\S]*?<\/style>/g, '')
+  .replace(/<script[\s\S]*?<\/script>/g, '');
 
-/** index.html 里声明的所有 id */
+/** 宿主页（classic.html）里声明的所有 id */
 function htmlIds() {
   const ids = new Set();
   for (const m of html.matchAll(/\sid="([^"]+)"/g)) ids.add(m[1]);
@@ -48,215 +57,188 @@ function referencedIds() {
  * 将来如果有人删了创建代码，这份名单就该跟着删。
  */
 const DYNAMIC_IDS = new Set([
-  'chat-empty', // renderEmptyState() 每次重建消息区时创建
-  'btn-goto-chat-2', // loadReport() 的空状态里创建
-  'btn-run-eval', // renderTeacherEval() 的模板里创建
-  'eval-result', // 同上，评测结果的容器
-  'toast', // toast() 首次调用时创建
-  'kg-wrap', // renderAnalysis() 的解析面板里创建，知识图谱的挂载点
-  'kg-wrap-teacher', // renderTeacherProblem() 的教师解析区里创建
-  'kg-detail', // renderKnowledgeGraph() 内部创建，点节点后的详情气泡
-  'teacher-path', // renderTeacherSession() 的"路径进度"卡里创建
-  'teacher-path-track', // renderPathList() 内部创建，教师版路径轨道
+  // 新版把容器都写死在 markup 里：实测内联脚本引用的 62 个 id 全部能在 index.html 里找到，
+  // 所以这份名单目前是空的。以后若有人改成"JS 现建容器再引用"，就得在这里登记谁创建它。
 ]);
 
 describe('前端 · DOM 契约（防止"点了没反应"）', () => {
-  it('app.js 引用的每个 id 都存在于 index.html（或是有意动态创建的）', () => {
+  /**
+   * 新版五页是单文件：markup、样式、脚本都在 public/index.html 里。
+   * 好处是不用再对两份文件，坏处一模一样 —— 脚本引用一个不存在的 id 不会报错，
+   * 只会静默地什么都不发生。所以照旧从脚本里把 id 抓出来，回同一个文件里核对。
+   */
+  it('内联脚本引用的每个 id 都存在于 index.html（或是有意动态创建的）', () => {
     const declared = htmlIds();
     const missing = [];
     for (const [id, count] of referencedIds()) {
       if (declared.has(id) || DYNAMIC_IDS.has(id)) continue;
-      missing.push(`${id}（引用 ${count} 次）`);
+      missing.push(id + '（引用 ' + count + ' 次）');
     }
-    assert(missing.length === 0, `以下 id 在 index.html 里不存在，运行时会静默失效：\n  ${missing.join('\n  ')}`);
+    assert(missing.length === 0, '以下 id 在 index.html 里不存在，运行时会静默失效：\n  ' + missing.join('\n  '));
   });
 
-  it('学生视图不含任何"防泄题 / 教研"面板（那些内容不该出现在学生面前）', () => {
-    // 说明：教师视图的容器允许存在（它是一个独立页面、且服务端会拦数据），
-    // 但学生对话页里不允许再出现"守卫拦截/防泄题"这类工程内控面板。
-    const start = htmlVisible.indexOf('id="page-chat"');
-    const end = htmlVisible.indexOf('id="page-report"');
-    assert(start > 0 && end > start, '页面锚点应存在');
+  it('学生解题页不含任何"防泄题 / 教研"面板（那些内容不该出现在学生面前）', () => {
+    const start = htmlVisible.indexOf('data-page="3"');
+    const end = htmlVisible.indexOf('data-page="4"');
+    assert(start > 0 && end > start, '第 3 页（解题）的锚点应存在');
     const chatSection = htmlVisible.slice(start, end);
-    assertNotIncludes(chatSection, '防泄题', '学生对话页不应出现"防泄题"面板');
-    assertNotIncludes(chatSection, '守卫拦截', '学生对话页不应出现"守卫拦截"统计');
-    assertNotIncludes(chatSection, '答案泄漏', '学生对话页不应出现"答案泄漏"字样');
-  });
-
-  it('学生页与教师页是两个独立页面，学生页不内嵌教研数据容器', () => {
-    assertIncludes(html, 'id="page-teacher"', '教师视图必须是独立页面');
-    assertIncludes(html, 'id="teacher-key"', '教师视图必须有口令入口');
-    // 教师口令绝不能写死在页面里
-    assertNotIncludes(html, 'TEACHER_KEY=', '口令不能写进 HTML');
-  });
-});
-
-describe('视图隔离 · 教师端点鉴权（三种形态）', () => {
-  const save = { key: process.env.TEACHER_KEY, lock: process.env.DSH_FORCE_TEACHER_LOCK };
-  const restore = () => {
-    if (save.key === undefined) delete process.env.TEACHER_KEY;
-    else process.env.TEACHER_KEY = save.key;
-    if (save.lock === undefined) delete process.env.DSH_FORCE_TEACHER_LOCK;
-    else process.env.DSH_FORCE_TEACHER_LOCK = save.lock;
-  };
-  const req = (key) => ({ headers: key ? { 'x-teacher-key': key } : {} });
-  const url = new URL('http://localhost/api/teacher/overview');
-
-  it('本地未配口令 ⇒ open：不带口令也能进（演示时"点一下直接进"）', () => {
-    process.env.TEACHER_KEY = '';
-    delete process.env.DSH_FORCE_TEACHER_LOCK;
-    assertEquals(teacherMode(), 'open', '本地默认应为开放模式');
-    assert(checkTeacherAuth(req(), url).ok, 'open 模式下不带口令应放行');
-    restore();
-  });
-
-  it('配了口令 ⇒ key：不带口令 401，带对口令放行', () => {
-    process.env.TEACHER_KEY = 'unit-test-key';
-    delete process.env.DSH_FORCE_TEACHER_LOCK;
-    assertEquals(teacherMode(), 'key');
-    const denied = checkTeacherAuth(req(), url);
-    assert(!denied.ok && denied.status === 401, `不带口令应 401，实际 ${JSON.stringify(denied)}`);
-    const wrong = checkTeacherAuth(req('nope'), url);
-    assert(!wrong.ok && wrong.status === 401, '错口令应 401');
-    assert(checkTeacherAuth(req('unit-test-key'), url).ok, '对口令应放行');
-    restore();
-  });
-
-  it('公网形态（强制锁死）⇒ off：即使没配口令也一律 403', () => {
-    process.env.TEACHER_KEY = '';
-    process.env.DSH_FORCE_TEACHER_LOCK = '1';
-    assertEquals(teacherMode(), 'off', '公网部署应锁死教师视图');
-    const denied = checkTeacherAuth(req(), url);
-    assert(!denied.ok && denied.status === 403, `应 403，实际 ${JSON.stringify(denied)}`);
-    assert(
-      String(denied.hint ?? '').includes('TEACHER_KEY'),
-      '拒绝时要说清怎么才能开 —— 否则线上没人知道该配什么',
-    );
-    restore();
-  });
-
-  it('公网形态但配了口令 ⇒ 回到 key 模式（留一条正经的开放路径）', () => {
-    process.env.TEACHER_KEY = 'unit-test-key';
-    process.env.DSH_FORCE_TEACHER_LOCK = '1';
-    assertEquals(teacherMode(), 'key', '配了口令应回到口令模式，而不是继续锁死');
-    assert(checkTeacherAuth(req('unit-test-key'), url).ok);
-    restore();
-  });
-
-  it('公网入口会在没有口令时强制锁死（这条是"部署时忘了配"的唯一防线）', () => {
-    /**
-     * 判定逻辑在 src/server/demo-gate.js，两个入口（Vercel / Cloudflare）共用。
-     * 这里同时钉住"规则本身在"和"两个入口都引用了它"，
-     * 免得以后有人为了省事在某个入口里手写一套 —— 那一定会漂移。
-     */
-    const gate = readFileSync(join(ROOT, 'src/server/demo-gate.js'), 'utf8');
-    assertIncludes(gate, 'DSH_FORCE_TEACHER_LOCK', '公网入口必须显式锁死教师视图');
-    assertIncludes(gate, 'TEACHER_KEY', '锁死逻辑必须给"配了口令"留出口');
-
-    for (const entry of ['api/index.js', 'api/worker.js']) {
-      const source = readFileSync(join(ROOT, entry), 'utf8');
-      assertIncludes(source, 'buildRequestContext', `${entry} 必须复用共享判定`);
-    }
+    assertNotIncludes(chatSection, '防泄题', '学生解题页不应出现"防泄题"面板');
+    assertNotIncludes(chatSection, '守卫拦截', '学生解题页不应出现"守卫拦截"统计');
+    assertNotIncludes(chatSection, '答案泄漏', '学生解题页不应出现"答案泄漏"字样');
+    assertNotIncludes(chatSection, '参考答案', '学生解题页不应出现"参考答案"字样');
   });
 });
 
 describe('前端 · 布局不许出现"钉住的面板遮挡内容"', () => {
   /**
    * 反馈过的真实问题："向下浏览时，右侧那一栏固定住了，压住下面的内容"。
-   *
-   * 根因是侧栏同时用了 `position: sticky` + `max-height: calc(100vh-…)` + 内部 `overflow` ——
-   * 这个组合会产生"钉住的面板盖住后续内容"的观感，而钉住本身只是个锦上添花的效果。
-   * 去掉之后整页按普通文档流滚动，遮挡在结构上就不可能发生。
-   *
-   * 这条断言防的是"以后有人觉得侧栏跟着滚很酷，又把它改回 sticky"。
+   * 新版把这条当成硬约束：整页走普通文档流，全站只有顶栏允许 sticky。
    */
-  it('只有顶栏允许 sticky，侧栏一律普通文档流', () => {
-    const css = readFileSync(join(ROOT, 'public/styles.css'), 'utf8');
-    const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '');
-    const stickyBlocks = [];
-    // 抓 "选择器 { ... position: sticky ... }" 这种块
+  it('样式里除顶栏外没有 sticky 元素', () => {
+    const style = (html.match(/<style>([\s\S]*?)<\/style>/) || [null, ''])[1];
+    const stripped = style.replace(/\/\*[\s\S]*?\*\//g, '');
+    const offenders = [];
     for (const m of stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-      if (/position:\s*sticky/.test(m[2])) stickyBlocks.push(m[1].trim().split(/\s+/).join(' '));
+      if (!/position:\s*sticky/.test(m[2])) continue;
+      const sel = m[1].trim().split(/\s+/).join(' ');
+      if (!sel.includes('.topbar')) offenders.push(sel);
     }
-    const offenders = stickyBlocks.filter((sel) => !sel.includes('.topbar'));
-    assert(
-      offenders.length === 0,
-      `除 .topbar 外不应有 sticky 元素（会导致面板遮挡内容）：\n  ${offenders.join('\n  ')}`,
-    );
-    assert(stickyBlocks.some((s) => s.includes('.topbar')), '顶栏应该保留 sticky —— 那是它该有的行为');
-  });
-
-  it('侧栏不再用 max-height + overflow 自己滚（那会和页面滚动打架）', () => {
-    const css = readFileSync(join(ROOT, 'public/styles.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
-    for (const sel of ['.study-panel', '.side-panel', '.study-body']) {
-      const m = css.match(new RegExp(`\\${sel}\\s*\\{([^}]*)\\}`));
-      if (!m) continue;
-      const body = m[1];
-      assert(!/max-height:\s*calc\(100vh/.test(body), `${sel} 不应再有 100vh 的 max-height`);
-      assert(!/overflow:\s*auto/.test(body), `${sel} 不应再是内部滚动容器`);
-    }
+    assert(offenders.length === 0, '除顶栏外不应有 sticky 元素（会导致面板遮挡内容）：\n  ' + offenders.join('\n  '));
   });
 });
 
 describe('前端 · 文案不会被当成纯文本显示', () => {
   /**
-   * 在 HTML / JS 模板字符串里写 `**加粗**` 不会生效，只会把星号原样显示出来。
-   *
-   * 这个坑我自己踩过一次：模式卡下面那句"两种模式**都不会**给你答案"
-   * 在页面上就是带着星号的样子 —— 截图里一眼能看到。
-   * 同一份文档习惯（Markdown）被带进了渲染层，改起来只要一处，但很容易再犯。
+   * 在 HTML / JS 模板字符串里写 \*\*加粗\*\* 不会生效，只会把星号原样显示出来。
+   * 新版是单文件，所以可见文本与内联脚本各守一遍。
    */
-  it('index.html 的可见文本里没有 Markdown 星号', () => {
-    const hits = htmlVisible
+  const starLines = (text) =>
+    text
       .split(/\r?\n/)
       .map((line, i) => ({ line: line.trim(), no: i + 1 }))
       .filter((x) => x.line.includes('**'));
-    assert(hits.length === 0, `index.html 有 Markdown 星号会被原样显示：\n  ${hits.map((h) => `${h.no}: ${h.line.slice(0, 80)}`).join('\n  ')}`);
+
+  it('index.html 的可见文本里没有 Markdown 星号', () => {
+    const hits = starLines(htmlVisible);
+    assert(
+      hits.length === 0,
+      'index.html 有 Markdown 星号会被原样显示：\n  ' + hits.map((h) => h.no + ': ' + h.line.slice(0, 80)).join('\n  '),
+    );
   });
 
-  it('app.js 的渲染模板里没有 Markdown 星号（注释不算）', () => {
+  it('内联脚本的渲染模板里没有 Markdown 星号（注释不算）', () => {
     const code = appJs
-      .replace(/\/\*[\s\S]*?\*\//g, '') // 块注释
+      .replace(/\/\*[\s\S]*?\*\//g, '')
       .split(/\r?\n/)
-      .filter((l) => !l.trim().startsWith('//') && !l.trim().startsWith('*'))
+      .filter((l) => !l.trim().startsWith('//'))
       .join('\n');
-    const hits = code
-      .split(/\r?\n/)
-      .map((line, i) => ({ line: line.trim(), no: i + 1 }))
-      .filter((x) => x.line.includes('**'));
-    assert(hits.length === 0, `app.js 渲染模板里还有 Markdown 星号：\n  ${hits.map((h) => `${h.no}: ${h.line.slice(0, 80)}`).join('\n  ')}`);
+    const hits = starLines(code);
+    assert(
+      hits.length === 0,
+      '内联脚本里有 Markdown 星号，会被原样显示：\n  ' + hits.map((h) => h.no + ': ' + h.line.slice(0, 80)).join('\n  '),
+    );
   });
 });
 
-describe('前端 · 陪伴模式的两个控件必须同步', () => {
+describe('前端 · 五页流程契约（新版单文件）', () => {
   /**
-   * 首页有一对模式卡、对话页有一个模式开关，两者共用 state.mode。
-   *
-   * 这是典型的"同一份状态两个控件"场景，也是最容易出现
-   * "首页显示自主训练、对话页显示学伴陪伴"这种自相矛盾状态的地方 ——
-   * 而且它不会报错，只会让用户觉得这个产品不可信。
+   * 这一组守的是"用户点得到、且点了有正确反应"。
+   * 之前守的是旧壳里的两张模式卡与一个开关；新版把口径换成了：
+   * 五页随时可切、AI 伴学按能力位置灰、第 5 页三张卡。
    */
-  it('两个控件都存在，且都覆盖两种模式', () => {
-    const cardModes = [...html.matchAll(/class="mode-card[^"]*"\s+data-mode="([^"]+)"/g)].map((m) => m[1]);
-    const switchModes = [...html.matchAll(/class="seg-btn[^"]*"\s+data-mode="([^"]+)"/g)].map((m) => m[1]);
-    for (const m of ['self_training', 'ai_companion']) {
-      assert(cardModes.includes(m), `首页模式卡缺少 ${m}`);
-      assert(switchModes.includes(m), `对话页模式开关缺少 ${m}`);
+  const PAGE_NAMES = ['题目', '方式', '解题', '报告', '巩固'];
+  const pageMarkup = (n) => {
+    const start = html.indexOf('<section class="page" data-page="' + n + '"');
+    const end = html.indexOf('<section class="page" data-page="' + (n + 1) + '"');
+    return html.slice(start, end > start ? end : html.length);
+  };
+  const page2 = pageMarkup(2);
+  const router = readFileSync(join(ROOT, 'src/server/router.js'), 'utf8');
+
+  it('步骤条就是这五页，而且五页都能点（没有 disabled）', () => {
+    assertIncludes(appJs, "var PAGES = ['题目', '方式', '解题', '报告', '巩固'];", '步骤条文案要与五页一致（第 5 页叫"巩固"）');
+    const stepper = appJs.slice(appJs.indexOf('function renderStepper'), appJs.indexOf('function setPage'));
+    assertIncludes(stepper, 'PAGES.map(', '步骤条要遍历 PAGES 渲染，而不是另抄一份页名');
+    assertIncludes(stepper, 'data-goto=', '每个步骤按钮都要带 data-goto，点了才能切页');
+    for (const label of PAGE_NAMES) assertIncludes(html, label, '页面标记里缺少 ' + label + ' 这一页');
+    assert(!/disabled/.test(stepper), '步骤条不该再禁用任何一页 —— 没数据就进空态，不能把人弹回去');
+  });
+
+  it('第 2 页：自主训练默认选中并标"推荐"，AI 伴学禁用并标"暂未更新"', () => {
+    const selfAt = page2.indexOf('data-mode="self"');
+    const aiAt = page2.indexOf('data-mode="ai"');
+    assert(selfAt > 0 && aiAt > 0, '两张模式卡都应存在');
+    assert(selfAt < aiAt, '自主训练要排在前面（它是当前唯一能用的方式）');
+    const selfBtn = page2.slice(Math.max(0, selfAt - 240), aiAt);
+    assertIncludes(selfBtn, 'aria-pressed="true"', '自主训练应当默认选中');
+    assertIncludes(selfBtn, '推荐', '自主训练要带"推荐"标签');
+    const aiBtn = page2.slice(aiAt - 240, aiAt + 900);
+    assertIncludes(aiBtn, 'disabled', 'AI 伴学必须是禁用态，而不是点了才报错');
+    assertIncludes(aiBtn, '暂未更新', 'AI 伴学要说明为什么点不了');
+    assertNotIncludes(aiBtn, '推荐', 'AI 伴学不该被推荐');
+    assertIncludes(appJs, "mode: 'self'", '初始模式必须是自主训练');
+  });
+
+  it('能不能点由服务端能力位决定，不是前端写死', () => {
+    assertIncludes(appJs, 'function applyModes(', '缺少按能力位渲染模式的 applyModes()');
+    assertIncludes(appJs, 'capabilities && h.capabilities.modes', '应当从 /api/health 的 capabilities.modes 读可用模式');
+    assertIncludes(router, "modes: ['self_training']", '能力位要如实只说自主训练');
+    assertIncludes(router, "'MODE_UNAVAILABLE'", '没上线的模式要在服务端直接拒绝，别让它跑到引擎里');
+  });
+
+  it('五页都有空态说明（没数据时说清下一步，而不是弹回去）', () => {
+    assertIncludes(appJs, 'pane-empty', '第 3 页左栏要有空态样式');
+    assertIncludes(appJs, '还没有题目', '空态要写清"现在没有题"');
+    assertIncludes(appJs, '还没有开始做题', '第 4 页空态要写清先去哪一步');
+    assertIncludes(appJs, '这个范围里没有别的题', '第 5 页同类题为空时也要说清楚');
+  });
+
+  it('第 3 页左侧显示"做到第几步"，且只翻译走过的步骤（防泄题）', () => {
+    assertIncludes(appJs, 'function renderXP()', '缺少步骤进度渲染');
+    assertIncludes(appJs, "'第 ' + cur + ' / ' + total + ' 步'", '进度文案应当是"第 N / M 步"');
+    assertIncludes(appJs, 'S.progress.labels', '步骤名称要取自服务端给的 stepLabels');
+    assertIncludes(router, 'function stepLabelsFor(', '服务端要有 stepLabelsFor()');
+    assertIncludes(router, 'safeStepRef', '步骤只允许翻译已经走过的，防提前泄题');
+  });
+
+  it('第 5 页是两张卡：重做 / 同类题', () => {
+    for (const id of ['redoBtn', 'startRelated']) {
+      assertIncludes(html, 'id="' + id + '"', '第 5 页缺少 ' + id);
     }
-    assertEquals(cardModes.length, 2, '首页模式卡应恰好两张（多一张就说明有别的元素蹭了 data-mode）');
+    assertIncludes(html, '重做这道题', '缺少"重做"卡');
+    assertIncludes(html, '同类题再练', '缺少"同类题"卡');
+
+    const seg = html.slice(
+      html.indexOf('<section class="page" data-page="5"'),
+      html.indexOf('<section class="page" data-page="5"') + 4000
+    );
+    const cards = (seg.match(/class="bar-card"/g) || []).length;
+    assert(cards === 2, '第 5 页只保留两张卡，实际 ' + cards + ' 张');
   });
 
-  it('setMode() 同时更新两个控件（改单边就会漂移）', () => {
-    const fn = appJs.slice(appJs.indexOf('function setMode('), appJs.indexOf('function setMode(') + 900);
-    assertIncludes(fn, '#mode-switch', 'setMode 必须更新对话页开关');
-    assertIncludes(fn, '#mode-cards', 'setMode 必须更新首页模式卡，否则两处会显示不同的模式');
+  it('同类题按题库的真实双轴标签筛，不再用 topics 字符串猜', () => {
+    assertIncludes(html, 'id="relDrawer"', '第 5 页要有同类题抽屉');
+    assertIncludes(appJs, 'function relCandidates(', '缺少同类题筛选函数');
+    assertIncludes(appJs, 'q.leafId === REL.kg', '知识点要按叶子 id 对齐，不能按 topics 文字');
+    assertIncludes(appJs, 'q.th2Id === REL.th', '思路要按思路方法 id 对齐');
+    assertIncludes(html, 'id="relKgSel"', '抽屉里要能直接筛知识点');
+    assertIncludes(html, 'id="relThSel"', '抽屉里要能直接筛思路');
+    assertNotIncludes(html, 'data-relquick', '抽屉只用两个下拉筛选，不再有快捷开关');
+    assertIncludes(appJs, "REL.th = (cur && cur.th2Id) || ''", '打开抽屉要按本题的思路预填');
+    assertIncludes(appJs, "REL.kg = (cur && cur.leafId) || ''", '打开抽屉要按本题的知识点预填');
+    assertNotIncludes(appJs, "API.req('/api/related", '页五已经不再走服务端的 related 接口');
   });
 
-  it('模式卡讲的是"什么时候开口"，而引擎确实按这套规则执行', () => {
-    // 卡片里必须出现"求助"这个触发条件 —— 它是自主训练模式下唯一的主动开口理由之一
-    const picker = htmlVisible.slice(htmlVisible.indexOf('id="mode-cards"'), htmlVisible.indexOf('id="mode-cards"') + 1600);
-    assertIncludes(picker, '卡住', '模式卡要说清"你求助时我会出声"这个触发条件');
-    // 引擎侧对应的规则由 route.test.js 覆盖（self_training + 未求助 ⇒ 静默）
+  it('报告页的下一步是"巩固"，不是"迁移"', () => {
+    assertIncludes(html, '下一步 · 巩固', '报告页的按钮要指向巩固');
+    assertNotIncludes(htmlVisible, '迁移', '第 5 页已经不叫"迁移"了');
+  });
+
+  it('答案功能与教师功能在新版里一点入口都不留', () => {
+    assertNotIncludes(html, '/api/demo/answer', '不该再有任何给答案的入口');
+    assertNotIncludes(html, '/api/teacher', '教师端点已下线，前端不该还引用');
+    assertNotIncludes(router, "'/api/teacher/", '服务端不该还留着教师端点');
+    assertNotIncludes(router, "'/api/demo/answer'", '服务端不该还留着答案端点');
   });
 });
 
@@ -368,59 +350,35 @@ function walk(dir, out) {
   }
 }
 
-describe('前端 · 超长题目要在框内滚动，而不是把整页拉长', () => {
+describe('前端 · 超长题目在框内滚动，而不是把整页拉长', () => {
   /**
    * 需求原话："一个特别长的题目会把整个页面拉的特别长，
    * 我希望这个题目有一个恰当的显示区域，超出的部分可以滑动观看。"
    *
-   * 注意这与"面板不许 sticky"是两件不同的事，别混：
-   *   面板：普通文档流（不钉住、不设 100vh 上限）—— 防遮挡
-   *   题干：有边界的阅读区（内部滚动）—— 防页面被拉长
-   * 两者可以同时成立，下面的断言把这两条边界都钉住。
+   * 新版把这条做进了结构里：第 3 页左右两栏都是 flex 容器，各自内部是
+   * .pane-body.scroller（overflow-y:auto），页面本身不跟着变长。
+   * 这与"面板不许 sticky"是两件事：不钉住防遮挡，内部滚动防拉长，两条可以同时成立。
    */
-  const css = readFileSync(join(ROOT, 'public/styles.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const style = (html.match(/<style>([\s\S]*?)<\/style>/) || [null, ''])[1].replace(/\/\*[\s\S]*?\*\//g, '');
+  const cssRule = (sel) => {
+    const at = style.indexOf(sel + '{');
+    if (at < 0) return '';
+    const end = style.indexOf('}', at);
+    return style.slice(at + sel.length + 1, end);
+  };
 
-  it('题干有高度上限，并且是它自己在滚动', () => {
-    const m = css.match(/\.stem\s*\{([^}]*)\}/);
-    assert(m, '应当有 .stem 规则');
-    const body = m[1];
-    assert(/max-height:\s*min\(/.test(body), `.stem 必须有 max-height（当前：${body}）`);
-    assert(/overflow-y:\s*auto/.test(body), '.stem 必须是自己的滚动容器');
+  it('左右两栏都是内部滚动容器，页面本身不被拉长', () => {
+    const start = html.indexOf('<section class="page" data-page="3"');
+    const page3 = html.slice(start, html.indexOf('<section class="page" data-page="4"'));
+    const scrollerCount = page3.split('scroller').length - 1;
+    assert(scrollerCount >= 2, '第 3 页左右两栏都要是滚动容器（.scroller），实际 ' + scrollerCount + ' 处');
+    assertIncludes(cssRule('.scroller'), 'overflow-y:auto', '.scroller 必须自己滚动');
+    const body = cssRule('.pane-body');
+    assertIncludes(body, 'flex:1', '.pane-body 要占满剩余高度');
+    assertIncludes(body, 'min-height:0', 'min-height:0 是 flex 子里能出现内部滚动的前提');
   });
 
-  it('上限取得保守：不会矮到把中等长度的题也塞进滚动框', () => {
-    const m = css.match(/\.stem\s*\{([^}]*)\}/);
-    const vh = Number((m[1].match(/min\((\d+)vh/) ?? [])[1]);
-    assert(vh >= 30 && vh <= 60, `46vh 左右比较合适，当前 ${vh}vh`);
-  });
-
-  it('"还有内容"的提示只在真的被截断时出现（由 JS 判定，不靠 CSS 猜）', () => {
-    assertIncludes(appJs, 'enhanceStemBoxes', '应有溢出检测函数');
-    const fn = appJs.slice(appJs.indexOf('function enhanceStemBoxes'));
-    assertIncludes(fn.slice(0, 1200), 'scrollHeight - stem.clientHeight', '必须按真实溢出量判断');
-    assertIncludes(fn.slice(0, 1200), 'hint.hidden = !overflow', '没溢出就必须把提示收起来');
-  });
-
-  it('溢出测量必须发生在页面可见之后（隐藏时 clientHeight 为 0）', () => {
-    /**
-     * 踩到的坑：selectProblem 的顺序是 applyProblemToChat → showPage('page-chat')，
-     * 而 applyProblemToChat 里就调了测量函数 —— 那时页面还是 display:none，
-     * clientHeight 为 0，函数按"量不出来就不判断"提前返回，
-     * 于是长题目的滚动提示**永远不出现**（截图里验证过）。
-     *
-     * 所以测量入口必须挂在页面切换的必经之路上。
-     */
-    const showPageFn = appJs.slice(appJs.indexOf('function showPage('), appJs.indexOf('function showPage(') + 1200);
-    assertIncludes(showPageFn, 'enhanceStemBoxes', 'showPage 里必须有测量入口');
-    assertIncludes(showPageFn, 'requestAnimationFrame', '要等一帧让布局落定再量');
-    const fn = appJs.slice(appJs.indexOf('function enhanceStemBoxes'), appJs.indexOf('function enhanceStemBoxes') + 900);
-    assertIncludes(fn, 'if (!stem.clientHeight) return', '隐藏状态下必须跳过，不能误判成"没有溢出"');
-  });
-  it('面板本身仍然不许 sticky（两条边界不能互相打架）', () => {
-    for (const sel of ['.study-panel', '.side-panel']) {
-      const m = css.match(new RegExp(`\\${sel}\\s*\\{([^}]*)\\}`));
-      if (!m) continue;
-      assert(!/position:\s*sticky/.test(m[1]), `${sel} 不该为了题干滚动又改回 sticky`);
-    }
+  it('不靠 100vh 的 max-height 硬顶高度（旧壳里那套会和页面滚动打架）', () => {
+    assert(!/max-height:\s*calc\(100vh/.test(style), '不该再用 100vh 的 max-height 硬顶高度');
   });
 });

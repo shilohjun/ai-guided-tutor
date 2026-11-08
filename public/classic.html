@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#FAF7F2">
+<title>步步解 · 学习版</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>">
+
+<!-- 防 FOUC：上色必须在样式之前同步执行。 -->
+<script>
+(function () {
+  var root = document.documentElement;
+  var KEY = 'dsh-theme', CKEY = 'dsh-contrast';
+  var mqDark = window.matchMedia('(prefers-color-scheme: dark)');
+  var mqMore = window.matchMedia('(prefers-contrast: more)');
+  var read = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  var write = function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} };
+
+  var fromUrl = new URLSearchParams(location.search).get('theme');
+  var valid = function (p) { return p === 'light' || p === 'dark' || p === 'system'; };
+  var pref = valid(fromUrl) ? fromUrl : (valid(read(KEY)) ? read(KEY) : 'system');
+
+  function resolve(p) { return p === 'system' ? (mqDark.matches ? 'dark' : 'light') : p; }
+  function paint(p) {
+    var t = resolve(p);
+    root.setAttribute('data-theme', t);
+    root.setAttribute('data-theme-pref', p);
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', t === 'dark' ? '#12111D' : '#FAF7F2');
+  }
+
+  var cPref = read(CKEY);
+  if (cPref !== 'high' && cPref !== 'normal') cPref = mqMore.matches ? 'high' : 'normal';
+  root.setAttribute('data-contrast', cPref);
+
+  paint(pref);
+  window.Theme = { KEY: KEY, CKEY: CKEY, pref: function () { return pref; }, set: function (p, persist) {
+    if (!valid(p)) return; pref = p; if (persist) write(KEY, p); paint(p);
+  }, repaint: function () { paint(pref); }, mqDark: mqDark, mqMore: mqMore };
+})();
+</script>
+
+<link rel="stylesheet" href="/shell.css?v=20261022-1">
+<link rel="stylesheet" href="/shell-overrides.css?v=20261022-1">
+<link rel="stylesheet" href="/youth.css?v=20261022-1">
+</head>
+<body data-step="1">
+
+<div class="masthead">
+  <div class="frame masthead-inner">
+    <button class="brand" type="button" data-action="home">
+      <span class="brand-mark" aria-hidden="true"><span>🧭</span></span>
+      <span class="brand-text">
+        <strong>步步解</strong>
+        <small>精做一题，胜过滥刷百题</small>
+      </span>
+    </button>
+    <div class="masthead-tools">
+      <span class="demo-pill" id="demo-pill" hidden>演示模式</span>
+      <button class="tool" id="contrast-toggle" type="button" aria-pressed="false">
+        <span class="tool-glyph" aria-hidden="true">◑</span>
+        <span>高对比</span>
+      </button>
+      <div class="theme-switch" role="radiogroup" aria-label="主题">
+        <button type="button" role="radio" aria-checked="false" data-theme-set="light" tabindex="-1" aria-label="浅色主题">
+          <span class="seg-glyph" aria-hidden="true">☀</span><span class="seg-label">浅色</span>
+        </button>
+        <button type="button" role="radio" aria-checked="false" data-theme-set="dark" tabindex="-1" aria-label="深色主题">
+          <span class="seg-glyph" aria-hidden="true">☾</span><span class="seg-label">深色</span>
+        </button>
+        <button type="button" role="radio" aria-checked="false" data-theme-set="system" tabindex="-1" aria-label="跟随系统">
+          <span class="seg-glyph" aria-hidden="true">◐</span><span class="seg-label">跟随</span>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="frame">
+    <div class="flow">
+      <div class="flow-ticks" aria-hidden="true">
+        <span class="flow-tick is-now"></span><span class="flow-tick"></span><span class="flow-tick"></span><span class="flow-tick"></span><span class="flow-tick"></span>
+      </div>
+      <p class="flow-label" id="flow-label" role="status">01 / 05 · 题目录入</p>
+    </div>
+  </div>
+</div>
+
+<main id="app"></main>
+
+<div class="colophon">
+  <span>步步解 · 学习版</span>
+</div>
+
+<div class="done-overlay" id="done-overlay" hidden>
+  <div class="confetti-layer" id="confetti-layer" aria-hidden="true"></div>
+  <div class="done-card" role="dialog" aria-modal="true" aria-labelledby="done-title">
+    <span class="done-kicker">CONGRATULATIONS</span>
+    <h1 id="done-title">恭喜你，这道题你自己做出来了</h1>
+    <p class="done-sub" id="done-sub">下面这些结果都是你自己算出来的，我没有替你算。</p>
+    <div class="done-answers" id="done-answers"></div>
+    <div class="done-stats" id="done-stats"></div>
+    <div class="done-actions">
+      <button class="quiet" id="btn-done-close" type="button">再看一会儿</button>
+      <button class="primary" id="btn-done-report" type="button">查看学习报告</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="/shell.js?v=20261018-19"></script>
+</body>
+</html>

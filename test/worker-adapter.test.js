@@ -72,13 +72,12 @@ describe('Workers 适配层 · 静态资源直接放行', () => {
 });
 
 describe('Workers 适配层 · /api 走同一份判定', () => {
-  it('默认形态（无凭据）→ 离线桩 + 教师视图锁死', async () => {
+  it('默认形态（无凭据）→ 离线桩', async () => {
     const env = makeEnv();
     const res = await callWorker(env);
     assertEquals(res.status, 200, '健康检查应 200');
     assertEquals(res.json.demoGate, 'off', '没配口令门时应报 off');
     assertEquals(res.json.engine, 'offline-stub', '没凭据必须走离线桩');
-    assertEquals(res.json.teacherView, 'off', '公网必须锁死教师视图');
     assertEquals(res.json.ocr.configured, false, '没凭据时 OCR 必须关闭');
   });
 
@@ -95,7 +94,6 @@ describe('Workers 适配层 · /api 走同一份判定', () => {
     assertEquals(res.json.engine, 'llm', '显式放行后应走真模型');
     assertEquals(res.json.model, 'test-model', '模型名应透出');
     assertEquals(res.json.ocr.configured, true, '显式放行后 OCR 应可用');
-    assertEquals(res.json.teacherView, 'off', '口令门不放行教师视图');
   });
 
   it('配了口令门但没带 → 回到离线桩', async () => {
@@ -136,7 +134,7 @@ describe('Workers 适配层 · 请求体要能穿过桥', () => {
         sessionId: `worker-${Date.now()}`,
         problemId: 'phy-emi-01',
         utterance: '我觉得是安培力让杆慢下来的',
-        mode: 'ai_companion',
+        mode: 'self_training',
       },
     });
     assertEquals(res.status, 200, '离线桩下应 200');

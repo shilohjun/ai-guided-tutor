@@ -121,11 +121,11 @@ interface Diagnosis {
   stuckKind: StuckKind;
   evidenceQuotes: string[];   // 必须能指回学生原话
   restatement: string;        // 给学生的一句复述
-  trace: TraceEntry[];        // 完整判断链路（教师视图用）
+  trace: TraceEntry[];        // 完整判断链路（内部诊断用，不出网）
 }
 ```
 
-**`stuckKind` 是策略选择的唯一输入**，它把"学生卡住"这件事分成六种互不相同的处境：
+**`stuckKind` 是策略选择的唯一输入**，它把"学生卡住"这件事分成七种互不相同的处境：
 
 | stuckKind | 学生处境 | 策略取向 |
 |---|---|---|
@@ -133,6 +133,7 @@ interface Diagnosis {
 | `knowledge_gap` | 不知道用哪个规律 | 问过程性质，不点名公式 |
 | `precondition_gap` | 知道规律但漏了前提 | **条件追问**（最高价值场景） |
 | `direction_lost` | 知道规律但走不下去 | 方向提示：指关系不指式子 |
+| `dead_end_path` | 自己已发现这条路走不通 | 提示换工具（`tool_switch`），而不是继续算 |
 | `execution_error` | 思路对但算错了 | 邀请自查；必要时局部示范 |
 | `finished` | 已接近完成 | **AI 应沉默** |
 
@@ -191,16 +192,18 @@ interface Diagnosis {
 
 ## 四、HTTP 接口契约
 
-> **本节最重要的约定：学生视图与教师视图在服务端分流。**
+> **本节最重要的约定：学生视图是唯一出网视图。**
 >
-> | 端点 | 谁可以拿 | 内容 |
-> |---|---|---|
-> | `/api/problem`、`/api/chat`、`/api/report` | 学生 | **白名单投影**：无路径名、无步骤、无指纹、无参考答案、无错因标签、无守卫细节 |
-> | `/api/teacher/*` | 带 `TEACHER_KEY` 的人 | 完整图谱、参考答案、三组指纹、逐轮 trace |
+> 服务端只向浏览器下发学生版投影：完整判断链路（`solutionGraphs`、`trace`、
+> 教师版 `enginePath`）、错因标签、参考答案，在投影这一步就被扔掉，
+> 不存在"前端拿到、只是藏起来"的字段。
 >
 > 这是**服务端不给**，不是前端不显示 —— 学生打开 F12 也拿不到。
 > 判定一个改动有没有破坏它，看 `test/ui.test.js`（密钥扫描）与
 > `test/analysis.test.js`（学生载荷反向断言）。
+>
+> 曾经有过 `/api/teacher/*` 教师视图（带口令的第二套出网载荷），本轮已整块删除：
+> 公网学生产品不需要第二套视图，多一条出网路径就多一处泄题面。
 
 ### 4.1 `GET /api/problem?id=<problemId>`
 
@@ -307,145 +310,172 @@ interface Diagnosis {
   "sessionId": "demo-phy-emi-01-1712345678",
   "problemId": "phy-emi-01",
   "utterance": "我用欧姆定律算电流，电流我直接用 I=E/R 算就行了，电阻只有R",
-  "mode": "ai_companion",          // 或 "self_training"
-  "explicitHelpSeeking": true
+  "mode": "self_training",          // 当前只开通了 self_training
+  "explicitHelpSeeking": true       // 点提示 / 明确求助时置 true
 }
 ```
+
+`mode` 传 `ai_companion` 会被**明确拒绝**，而不是悄悄降级：
+`400 { error: "AI 伴学暂未上线，目前只支持自主训练。", code: "MODE_UNAVAILABLE" }`。
+哪些模式可点由 `/api/health` 的 `capabilities.modes` 决定（见 4.5）。
 
 **响应**
 
 ```json
 {
-  "message": "我理解你的意思是：……\n\n这段电路里，谁是提供电动势的那一部分？\n\n【下一步】检查一下这个规律的前提条件",
+  "message": "我理解你的意思是：……\n\n这段电路里，谁是提供电动势的那一部分？\n\n【下一步】想想这个规律成立要什么前提",
   "hint": {
     "level": 1,
     "levelName": "L1 条件追问",
+    "levelNote": "我在问你一个前提",
     "form": "condition_question",
-    "text": "这段电路里，谁是提供电动势的那一部分？它自身有没有电阻？",
-    "concepts": ["闭合电路欧姆定律", "含内阻电路"],
-    "nextAsk": "检查一下这个规律的前提条件，然后告诉我哪一条最值得怀疑。",
-    "rationale": "层级 L1（condition_question）；首次给出提示，从 L1 条件追问开始"
+    "text": "这段电路里，谁是提供电动势的那一部分？",
+    "concepts": ["电动势"],
+    "nextAsk": "先说说这个电动势是谁提供的？"
   },
-  "diagnosis": {
-    "stepIndex": 4,
-    "graphId": "phy-emi-01-g1",
-    "confidence": 0.9,
-    "feasibility": "partially_viable",
-    "stuckKind": "precondition_gap",
-    "teacherView": {
-      "misconceptionLabels": ["把导体棒当外电路，算电流时漏掉内阻 r"],
-      "evidenceQuotes": ["I=E/R", "电阻只有R"],
-      "trace": [{ "stage": "locate", "message": "双通道定位：关键词通道=4，语义通道=4，一致 ⇒ 定位第 4 步（置信 0.9）" }]
-    }
+  "progress": {
+    "stepIndex": 2,
+    "stepCount": 5,
+    "completed": [0, 1],
+    "stepLabels": { "0": "判断感应电动势方向", "1": "写出法拉第定律" },
+    "confidenceLabel": "中"
   },
-  "refusal": null,
+  "enginePath": ["读题：……", "听懂：……", "定位：第 2 步", "决定：L1 条件追问", "成文：……", "复核：通过"],
+  "understood": ["学生想用 I=E/R 直接算电流"],
+  "nextStep": "先说说这个电动势是谁提供的？",
+  "mode": "self_training",
+  "reviewed": false,
   "suppressed": false,
-  "allowedNextLevel": 2,
-  "meta": {
-    "engine": "offline-stub",     // 或 "llm"
-    "model": null,
-    "latencyMs": 3,
-    "guardPassed": true,
-    "guardBlocked": 0
-  }
+  "refused": false,
+  "completion": null,
+  "meta": { "engine": "llm", "model": "deepseek-chat", "latencyMs": 1832 }
 }
 ```
 
-**字段语义要点**
-
-| 字段 | 说明 |
+| 字段 | 含义 |
 |---|---|
-| `message` | 学生可见的完整文本（复述 + 提示 + 下一步）。**唯一应该渲染给学生看的字段。** |
-| `hint.text` | 仅提示部分，不含复述。用于 UI 分行着色 |
-| `hint.levelNote` | 层级的人话版本（"我在问你一个前提"）。给学生的不是 `L1 条件追问` 这种教研语言 |
-| `progress` | `{ stepIndex, stepCount, confidenceLabel }` —— 只给"第几步 / 共几步 / 把握粗档" |
-| `enginePath` | 引擎判断链路的**学生版投影**（见 §4.6） |
-| `understood` | 学生已经想对的地方（正面反馈，报告与鼓励都从这里出） |
-| `refusal` | 非空表示本轮走的是"拒绝给答案"路径，`count` 是累计次数（话术递进） |
-| `suppressed` | true 表示"决定不介入"（自主训练静默 / 学生已完成） |
-| `allowedNextLevel` | 下一轮最多可升到几级，供 UI 提示"再想想还能要提示" |
+| `message` | 给学生看的完整一段话（复述 + 提示 + 【下一步】） |
+| `hint.level` / `levelName` | 本轮层级与它的名字（L0–L3）；被抑制时 `level` 为 `null` |
+| `hint.levelNote` | 给学生的层级说明，如"我在问你一个前提" |
+| `hint.form` | 这段话的形态：`clarify` / `condition_question` / `direction` / `worked_step` / `confirm` / `refusal` / `fallback` |
+| `hint.concepts` | 这轮点到的概念，报告三色档与错题摘要从这里取 |
+| `hint.nextAsk` | 建议学生接着回答的问题（与 `nextStep` 同源） |
+| `progress.stepIndex` / `stepCount` | 定位到第几步（从 0 数）、共几步 |
+| `progress.completed` | 推断"已走过"的步骤（定位到第 N 步 ⇒ 之前的都算走过；是**走过**，不是**做对**） |
+| `progress.stepLabels` | 只翻译**已走过**步骤的标题，未走到的不给 |
+| `progress.confidenceLabel` | 定位置信度的粗标签：高 / 中 / 低（不返数值） |
+| `enginePath` | 学生版引擎路径（读题 / 听懂 / 定位 / 决定 / 成文 / 复核），不含教师版细节 |
+| `understood` | 模型从学生这句话里接住的信息 |
+| `completion` | 只有收尾轮非 `null`：`{ complete, matched, remainingCount, expectedCount }` |
+| `meta` | 引擎、模型、耗时 |
 
 **响应里刻意不存在的东西**（不是"前端不显示"，是根本没发）：
 
-`diagnosis.stuckKind`、`confidence` 数值、`hint.rationale`、`meta.guardPassed`、
-`guardBlocked`、`guardHistory`、错因标签、路径名、步骤标题。
+完整 `solutionGraphs`、步骤的答案与指纹、`diagnosis` 的错因标签与证据原话、
+`confidence` 数值、`hint.rationale`、`meta.guardPassed` / `guardBlocked` / `guardHistory`、
+未走到步骤的标题。
 
 > 早期版本把 `diagnosis.teacherView`（错因标签 + 证据原话 + 完整 trace）
 > 和学生消息一起返回，靠前端一个 checkbox 决定显不显示 —— 打开 F12 就能看到。
-> 现在这些只在 `/api/teacher/*` 里，且必须带口令。
+> 现在这套载荷在 `buildStudentTurn()` 里就不存在了。
 
 ### 4.3 `GET /api/report?sessionId=<id>`
 
-返回学习报告，结构见 §5。
+返回 `{ report, turns }`：`report` 的结构见 §五，`turns` 是这次会话的逐轮记录
+（学生说了什么、AI 回了什么），报告页用它还原"这一轮是怎么走过来的"。
+
+| 状态码 | 含义 |
+|---|---|
+| 200 | 正常返回 |
+| 404 | 会话不存在或已过期：`{ error: "该会话不存在或已过期", detail: "公开演示部署在 serverless 环境，会话只保留在单个实例内存里，间隔较久或实例切换后会丢失。本地运行不受影响。" }` |
+| 404 | 会话还在，但题目已不在注册表里（导入题目有存活时间） |
+
+会话在内存里保留 2 小时（`SESSION_TTL_MS`），超时后没法补算 —— 所以没有会话时
+前端给的是"报告没能生成"的提示 + 空态，而不是一张空卡片。
 
 ### 4.4 `POST /api/eval`
 
 一键跑离线评测，返回指标。**用途：路演/评审时当场证明"泄题率 0%"**，
 而不是只给一个漂亮的演示截图。
 
-> 入口在学生界面里已经移除了 —— 它是工程质量指标，
-> 放在学生页面上学生会以为"AI 在考核我"。现在只在教师视图 → 质量评测里。
+> 它是工程指标，不进学生界面。要看结果只有两条路：`POST /api/eval`，
+> 或者在命令行跑 `npm run eval`（加 `-- --adapter llm` 走真模型）。
+> 学生页面上没有任何评测入口。
 
 ### 4.5 `GET /api/health`
 
-返回引擎模式、读题能力、教师视图形态、题目注册表统计。**绝不回传口令本身。**
+返回引擎模式、读题能力、题目注册表统计，以及**前端据此决定"哪些功能可点"的能力位**。
+绝不回传 Key 或 AppCode 本身，只回显脱敏后的形态。
 
 ```json
 {
+  "ok": true,
+  "demoGate": "off",                  // off 未配口令 / locked 配了但没带对 / unlocked 已放行
   "engine": "llm",
   "model": "deepseek-chat",
   "llmConfigured": true,
+  "llmBaseUrl": "https://api.deepseek.com",
   "keyMask": "sk-91a…789f（共 35 位）",
-  "capabilities": { "intake": true, "intakeFallback": true },
-  "teacherView": "open",            // open | key | off
-  "registry": { "library": 6, "imported": 0, "importTtlHours": 6, "maxImported": 200 }
+  "problemCount": 6,
+  "registry": { "library": 6, "imported": 0, "importTtlHours": 6, "maxImported": 200 },
+  "ocr": { ... },                     // 拍照通道状态，字段见 06
+  "capabilities": {
+    "modes": ["self_training"],       // 只有列出来的模式可点
+    "intake": true,                   // 读题通道是否可用（布尔值）
+    "intakeFallback": true,           // 读题失败时是否退到离线骨架
+    "ocr": false                      // 配了 OCR 凭据才为 true
+  },
+  "hintPolicy": {
+    "levels": ["L0 结构化澄清", "L1 条件追问", "L2 方向提示", "L3 降级示范"],
+    "neverRevealsAnswer": true,
+    "guardChecks": ["answer_in_text", "formula_leak", "level_overflow", "solution_dump", "final_conclusion", "concept_out_of_domain", "solution_insight"]
+  }
 }
 ```
 
-### 4.6 教师视图端点（需 `TEACHER_KEY`）
+`capabilities.modes` 是前端唯一可信的模式来源：不在清单里的模式显示为**禁用 +
+灰标"暂未更新"**，而不是藏起来。当前清单里只有 `self_training`，所以 AI 伴学是禁用的。
+`hintPolicy.guardChecks` 的七项就是 §六 的七类检查。
 
-三种形态由**部署形态**决定，不由"有没有配口令"决定（见 `router.js` 的 `teacherMode`）：
+### 4.6 `GET /api/related?id=<problemId>`
 
-| 形态 | 触发条件 | 行为 |
-|---|---|---|
-| `open` | 本地运行且 `TEACHER_KEY` 留空 | 直接进（自己看图谱/复盘方便） |
-| `key` | 配了 `TEACHER_KEY` | 不带口令一律 401 |
-| `off` | 公网部署（`api/index.js` 强制置位）且没配口令 | 403，整体关闭 |
+"同类题再练"的数据源。按 `topics` 重合筛：先挑与当前题至少共享一个知识点的题；
+一道都没有时，退化成"题库里除它之外的题"，最后取前 6 道。
 
-**为什么公网一定要 `off`**：教师接口返回的是**完整解题路径 + 参考答案 + 答案指纹**。
-如果"没配口令 = 开放"这个默认值跟着代码上了 Vercel，
-那份公开链接就等于把答案挂在网上 —— 而这恰恰是最容易发生的疏忽：
-本地跑得好好的，部署时没人会想起来"还得去配个口令"。
-三档形态在 `test/ui.test.js` 里各有断言，其中一条专门检查
-`api/index.js` 那段强制锁死逻辑还在不在（删掉不会有任何报错）。
+```json
+{
+  "problems": [
+    {
+      "id": "phy-emi-03",
+      "source": "library",
+      "subject": "physics",
+      "difficulty": 4,
+      "topics": ["电磁感应", "楞次定律"],
+      "stemPreview": "如图，匀强磁场垂直穿过……"
+    }
+  ]
+}
+```
 
-| 端点 | 返回 |
-|---|---|
-| `GET /api/teacher/overview` | 跨会话聚合：帮助强度分布、卡点性质分布、会话列表 |
-| `GET /api/teacher/session?sessionId=` | 逐轮复盘：层级、卡点性质、定位步骤、**被拦下的原句与违规类型**、学生原话证据、voice 体检、完整 trace |
-| `GET /api/teacher/problem?id=` | 完整图谱 + 参考答案 + 三组指纹 + 教师版解析（含剧透标记） |
-
-**引擎判断链路（§4.6 的核心）在两个视图里是两次独立的投影，不是同一份数据加打码**：
-
-| | 学生版 | 教师版 |
-|---|---|---|
-| 来源 | `prompt.js` 的 `buildStudentEnginePath()` 白名单构造 | `diagnosis.trace` 完整内容 |
-| 内容 | 读题 / 听懂（引用学生自己的词）/ 定位（只说第几步）/ 决定（给人话）/ 成文 | 双通道定位数值、冲突与采信、卡点性质、层级策略、守卫违规 |
-| 刻意没有 | 错因标签、置信度数字、违规类型、层级策略名、路径名、步骤标题 | —— |
-
-打码依赖"记得打哪里"，每加一个字段都要重审一遍；白名单依赖"允许说什么"，
-漏一处只是少说一句话。这和守卫用**封闭词表**而不是黑名单是同一条思路。
+刻意**不按难度排序**：巩固要的是"换个情境把同一条规律再用一次"，不是做更难的题。
+`id` 缺失返回 400，题目不存在返回 404（`未找到题目 <id>`）。
 
 ### 4.7 其它
 
 | 端点 | 说明 |
 |---|---|
-| `GET /api/problems` | 题目列表（题库 + 现场导入），导入题会带 `graphConfidence` 标记 |
-| `GET /api/demo-scripts` | 演示剧本（典型学生的说法），供现场一键填入 |
+| `GET /api/problems` | 题目列表（题库 + 现场导入），导入题会带 `graphConfidence` 标记；列表只给 `stemPreview`，不给完整题干 |
+| `POST /api/formula` | 取公式卡：必须在**同一步**给过 L3 提示之后才可用 |
 | `POST /api/reset` | 清掉某个会话 |
 
+`POST /api/formula` 的失败契约：404 会话不存在 / 404 题目已不在题库 / 409 还没给过
+L3（"公式卡要在同一步给过 L3 提示之后才能用"）/ 404 没有匹配的公式卡；成功返回
+`{ card }`，并计入报告的 `formulaCards`。公式卡不在 `/api/problem` 里下发（F12 能看到），
+也不让模型现场生成。
 
-返回引擎模式、是否已配 Key（**只回显脱敏信息**）、提示策略摘要。
+> 演示答案（`/api/demo-scripts`、`/api/demo/answer`）与教师视图（`/api/teacher/*`）
+> **本轮已下线**：路由、口令、投影函数、类型里的教师载荷全部删除。
+> 产品没有"给答案"的入口；`demoGate` 只是公开部署的访问口令门，不提供答案。
 
 ---
 
@@ -456,22 +486,48 @@ interface Diagnosis {
 
 ```ts
 interface Report {
-  stuckPoints: { stepIndex, stepTitle, kind, misconceptionLabels, hintRounds, maxLevel }[];
-  hintStats: { total, byLevel: {0,1,2,3}, guardBlocked };
-  independence: { score, completedSteps, totalSteps, note };
+  problemId: string;
+  problemTitle: string;          // 如「物理 · 电磁感应/法拉第电磁感应定律（难度 4/5）」
+  stuckPoints: {
+    stepIndex: number;
+    stepTitle: string;           // 经 safeStepRef，不泄解
+    kind: StuckKind;
+    misconceptionLabels: string[];
+    hintRounds: number;          // 这一步问了几轮
+    maxLevel: number;            // 这一步最高用到 L 几
+    guardBlocked: number;        // 这一步被守卫拦了几次
+  }[];
+  hintStats: {
+    total: number;
+    byLevel: { 0: number; 1: number; 2: number; 3: number };   // 确认轮不计入
+    guardBlocked: number;
+    confirmed: number;           // 收尾确认轮数
+    confirmedComplete: number;   // 其中学生确实做完的
+  };
+  formulaCards: number;          // 这次用了几张公式卡
+  independence: { score: number; completedSteps: number; totalSteps: number; note: string };
   deeperIssues: string[];        // 跨卡点归纳的认知缺口
-  recommendations: { topic, reason, drill }[];
-  nextActions: string[];
+  recommendations: { topic: string; reason: string; drill: string }[];
+  nextActions: string[];         // 最多 4 条
+  meta: { engine: string; model: string | null; generatedAt: string };
 }
 ```
+
+`stuckPoints` 只统计引导轮（`form !== 'confirm'`），确认轮单独记在
+`hintStats.confirmed`；按 `stepIndex` 升序，前端可以从上往下讲这次卡在哪。
 
 ### 5.1 独立完成度算法（可解释版）
 
 ```
-基础分 = 学生自己走过的步骤数 / 总步骤数
-扣分项 = L3 示范次数 × 0.1 + L2 方向提示次数 × 0.04   （最多扣 0.4）
-结果裁剪到 [0, 1]
+完成步骤 = hintLog 里出现过 stepIndex 的个数（去重）
+基础分   = 完成步骤 / max(总步骤数, 完成步骤, 1)
+扣分项   = L3 示范次数 × 0.1 + L2 方向提示次数 × 0.04 + 公式卡张数 × 0.1
+扣分上限 = 0.4
+结果     = clamp(基础分 − 扣分项, 0, 1)，保留两位小数
 ```
+
+`note` 会写成一句人话：「你独立走过了 X / Y 个关键步骤，其中 N 次用到了"示范一步"……」；
+如果全程只用到条件追问，再加一句「全程只用到条件追问，说明你自己完成得很扎实」。
 
 **注意文案约束**：这个数字衡量的是"**你得到的帮助强度**"，不是"你的水平"。
 报告里必须显式说明这一点，否则学生会把它当成分数评价，违背产品主张。
@@ -494,6 +550,9 @@ const DEEPER_PATTERNS = [
 ```
 
 理由：教研能读懂、能改、能跟知识点图谱对齐 —— 这比算法高级更重要。
+
+一条都没命中时给一句兜底说明（"本轮没有暴露出系统性缺口"），而不是让报告里的
+这一栏空着；这次连一轮对话都没有则返回空数组。
 
 ---
 

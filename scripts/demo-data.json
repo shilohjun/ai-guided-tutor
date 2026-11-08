@@ -1,0 +1,2849 @@
+{
+  "capturedAt": "2026-10-28T13:06:46.142Z",
+  "engine": "offline-stub",
+  "health": {
+    "ok": true,
+    "engine": "offline-stub",
+    "llmConfigured": false,
+    "ocr": {
+      "configured": false,
+      "provider": "marketplace"
+    }
+  },
+  "bank": [
+    {
+      "id": "phy-emi-01",
+      "source": "library",
+      "subject": "physics",
+      "difficulty": 2,
+      "topics": [
+        "电磁感应",
+        "法拉第电磁感应定律",
+        "安培力",
+        "受力平衡",
+        "闭合电路欧姆定律"
+      ],
+      "stemPreview": "如图所示，水平放置的两条光滑平行金属导轨间距为 L = 0.5 m，处于竖直向上、垂直于导轨平面的匀强磁场中，磁感应强度…"
+    },
+    {
+      "id": "phy-emi-02",
+      "source": "library",
+      "subject": "physics",
+      "difficulty": 2,
+      "topics": [
+        "电磁感应",
+        "磁通量",
+        "法拉第电磁感应定律",
+        "电荷量",
+        "焦耳热"
+      ],
+      "stemPreview": "一个矩形金属线框边长分别为 L₁ = 0.5 m 和 L₂ = 0.4 m，总电阻 R = 0.5 Ω，放置在匀强磁场中…"
+    },
+    {
+      "id": "phy-emi-03",
+      "source": "library",
+      "subject": "physics",
+      "difficulty": 4,
+      "topics": [
+        "电磁感应",
+        "动量定理",
+        "安培力冲量",
+        "电荷量",
+        "能量守恒"
+      ],
+      "stemPreview": "光滑水平导轨间距 L = 1 m，处在竖直向上的匀强磁场中，B = 1 T，导轨电阻不计。一根质量 m = 0.5 kg…"
+    },
+    {
+      "id": "phy-emi-04",
+      "source": "library",
+      "subject": "physics",
+      "difficulty": 3,
+      "topics": [
+        "电磁感应",
+        "安培力",
+        "受力平衡",
+        "收尾速度",
+        "功率"
+      ],
+      "stemPreview": "水平放置的平行金属导轨间距 L = 0.5 m，处在竖直向下、垂直于导轨平面的匀强磁场中，B = 2 T。一根质量 m …"
+    },
+    {
+      "id": "phy-emi-05",
+      "source": "library",
+      "subject": "physics",
+      "difficulty": 4,
+      "topics": [
+        "电磁感应",
+        "电容器",
+        "恒定电流",
+        "匀加速运动",
+        "安培力"
+      ],
+      "stemPreview": "水平光滑导轨间距 L = 0.5 m，处在竖直向上、垂直于导轨平面的匀强磁场中，B = 0.4 T。一根电阻 r = 0…"
+    },
+    {
+      "id": "math-proof-01",
+      "source": "library",
+      "subject": "math",
+      "difficulty": 3,
+      "topics": [
+        "反证法",
+        "数论",
+        "互质",
+        "奇偶性"
+      ],
+      "stemPreview": "用反证法证明：√2 不是有理数（即 √2 无法写成两个整数之比）。要求写出完整的推理链，并说明每一步的依据。…"
+    },
+    {
+      "id": "imp-e133e37f",
+      "source": "imported",
+      "subject": "physics",
+      "difficulty": 3,
+      "topics": [
+        "已知条件",
+        "待求量",
+        "规律选择",
+        "适用前提",
+        "关系式",
+        "代入求解"
+      ],
+      "stemPreview": "如图所示，水平放置的两条光滑平行金属导轨间距为 L = 0.5 m，处在竖直向下、垂直于导轨平面的匀强磁场中，B = 2…",
+      "graphConfidence": "degraded"
+    }
+  ],
+  "problems": {
+    "phy-emi-01": {
+      "id": "phy-emi-01",
+      "source": "library",
+      "subject": "physics",
+      "topics": [
+        "电磁感应",
+        "法拉第电磁感应定律",
+        "安培力",
+        "受力平衡",
+        "闭合电路欧姆定律"
+      ],
+      "difficulty": 2,
+      "stem": "如图所示，水平放置的两条光滑平行金属导轨间距为 L = 0.5 m，处于竖直向上、垂直于导轨平面的匀强磁场中，磁感应强度 B = 0.4 T。一根质量为 m、电阻为 r = 0.1 Ω 的导体棒垂直搁在导轨上，导轨左端接有阻值 R = 0.3 Ω 的电阻，导轨电阻不计，忽略一切摩擦。现用水平向右的外力拉着导体棒，使导体棒沿导轨以恒定速度 v = 2 m/s 向右运动。求：(1) 导体棒中感应电动势的大小；(2) 回路中的感应电流大小；(3) 作用在导体棒上的水平外力的大小；(4) 外力做功的功率。",
+      "givens": [
+        "L = 0.5 m",
+        "B = 0.4 T",
+        "r = 0.1 Ω",
+        "R = 0.3 Ω",
+        "v = 2 m/s",
+        "匀速运动"
+      ],
+      "asked": [
+        "感应电动势 E",
+        "感应电流 I",
+        "水平外力 F",
+        "外力功率 P"
+      ],
+      "figure": "水平导轨，竖直向上磁场，导体棒以 v 向右匀速运动，左端接电阻 R",
+      "stepCount": 8,
+      "analysis": {
+        "summary": "物理题，考点集中在电磁感应、法拉第电磁感应定律：如图所示,水平放置的两条光滑平行金属导轨间距为 L = 0.5 m,处于竖直向上…",
+        "variables": {
+          "given": [
+            {
+              "id": "v0",
+              "kind": "given",
+              "raw": "L = 0.5 m",
+              "symbol": "L",
+              "value": "0.5",
+              "unit": "m",
+              "note": "长度 / 距离"
+            },
+            {
+              "id": "v1",
+              "kind": "given",
+              "raw": "B = 0.4 T",
+              "symbol": "B",
+              "value": "0.4",
+              "unit": "T",
+              "note": "磁感应强度"
+            },
+            {
+              "id": "v2",
+              "kind": "given",
+              "raw": "r = 0.1 Ω",
+              "symbol": "r",
+              "value": "0.1",
+              "unit": "Ω",
+              "note": "内阻"
+            },
+            {
+              "id": "v3",
+              "kind": "given",
+              "raw": "R = 0.3 Ω",
+              "symbol": "R",
+              "value": "0.3",
+              "unit": "Ω",
+              "note": "外电阻"
+            },
+            {
+              "id": "v4",
+              "kind": "given",
+              "raw": "v = 2 m/s",
+              "symbol": "v",
+              "value": "2",
+              "unit": "m/s",
+              "note": "速度"
+            },
+            {
+              "id": "v5",
+              "kind": "given",
+              "raw": "匀速运动",
+              "symbol": "",
+              "value": null,
+              "unit": "",
+              "note": ""
+            }
+          ],
+          "asked": [
+            {
+              "id": "v0",
+              "kind": "asked",
+              "raw": "感应电动势 E",
+              "symbol": "E",
+              "value": null,
+              "unit": "",
+              "note": "感应电动势 E"
+            },
+            {
+              "id": "v1",
+              "kind": "asked",
+              "raw": "感应电流 I",
+              "symbol": "I",
+              "value": null,
+              "unit": "",
+              "note": "感应电流 I"
+            },
+            {
+              "id": "v2",
+              "kind": "asked",
+              "raw": "水平外力 F",
+              "symbol": "F",
+              "value": null,
+              "unit": "",
+              "note": "水平外力 F"
+            },
+            {
+              "id": "v3",
+              "kind": "asked",
+              "raw": "外力功率 P",
+              "symbol": "P",
+              "value": null,
+              "unit": "",
+              "note": "外力功率 P"
+            }
+          ],
+          "qualitative": [
+            "匀速运动"
+          ]
+        },
+        "keyConditions": [
+          {
+            "text": "如图所示，水平放置的两条光滑平行金属导轨间距为 L…",
+            "kind": "qualitative",
+            "label": "接触面光滑",
+            "meaning": "摩擦力为零，沿接触面方向上只有重力分量与外力参与，不需要再引入摩擦系数。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…导体棒，使导体棒沿导轨以恒定速度 v = 2 m/s 向…",
+            "kind": "constraint",
+            "label": "匀速（速度不变）",
+            "meaning": null,
+            "question": "\"匀速\"在力学上等价于什么条件？先把这句话翻译出来。",
+            "revealsInsight": true
+          },
+          {
+            "text": "…直向上、垂直于导轨平面的匀强磁场中，磁感应强度 B =…",
+            "kind": "constraint",
+            "label": "场/变化是均匀的",
+            "meaning": "均匀意味着\"平均\"等于\"瞬时\"，可以直接用乘积式或线性关系，不需要积分。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "如图所示，水平放置的两条光滑平行金属导轨间…",
+            "kind": "geometry",
+            "label": "方向 / 几何关系",
+            "meaning": null,
+            "question": "题干里的方向关系，决定了哪个乘积式可以直接用？",
+            "revealsInsight": true
+          },
+          {
+            "text": "…= 0.3 Ω 的电阻，导轨电阻不计，忽略一切摩擦。现用水平…",
+            "kind": "qualitative",
+            "label": "部分电阻不计",
+            "meaning": "这一部分不消耗电能，列电功率或能量方程时可以整项去掉。",
+            "question": null,
+            "revealsInsight": false
+          }
+        ],
+        "knowledgeGraph": {
+          "nodes": [
+            {
+              "id": "电磁感应",
+              "name": "电磁感应",
+              "role": "core",
+              "level": 1,
+              "note": ""
+            },
+            {
+              "id": "法拉第电磁感应定律",
+              "name": "法拉第电磁感应定律",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "安培力",
+              "name": "安培力",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "受力平衡",
+              "name": "受力平衡",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "闭合电路欧姆定律",
+              "name": "闭合电路欧姆定律",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            }
+          ],
+          "edges": [
+            {
+              "from": "电磁感应",
+              "to": "法拉第电磁感应定律",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "安培力",
+              "to": "电磁感应",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "受力平衡",
+              "to": "电磁感应",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "闭合电路欧姆定律",
+              "to": "电磁感应",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "法拉第电磁感应定律",
+              "to": "安培力",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "法拉第电磁感应定律",
+              "to": "受力平衡",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "法拉第电磁感应定律",
+              "to": "闭合电路欧姆定律",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "安培力",
+              "to": "受力平衡",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "安培力",
+              "to": "闭合电路欧姆定律",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "受力平衡",
+              "to": "闭合电路欧姆定律",
+              "relation": "related",
+              "label": "相关"
+            }
+          ],
+          "edgeSource": "derived",
+          "scope": "topics-only"
+        },
+        "asked": [
+          "感应电动势 E",
+          "感应电流 I",
+          "水平外力 F",
+          "外力功率 P"
+        ]
+      }
+    },
+    "phy-emi-02": {
+      "id": "phy-emi-02",
+      "source": "library",
+      "subject": "physics",
+      "topics": [
+        "电磁感应",
+        "磁通量",
+        "法拉第电磁感应定律",
+        "电荷量",
+        "焦耳热"
+      ],
+      "difficulty": 2,
+      "stem": "一个矩形金属线框边长分别为 L₁ = 0.5 m 和 L₂ = 0.4 m，总电阻 R = 0.5 Ω，放置在匀强磁场中，磁场方向始终垂直于线框平面。从 t = 0 开始，磁感应强度随时间均匀增加，经过 t₀ = 0.1 s 由 0 增加到 B₀ = 0.2 T。求：(1) 线框中感应电动势的大小；(2) 感应电流的大小；(3) 这 0.1 s 内通过线框导线某一横截面的电荷量 q；(4) 这 0.1 s 内线框中产生的焦耳热 Q。",
+      "givens": [
+        "L₁ = 0.5 m",
+        "L₂ = 0.4 m",
+        "R = 0.5 Ω",
+        "t₀ = 0.1 s",
+        "B: 0 → 0.2 T 均匀增加",
+        "B ⊥ 线框平面"
+      ],
+      "asked": [
+        "感应电动势 E",
+        "感应电流 I",
+        "电荷量 q",
+        "焦耳热 Q"
+      ],
+      "figure": "矩形线框在垂直纸面的匀强磁场中，B 随时间均匀增大",
+      "stepCount": 7,
+      "analysis": {
+        "summary": "物理题，考点集中在电磁感应、磁通量：一个矩形金属线框边长分别为 L₁ = 0.5 m 和 L₂ = 0.4 m,总电…",
+        "variables": {
+          "given": [
+            {
+              "id": "v0",
+              "kind": "given",
+              "raw": "L₁ = 0.5 m",
+              "symbol": "m",
+              "value": null,
+              "unit": "",
+              "note": ""
+            },
+            {
+              "id": "v1",
+              "kind": "given",
+              "raw": "L₂ = 0.4 m",
+              "symbol": "m",
+              "value": null,
+              "unit": "",
+              "note": ""
+            },
+            {
+              "id": "v2",
+              "kind": "given",
+              "raw": "R = 0.5 Ω",
+              "symbol": "R",
+              "value": "0.5",
+              "unit": "Ω",
+              "note": "外电阻"
+            },
+            {
+              "id": "v3",
+              "kind": "given",
+              "raw": "t₀ = 0.1 s",
+              "symbol": "s",
+              "value": null,
+              "unit": "",
+              "note": ""
+            },
+            {
+              "id": "v4",
+              "kind": "given",
+              "raw": "B: 0 → 0.2 T 均匀增加",
+              "symbol": "",
+              "value": null,
+              "unit": "",
+              "note": ""
+            },
+            {
+              "id": "v5",
+              "kind": "given",
+              "raw": "B ⊥ 线框平面",
+              "symbol": "",
+              "value": null,
+              "unit": "",
+              "note": ""
+            }
+          ],
+          "asked": [
+            {
+              "id": "v0",
+              "kind": "asked",
+              "raw": "感应电动势 E",
+              "symbol": "E",
+              "value": null,
+              "unit": "",
+              "note": "感应电动势 E"
+            },
+            {
+              "id": "v1",
+              "kind": "asked",
+              "raw": "感应电流 I",
+              "symbol": "I",
+              "value": null,
+              "unit": "",
+              "note": "感应电流 I"
+            },
+            {
+              "id": "v2",
+              "kind": "asked",
+              "raw": "电荷量 q",
+              "symbol": "q",
+              "value": null,
+              "unit": "",
+              "note": "电荷量 q"
+            },
+            {
+              "id": "v3",
+              "kind": "asked",
+              "raw": "焦耳热 Q",
+              "symbol": "Q",
+              "value": null,
+              "unit": "",
+              "note": "焦耳热 Q"
+            }
+          ],
+          "qualitative": [
+            "B: 0 → 0.2 T 均匀增加",
+            "B ⊥ 线框平面"
+          ]
+        },
+        "keyConditions": [
+          {
+            "text": "…= 0.5 Ω，放置在匀强磁场中，磁场方向始终垂直于线…",
+            "kind": "constraint",
+            "label": "场/变化是均匀的",
+            "meaning": "均匀意味着\"平均\"等于\"瞬时\"，可以直接用乘积式或线性关系，不需要积分。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…匀强磁场中，磁场方向始终垂直于线框平面。从 t = 0…",
+            "kind": "geometry",
+            "label": "方向 / 几何关系",
+            "meaning": "方向关系决定了哪些量之间的乘积有效（例如切割式要求 B、L、v 两两垂直）。",
+            "question": null,
+            "revealsInsight": false
+          }
+        ],
+        "knowledgeGraph": {
+          "nodes": [
+            {
+              "id": "电磁感应",
+              "name": "电磁感应",
+              "role": "core",
+              "level": 1,
+              "note": ""
+            },
+            {
+              "id": "磁通量",
+              "name": "磁通量",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "法拉第电磁感应定律",
+              "name": "法拉第电磁感应定律",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "电荷量",
+              "name": "电荷量",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "焦耳热",
+              "name": "焦耳热",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            }
+          ],
+          "edges": [
+            {
+              "from": "磁通量",
+              "to": "电磁感应",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "电磁感应",
+              "to": "法拉第电磁感应定律",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "电荷量",
+              "to": "电磁感应",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "焦耳热",
+              "to": "电磁感应",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "磁通量",
+              "to": "法拉第电磁感应定律",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "磁通量",
+              "to": "电荷量",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "磁通量",
+              "to": "焦耳热",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "法拉第电磁感应定律",
+              "to": "电荷量",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "法拉第电磁感应定律",
+              "to": "焦耳热",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "电荷量",
+              "to": "焦耳热",
+              "relation": "related",
+              "label": "相关"
+            }
+          ],
+          "edgeSource": "derived",
+          "scope": "topics-only"
+        },
+        "asked": [
+          "感应电动势 E",
+          "感应电流 I",
+          "电荷量 q",
+          "焦耳热 Q"
+        ]
+      }
+    },
+    "phy-emi-03": {
+      "id": "phy-emi-03",
+      "source": "library",
+      "subject": "physics",
+      "topics": [
+        "电磁感应",
+        "动量定理",
+        "安培力冲量",
+        "电荷量",
+        "能量守恒"
+      ],
+      "difficulty": 4,
+      "stem": "光滑水平导轨间距 L = 1 m，处在竖直向上的匀强磁场中，B = 1 T，导轨电阻不计。一根质量 m = 0.5 kg、电阻 r = 0.5 Ω 的导体棒垂直搁在导轨上，导轨一端接有 R = 0.5 Ω 的电阻。t = 0 时导体棒静止，此后受到水平向右的恒力 F = 2 N。经过 t₀ = 2 s，导体棒速度为 v = 2 m/s。求：(1) 这 2 s 内通过电阻 R 的电荷量 q；(2) 导体棒在这 2 s 内的位移 x；(3) 这 2 s 内回路中产生的总热量 Q。",
+      "givens": [
+        "L = 1 m",
+        "B = 1 T",
+        "m = 0.5 kg",
+        "r = 0.5 Ω",
+        "R = 0.5 Ω",
+        "F = 2 N 恒力",
+        "t₀ = 2 s",
+        "v = 2 m/s",
+        "光滑"
+      ],
+      "asked": [
+        "电荷量 q",
+        "位移 x",
+        "总热量 Q"
+      ],
+      "figure": "光滑水平导轨、竖直向上磁场，导体棒受水平恒力 F，左端接 R",
+      "stepCount": 7,
+      "analysis": {
+        "summary": "物理题，考点集中在电磁感应、动量定理：光滑水平导轨间距 L = 1 m,处在竖直向上的匀强磁场中,B = 1 T,导轨…",
+        "variables": {
+          "given": [
+            {
+              "id": "v0",
+              "kind": "given",
+              "raw": "L = 1 m",
+              "symbol": "L",
+              "value": "1",
+              "unit": "m",
+              "note": "长度 / 距离"
+            },
+            {
+              "id": "v1",
+              "kind": "given",
+              "raw": "B = 1 T",
+              "symbol": "B",
+              "value": "1",
+              "unit": "T",
+              "note": "磁感应强度"
+            },
+            {
+              "id": "v2",
+              "kind": "given",
+              "raw": "m = 0.5 kg",
+              "symbol": "m",
+              "value": "0.5",
+              "unit": "kg",
+              "note": "质量"
+            },
+            {
+              "id": "v3",
+              "kind": "given",
+              "raw": "r = 0.5 Ω",
+              "symbol": "r",
+              "value": "0.5",
+              "unit": "Ω",
+              "note": "内阻"
+            },
+            {
+              "id": "v4",
+              "kind": "given",
+              "raw": "R = 0.5 Ω",
+              "symbol": "R",
+              "value": "0.5",
+              "unit": "Ω",
+              "note": "外电阻"
+            },
+            {
+              "id": "v5",
+              "kind": "given",
+              "raw": "F = 2 N 恒力",
+              "symbol": "F",
+              "value": "2",
+              "unit": "N",
+              "note": "力"
+            },
+            {
+              "id": "v6",
+              "kind": "given",
+              "raw": "t₀ = 2 s",
+              "symbol": "s",
+              "value": null,
+              "unit": "",
+              "note": ""
+            },
+            {
+              "id": "v7",
+              "kind": "given",
+              "raw": "v = 2 m/s",
+              "symbol": "v",
+              "value": "2",
+              "unit": "m/s",
+              "note": "速度"
+            },
+            {
+              "id": "v8",
+              "kind": "given",
+              "raw": "光滑",
+              "symbol": "",
+              "value": null,
+              "unit": "",
+              "note": ""
+            }
+          ],
+          "asked": [
+            {
+              "id": "v0",
+              "kind": "asked",
+              "raw": "电荷量 q",
+              "symbol": "q",
+              "value": null,
+              "unit": "",
+              "note": "电荷量 q"
+            },
+            {
+              "id": "v1",
+              "kind": "asked",
+              "raw": "位移 x",
+              "symbol": "x",
+              "value": null,
+              "unit": "",
+              "note": "位移 x"
+            },
+            {
+              "id": "v2",
+              "kind": "asked",
+              "raw": "总热量 Q",
+              "symbol": "Q",
+              "value": null,
+              "unit": "",
+              "note": "总热量 Q"
+            }
+          ],
+          "qualitative": [
+            "光滑"
+          ]
+        },
+        "keyConditions": [
+          {
+            "text": "光滑水平导轨间距 L = 1…",
+            "kind": "qualitative",
+            "label": "接触面光滑",
+            "meaning": "摩擦力为零，沿接触面方向上只有重力分量与外力参与，不需要再引入摩擦系数。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…1 m，处在竖直向上的匀强磁场中，B = 1 T，导轨…",
+            "kind": "constraint",
+            "label": "场/变化是均匀的",
+            "meaning": "均匀意味着\"平均\"等于\"瞬时\"，可以直接用乘积式或线性关系，不需要积分。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…距 L = 1 m，处在竖直向上的匀强磁场中，B = 1…",
+            "kind": "geometry",
+            "label": "方向 / 几何关系",
+            "meaning": "方向关系决定了哪些量之间的乘积有效（例如切割式要求 B、L、v 两两垂直）。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…静止，此后受到水平向右的恒力 F = 2 N。经过…",
+            "kind": "constraint",
+            "label": "恒定外力",
+            "meaning": "力不随时间变化，加速度恒定，可以叠加使用匀变速关系；同时也常用冲量式。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…磁场中，B = 1 T，导轨电阻不计。一根质量 m = 0.…",
+            "kind": "qualitative",
+            "label": "部分电阻不计",
+            "meaning": "这一部分不消耗电能，列电功率或能量方程时可以整项去掉。",
+            "question": null,
+            "revealsInsight": false
+          }
+        ],
+        "knowledgeGraph": {
+          "nodes": [
+            {
+              "id": "电磁感应",
+              "name": "电磁感应",
+              "role": "core",
+              "level": 1,
+              "note": ""
+            },
+            {
+              "id": "动量定理",
+              "name": "动量定理",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "安培力冲量",
+              "name": "安培力冲量",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "电荷量",
+              "name": "电荷量",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "能量守恒",
+              "name": "能量守恒",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            }
+          ],
+          "edges": [
+            {
+              "from": "动量定理",
+              "to": "电磁感应",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "安培力冲量",
+              "to": "电磁感应",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "电荷量",
+              "to": "电磁感应",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "能量守恒",
+              "to": "电磁感应",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "动量定理",
+              "to": "安培力冲量",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "动量定理",
+              "to": "电荷量",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "动量定理",
+              "to": "能量守恒",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "安培力冲量",
+              "to": "电荷量",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "安培力冲量",
+              "to": "能量守恒",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "电荷量",
+              "to": "能量守恒",
+              "relation": "related",
+              "label": "相关"
+            }
+          ],
+          "edgeSource": "derived",
+          "scope": "topics-only"
+        },
+        "asked": [
+          "电荷量 q",
+          "位移 x",
+          "总热量 Q"
+        ]
+      }
+    },
+    "phy-emi-04": {
+      "id": "phy-emi-04",
+      "source": "library",
+      "subject": "physics",
+      "topics": [
+        "电磁感应",
+        "安培力",
+        "受力平衡",
+        "收尾速度",
+        "功率"
+      ],
+      "difficulty": 3,
+      "stem": "水平放置的平行金属导轨间距 L = 0.5 m，处在竖直向下、垂直于导轨平面的匀强磁场中，B = 2 T。一根质量 m = 0.1 kg 的导体棒垂直导轨放置，导轨光滑，导体棒电阻 r = 0.2 Ω，导轨电阻不计，导轨左端接有 R = 0.8 Ω 的电阻。现用水平恒力 F = 2 N 沿导轨方向拉导体棒，导体棒由静止开始运动。求：(1) 导体棒能达到的最大速度 v_max；(2) 达到最大速度时电阻 R 上消耗的电功率 P_R。",
+      "givens": [
+        "L = 0.5 m",
+        "B = 2 T",
+        "m = 0.1 kg",
+        "r = 0.2 Ω",
+        "R = 0.8 Ω",
+        "F = 2 N",
+        "光滑",
+        "由静止开始"
+      ],
+      "asked": [
+        "最大速度 v_max",
+        "R 上的功率 P_R"
+      ],
+      "figure": "水平光滑导轨、竖直向下磁场、导体棒受水平恒力 F、左端接 R",
+      "stepCount": 6,
+      "analysis": {
+        "summary": "物理题，考点集中在电磁感应、安培力：水平放置的平行金属导轨间距 L = 0.5 m,处在竖直向下,垂直于导轨平面的匀…",
+        "variables": {
+          "given": [
+            {
+              "id": "v0",
+              "kind": "given",
+              "raw": "L = 0.5 m",
+              "symbol": "L",
+              "value": "0.5",
+              "unit": "m",
+              "note": "长度 / 距离"
+            },
+            {
+              "id": "v1",
+              "kind": "given",
+              "raw": "B = 2 T",
+              "symbol": "B",
+              "value": "2",
+              "unit": "T",
+              "note": "磁感应强度"
+            },
+            {
+              "id": "v2",
+              "kind": "given",
+              "raw": "m = 0.1 kg",
+              "symbol": "m",
+              "value": "0.1",
+              "unit": "kg",
+              "note": "质量"
+            },
+            {
+              "id": "v3",
+              "kind": "given",
+              "raw": "r = 0.2 Ω",
+              "symbol": "r",
+              "value": "0.2",
+              "unit": "Ω",
+              "note": "内阻"
+            },
+            {
+              "id": "v4",
+              "kind": "given",
+              "raw": "R = 0.8 Ω",
+              "symbol": "R",
+              "value": "0.8",
+              "unit": "Ω",
+              "note": "外电阻"
+            },
+            {
+              "id": "v5",
+              "kind": "given",
+              "raw": "F = 2 N",
+              "symbol": "F",
+              "value": "2",
+              "unit": "N",
+              "note": "力"
+            },
+            {
+              "id": "v6",
+              "kind": "given",
+              "raw": "光滑",
+              "symbol": "",
+              "value": null,
+              "unit": "",
+              "note": ""
+            },
+            {
+              "id": "v7",
+              "kind": "given",
+              "raw": "由静止开始",
+              "symbol": "",
+              "value": null,
+              "unit": "",
+              "note": ""
+            }
+          ],
+          "asked": [
+            {
+              "id": "v0",
+              "kind": "asked",
+              "raw": "最大速度 v_max",
+              "symbol": "max",
+              "value": null,
+              "unit": "",
+              "note": "最大速度 v_max"
+            },
+            {
+              "id": "v1",
+              "kind": "asked",
+              "raw": "R 上的功率 P_R",
+              "symbol": "P_R",
+              "value": null,
+              "unit": "",
+              "note": "R 上的功率 P_R"
+            }
+          ],
+          "qualitative": [
+            "光滑",
+            "由静止开始"
+          ]
+        },
+        "keyConditions": [
+          {
+            "text": "…导轨方向拉导体棒，导体棒由静止开始运动。求：(1) 导…",
+            "kind": "boundary",
+            "label": "初速度为零",
+            "meaning": "初始状态被指定了，运动学的几个关系式可以直接用，不必再设未知初速度。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…导体棒垂直导轨放置，导轨光滑，导体棒电阻 r = 0…",
+            "kind": "qualitative",
+            "label": "接触面光滑",
+            "meaning": "摩擦力为零，沿接触面方向上只有重力分量与外力参与，不需要再引入摩擦系数。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…直向下、垂直于导轨平面的匀强磁场中，B = 2 T。一根…",
+            "kind": "constraint",
+            "label": "场/变化是均匀的",
+            "meaning": "均匀意味着\"平均\"等于\"瞬时\"，可以直接用乘积式或线性关系，不需要积分。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…：(1) 导体棒能达到的最大速度 v_max；(2)…",
+            "kind": "constraint",
+            "label": "临界 / 极值条件",
+            "meaning": "这类词通常对应某个不等式取等号，或者某个量取到极值 —— 是多问里最容易漏掉的一步。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "水平放置的平行金属导轨间距 L…",
+            "kind": "geometry",
+            "label": "方向 / 几何关系",
+            "meaning": "方向关系决定了哪些量之间的乘积有效（例如切割式要求 B、L、v 两两垂直）。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…8 Ω 的电阻。现用水平恒力 F = 2 N 沿导轨…",
+            "kind": "constraint",
+            "label": "恒定外力",
+            "meaning": "力不随时间变化，加速度恒定，可以叠加使用匀变速关系；同时也常用冲量式。",
+            "question": null,
+            "revealsInsight": false
+          }
+        ],
+        "knowledgeGraph": {
+          "nodes": [
+            {
+              "id": "电磁感应",
+              "name": "电磁感应",
+              "role": "core",
+              "level": 1,
+              "note": ""
+            },
+            {
+              "id": "安培力",
+              "name": "安培力",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "受力平衡",
+              "name": "受力平衡",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "收尾速度",
+              "name": "收尾速度",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "功率",
+              "name": "功率",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            }
+          ],
+          "edges": [
+            {
+              "from": "安培力",
+              "to": "电磁感应",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "受力平衡",
+              "to": "电磁感应",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "收尾速度",
+              "to": "电磁感应",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "功率",
+              "to": "电磁感应",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "安培力",
+              "to": "受力平衡",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "安培力",
+              "to": "收尾速度",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "安培力",
+              "to": "功率",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "受力平衡",
+              "to": "收尾速度",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "受力平衡",
+              "to": "功率",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "收尾速度",
+              "to": "功率",
+              "relation": "related",
+              "label": "相关"
+            }
+          ],
+          "edgeSource": "derived",
+          "scope": "topics-only"
+        },
+        "asked": [
+          "最大速度 v_max",
+          "R 上的功率 P_R"
+        ]
+      }
+    },
+    "phy-emi-05": {
+      "id": "phy-emi-05",
+      "source": "library",
+      "subject": "physics",
+      "topics": [
+        "电磁感应",
+        "电容器",
+        "恒定电流",
+        "匀加速运动",
+        "安培力"
+      ],
+      "difficulty": 4,
+      "stem": "水平光滑导轨间距 L = 0.5 m，处在竖直向上、垂直于导轨平面的匀强磁场中，B = 0.4 T。一根电阻 r = 0.5 Ω 的导体棒垂直搁在导轨上，导轨电阻不计。导轨左端接有 R = 0.5 Ω 的电阻，电阻两端并联一个电容 C = 2 μF 的电容器。开始时导体棒静止，t = 0 起受到水平恒力 F = 0.1 N 作用沿导轨运动。求：(1) 导体棒运动的性质（匀加速还是变加速），并说明理由；(2) 导体棒的加速度大小。",
+      "givens": [
+        "L = 0.5 m",
+        "B = 0.4 T",
+        "r = 0.5 Ω",
+        "R = 0.5 Ω",
+        "C = 2 μF",
+        "F = 0.1 N",
+        "光滑",
+        "由静止"
+      ],
+      "asked": [
+        "运动性质",
+        "加速度 a"
+      ],
+      "figure": "光滑导轨、竖直向上磁场、导体棒受恒力 F，R 两端并联电容器 C",
+      "stepCount": 5,
+      "analysis": {
+        "summary": "物理题，考点集中在电磁感应、电容器：水平光滑导轨间距 L = 0.5 m,处在竖直向上,垂直于导轨平面的匀强磁场中,…",
+        "variables": {
+          "given": [
+            {
+              "id": "v0",
+              "kind": "given",
+              "raw": "L = 0.5 m",
+              "symbol": "L",
+              "value": "0.5",
+              "unit": "m",
+              "note": "长度 / 距离"
+            },
+            {
+              "id": "v1",
+              "kind": "given",
+              "raw": "B = 0.4 T",
+              "symbol": "B",
+              "value": "0.4",
+              "unit": "T",
+              "note": "磁感应强度"
+            },
+            {
+              "id": "v2",
+              "kind": "given",
+              "raw": "r = 0.5 Ω",
+              "symbol": "r",
+              "value": "0.5",
+              "unit": "Ω",
+              "note": "内阻"
+            },
+            {
+              "id": "v3",
+              "kind": "given",
+              "raw": "R = 0.5 Ω",
+              "symbol": "R",
+              "value": "0.5",
+              "unit": "Ω",
+              "note": "外电阻"
+            },
+            {
+              "id": "v4",
+              "kind": "given",
+              "raw": "C = 2 μF",
+              "symbol": "C",
+              "value": "2",
+              "unit": "μF",
+              "note": "电容 / 浓度"
+            },
+            {
+              "id": "v5",
+              "kind": "given",
+              "raw": "F = 0.1 N",
+              "symbol": "F",
+              "value": "0.1",
+              "unit": "N",
+              "note": "力"
+            },
+            {
+              "id": "v6",
+              "kind": "given",
+              "raw": "光滑",
+              "symbol": "",
+              "value": null,
+              "unit": "",
+              "note": ""
+            },
+            {
+              "id": "v7",
+              "kind": "given",
+              "raw": "由静止",
+              "symbol": "",
+              "value": null,
+              "unit": "",
+              "note": ""
+            }
+          ],
+          "asked": [
+            {
+              "id": "v0",
+              "kind": "asked",
+              "raw": "运动性质",
+              "symbol": "",
+              "value": null,
+              "unit": "",
+              "note": "运动性质"
+            },
+            {
+              "id": "v1",
+              "kind": "asked",
+              "raw": "加速度 a",
+              "symbol": "a",
+              "value": null,
+              "unit": "",
+              "note": "加速度 a"
+            }
+          ],
+          "qualitative": [
+            "光滑",
+            "由静止"
+          ]
+        },
+        "keyConditions": [
+          {
+            "text": "水平光滑导轨间距 L = 0.5…",
+            "kind": "qualitative",
+            "label": "接触面光滑",
+            "meaning": "摩擦力为零，沿接触面方向上只有重力分量与外力参与，不需要再引入摩擦系数。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…直向上、垂直于导轨平面的匀强磁场中，B = 0.4 T。…",
+            "kind": "constraint",
+            "label": "场/变化是均匀的",
+            "meaning": "均匀意味着\"平均\"等于\"瞬时\"，可以直接用乘积式或线性关系，不需要积分。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…L = 0.5 m，处在竖直向上、垂直于导轨平面的匀强磁…",
+            "kind": "geometry",
+            "label": "方向 / 几何关系",
+            "meaning": "方向关系决定了哪些量之间的乘积有效（例如切割式要求 B、L、v 两两垂直）。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…，t = 0 起受到水平恒力 F = 0.1 N 作…",
+            "kind": "constraint",
+            "label": "恒定外力",
+            "meaning": "力不随时间变化，加速度恒定，可以叠加使用匀变速关系；同时也常用冲量式。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…的导体棒垂直搁在导轨上，导轨电阻不计。导轨左端接有 R =…",
+            "kind": "qualitative",
+            "label": "部分电阻不计",
+            "meaning": "这一部分不消耗电能，列电功率或能量方程时可以整项去掉。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…的电阻，电阻两端并联一个电容 C = 2 μF 的电…",
+            "kind": "qualitative",
+            "label": "含电容器",
+            "meaning": "电容支路在稳态下不通过电流，但它两端有电压 —— 这是最容易误判成\"断路所以没影响\"的地方。",
+            "question": null,
+            "revealsInsight": false
+          }
+        ],
+        "knowledgeGraph": {
+          "nodes": [
+            {
+              "id": "电磁感应",
+              "name": "电磁感应",
+              "role": "core",
+              "level": 1,
+              "note": ""
+            },
+            {
+              "id": "电容器",
+              "name": "电容器",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "恒定电流",
+              "name": "恒定电流",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "匀加速运动",
+              "name": "匀加速运动",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "安培力",
+              "name": "安培力",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            }
+          ],
+          "edges": [
+            {
+              "from": "电容器",
+              "to": "电磁感应",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "恒定电流",
+              "to": "电磁感应",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "匀加速运动",
+              "to": "电磁感应",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "安培力",
+              "to": "电磁感应",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "电容器",
+              "to": "恒定电流",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "电容器",
+              "to": "匀加速运动",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "电容器",
+              "to": "安培力",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "恒定电流",
+              "to": "匀加速运动",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "恒定电流",
+              "to": "安培力",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "匀加速运动",
+              "to": "安培力",
+              "relation": "related",
+              "label": "相关"
+            }
+          ],
+          "edgeSource": "derived",
+          "scope": "topics-only"
+        },
+        "asked": [
+          "运动性质",
+          "加速度 a"
+        ]
+      }
+    },
+    "math-proof-01": {
+      "id": "math-proof-01",
+      "source": "library",
+      "subject": "math",
+      "topics": [
+        "反证法",
+        "数论",
+        "互质",
+        "奇偶性"
+      ],
+      "difficulty": 3,
+      "stem": "用反证法证明：√2 不是有理数（即 √2 无法写成两个整数之比）。要求写出完整的推理链，并说明每一步的依据。",
+      "givens": [
+        "目标：证明 √2 是无理数",
+        "方法限定：反证法",
+        "√2 定义：满足 x² = 2 的正实数"
+      ],
+      "asked": [
+        "完整的反证法证明过程"
+      ],
+      "figure": null,
+      "stepCount": 6,
+      "analysis": {
+        "summary": "数学题，考点集中在反证法、数论：用反证法证明:√2 不是有理数(即 √2 无法写成两个整数之比).要求写出完整的…",
+        "variables": {
+          "given": [
+            {
+              "id": "v0",
+              "kind": "given",
+              "raw": "目标：证明 √2 是无理数",
+              "symbol": "",
+              "value": null,
+              "unit": "",
+              "note": ""
+            },
+            {
+              "id": "v1",
+              "kind": "given",
+              "raw": "方法限定：反证法",
+              "symbol": "",
+              "value": null,
+              "unit": "",
+              "note": ""
+            },
+            {
+              "id": "v2",
+              "kind": "given",
+              "raw": "√2 定义：满足 x² = 2 的正实数",
+              "symbol": "",
+              "value": null,
+              "unit": "",
+              "note": ""
+            }
+          ],
+          "asked": [
+            {
+              "id": "v0",
+              "kind": "asked",
+              "raw": "完整的反证法证明过程",
+              "symbol": "",
+              "value": null,
+              "unit": "",
+              "note": "完整的反证法证明过程"
+            }
+          ],
+          "qualitative": [
+            "目标：证明 √2 是无理数",
+            "方法限定：反证法"
+          ]
+        },
+        "keyConditions": [
+          {
+            "text": "用反证法证明：√2 不是有理数（即…",
+            "kind": "task",
+            "label": "这是一道证明题",
+            "meaning": "目标不是求数值，而是从已知推出结论；每一步都必须能被前一步支撑，不能跳。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "用反证法证明：√2 不是有理数（即 √2 无法写成两个…",
+            "kind": "domain",
+            "label": "数域 / 整除条件",
+            "meaning": "整数的整除性质是证明题最常用的抓手，反证法里通常就是靠它构造出矛盾。",
+            "question": null,
+            "revealsInsight": false
+          }
+        ],
+        "knowledgeGraph": {
+          "nodes": [
+            {
+              "id": "反证法",
+              "name": "反证法",
+              "role": "core",
+              "level": 1,
+              "note": ""
+            },
+            {
+              "id": "数论",
+              "name": "数论",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "互质",
+              "name": "互质",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "奇偶性",
+              "name": "奇偶性",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            }
+          ],
+          "edges": [
+            {
+              "from": "数论",
+              "to": "反证法",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "互质",
+              "to": "反证法",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "奇偶性",
+              "to": "反证法",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "数论",
+              "to": "互质",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "数论",
+              "to": "奇偶性",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "互质",
+              "to": "奇偶性",
+              "relation": "related",
+              "label": "相关"
+            }
+          ],
+          "edgeSource": "derived",
+          "scope": "topics-only"
+        },
+        "asked": [
+          "完整的反证法证明过程"
+        ]
+      }
+    },
+    "imp-e133e37f": {
+      "id": "imp-e133e37f",
+      "source": "imported",
+      "subject": "physics",
+      "topics": [
+        "已知条件",
+        "待求量",
+        "规律选择",
+        "适用前提",
+        "关系式",
+        "代入求解"
+      ],
+      "difficulty": 3,
+      "stem": "如图所示，水平放置的两条光滑平行金属导轨间距为 L = 0.5 m，处在竖直向下、垂直于导轨平面的匀强磁场中，B = 2 T。一根质量 m = 0.2 kg、电阻 r = 0.2 Ω 的导体棒垂直搁在导轨上，导轨左端接有 R = 0.8 Ω 的电阻，导轨电阻不计。现用水平向右的外力拉着导体棒，使导体棒沿导轨以恒定速度 v = 3 m/s 向右运动。求：(1) 感应电动势；(2) 感应电流；(3) 水平外力的大小。",
+      "givens": [
+        "L = 0.5 m",
+        "B = 2 T",
+        "m = 0.2 kg",
+        "r = 0.2 Ω",
+        "R = 0.8 Ω",
+        "v = 3 m/s"
+      ],
+      "asked": [
+        "感应电动势",
+        "感应电流",
+        "水平外力的大小"
+      ],
+      "figure": null,
+      "stepCount": 6,
+      "analysis": {
+        "summary": "物理题，考点集中在已知条件、待求量：如图所示,水平放置的两条光滑平行金属导轨间距为 L = 0.5 m,处在竖直向下…",
+        "variables": {
+          "given": [
+            {
+              "id": "v0",
+              "kind": "given",
+              "raw": "L = 0.5 m",
+              "symbol": "L",
+              "value": "0.5",
+              "unit": "m",
+              "note": "长度 / 距离"
+            },
+            {
+              "id": "v1",
+              "kind": "given",
+              "raw": "B = 2 T",
+              "symbol": "B",
+              "value": "2",
+              "unit": "T",
+              "note": "磁感应强度"
+            },
+            {
+              "id": "v2",
+              "kind": "given",
+              "raw": "m = 0.2 kg",
+              "symbol": "m",
+              "value": "0.2",
+              "unit": "kg",
+              "note": "质量"
+            },
+            {
+              "id": "v3",
+              "kind": "given",
+              "raw": "r = 0.2 Ω",
+              "symbol": "r",
+              "value": "0.2",
+              "unit": "Ω",
+              "note": "内阻"
+            },
+            {
+              "id": "v4",
+              "kind": "given",
+              "raw": "R = 0.8 Ω",
+              "symbol": "R",
+              "value": "0.8",
+              "unit": "Ω",
+              "note": "外电阻"
+            },
+            {
+              "id": "v5",
+              "kind": "given",
+              "raw": "v = 3 m/s",
+              "symbol": "v",
+              "value": "3",
+              "unit": "m/s",
+              "note": "速度"
+            }
+          ],
+          "asked": [
+            {
+              "id": "v0",
+              "kind": "asked",
+              "raw": "感应电动势",
+              "symbol": "",
+              "value": null,
+              "unit": "",
+              "note": "感应电动势"
+            },
+            {
+              "id": "v1",
+              "kind": "asked",
+              "raw": "感应电流",
+              "symbol": "",
+              "value": null,
+              "unit": "",
+              "note": "感应电流"
+            },
+            {
+              "id": "v2",
+              "kind": "asked",
+              "raw": "水平外力的大小",
+              "symbol": "",
+              "value": null,
+              "unit": "",
+              "note": "水平外力的大小"
+            }
+          ],
+          "qualitative": []
+        },
+        "keyConditions": [
+          {
+            "text": "如图所示，水平放置的两条光滑平行金属导轨间距为 L…",
+            "kind": "qualitative",
+            "label": "接触面光滑",
+            "meaning": "摩擦力为零，沿接触面方向上只有重力分量与外力参与，不需要再引入摩擦系数。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…导体棒，使导体棒沿导轨以恒定速度 v = 3 m/s 向…",
+            "kind": "constraint",
+            "label": "匀速（速度不变）",
+            "meaning": "速度不变 ⇒ 加速度为零 ⇒ 该方向上合力为零。这类题里它通常就是把\"力\"与\"电/热\"接起来的那个关节。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…直向下、垂直于导轨平面的匀强磁场中，B = 2 T。一根…",
+            "kind": "constraint",
+            "label": "场/变化是均匀的",
+            "meaning": "均匀意味着\"平均\"等于\"瞬时\"，可以直接用乘积式或线性关系，不需要积分。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "如图所示，水平放置的两条光滑平行金属导轨间…",
+            "kind": "geometry",
+            "label": "方向 / 几何关系",
+            "meaning": "方向关系决定了哪些量之间的乘积有效（例如切割式要求 B、L、v 两两垂直）。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…= 0.8 Ω 的电阻，导轨电阻不计。现用水平向右的外力拉着…",
+            "kind": "qualitative",
+            "label": "部分电阻不计",
+            "meaning": "这一部分不消耗电能，列电功率或能量方程时可以整项去掉。",
+            "question": null,
+            "revealsInsight": false
+          }
+        ],
+        "knowledgeGraph": {
+          "nodes": [
+            {
+              "id": "已知条件",
+              "name": "已知条件",
+              "role": "core",
+              "level": 1,
+              "note": ""
+            },
+            {
+              "id": "待求量",
+              "name": "待求量",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "规律选择",
+              "name": "规律选择",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "适用前提",
+              "name": "适用前提",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "关系式",
+              "name": "关系式",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "代入求解",
+              "name": "代入求解",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            }
+          ],
+          "edges": [
+            {
+              "from": "待求量",
+              "to": "已知条件",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "规律选择",
+              "to": "已知条件",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "适用前提",
+              "to": "已知条件",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "关系式",
+              "to": "已知条件",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "代入求解",
+              "to": "已知条件",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "待求量",
+              "to": "规律选择",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "待求量",
+              "to": "适用前提",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "待求量",
+              "to": "关系式",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "待求量",
+              "to": "代入求解",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "规律选择",
+              "to": "适用前提",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "规律选择",
+              "to": "关系式",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "规律选择",
+              "to": "代入求解",
+              "relation": "related",
+              "label": "相关"
+            }
+          ],
+          "edgeSource": "derived",
+          "scope": "topics-only"
+        },
+        "asked": [
+          "感应电动势",
+          "感应电流",
+          "水平外力的大小"
+        ]
+      }
+    }
+  },
+  "imported": {
+    "problem": {
+      "id": "imp-e133e37f",
+      "source": "imported",
+      "subject": "physics",
+      "topics": [
+        "已知条件",
+        "待求量",
+        "规律选择",
+        "适用前提",
+        "关系式",
+        "代入求解"
+      ],
+      "difficulty": 3,
+      "stem": "如图所示，水平放置的两条光滑平行金属导轨间距为 L = 0.5 m，处在竖直向下、垂直于导轨平面的匀强磁场中，B = 2 T。一根质量 m = 0.2 kg、电阻 r = 0.2 Ω 的导体棒垂直搁在导轨上，导轨左端接有 R = 0.8 Ω 的电阻，导轨电阻不计。现用水平向右的外力拉着导体棒，使导体棒沿导轨以恒定速度 v = 3 m/s 向右运动。求：(1) 感应电动势；(2) 感应电流；(3) 水平外力的大小。",
+      "givens": [
+        "L = 0.5 m",
+        "B = 2 T",
+        "m = 0.2 kg",
+        "r = 0.2 Ω",
+        "R = 0.8 Ω",
+        "v = 3 m/s"
+      ],
+      "asked": [
+        "感应电动势",
+        "感应电流",
+        "水平外力的大小"
+      ],
+      "figure": null,
+      "stepCount": 6,
+      "analysis": {
+        "summary": "物理题，考点集中在已知条件、待求量：如图所示,水平放置的两条光滑平行金属导轨间距为 L = 0.5 m,处在竖直向下…",
+        "variables": {
+          "given": [
+            {
+              "id": "v0",
+              "kind": "given",
+              "raw": "L = 0.5 m",
+              "symbol": "L",
+              "value": "0.5",
+              "unit": "m",
+              "note": "长度 / 距离"
+            },
+            {
+              "id": "v1",
+              "kind": "given",
+              "raw": "B = 2 T",
+              "symbol": "B",
+              "value": "2",
+              "unit": "T",
+              "note": "磁感应强度"
+            },
+            {
+              "id": "v2",
+              "kind": "given",
+              "raw": "m = 0.2 kg",
+              "symbol": "m",
+              "value": "0.2",
+              "unit": "kg",
+              "note": "质量"
+            },
+            {
+              "id": "v3",
+              "kind": "given",
+              "raw": "r = 0.2 Ω",
+              "symbol": "r",
+              "value": "0.2",
+              "unit": "Ω",
+              "note": "内阻"
+            },
+            {
+              "id": "v4",
+              "kind": "given",
+              "raw": "R = 0.8 Ω",
+              "symbol": "R",
+              "value": "0.8",
+              "unit": "Ω",
+              "note": "外电阻"
+            },
+            {
+              "id": "v5",
+              "kind": "given",
+              "raw": "v = 3 m/s",
+              "symbol": "v",
+              "value": "3",
+              "unit": "m/s",
+              "note": "速度"
+            }
+          ],
+          "asked": [
+            {
+              "id": "v0",
+              "kind": "asked",
+              "raw": "感应电动势",
+              "symbol": "",
+              "value": null,
+              "unit": "",
+              "note": "感应电动势"
+            },
+            {
+              "id": "v1",
+              "kind": "asked",
+              "raw": "感应电流",
+              "symbol": "",
+              "value": null,
+              "unit": "",
+              "note": "感应电流"
+            },
+            {
+              "id": "v2",
+              "kind": "asked",
+              "raw": "水平外力的大小",
+              "symbol": "",
+              "value": null,
+              "unit": "",
+              "note": "水平外力的大小"
+            }
+          ],
+          "qualitative": []
+        },
+        "keyConditions": [
+          {
+            "text": "如图所示，水平放置的两条光滑平行金属导轨间距为 L…",
+            "kind": "qualitative",
+            "label": "接触面光滑",
+            "meaning": "摩擦力为零，沿接触面方向上只有重力分量与外力参与，不需要再引入摩擦系数。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…导体棒，使导体棒沿导轨以恒定速度 v = 3 m/s 向…",
+            "kind": "constraint",
+            "label": "匀速（速度不变）",
+            "meaning": "速度不变 ⇒ 加速度为零 ⇒ 该方向上合力为零。这类题里它通常就是把\"力\"与\"电/热\"接起来的那个关节。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…直向下、垂直于导轨平面的匀强磁场中，B = 2 T。一根…",
+            "kind": "constraint",
+            "label": "场/变化是均匀的",
+            "meaning": "均匀意味着\"平均\"等于\"瞬时\"，可以直接用乘积式或线性关系，不需要积分。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "如图所示，水平放置的两条光滑平行金属导轨间…",
+            "kind": "geometry",
+            "label": "方向 / 几何关系",
+            "meaning": "方向关系决定了哪些量之间的乘积有效（例如切割式要求 B、L、v 两两垂直）。",
+            "question": null,
+            "revealsInsight": false
+          },
+          {
+            "text": "…= 0.8 Ω 的电阻，导轨电阻不计。现用水平向右的外力拉着…",
+            "kind": "qualitative",
+            "label": "部分电阻不计",
+            "meaning": "这一部分不消耗电能，列电功率或能量方程时可以整项去掉。",
+            "question": null,
+            "revealsInsight": false
+          }
+        ],
+        "knowledgeGraph": {
+          "nodes": [
+            {
+              "id": "已知条件",
+              "name": "已知条件",
+              "role": "core",
+              "level": 1,
+              "note": ""
+            },
+            {
+              "id": "待求量",
+              "name": "待求量",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "规律选择",
+              "name": "规律选择",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "适用前提",
+              "name": "适用前提",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "关系式",
+              "name": "关系式",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            },
+            {
+              "id": "代入求解",
+              "name": "代入求解",
+              "role": "support",
+              "level": 2,
+              "note": ""
+            }
+          ],
+          "edges": [
+            {
+              "from": "待求量",
+              "to": "已知条件",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "规律选择",
+              "to": "已知条件",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "适用前提",
+              "to": "已知条件",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "关系式",
+              "to": "已知条件",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "代入求解",
+              "to": "已知条件",
+              "relation": "prereq",
+              "label": "前置"
+            },
+            {
+              "from": "待求量",
+              "to": "规律选择",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "待求量",
+              "to": "适用前提",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "待求量",
+              "to": "关系式",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "待求量",
+              "to": "代入求解",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "规律选择",
+              "to": "适用前提",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "规律选择",
+              "to": "关系式",
+              "relation": "related",
+              "label": "相关"
+            },
+            {
+              "from": "规律选择",
+              "to": "代入求解",
+              "relation": "related",
+              "label": "相关"
+            }
+          ],
+          "edgeSource": "derived",
+          "scope": "topics-only"
+        },
+        "asked": [
+          "感应电动势",
+          "感应电流",
+          "水平外力的大小"
+        ]
+      }
+    },
+    "intake": {
+      "usedModel": false,
+      "latencyMs": 1,
+      "topics": [
+        "已知条件",
+        "待求量",
+        "规律选择",
+        "适用前提",
+        "关系式",
+        "代入求解"
+      ],
+      "stepCount": 6,
+      "graphReady": false,
+      "analysisFromModel": false,
+      "conditionCount": 5,
+      "notice": "未启用模型读题（当前是离线规则桩）：只抽取了已知量与待求量，解题路径是通用六步骨架，定位精度会明显下降。配置 LLM_API_KEY 后重新导入即可得到真正的读题结果。",
+      "warningCount": 6
+    }
+  },
+  "mainId": "phy-emi-01",
+  "sessionId": "demo-mvs4p4go",
+  "turns": [
+    {
+      "say": "先看回路吧，导体棒是电源，左边那个电阻是外电路",
+      "res": {
+        "message": "我理解你的意思是：你的推理走到了「先看回路吧,导体棒是电源,左边那个电阻是外电路」。这一步你想对的地方是：在「明确回路构成：谁是电源、谁是外电路」这一步上方向是清楚的。按这个思路，你大概停在「明确回路构成：谁是电源、谁是外电路」这一步。如果我说错了，你直接纠正我。\n\n你打算用的这个规律，它成立需要满足什么前提？\n\n【下一步】只检查前提，先别往下算 —— 说出一条你认为最可能不满足的条件。",
+        "hint": {
+          "level": 1,
+          "levelName": "L1 条件追问",
+          "levelNote": "我在问你一个前提",
+          "form": "condition_question",
+          "text": "你打算用的这个规律，它成立需要满足什么前提？",
+          "concepts": [
+            "回路构成",
+            "电源与内阻"
+          ],
+          "nextAsk": "只检查前提，先别往下算 —— 说出一条你认为最可能不满足的条件。"
+        },
+        "progress": {
+          "stepIndex": 1,
+          "stepCount": 8,
+          "completed": [],
+          "stepLabels": {},
+          "confidenceLabel": "高"
+        },
+        "enginePath": [
+          {
+            "stage": "understand",
+            "label": "听懂思路：这一段里我还没抓到可用的信息",
+            "tone": "hold"
+          },
+          {
+            "stage": "locate",
+            "label": "定位：按你说的话，你大概走到第 1 步（共 8 步）",
+            "tone": "ok"
+          },
+          {
+            "stage": "route",
+            "label": "决定：我在问你一个前提",
+            "tone": "info"
+          },
+          {
+            "stage": "generate",
+            "label": "成文：把它写成一句你能直接回答的话",
+            "tone": "ok"
+          }
+        ],
+        "understood": [
+          "在「明确回路构成：谁是电源、谁是外电路」这一步上方向是清楚的"
+        ],
+        "nextStep": "只检查前提，先别往下算 —— 说出一条你认为最可能不满足的条件。",
+        "mode": "ai_companion",
+        "reviewed": false,
+        "suppressed": false,
+        "refused": false,
+        "completion": null,
+        "meta": {
+          "engine": "offline-stub",
+          "model": null,
+          "latencyMs": 2
+        }
+      }
+    },
+    {
+      "say": "这是导体棒切割磁感线，应该能用 E=BLv",
+      "res": {
+        "message": "我理解你的意思是：你的推理走到了「这是导体棒切割磁感线,应该能用 E=BLv」。这一步你想对的地方是：已经走到了「明确回路构成：谁是电源、谁是外电路」；在「识别这是导体棒切割磁感线问题」这一步上方向是清楚的。按这个思路，你大概停在「识别这是导体棒切割磁感线问题」这一步。如果我说错了，你直接纠正我。\n\n你提到的这个规律，它成立需要的前提条件，题目里的条件满足了吗？先只检查前提，不用往下算。\n\n【下一步】把题干条件逐条列出来，标出哪一条还没用上。",
+        "hint": {
+          "level": 1,
+          "levelName": "L1 条件追问",
+          "levelNote": "我在问你一个前提",
+          "form": "condition_question",
+          "text": "你提到的这个规律，它成立需要的前提条件，题目里的条件满足了吗？先只检查前提，不用往下算。",
+          "concepts": [
+            "法拉第电磁感应定律",
+            "切割磁感线"
+          ],
+          "nextAsk": "把题干条件逐条列出来，标出哪一条还没用上。"
+        },
+        "progress": {
+          "stepIndex": 2,
+          "stepCount": 8,
+          "completed": [
+            1
+          ],
+          "stepLabels": {
+            "1": "明确回路构成：谁是电源、谁是外电路"
+          },
+          "confidenceLabel": "高"
+        },
+        "enginePath": [
+          {
+            "stage": "understand",
+            "label": "听懂思路：我抓到了你说的已知量（L = 0.5 m、B = 0.4 T）",
+            "tone": "ok"
+          },
+          {
+            "stage": "locate",
+            "label": "定位：按你说的话，你大概走到第 2 步（共 8 步）",
+            "tone": "ok"
+          },
+          {
+            "stage": "route",
+            "label": "决定：我在问你一个前提",
+            "tone": "info"
+          },
+          {
+            "stage": "generate",
+            "label": "成文：把它写成一句你能直接回答的话",
+            "tone": "ok"
+          },
+          {
+            "stage": "guard",
+            "label": "复核：换了一种问法，让它更贴近你现在的进度",
+            "tone": "info"
+          }
+        ],
+        "understood": [
+          "已经走到了「明确回路构成：谁是电源、谁是外电路」",
+          "在「识别这是导体棒切割磁感线问题」这一步上方向是清楚的"
+        ],
+        "nextStep": "把题干条件逐条列出来，标出哪一条还没用上。",
+        "mode": "ai_companion",
+        "reviewed": true,
+        "suppressed": false,
+        "refused": false,
+        "completion": null,
+        "meta": {
+          "engine": "offline-stub",
+          "model": null,
+          "latencyMs": 3
+        }
+      }
+    },
+    {
+      "say": "电流用欧姆定律算，I=E/R，内阻 r 应该不用管",
+      "res": {
+        "message": "我理解你的意思是：你打算用「欧姆定律」，你的推理走到了「电流用欧姆定律算,I=E/R,内阻 r 应该不用管」。这一步你想对的地方是：选对了「闭合电路欧姆定律」这个方向；已经走到了「识别这是导体棒切割磁感线问题」→「检查 E = BLv 的使用前提：B、L、v 三者是否互相垂直且 B 均匀」。按这个思路，你大概停在「用闭合电路欧姆定律算电流：外电路 + 内阻一起算」这一步。我感觉问题可能不在算，而在某个规律的前提条件上。如果我说错了，你直接纠正我。\n\n先别写式子。你打算用的这个规律，在你面前的这个情境里成立吗？\n\n【下一步】先说\"成立\"或\"不成立\"，再说一句理由。",
+        "hint": {
+          "level": 1,
+          "levelName": "L1 条件追问",
+          "levelNote": "我在问你一个前提",
+          "form": "condition_question",
+          "text": "先别写式子。你打算用的这个规律，在你面前的这个情境里成立吗？",
+          "concepts": [
+            "闭合电路欧姆定律",
+            "含内阻电路"
+          ],
+          "nextAsk": "先说\"成立\"或\"不成立\"，再说一句理由。"
+        },
+        "progress": {
+          "stepIndex": 4,
+          "stepCount": 8,
+          "completed": [
+            1,
+            2,
+            3
+          ],
+          "stepLabels": {
+            "1": "明确回路构成：谁是电源、谁是外电路",
+            "2": "识别这是导体棒切割磁感线问题",
+            "3": "第 3 步（检查前提）"
+          },
+          "confidenceLabel": "高"
+        },
+        "enginePath": [
+          {
+            "stage": "understand",
+            "label": "听懂思路：我抓到了你提到的「欧姆定律」和你说的已知量（r = 0.1 Ω、R = 0.3 Ω）",
+            "tone": "ok"
+          },
+          {
+            "stage": "locate",
+            "label": "定位：按你说的话，你大概走到第 4 步（共 8 步）",
+            "tone": "ok"
+          },
+          {
+            "stage": "route",
+            "label": "决定：我在问你一个前提",
+            "tone": "info"
+          },
+          {
+            "stage": "generate",
+            "label": "成文：把它写成一句你能直接回答的话",
+            "tone": "ok"
+          }
+        ],
+        "understood": [
+          "选对了「闭合电路欧姆定律」这个方向",
+          "已经走到了「识别这是导体棒切割磁感线问题」→「检查 E = BLv 的使用前提：B、L、v 三者是否互相垂直且 B 均匀」"
+        ],
+        "nextStep": "先说\"成立\"或\"不成立\"，再说一句理由。",
+        "mode": "ai_companion",
+        "reviewed": false,
+        "suppressed": false,
+        "refused": false,
+        "completion": null,
+        "meta": {
+          "engine": "offline-stub",
+          "model": null,
+          "latencyMs": 2
+        }
+      }
+    },
+    {
+      "say": "匀速说明合力为零，外力应该等于安培力",
+      "res": {
+        "message": "我理解你的意思是：你打算用「安培力」，你的推理走到了「匀速说明合力为零,外力应该等于安培力」。这一步你想对的地方是：选对了「安培力」这个方向；已经走到了「用闭合电路欧姆定律算电流：外电路 + 内阻一起算」→「判断安培力方向并写大小」；在「用匀速条件做受力平衡，求出外力」这一步上方向是清楚的。按这个思路，你大概停在「用匀速条件做受力平衡，求出外力」这一步。如果我说错了，你直接纠正我。\n\n你打算用的这个规律，它成立需要满足什么前提？\n\n【下一步】只检查前提，先别往下算 —— 说出一条你认为最可能不满足的条件。",
+        "hint": {
+          "level": 1,
+          "levelName": "L1 条件追问",
+          "levelNote": "我在问你一个前提",
+          "form": "condition_question",
+          "text": "你打算用的这个规律，它成立需要满足什么前提？",
+          "concepts": [
+            "受力平衡",
+            "匀速直线运动合力为零"
+          ],
+          "nextAsk": "只检查前提，先别往下算 —— 说出一条你认为最可能不满足的条件。"
+        },
+        "progress": {
+          "stepIndex": 6,
+          "stepCount": 8,
+          "completed": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "stepLabels": {
+            "1": "明确回路构成：谁是电源、谁是外电路",
+            "2": "识别这是导体棒切割磁感线问题",
+            "3": "第 3 步（检查前提）",
+            "4": "用闭合电路欧姆定律算电流：外电路 + 内阻一起算",
+            "5": "判断安培力方向并写大小"
+          },
+          "confidenceLabel": "高"
+        },
+        "enginePath": [
+          {
+            "stage": "understand",
+            "label": "听懂思路：我抓到了你提到的「安培力」",
+            "tone": "ok"
+          },
+          {
+            "stage": "locate",
+            "label": "定位：按你说的话，你大概走到第 6 步（共 8 步）",
+            "tone": "ok"
+          },
+          {
+            "stage": "route",
+            "label": "决定：我在问你一个前提",
+            "tone": "info"
+          },
+          {
+            "stage": "generate",
+            "label": "成文：把它写成一句你能直接回答的话",
+            "tone": "ok"
+          }
+        ],
+        "understood": [
+          "选对了「安培力」这个方向",
+          "已经走到了「用闭合电路欧姆定律算电流：外电路 + 内阻一起算」→「判断安培力方向并写大小」",
+          "在「用匀速条件做受力平衡，求出外力」这一步上方向是清楚的"
+        ],
+        "nextStep": "只检查前提，先别往下算 —— 说出一条你认为最可能不满足的条件。",
+        "mode": "ai_companion",
+        "reviewed": false,
+        "suppressed": false,
+        "refused": false,
+        "completion": null,
+        "meta": {
+          "engine": "offline-stub",
+          "model": null,
+          "latencyMs": 3
+        }
+      }
+    },
+    {
+      "say": "代入数值得 E=0.4 V，I=1 A，F=0.2 N，P=0.4 W",
+      "res": {
+        "message": "完全正确。这道题从头到尾是你自己推出来的 —— 每一步的判断都由你完成，我只在你停顿时问了一个前提。",
+        "hint": {
+          "level": 0,
+          "levelName": "L0 结构化澄清",
+          "levelNote": "先把问题说清楚",
+          "form": "confirm",
+          "text": "完全正确。这道题从头到尾是你自己推出来的 —— 每一步的判断都由你完成，我只在你停顿时问了一个前提。",
+          "concepts": [],
+          "nextAsk": "把这道题的思路用一句话总结给自己听，然后看学习报告。"
+        },
+        "progress": {
+          "stepIndex": 8,
+          "stepCount": 8,
+          "completed": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "stepLabels": {
+            "1": "明确回路构成：谁是电源、谁是外电路",
+            "2": "识别这是导体棒切割磁感线问题",
+            "3": "第 3 步（检查前提）",
+            "4": "用闭合电路欧姆定律算电流：外电路 + 内阻一起算",
+            "5": "判断安培力方向并写大小",
+            "6": "用匀速条件做受力平衡，求出外力",
+            "7": "第 7 步（做运算）"
+          },
+          "confidenceLabel": "高"
+        },
+        "enginePath": [
+          {
+            "stage": "understand",
+            "label": "听懂思路：我抓到了你说的已知量（0.4 V、1 A）",
+            "tone": "ok"
+          },
+          {
+            "stage": "locate",
+            "label": "定位：按你说的话，你大概走到第 8 步（共 8 步）",
+            "tone": "ok"
+          },
+          {
+            "stage": "route",
+            "label": "决定：先把问题说清楚",
+            "tone": "info"
+          },
+          {
+            "stage": "generate",
+            "label": "成文：把它写成一句你能直接回答的话",
+            "tone": "ok"
+          }
+        ],
+        "understood": [
+          "自己算出了 4 个待求量：0.4 V、1 A、0.2 N、0.4 W",
+          "把这道题的每一问都推进到了结果"
+        ],
+        "nextStep": "把这道题的思路用一句话总结给自己听，然后看学习报告。",
+        "mode": "ai_companion",
+        "reviewed": false,
+        "suppressed": false,
+        "refused": false,
+        "completion": {
+          "complete": true,
+          "matched": [
+            {
+              "value": "0.4",
+              "unit": "V",
+              "raw": "0.4 V",
+              "quote": "代入数值得 E=0.4 V，I=1 A，F…"
+            },
+            {
+              "value": "1",
+              "unit": "A",
+              "raw": "1 A",
+              "quote": "…0.4 V，I=1 A，F=0.2 N…"
+            },
+            {
+              "value": "0.2",
+              "unit": "N",
+              "raw": "0.2 N",
+              "quote": "…I=1 A，F=0.2 N，P=0.4 W"
+            },
+            {
+              "value": "0.4",
+              "unit": "W",
+              "raw": "0.4 W",
+              "quote": "…0.2 N，P=0.4 W"
+            }
+          ],
+          "remainingCount": 0,
+          "expectedCount": 4
+        },
+        "meta": {
+          "engine": "offline-stub",
+          "model": null,
+          "latencyMs": 2
+        }
+      }
+    }
+  ],
+  "report": {
+    "report": {
+      "problemId": "phy-emi-01",
+      "problemTitle": "物理 · 电磁感应/法拉第电磁感应定律（难度 2/5）",
+      "stuckPoints": [
+        {
+          "stepIndex": 1,
+          "stepTitle": "明确回路构成：谁是电源、谁是外电路",
+          "kind": "direction_lost",
+          "misconceptionLabels": [],
+          "hintRounds": 1,
+          "maxLevel": 1,
+          "guardBlocked": 0
+        },
+        {
+          "stepIndex": 2,
+          "stepTitle": "识别这是导体棒切割磁感线问题",
+          "kind": "direction_lost",
+          "misconceptionLabels": [],
+          "hintRounds": 1,
+          "maxLevel": 1,
+          "guardBlocked": 0
+        },
+        {
+          "stepIndex": 4,
+          "stepTitle": "用闭合电路欧姆定律算电流：外电路 + 内阻一起算",
+          "kind": "precondition_gap",
+          "misconceptionLabels": [
+            "把导体棒当外电路，算电流时漏掉内阻 r"
+          ],
+          "hintRounds": 1,
+          "maxLevel": 1,
+          "guardBlocked": 0
+        },
+        {
+          "stepIndex": 6,
+          "stepTitle": "用匀速条件做受力平衡，求出外力",
+          "kind": "direction_lost",
+          "misconceptionLabels": [],
+          "hintRounds": 1,
+          "maxLevel": 1,
+          "guardBlocked": 0
+        }
+      ],
+      "hintStats": {
+        "total": 4,
+        "byLevel": {
+          "0": 0,
+          "1": 4,
+          "2": 0,
+          "3": 0
+        },
+        "guardBlocked": 0,
+        "confirmed": 1,
+        "confirmedComplete": 1
+      },
+      "formulaCards": 0,
+      "independence": {
+        "score": 0.63,
+        "completedSteps": 5,
+        "totalSteps": 8,
+        "note": "你独立走过了 5 / 8 个关键步骤，全程只用到条件追问，说明你自己完成得很扎实。"
+      },
+      "deeperIssues": [
+        "规律的使用前提没有形成检查习惯。你会在\"知道用什么\"之后就急着代公式，导致前提不满足时仍然硬算。",
+        "电路建模不够稳：谁是电源、谁是外电路、内阻算不算，这几个判断容易跳步。"
+      ],
+      "recommendations": [
+        {
+          "topic": "用闭合电路欧姆定律算电流：外电路 + 内阻一起算",
+          "reason": "在「用闭合电路欧姆定律算电流：外电路 + 内阻一起算」这一步，把导体棒当外电路，算电流时漏掉内阻 r——共引导 1 轮。",
+          "drill": "建议直接做 2 道同结构变式题，检验这一步是否已内化。"
+        },
+        {
+          "topic": "条件判断题组",
+          "reason": "本轮卡点集中在\"规律前提是否满足\"上。",
+          "drill": "收集 5 道电磁感应题，只做一件事：写出每个公式的适用前提，不做计算。"
+        }
+      ],
+      "nextActions": [
+        "整理一张\"公式—前提\"对照卡，把本轮涉及规律的适用条件写全。",
+        "先做一道结构完全相同的变式题，目标是不借助提示走完前三步。",
+        "把报告里的\"深层问题\"读一遍，用自己的话复述给同学听——能讲清楚才算真懂。"
+      ],
+      "meta": {
+        "engine": "offline-stub",
+        "generatedAt": "2026-10-28T13:06:46.138Z"
+      }
+    },
+    "turns": [
+      {
+        "role": "student",
+        "text": "先看回路吧，导体棒是电源，左边那个电阻是外电路",
+        "at": "2026-10-28T13:06:46.110Z"
+      },
+      {
+        "role": "ai",
+        "text": "你打算用的这个规律，它成立需要满足什么前提？",
+        "at": "2026-10-28T13:06:46.110Z",
+        "level": 1,
+        "metaStep": 1,
+        "metaGraphId": "phy-emi-01-g1"
+      },
+      {
+        "role": "student",
+        "text": "这是导体棒切割磁感线，应该能用 E=BLv",
+        "at": "2026-10-28T13:06:46.116Z"
+      },
+      {
+        "role": "ai",
+        "text": "你提到的这个规律，它成立需要的前提条件，题目里的条件满足了吗？先只检查前提，不用往下算。",
+        "at": "2026-10-28T13:06:46.116Z",
+        "level": 1,
+        "metaStep": 2,
+        "metaGraphId": "phy-emi-01-g1"
+      },
+      {
+        "role": "student",
+        "text": "电流用欧姆定律算，I=E/R，内阻 r 应该不用管",
+        "at": "2026-10-28T13:06:46.122Z"
+      },
+      {
+        "role": "ai",
+        "text": "先别写式子。你打算用的这个规律，在你面前的这个情境里成立吗？",
+        "at": "2026-10-28T13:06:46.122Z",
+        "level": 1,
+        "metaStep": 4,
+        "metaGraphId": "phy-emi-01-g1"
+      },
+      {
+        "role": "student",
+        "text": "匀速说明合力为零，外力应该等于安培力",
+        "at": "2026-10-28T13:06:46.128Z"
+      },
+      {
+        "role": "ai",
+        "text": "你打算用的这个规律，它成立需要满足什么前提？",
+        "at": "2026-10-28T13:06:46.128Z",
+        "level": 1,
+        "metaStep": 6,
+        "metaGraphId": "phy-emi-01-g1"
+      },
+      {
+        "role": "student",
+        "text": "代入数值得 E=0.4 V，I=1 A，F=0.2 N，P=0.4 W",
+        "at": "2026-10-28T13:06:46.133Z"
+      },
+      {
+        "role": "ai",
+        "text": "完全正确。这道题从头到尾是你自己推出来的 —— 每一步的判断都由你完成，我只在你停顿时问了一个前提。",
+        "at": "2026-10-28T13:06:46.133Z",
+        "level": 0,
+        "metaStep": 8,
+        "metaGraphId": "phy-emi-01-g1"
+      }
+    ]
+  }
+}

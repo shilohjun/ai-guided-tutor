@@ -111,18 +111,8 @@ server.listen(PORT, HOST, () => {
     // 明说"地址还没确认"：否则第一次调用会静默多花几次候选调用的钱，而日志里看不出来
     console.log('    （接口地址未指定，首次识别会自动探索候选地址并缓存；确认后建议写进 ALIYUN_OCR_ENDPOINT）');
   }
-  const teacherKey = String(process.env.TEACHER_KEY ?? '').trim();
-  console.log(
-    `  ▸ 教师视图：${
-      teacherKey
-        ? `需要口令（${maskSecret(teacherKey)}）`
-        : String(process.env.DSH_FORCE_TEACHER_LOCK ?? '') === '1'
-          ? '已关闭（本部署形态锁死了教师视图）'
-          : '无需口令 · 本地模式，点一下直接进'
-    }`,
-  );
   console.log('');
   console.log('  ▸ 核心承诺：只给提示，不给答案（出口由 guard 强制校验）');
-  console.log('  ▸ 视图隔离：学生视图拿不到解题路径 / 答案指纹 / 错因标签 —— 由服务端分流');
+  console.log('  ▸ 学生视图：白名单投影 —— 拿不到解题路径 / 答案指纹 / 错因标签');
   console.log('');
 });
