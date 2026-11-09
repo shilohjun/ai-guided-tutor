@@ -201,6 +201,16 @@ describe('事件 · 上报接口（真实 HTTP）', () => {
       body: typeof body === 'string' ? body : JSON.stringify(body),
     });
 
+  /**
+   * 两个计数要断言到**值**，不是"是数字"。
+   * 只断言类型的话，整个分支消失（比如非对象条目的计数）也照样绿 ——
+   * 而这正是评审点名的那条（`rejected` 是对外的唯一故障信号，它错了没人能发现）。
+   */
+  function assertCounts(json, accepted, rejected) {
+    assertEquals(json.accepted, accepted, `accepted 应为 ${accepted}`);
+    assertEquals(json.rejected, rejected, `rejected 应为 ${rejected}`);
+  }
+
   it('正常一批：逐条校验，合法的写入、不合法的只跳过那一条', async () => {
     await withServer(async (base) => {
       const sessionId = uid('sess');
@@ -239,13 +249,23 @@ describe('事件 · 上报接口（真实 HTTP）', () => {
     });
   });
 
-  it('events 不是数组 / 缺字段 → 200，不 5xx', async () => {
+  it('events 不是数组 / 缺字段 → 200，不 5xx，且计数精确', async () => {
     await withServer(async (base) => {
-      for (const body of [{ events: 'nope' }, {}, { events: [null, 42, 'x', []] }]) {
+      /**
+       * 第三组是**非对象条目**那条分支（`null` / 数字 / 字符串 / 数组混在数组里，
+       * 前端拼接出错时就是这样）：它们连 `validateEvent` 的入参都不该是，
+       * 必须逐条计入 rejected。只断言"是数字"的话，这条分支整个删掉测试也不会红 ——
+       * 所以把 4 这个数钉在这里。
+       */
+      const cases = [
+        [{ events: 'nope' }, 0, 0],
+        [{}, 0, 0],
+        [{ events: [null, 42, 'x', []] }, 0, 4],
+      ];
+      for (const [body, accepted, rejected] of cases) {
         const res = await post(base, body);
         assertEquals(res.status, 200, `body=${JSON.stringify(body)} 不该 5xx`);
-        const json = await res.json();
-        assert(typeof json.accepted === 'number' && typeof json.rejected === 'number', '两个计数必须是数字');
+        assertCounts(await res.json(), accepted, rejected);
       }
     });
   });
@@ -373,6 +393,79 @@ describe('事件 · 上报接口（真实 HTTP）', () => {
       assert(
         Number.isFinite(Date.parse(stored.at)) && Math.abs(Date.now() - Date.parse(stored.at)) < 60_000,
         `at 应是这次请求的服务端时间，实际 ${stored.at}`,
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 可读性：收下的事件必须至少能被一条查询路径读出来
+  // -------------------------------------------------------------------------
+
+  /**
+   * 这条规则为什么必须存在（评审点名）：
+   *
+   * `{ type: 'login' }` 这条**裸 login** 过了 `validateEvent`（`login` 允许没有归属，B7-1），
+   * 但落库之后 `listEventsBySession` 看不到它（没有归属键）、
+   * `listEventsByBatch` 也看不到它（`batchId` 为空）—— 它被写进磁盘、计入 `accepted`，
+   * 然后对漏斗 / 看板 / 导出**永久不可见**，而这三个功能正是只读事件表的。
+   * 于是 `accepted` 变成了谎话，而且没有任何东西能区分"收下了一条好的"和"丢了一条"。
+   *
+   * 裁定：**能被至少一条查询路径读出来，才叫收下**。
+   * 这是**路由层的可读性判断**，不是校验规则 —— `validateEvent` 不认识 `batchId`，
+   * 它继续放行无归属的 `login`（那是纯函数契约），拦截发生在归属键与 batchId 都解析完之后。
+   *
+   * 现实路径不受影响：登录之后客户端就握着令牌了，路由会从令牌解出用户、
+   * 再把批次补进 `batchId`，那条 `login` 于是既可查、也被收下（下一条用例钉住它）。
+   */
+  it('既没有归属也没有 batchId 的事件被拒，且一条都没写进去（收了也永远查不出来）', async () => {
+    await withServer(async (base) => {
+      const store = await routeStore();
+      const seqBefore = await store.getCounter('seq:event');
+
+      const res = await post(base, { events: [{ type: 'login' }] });
+      assertEquals(res.status, 200, '拒一条不等于 5xx —— 埋点接口永远 200（B4）');
+      assertCounts(await res.json(), 0, 1);
+
+      /**
+       * "什么都没写"要真的看一眼存储，而不是只看 accepted：
+       * `recordEvent` 落库前会领一个 `seq`，所以计数器没动就证明了**一条都没写进去**
+       * （也说明拒在领号之前，没白占一个序号）。
+       */
+      assertEquals(await store.getCounter('seq:event'), seqBefore, '被拒的事件不得占用 seq，更不得落库');
+    });
+  });
+
+  it('带令牌时同一个裸 login 被收下，且 batchId 由服务端补齐（登录后的真实路径）', async () => {
+    await withServer(async (base) => {
+      const { issueAccounts, login } = await import('../src/server/auth.js');
+      const store = await routeStore();
+      const batchId = uid('batch');
+      const [{ code }] = await issueAccounts(store, { batchId, count: 1 });
+      const session = await login(store, code);
+      assert(session?.token, '发号后应当能登录拿到令牌');
+
+      /** body 里什么身份都不带 —— 全部来自令牌，这才是登录之后客户端的真实形状 */
+      const res = await post(base, { events: [{ type: 'login' }] }, { authorization: `Bearer ${session.token}` });
+      assertEquals(res.status, 200);
+      assertCounts(await res.json(), 1, 0);
+
+      const [stored] = await store.listEventsByBatch(batchId);
+      assertEquals(stored.type, 'login', '无归属的 login 只能按 batchId 查到');
+      assertEquals(stored.batchId, batchId, 'batchId 必须由服务端从令牌补上 —— 那是它唯一的查询路径');
+      assertEquals(stored.userId, session.user.id, 'userId 也必须来自令牌');
+    });
+  });
+
+  it('混批：无主无批的那条被拒，同批的合法事件照收（一条坏事件不牵连整批）', async () => {
+    await withServer(async (base) => {
+      const visitId = uid('visit');
+      const res = await post(base, { events: [{ type: 'login' }, { type: 'page_enter', visitId }] });
+      assertEquals(res.status, 200);
+      assertCounts(await res.json(), 1, 1);
+      assertEquals(
+        (await (await routeStore()).listEventsBySession(visitId)).map((e) => e.type).join(','),
+        'page_enter',
+        '同批里的合法事件必须照旧落库（B6：能收几条收几条）',
       );
     });
   });

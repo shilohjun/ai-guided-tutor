@@ -104,8 +104,15 @@ const MAX_PAYLOAD_BYTES = 2048;
  */
 const SEQ_COUNTER_KEY = 'seq:event';
 
-/** 归属键：`sessionId` 非空就用它，否则用 `visitId`。三个驱动共用这一条规则。 */
-function ownerOf(event) {
+/**
+ * 归属键：`sessionId` 非空就用它，否则用 `visitId`。三个驱动共用这一条规则。
+ *
+ * 导出是因为**路由也要用同一条规则**：`acceptEvents` 要判断"这条事件有没有归属"，
+ * 才能在收下之前发现"没有归属、也没有 batchId"的事件，而那种事件落库之后
+ * 两条查询路径都读不到（见 router.js 里那段说明）。第四份手抄的
+ * `sessionId || visitId` 迟早在某处多一个 `??`，那正是 B1 那次分叉的形状。
+ */
+export function ownerOf(event) {
   const owner = event?.sessionId || event?.visitId;
   return owner ? String(owner) : '';
 }

@@ -50,7 +50,7 @@ import { PROBLEMS } from '../core/problems.data.js';
 import { DEFAULT_PERSONA, PERSONA_IDS, PERSONAS, normalizePersona, personaById, stylePersonaReply } from '../core/personas.js';
 import { openStore } from './store/index.js';
 import { checkLoginRate, login, noteLoginFailure, noteLoginSuccess, resolveToken } from './auth.js';
-import { recordEvent, validateEvent } from './events.js';
+import { ownerOf, recordEvent, validateEvent } from './events.js';
 
 loadEnvFile();
 
@@ -522,14 +522,32 @@ function textOrNull(value) {
  * 重试，于是坏请求被放大成一串坏请求，还可能顶掉真正的主流程请求。
  * 所以这里把"丢掉"当成正常结果：逐条判断，能收几条收几条，剩下的计数返回。
  *
- * 四类情况都不许 5xx：
+ * 下面这几种情况都不许 5xx：
  *   ① 请求体解析失败（半截 JSON / 超过 1MB / 空 body）→ `{ accepted: 0, rejected: 0 }`
  *   ② 单条不合法（未知 type / payload 超 2KB / 没有归属）→ 跳过并计入 rejected
  *   ③ 存储写失败（磁盘满、驱动不可用）→ 同样计入 rejected，不往上报错
  *   ④ 令牌解析失败 → 当作"没有身份"，回落到 body 里的 userId（Task 4 会把它收紧成必须登录）
+ *   ⑤ **读不出来**的（既没有归属、也没有 batchId，见下一节）→ 同样计入 rejected、不写
  *
  * `rejected` 存在的意义不是给前端看，而是**让埋点坏掉这件事有数字**：
  * 没有它，"这周为什么少了三分之一的事件"只能靠猜。
+ *
+ * ============================================================================
+ * "收下"的定义：至少能被一条查询路径读出来
+ * ============================================================================
+ * 事件表只有两个读入口 —— `listEventsBySession(归属键)` 与 `listEventsByBatch(batchId)`。
+ * 一条**既没有归属、也没有 batchId** 的事件落库之后，两个都读不到它：
+ * 前者按归属键分文件/过滤，后者对空 batchId 直接返回 `[]`。
+ * 于是它被写进磁盘、计入 `accepted`，然后对漏斗 / 看板 / 导出**永久不可见** ——
+ * 那三个功能只读事件表，而且不会报错。`accepted` 在这里就成了谎话。
+ *
+ * 所以可读性是**收下的前提**，判在归属键与 batchId 都解析完之后：
+ * 读不出来的一条，计入 `rejected`、不写。这不是校验规则 —— `validateEvent`
+ * 不认识 `batchId`，它照旧放行无归属的 `login`（B7-1 的纯函数契约）。
+ *
+ * 现实路径不受影响：登录之后客户端就握着令牌，下面会把用户和当前批次解出来，
+ * `login` 于是既可查、也被收下。真正会被拒的只有"匿名 + 没带 batchId"那种埋点 ——
+ * 它本来就没有任何分析价值。
  *
  * ============================================================================
  * 身份与时间都不信客户端
@@ -586,6 +604,19 @@ async function acceptEvents(req, body) {
       userId: identity ? identity.user.id : (textOrNull(item.userId) ?? textOrNull(body?.userId)),
       batchId: identity ? (identity.batchId ?? null) : (textOrNull(item.batchId) ?? textOrNull(body?.batchId)),
     };
+
+    /**
+     * **读不出来就不算收下**（见上面"收下的定义"）：归属键与 batchId 都为空的事件，
+     * 两条查询路径都取不到它 —— 写进去只会让 `accepted` 变成谎话。
+     *
+     * 判在校验**之后**是刻意的：`validateEvent` 放行无归属的 `login` 是纯函数契约（B7-1），
+     * 而且它不认识 `batchId`；"这条以后查不查得出来"是这里才知道的事。
+     * 也判在 `recordEvent` **之前**：被拒的事件不该占掉一个 seq。
+     */
+    if (!ownerOf(event) && !event.batchId) {
+      rejected += 1;
+      continue;
+    }
 
     try {
       await recordEvent(store, event);

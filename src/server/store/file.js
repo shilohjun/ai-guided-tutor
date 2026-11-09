@@ -34,7 +34,7 @@
  */
 
 import { appendFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 
 /** `login` 是唯一允许没有归属的事件 —— 这条例外只写在 events.js 一处（见 allowsNoOwner） */
 import { allowsNoOwner } from '../events.js';
@@ -191,6 +191,20 @@ export async function openFileStore(env = {}) {
     return join(root, EVENTS, '_no-owner', 'events.jsonl');
   }
 
+  /**
+   * 读一个归属的事件文件。**一行读不出来不牵连整份文件。**
+   *
+   * 为什么不能裸 `JSON.parse`：事件是"一行一个、只追加"的 JSONL，
+   * 而 `appendFileSync` 写到一半断电、或者盘满（ENOSPC）时，最后一行就是半截 JSON ——
+   * 那是磁盘写满时的标准形状，不是臆想。裸 parse 的后果是**一行坏数据 = 整次读取抛错**，
+   * 而 `listEventsByBatch` 要扫**所有**归属文件：一个人的一行残留会让**全批次**的
+   * 读都失败（导出周报直接打不开），爆炸半径从"一个学生的会话"变成"所有人"。
+   *
+   * 所以跳过读不出来的行、把条数数下来并留一条 warn。
+   * 为什么不是静默跳过：静默等于把损坏藏起来（`readJson` 那边宁可抛也不返回空，
+   * 是同一个理由）—— 盘写满这件事必须有人能看见。warn 里只报文件名与条数，
+   * 不打印坏行内容：那里面可能是一段学生消息，日志不是放这些的地方。
+   */
   function readEventFile(file) {
     let text;
     try {
@@ -199,10 +213,20 @@ export async function openFileStore(env = {}) {
       if (err?.code === 'ENOENT') return [];
       throw err;
     }
-    return text
-      .split('\n')
-      .filter((line) => line.trim())
-      .map((line) => JSON.parse(line));
+    const events = [];
+    let unreadable = 0;
+    for (const line of text.split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        events.push(JSON.parse(line));
+      } catch {
+        unreadable += 1;
+      }
+    }
+    if (unreadable) {
+      console.warn(`[store] ${basename(file)} 里有 ${unreadable} 行事件无法解析，已跳过（磁盘写满或进程中途退出？）`);
+    }
+    return events;
   }
 
   function readEventLines(owner) {
