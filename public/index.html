@@ -879,38 +879,70 @@ body.is-qb{overflow:hidden}
 .p2-foot .note{font-size:var(--fs-body);color:var(--ink-3);font-weight:400}
 
 /* =====================================================================
-   5.1 陪学老师：一个选择器，不是一屏
+   5.1 陪学老师：跟模式卡同层的一个大选择框
    ---------------------------------------------------------------------
-   四位老师是"同一道题的不同讲法"，语义上属于「选一种做题方式」这一层，
-   所以它只是页面二里的一个选择器 —— 不另开屏、不做立绘大卡。
-   全身图留在库里给别处用；这里只出头像和名字，密度跟上面两张模式卡一致。
+   四位老师是"同一道题的不同讲法"，所以它和两张模式卡是同一层上的选择：
+   默认派蒙，选过就记住（bsj-mentor），不选就一直是派蒙。
+   点开的是浮层而不是第五屏 —— 步骤条只有四步，不该多出一个不在条上的页。
    ===================================================================== */
-.p2-teacher{display:flex;flex-direction:column;gap:8px;margin-top:16px}
-.p2-teacher-head{display:flex;align-items:center;gap:8px;font-size:var(--fs-body);color:var(--ink-3);font-weight:600}
-.p2-teacher-head .tag{margin-left:auto}
-.pick-row{display:flex;flex-wrap:wrap;gap:8px}
-.pick{
-  display:inline-flex;align-items:center;gap:8px;
-  padding:2px 12px 2px 2px;
+
+/* —— 头像取景 ——
+   四张素材各自是独立裁的去底头像。做头像时素材本身就得是"脸在正中"的方图：
+   靠 CSS 平移只在 s=1 时管用，而一平移，另一侧就没有像素补上（会长出一条空白），
+   单纯放大又会把头顶切掉。所以取景问题在**素材层**解决，这里只负责圆形裁切与留白。
+   建华的素材曾偏左 60px，已按 characters/body 的原图重裁（脸居中、且裁掉了左侧的板子）；
+   其余三位目前的构图可以直接用。 */
+.av-frame{
+  position:relative;overflow:hidden;flex:none;
+  border-radius:var(--r-circle);
+}
+.av-frame img{
+  position:absolute;inset:0;
+  width:100%;height:100%;
+  object-fit:cover;
+  /* 留给"确实需要微调"的极端情况；正常情况下不设 --fx/--fy，等于不位移 */
+  transform:translate(var(--fx,0),var(--fy,0));
+}
+
+/* —— 页面二：与两张模式卡同宽同高，排在同一列里 —— */
+.teacher-bar .av-frame{width:48px;height:48px}
+
+/* —— 选老师层：居中浮层，点谁就是谁，点完即关 —— */
+.mentor-mask{position:fixed;inset:0;z-index:60;background:rgba(17,17,22,.40)}
+.mentor{
+  position:fixed;z-index:61;left:50%;top:50%;
+  transform:translate(-50%,-50%);
+  width:min(720px,calc(100vw - 32px));
+  max-height:calc(100% - 32px);
+  display:flex;flex-direction:column;gap:16px;
+  padding:24px;
   background:var(--surface);
   border:1px solid var(--line);
-  border-radius:var(--r-pill);
+  border-radius:var(--r-card);
+  box-shadow:var(--shadow-2);
+}
+.mentor-head{display:flex;align-items:flex-start;gap:16px}
+.mentor-head h2{font-size:var(--fs-sub);font-weight:700;line-height:var(--lh-sub)}
+.mentor-head p{margin-top:4px;font-size:var(--fs-body);color:var(--ink-3)}
+.mentor-head .icon-btn{margin-left:auto}
+.mentor-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;overflow:auto}
+.pick{
+  display:flex;align-items:center;gap:8px;
+  padding:8px;
+  background:var(--surface-2);
+  border:1px solid var(--line);
+  border-radius:var(--r-sub);
   color:var(--ink-2);
   font-size:var(--fs-body);font-weight:600;
   text-align:left;
   transition:.16s;
 }
-.pick:hover{border-color:var(--line-strong);color:var(--ink)}
-.pick img{
-  width:var(--av-img);height:var(--av-img);flex:none;
-  border-radius:var(--r-circle);object-fit:cover;
-  background:var(--surface-2);
-}
+.pick:hover{border-color:var(--line-strong);background:var(--surface)}
 .pick[aria-checked="true"]{border-color:var(--brand);background:var(--brand-tint);color:var(--brand-ink)}
+.pick .av-frame{width:48px;height:48px}
 .pick-copy{display:flex;flex-direction:column;gap:2px;min-width:0}
 .pick-copy b{font-weight:700}
-/* 页面二只留名字；一句简介只在弹出的选择层里出现 */
-.pick-copy em{display:none;font-style:normal;font-size:var(--fs-meta);font-weight:400;color:var(--ink-3)}
+.pick-copy em{font-style:normal;font-size:var(--fs-meta);font-weight:400;color:var(--ink-3)}
 
 /* —— 对话里的老师标识：谁在说话，点一下就能换 —— */
 .chat-mentor{
@@ -924,26 +956,10 @@ body.is-qb{overflow:hidden}
   transition:.16s;
 }
 .chat-mentor:hover{border-color:var(--line-strong);color:var(--ink)}
-.chat-mentor img{
-  width:var(--ico-sm);height:var(--ico-sm);flex:none;
-  border-radius:var(--r-circle);object-fit:cover;
-  background:var(--surface-2);
-}
+.chat-mentor .av-frame{width:var(--ico-sm);height:var(--ico-sm)}
 .chat-mentor[aria-expanded="true"]{border-color:var(--brand);color:var(--brand-ink)}
-
-/* —— 换老师：贴着触发点的浮层，不打断正在做的题 —— */
-.mentor-pop{
-  position:fixed;z-index:70;
-  display:flex;flex-direction:column;gap:4px;
-  padding:8px;
-  background:var(--surface);
-  border:1px solid var(--line);
-  border-radius:var(--r-sub);
-  box-shadow:var(--shadow-2);
-}
-.mentor-pop .pick{width:100%;padding:8px 12px 8px 8px;border-radius:var(--r-inner)}
-.pick-list{display:flex;flex-direction:column;gap:4px}
-.mentor-pop .pick-copy em{display:block}
+/* 气泡旁的头像跟着老师走，尺寸沿用原有的 26px 槽位 */
+.msg .av .av-frame{width:var(--av-img);height:var(--av-img)}
 @container (max-width:380px){
   .chat-mentor .cm-name{display:none}
 }
@@ -1629,7 +1645,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       <div class="p2-col">
         <div class="p2-head">
           <h2>选一种做题方式</h2>
-          <p>同一道题，两种陪法</p>
+          <p>同一道题，两种陪法 · 再挑一位合拍的老师</p>
         </div>
         <div class="p2-quote" id="p2quote">
           <span>当前题目</span>
@@ -1667,13 +1683,20 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
             </span>
           </button>
         </div>
-      </div>
-      <div class="p2-teacher">
-        <div class="p2-teacher-head">
-          <span>陪学老师</span>
-          <span class="tag" id="mentorTag">默认 · 派蒙</span>
+        <div class="p2-teacher">
+          <button class="mode-bar teacher-bar" id="teacherPick" type="button" aria-pressed="true" aria-haspopup="dialog" aria-controls="mentorDlg" aria-expanded="false" title="换一位陪学老师">
+            <span class="av-frame" id="tpAvFrame" data-mentor="paimon" aria-hidden="true">
+              <img id="tpAv" src="/characters/profile/paimon.png" alt="" width="48" height="48">
+            </span>
+            <span class="mode-copy">
+              <span class="mode-title">陪学老师 · <span id="tpName">派蒙</span> <span class="tag brand" id="mentorTag">默认</span></span>
+              <span class="mode-desc" id="tpDesc">软萌亲切，温柔陪学</span>
+            </span>
+            <span class="mode-arrow" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+            </span>
+          </button>
         </div>
-        <div class="pick-row" id="mentorRow" role="radiogroup" aria-label="选择陪学老师"></div>
       </div>
       <div class="p2-foot">
         <button class="btn-ghost" id="back1" type="button">返回</button>
@@ -1858,8 +1881,20 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       </button>
     </div>
 
-    <!-- 换老师：贴着「对话」栏头那个老师标识弹出的选择层 -->
-    <div class="mentor-pop" id="mentorPop" role="dialog" aria-label="换一位陪学老师" hidden></div>
+    <!-- 选老师：第 2 页的大框与第 3 页栏头共用这一层 -->
+    <div class="mentor-mask" id="mentorMask" hidden></div>
+    <div class="mentor" id="mentorDlg" role="dialog" aria-modal="true" aria-labelledby="mentorTitle" hidden>
+      <div class="mentor-head">
+        <div>
+          <h2 id="mentorTitle">选一位陪学老师</h2>
+          <p>同一道题，四种讲法。点谁就用谁的讲法，之后还能换。</p>
+        </div>
+        <button class="icon-btn" id="mentorClose" type="button" aria-label="关闭">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="mentor-grid" id="mentorGrid" role="radiogroup" aria-label="选择陪学老师"></div>
+    </div>
 
 <script src="/vendor/katex/katex.min.js"></script>
 <script src="/math.js"></script>
@@ -1898,9 +1933,12 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
   /**
    * 每条 AI 消息都记下"当时是谁在说"。
    * 换老师只该影响之后的话，不该把已经说过的话改写成另一个人的口吻。
+   * 头像统一走 .av-frame：圆形裁切 + 每个老师自己的取景（见 CSS 那段注释）。
    */
   function avatarHtml(id) {
-    return '<img src="' + mentorOf(id).avatar + '" alt="" width="26" height="26">';
+    var m = mentorOf(id);
+    return '<span class="av-frame" data-mentor="' + m.id + '">' +
+      '<img src="' + m.avatar + '" alt="" width="26" height="26"></span>';
   }
 
   var PAGES = ['题目', '方式', '解题', '报告'];
@@ -2463,62 +2501,70 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
   $('#back1').addEventListener('click', function () { setPage(1); });
 
   /* ---------------- 陪学老师 ----------------
-     页面二是一个纯选择器：点谁选谁，不改变"点模式卡即进入"的流程。
-     页面三的栏头再放一个老师标识，点开就地换人 —— 不必退回第二页。
+     页面二是跟模式卡并排的一个大选择框：它只负责"点开"，不改变
+     "点模式卡即进入"的流程；不选就一直是派蒙。
+     页面三的栏头再放一个老师标识，点开是同一层 —— 不必退回第二页。
      换人只影响之后的话，历史消息保留各自的老师（见 avatarHtml 的注释）。 */
   function pickHtml(id, current) {
     var m = mentorOf(id);
     return '<button class="pick" type="button" role="radio" aria-checked="' + (id === current) + '" data-mentor="' + m.id + '">' +
-      '<img src="' + m.avatar + '" alt="" width="26" height="26">' +
+      '<span class="av-frame" data-mentor="' + m.id + '" aria-hidden="true">' +
+      '<img src="' + m.avatar + '" alt="" width="48" height="48"></span>' +
       '<span class="pick-copy"><b>' + esc(m.name) + '</b><em>' + esc(m.tagline) + '</em></span>' +
       '</button>';
   }
 
+  function mentorOpen() {
+    var dlg = $('#mentorDlg');
+    return !!dlg && !dlg.hidden;
+  }
+
   function paintMentor() {
     var m = mentorOf(S.mentor);
-    if ($('#mentorRow')) {
-      $('#mentorRow').innerHTML = MENTOR_ORDER.map(function (id) { return pickHtml(id, S.mentor); }).join('');
+    if ($('#mentorDlg')) {
+      $('#mentorGrid').innerHTML = MENTOR_ORDER.map(function (id) { return pickHtml(id, S.mentor); }).join('');
     }
-    if ($('#mentorTag')) {
-      $('#mentorTag').textContent = (S.mentor === 'paimon' ? '默认 · ' : '已选 · ') + m.name;
+    if ($('#teacherPick')) {
+      $('#tpName').textContent = m.name;
+      $('#tpDesc').textContent = m.tagline;
+      $('#tpAv').src = m.avatar;
+      $('#tpAvFrame').setAttribute('data-mentor', m.id);
+      /* 默认派蒙时标"默认"，换过之后标"已选" —— 一眼能看出是不是自己挑的 */
+      $('#mentorTag').textContent = S.mentor === 'paimon' ? '默认' : '已选';
+      $('#teacherPick').title = '换一位陪学老师（现在是' + m.name + '）';
     }
     if ($('#chatMentor')) {
-      $('#chatMentor').innerHTML = '<img src="' + m.avatar + '" alt="" width="24" height="24">' +
+      $('#chatMentor').innerHTML = '<span class="av-frame" data-mentor="' + m.id + '" aria-hidden="true">' +
+        '<img src="' + m.avatar + '" alt="" width="24" height="24"></span>' +
         '<span class="cm-name">' + esc(m.name) + '</span>';
     }
-    if (mentorPopOpen()) paintMentorPop();
   }
 
-  function paintMentorPop() {
-    var pop = $('#mentorPop');
-    if (!pop) return;
-    pop.innerHTML = '<div class="pick-list" role="radiogroup" aria-label="选择陪学老师">' +
-      MENTOR_ORDER.map(function (id) { return pickHtml(id, S.mentor); }).join('') +
-      '</div>';
+  /** 打开选老师层的那个按钮：关掉时焦点要回到它身上，而不是跳去另一个页面 */
+  var mentorTrigger = null;
+
+  function openMentor(trigger) {
+    var dlg = $('#mentorDlg');
+    if (!dlg) return;
+    mentorTrigger = trigger || null;
+    paintMentor();
+    $('#mentorMask').hidden = false;
+    dlg.hidden = false;
+    if (trigger && trigger.setAttribute) trigger.setAttribute('aria-expanded', 'true');
+    var checked = $('#mentorGrid .pick[aria-checked="true"]');
+    setTimeout(function () { (checked || $('#mentorClose')).focus(); }, 0);
   }
 
-  function mentorPopOpen() {
-    var pop = $('#mentorPop');
-    return !!pop && !pop.hidden;
-  }
-
-  function closeMentorPop() {
-    var pop = $('#mentorPop');
-    if (!pop || pop.hidden) return;
-    pop.hidden = true;
-    if ($('#chatMentor')) $('#chatMentor').setAttribute('aria-expanded', 'false');
-  }
-
-  function openMentorPop(trigger) {
-    var pop = $('#mentorPop');
-    if (!pop) return;
-    paintMentorPop();
-    pop.hidden = false;
-    var r = trigger.getBoundingClientRect();
-    var left = Math.max(8, Math.min(r.left, window.innerWidth - pop.offsetWidth - 8));
-    pop.style.top = (r.bottom + 6) + 'px';
-    pop.style.left = left + 'px';
-    trigger.setAttribute('aria-expanded', 'true');
+  function closeMentor() {
+    var dlg = $('#mentorDlg');
+    if (!dlg || dlg.hidden) return;
+    dlg.hidden = true;
+    $('#mentorMask').hidden = true;
+    ['#teacherPick', '#chatMentor'].forEach(function (sel) {
+      if ($(sel)) $(sel).setAttribute('aria-expanded', 'false');
+    });
+    if (mentorTrigger && mentorTrigger.focus) mentorTrigger.focus();
+    mentorTrigger = null;
   }
 
   /** 选完之后：记住、重画、把对话里的头像一并换成新老师 */
@@ -2531,41 +2577,26 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     renderChat();
   }
 
-  if ($('#mentorRow')) {
-    $('#mentorRow').addEventListener('click', function (e) {
-      var el = e.target.closest('[data-mentor]');
-      if (el) setMentor(el.getAttribute('data-mentor'));
-    });
+  if ($('#teacherPick')) {
+    $('#teacherPick').addEventListener('click', function () { openMentor(this); });
   }
-
   if ($('#chatMentor')) {
-    $('#chatMentor').addEventListener('click', function (e) {
-      e.stopPropagation();
-      if (mentorPopOpen()) closeMentorPop();
-      else openMentorPop(this);
-    });
+    $('#chatMentor').addEventListener('click', function () { openMentor(this); });
   }
-
-  if ($('#mentorPop')) {
-    $('#mentorPop').addEventListener('click', function (e) {
+  if ($('#mentorGrid')) {
+    $('#mentorGrid').addEventListener('click', function (e) {
       var el = e.target.closest('[data-mentor]');
       if (!el) return;
       setMentor(el.getAttribute('data-mentor'));
-      closeMentorPop();
+      closeMentor();
     });
   }
-
-  document.addEventListener('click', function (e) {
-    if (!mentorPopOpen()) return;
-    if (e.target.closest('#mentorPop') || e.target.closest('#chatMentor')) return;
-    closeMentorPop();
-  });
+  if ($('#mentorMask')) $('#mentorMask').addEventListener('click', closeMentor);
+  if ($('#mentorClose')) $('#mentorClose').addEventListener('click', closeMentor);
   document.addEventListener('keydown', function (e) {
-    if (e.key !== 'Escape' || !mentorPopOpen()) return;
-    closeMentorPop();
-    if ($('#chatMentor')) $('#chatMentor').focus();
+    if (e.key !== 'Escape' || !mentorOpen()) return;
+    closeMentor();
   });
-  window.addEventListener('resize', closeMentorPop);
 
   /** 进对话页：没有题就先回第一页选题（空态不假装能开始） */
   function enterSolving() {

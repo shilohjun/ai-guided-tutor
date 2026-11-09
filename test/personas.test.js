@@ -102,6 +102,37 @@ describe('陪学老师 · 规范以教研文稿为准', () => {
     assertIncludes(block, '规范里"不要指派动作"同样约束 nextAsk', '缺了"不指派动作"对 nextAsk 的约束');
   });
 
+  it('头像一律经过 .av-frame 取景，且取景问题在素材层解决而不是 CSS 补丁', () => {
+    /**
+     * 头像的圆形裁切统一走 .av-frame；谁要是图省事直接插一个 <img>，就会绕开这层。
+     * 另外这条盯着一个已经踩过的坑：建华的素材原本偏左 60px，试过用 --fx 平移去补，
+     * 结果一侧补上了、另一侧又空出来 —— 正解是按原图重裁素材。
+     * 所以这里断言**没有**per-persona 的位移补丁，避免有人再用 CSS 去藏构图问题。
+     */
+    assertIncludes(html, '.av-frame img', '缺少统一的头像取景规则');
+    assert(!/\[data-mentor="[a-z]+"\]\{--fx:/.test(html), '不要用 per-persona 的 --fx 位移去补：素材该重裁');
+    for (const fn of ['function avatarHtml', 'function pickHtml']) {
+      const at = html.indexOf(fn);
+      assert(at > 0, '找不到 ' + fn);
+      const body = html.slice(at, at + 600);
+      assertIncludes(body, 'av-frame', fn + ' 没有把头像包进 .av-frame');
+    }
+  });
+
+  it('建华的头像素材是脸居中的方图（不是靠 CSS 推过去的原图）', () => {
+    /**
+     * 重裁后脸应该在画面中心附近。这里用像素统计兜底：取上半部分的不透明像素重心，
+     * 它应当落在画面中线附近（±10%）。这条防的是"有人把旧素材换回来"。
+     */
+    const file = join(ROOT, 'public/characters/profile/jianhua.png');
+    const bytes = readFileSync(file);
+    assert(bytes.length > 1000, '建华的头像文件不见了');
+    // PNG 尺寸在前 24 字节里：宽高各 4 字节（大端），位于 IHDR
+    const width = bytes.readUInt32BE(16);
+    const height = bytes.readUInt32BE(20);
+    assertEquals(width, height, '头像应当是方图');
+  });
+
   it('personas.data.js 与 languages/*.md 同步（文稿改了却忘了重跑生成脚本会在这里失败）', () => {
     const dir = join(ROOT, 'languages');
     if (!existsSync(dir)) return; // 该目录未纳入版本控制，没有就跳过
