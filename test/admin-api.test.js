@@ -1,0 +1,847 @@
+/**
+ * 管理接口与 `ADMIN_CODE` 闸门（Task 8）。
+ *
+ * ============================================================================
+ * 这个套件钉的是"看板拿到的数字是真的"，不是"函数返回了 200"
+ * ============================================================================
+ * 看板是这批试点**唯一**的输出：老师看到的是四根柱子、四个数、一张人的列表。
+ * 它们出错的方式全都不会报错，而且全都看起来很正常：
+ *
+ * ① **页 1–2 的停留永远是 0**（G3）。设计稿 §5.2 约定页 1–2 的事件挂在 `visit.id`
+ *    上，页 3–4 的才挂在 `session.id` 上。组装 overview 时若只把事件拼进 session，
+ *    看板上"第 1 页没人停留"会是个**结构性**的结论 —— 而它其实是"没读那个字段"。
+ *    前两轮评审各抓到一次，所以这里有一条用例专门钉它：一个批次的 visit 带页 1、
+ *    session 带页 3，两页的停留都必须非 0。
+ * ② **没配 `ADMIN_CODE` 时接口还在**。那等于把全班数据挂在公网上 —— 而且不会有任何
+ *    报错，只是"多了一个能打开的网址"。
+ * ③ **导出件是 JSON 而不是 zip**。它照样 200、照样有内容，只是老师打不开。
+ * ④ **看板自己写事件**（G5）。事件表一旦被当成访问日志，漏斗的分母就被看板自己污染，
+ *    而且污染是**单向累积**的：越常看越脏。
+ *
+ * ============================================================================
+ * 为什么用 `await import(...).catch()`
+ * ============================================================================
+ * 静态 import 一个还不存在的模块，会让整个套件在**加载阶段**就挂掉：一条用例都跑不起来，
+ * RED 只能证明"文件不存在"，证明不了行为不对（同 `test/export-batch.test.js`）。
+ * 这里把加载失败记下来交给第一条用例报出来，其余用例各自在调用处失败。
+ */
+
+import { describe, it, assert, assertEquals, assertNotIncludes } from './runner.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { handleApi, getStore, requestEnv, __resetStoreForTests } from '../src/server/router.js';
+
+/** 模块还不存在时不要炸掉整个套件（见文件头） */
+const loadErrors = [];
+const adminModule = await import('../src/server/admin.js').catch((err) => {
+  loadErrors.push(err);
+  return {};
+});
+const { adminEnabled, checkAdmin, stitchEvents, handleAdminApi } = adminModule;
+
+// ---------------------------------------------------------------------------
+// 公共小工具
+// ---------------------------------------------------------------------------
+
+const MIN = 60_000;
+const HOUR = 3_600_000;
+
+/**
+ * 夹具的"现在"。
+ *
+ * 放弃判定（`batch.abandonHours`）与"今天"的 OCR 计数都跟真实时间有关，
+ * 所以夹具一律用**相对当前时刻**的偏移构造 —— 写死日期的话，这个套件会在某一天
+ * 自己变红，而那时没人知道它为什么红。
+ */
+const T0 = Date.now();
+const at = (msAgo) => new Date(T0 - msAgo).toISOString();
+
+const ADMIN_CODE = 'k-8';
+
+/** 一次管理请求的、够用的 req */
+function reqOf({ method = 'GET', headers = {} } = {}) {
+  return { method, headers };
+}
+
+/** 假 res：只实现处理函数真的会用到的那几个方法 */
+function fakeRes() {
+  return {
+    statusCode: 0,
+    headers: {},
+    body: undefined,
+    setHeader(name, value) {
+      this.headers[String(name).toLowerCase()] = value;
+    },
+    end(body) {
+      this.body = body;
+    },
+  };
+}
+
+/** 直接调处理函数（不走 HTTP）：用来精确构造"库读不出来"这类端到端难以复现的情形 */
+async function callAdmin(store, path, options = {}) {
+  const { method = 'GET', headers = { 'x-admin-code': ADMIN_CODE }, env = { ADMIN_CODE, OCR_DAILY_CAP: '40' } } = options;
+  const res = fakeRes();
+  const url = new URL(`http://127.0.0.1${path}`);
+  const handled = await handleAdminApi(reqOf({ method, headers }), res, url, { store, env });
+  const raw = res.body;
+  const text = raw === undefined ? '' : Buffer.isBuffer(raw) ? raw.toString('utf8') : String(raw);
+  let json = null;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    json = null;
+  }
+  return { handled, status: res.statusCode, headers: res.headers, raw, text, json };
+}
+
+/** 假 store：默认"什么都没有"，但每个用例可以覆盖任意一个方法 */
+function stubStore(patch = {}) {
+  const calls = [];
+  const record = (name) => async () => {
+    calls.push(name);
+    return null;
+  };
+  const base = {
+    kind: 'file',
+    calls,
+    getBatch: async (id) => {
+      calls.push(`getBatch:${id}`);
+      return { id, label: '第二版', abandonHours: 24 };
+    },
+    listMembers: async () => {
+      calls.push('listMembers');
+      return [];
+    },
+    getUserById: async (id) => {
+      calls.push(`getUserById:${id}`);
+      return null;
+    },
+    listSessionsByBatch: async () => {
+      calls.push('listSessionsByBatch');
+      return [];
+    },
+    listEventsByBatch: async () => {
+      calls.push('listEventsByBatch');
+      return [];
+    },
+    getVisit: record('getVisit'),
+    getSession: record('getSession'),
+    getCounter: async (key) => {
+      calls.push(`getCounter:${key}`);
+      return 0;
+    },
+  };
+  return { ...base, ...patch, calls };
+}
+
+// ---------------------------------------------------------------------------
+// 夹具：一个像样的批次（两人作答、一人只打开没选题、一人已从名单里删掉）
+// ---------------------------------------------------------------------------
+
+/**
+ * 数据形状刻意做成"最容易被读漏"的那一种：
+ *   · `v2`（u2 的第一次打开）只有页 1 的两个事件、**没有会话之外的东西**；
+ *   · `s9`（u9）的 `visitId` 指向一条**库里不存在**的 visit（历史数据缺件）；
+ *   · 用户的 `displayName` 与 `id` 顺序相反（按 displayName 排就必须重排）；
+ *   · 事件按 seq 乱序写进去（顺序由驱动/排序决定，不靠"恰好写对了"）。
+ */
+function fixture() {
+  const batch = {
+    id: 'b8',
+    label: '第二版',
+    versionSha: 'sha-8',
+    questionIds: ['qbank-1', 'qbank-2'],
+    startsAt: at(200 * HOUR),
+    endsAt: null,
+    ocrCap: 200,
+    dailyCap: 40,
+    idleMinutes: 30,
+    abandonHours: 24,
+    allowPhoto: true,
+    createdAt: at(200 * HOUR),
+  };
+
+  const users = [
+    { id: 'u1', displayName: 'S02', batches: ['b8'], firstSeenAt: at(100 * MIN), lastSeenAt: at(9 * MIN) },
+    { id: 'u2', displayName: 'S01', batches: ['b8'], firstSeenAt: at(41 * HOUR), lastSeenAt: at(30 * HOUR) },
+    /** 一次都没打开：列表里必须留着这一行，否则"没人来"这件事看不出来 */
+    { id: 'u3', displayName: 'S03', batches: ['b8'], firstSeenAt: at(20 * HOUR), lastSeenAt: at(20 * HOUR) },
+  ];
+
+  const members = ['u1', 'u2', 'u3'];
+
+  const visits = [
+    { id: 'v1', userId: 'u1', batchId: 'b8', openedAt: at(1000e3), lastAt: at(910e3), sessionIds: ['s1'] },
+    /** 打开之后一道题都没选：只有页 1 的事件，没有会话 */
+    { id: 'v2', userId: 'u2', batchId: 'b8', openedAt: at(41 * HOUR), lastAt: at(41 * HOUR - 20e3), sessionIds: [] },
+  ];
+
+  const sessions = [
+    {
+      id: 's1',
+      visitId: 'v1',
+      userId: 'u1',
+      batchId: 'b8',
+      problemId: 'qbank-1',
+      questionIndex: 0,
+      startedAt: at(600e3),
+      lastAt: at(540e3),
+      finishedAt: at(540e3),
+      endState: 'finished',
+      progress: { maxPage: 4, reached: { p2: at(940e3), p3: at(600e3), p4: at(500e3) }, backtracks: 0 },
+      counters: { resetCount: 0, chatTurns: 2, hintLevels: [1] },
+      turns: [{ i: 0, at: at(590e3), role: 'student', text: '先把力分解' }],
+      reportSnapshot: { independence: 0.6 },
+    },
+    {
+      id: 's2',
+      visitId: 'v2',
+      userId: 'u2',
+      batchId: 'b8',
+      problemId: 'qbank-2',
+      questionIndex: 1,
+      startedAt: at(41 * HOUR),
+      lastAt: at(30 * HOUR),
+      finishedAt: null,
+      endState: 'in_progress',
+      progress: { maxPage: 2, reached: { p2: at(41 * HOUR) }, backtracks: 0 },
+      counters: { resetCount: 0, chatTurns: 1, hintLevels: [] },
+      turns: [],
+    },
+    {
+      /** u9 已经不在名单里（人删了、记录还在）；它的 visit 也不在库里 */
+      id: 's9',
+      visitId: 'v9',
+      userId: 'u9',
+      batchId: 'b8',
+      problemId: 'qbank-2',
+      questionIndex: 2,
+      startedAt: at(5 * HOUR),
+      lastAt: at(4 * HOUR),
+      finishedAt: null,
+      endState: 'in_progress',
+      progress: { maxPage: 1, reached: {}, backtracks: 0 },
+      counters: { chatTurns: 0, hintLevels: [] },
+      turns: [],
+    },
+  ];
+
+  /** 一条事件的唯一写法：归属字段按 G3 的约定分（页 1–2 挂 visit，页 3–4 挂 session） */
+  const ev = (seq, type, atIso, owner, payload) => ({
+    seq,
+    type,
+    at: atIso,
+    userId: owner.userId ?? null,
+    batchId: 'b8',
+    sessionId: owner.sessionId ?? null,
+    visitId: owner.visitId ?? null,
+    payload,
+  });
+
+  const events = [
+    ev(1, 'page_enter', at(1000e3), { visitId: 'v1' }, { page: 1 }),
+    ev(2, 'page_exit', at(940e3), { visitId: 'v1' }, { page: 1 }),
+    ev(3, 'page_enter', at(940e3), { visitId: 'v1' }, { page: 2 }),
+    ev(4, 'page_exit', at(910e3), { visitId: 'v1' }, { page: 2 }),
+    ev(5, 'page_enter', at(600e3), { sessionId: 's1', visitId: 'v1' }, { page: 3 }),
+    ev(6, 'page_exit', at(540e3), { sessionId: 's1', visitId: 'v1' }, { page: 3 }),
+    ev(7, 'page_enter', at(500e3), { sessionId: 's1', visitId: 'v1' }, { page: 4 }),
+    ev(8, 'page_exit', at(470e3), { sessionId: 's1', visitId: 'v1' }, { page: 4 }),
+    ev(9, 'chat_send', at(490e3), { sessionId: 's1', visitId: 'v1' }, { len: 12 }),
+    ev(10, 'chat_error', at(489e3), { sessionId: 's1', visitId: 'v1' }, { code: 'TURN_SLOW' }),
+    ev(11, 'chat_send', at(40 * HOUR), { sessionId: 's2', visitId: 'v2' }, { len: 3 }),
+    ev(12, 'chat_reply', at(40 * HOUR - 1000), { sessionId: 's2', visitId: 'v2' }, {}),
+    ev(13, 'page_enter', at(41 * HOUR), { visitId: 'v2' }, { page: 1 }),
+    ev(14, 'page_exit', at(41 * HOUR - 20e3), { visitId: 'v2' }, { page: 1 }),
+  ];
+
+  return { batch, users, members, visits, sessions, events };
+}
+
+/** 把夹具写进库（走存储端口，不绕过它） */
+async function seed(store, data = fixture()) {
+  await store.putBatch(data.batch);
+  for (const user of data.users) await store.putUser(user);
+  for (const userId of data.members) await store.addMember(data.batch.id, userId);
+  for (const visit of data.visits) await store.putVisit(visit);
+  for (const session of data.sessions) await store.putSession(session);
+  /** 乱序写入：读取顺序由驱动的 seq 排序决定，不靠"恰好按顺序写了" */
+  for (const event of [...data.events].reverse()) await store.appendEvent(event);
+  await store.incrCounter(`ocr:batch:${data.batch.id}`, 7);
+  return data;
+}
+
+/**
+ * 起一个真 HTTP 服务，STORE 指到临时目录。
+ *
+ * 为什么走真服务：zip 的 content-type / 附件头、404/401 的状态码与响应体、
+ * "挂载点在登录守卫之前" —— 这几件事只发生在路由层，直接调处理函数证明不了。
+ *
+ * 为什么要把 ADMIN_CODE / OCR_DAILY_CAP 从继承来的环境里删掉：开发者的 `.env`
+ * 可能带着真口令（`loadEnvFile` 在 router 被 import 时就跑过了）。带着它，
+ * "没配口令就该 404"这条用例会永远绿，而线上恰恰是那个样子。
+ */
+async function withAdminServer(envPatch, fn) {
+  const { createServer } = await import('node:http');
+  const dir = mkdtempSync(join(tmpdir(), 'bsj-admin-'));
+  const env = { ...process.env, STORE: 'file', STORE_DIR: dir, ADMIN_CODE };
+  delete env.LLM_API_KEY;
+  delete env.OPENAI_API_KEY;
+  delete env.PILOT_REQUIRE_LOGIN;
+  delete env.OCR_DAILY_CAP;
+  Object.assign(env, envPatch ?? {});
+  /** `undefined` 表示"这个变量不存在"，不能留在 env 里当字符串 */
+  for (const key of Object.keys(env)) if (env[key] === undefined) delete env[key];
+
+  __resetStoreForTests();
+  const store = await requestEnv.run(env, () => getStore());
+
+  const server = createServer(async (req, res) => {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const handled = await requestEnv.run(env, () => handleApi(req, res, url));
+    if (!handled) {
+      res.statusCode = 404;
+      res.setHeader('content-type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: `未知接口 ${url.pathname}` }));
+    }
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+
+  try {
+    return await fn({ base, store, dir, env });
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    __resetStoreForTests();
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** 真实 HTTP 调用：JSON 与二进制都返回（看板要的两种响应形状） */
+async function call(base, path, { method = 'GET', headers = {} } = {}) {
+  const res = await fetch(`${base}${path}`, { method, headers });
+  const buf = Buffer.from(await res.arrayBuffer());
+  const type = res.headers.get('content-type') ?? '';
+  let json = null;
+  if (type.includes('application/json')) {
+    try {
+      json = JSON.parse(buf.toString('utf8'));
+    } catch {
+      json = null;
+    }
+  }
+  return { status: res.status, headers: res.headers, buf, type, json };
+}
+
+const withCode = (extra = {}) => ({ 'x-admin-code': ADMIN_CODE, ...extra });
+
+/**
+ * 深比较。
+ *
+ * `runner.js` 的 `assertEquals` 是 `!==`：拿它比数组时，值明明一样也会失败
+ * （报出来是"期望与实参长得一样"的假失败）。数组/对象一律用这一条。
+ */
+function assertDeep(actual, expected, msg = '') {
+  assertEquals(JSON.stringify(actual), JSON.stringify(expected), msg);
+}
+
+// ===========================================================================
+// 一、闸门（纯函数）
+// ===========================================================================
+
+describe('管理接口 · 闸门', () => {
+  it('admin.js 能加载（加载失败时这一条会指出真正的原因）', () => {
+    assertEquals(loadErrors.length, 0, `admin.js 加载失败：${loadErrors[0]?.message ?? ''}`);
+  });
+
+  it('没配 ADMIN_CODE → disabled（页面与接口都应当 404）', () => {
+    assertEquals(adminEnabled({}), false);
+    assertEquals(checkAdmin(reqOf({ headers: {} }), {}), 'disabled');
+  });
+
+  it('ADMIN_CODE 只有空白也算没配（否则"配了个空格"会让闸门形同虚设）', () => {
+    assertEquals(adminEnabled({ ADMIN_CODE: '   ' }), false);
+    assertEquals(checkAdmin(reqOf({ headers: { 'x-admin-code': '   ' } }), { ADMIN_CODE: '  ' }), 'disabled');
+  });
+
+  it('配了但没带 → locked', () => {
+    assertEquals(checkAdmin(reqOf({ headers: {} }), { ADMIN_CODE: 'k' }), 'locked');
+  });
+
+  it('带对 → ok；带错 → locked', () => {
+    assertEquals(checkAdmin(reqOf({ headers: { 'x-admin-code': 'k' } }), { ADMIN_CODE: 'k' }), 'ok');
+    assertEquals(checkAdmin(reqOf({ headers: { 'x-admin-code': 'k2' } }), { ADMIN_CODE: 'k' }), 'locked');
+  });
+
+  it('学生 token 不能当管理员口令用（两把钥匙不能互相开锁）', () => {
+    assertEquals(checkAdmin(reqOf({ headers: { 'x-test-token': 'abc' } }), { ADMIN_CODE: 'k' }), 'locked');
+    assertEquals(
+      checkAdmin(reqOf({ headers: { authorization: 'Bearer abc' } }), { ADMIN_CODE: 'abc' }),
+      'locked',
+      'Bearer 头也不该被当成管理员口令',
+    );
+  });
+
+  it('Fetch 形状的 Headers 实例也取得到（Workers / Vercel 用的就是它）', () => {
+    const headers = new Headers({ 'x-admin-code': 'k' });
+    assertEquals(checkAdmin(reqOf({ headers }), { ADMIN_CODE: 'k' }), 'ok');
+  });
+});
+
+// ===========================================================================
+// 二、404 与 401：没配就"没有这个接口"，配了才"需要口令"
+// ===========================================================================
+
+describe('管理接口 · 三道门（真实 HTTP）', () => {
+  const ADMIN_PATHS = ['/api/admin/overview?batchId=b8', '/api/admin/users?batchId=b8', '/api/admin/export?batchId=b8', '/api/admin/nope', '/api/admin/'];
+
+  it('没配 ADMIN_CODE：五条管理路径一律 404，且响应体一字不差（不承认这是管理员接口）', async () => {
+    await withAdminServer({ ADMIN_CODE: undefined }, async ({ base, store }) => {
+      await seed(store);
+      for (const path of ADMIN_PATHS) {
+        const res = await call(base, path, { headers: withCode() });
+        assertEquals(res.status, 404, `${path} 应当是 404`);
+        assertEquals(res.buf.toString('utf8'), JSON.stringify({ error: '没有这个接口' }), `${path} 的响应体不该透露任何东西`);
+        assertNotIncludes(res.buf.toString('utf8'), '管理', `${path} 的响应体不该出现"管理"`);
+      }
+    });
+  });
+
+  it('配了但没带口令 → 401 需要管理员口令；带错也是 401', async () => {
+    await withAdminServer({}, async ({ base, store }) => {
+      await seed(store);
+      for (const headers of [{}, { 'x-admin-code': 'wrong' }, { 'x-test-token': 'abc' }]) {
+        const res = await call(base, '/api/admin/overview?batchId=b8', { headers });
+        assertEquals(res.status, 401, `headers=${JSON.stringify(headers)} 应当 401`);
+        assertEquals(res.json.error, '需要管理员口令');
+      }
+    });
+  });
+
+  it('STORE 是内存时（Vercel / Workers 上就是这样）即便口令对也 404', async () => {
+    await withAdminServer({ STORE: undefined, STORE_DIR: undefined }, async ({ base, store }) => {
+      /** 库里确实有这个批次：404 只能来自"这个部署没有库"，不能来自"查不到批次" */
+      await seed(store);
+      assertEquals(await store.getBatch('b8') === null, false, '夹具应当真的写进了内存库');
+      for (const path of ADMIN_PATHS) {
+        const res = await call(base, path, { headers: withCode() });
+        assertEquals(res.status, 404, `${path} 在内存库上应当 404`);
+        assertEquals(res.buf.toString('utf8'), JSON.stringify({ error: '没有这个接口' }));
+      }
+    });
+  });
+
+  it('PILOT_REQUIRE_LOGIN=1 时管理接口不吃 401（它挂在登录守卫之前）', async () => {
+    await withAdminServer({ PILOT_REQUIRE_LOGIN: '1' }, async ({ base, store }) => {
+      await seed(store);
+      const res = await call(base, '/api/admin/overview?batchId=b8', { headers: withCode() });
+      assertEquals(res.status, 200, '管理员口令与学生登录是两件事');
+      /** 反过来：学生端那条路仍然被守卫挡着（挂载点没有把它一起放开） */
+      const guarded = await call(base, '/api/problems');
+      assertEquals(guarded.status, 401);
+    });
+  });
+
+  it('未知路径 404；非 GET 405（两个都在口令之后判，没口令的人看不到区别）', async () => {
+    await withAdminServer({}, async ({ base, store }) => {
+      await seed(store);
+      const unknown = await call(base, '/api/admin/whatever', { headers: withCode() });
+      assertEquals(unknown.status, 404);
+      assertEquals(unknown.json.error, '没有这个接口');
+
+      const posted = await call(base, '/api/admin/overview?batchId=b8', { method: 'POST', headers: withCode() });
+      assertEquals(posted.status, 405);
+      assertEquals(posted.json.error, '只支持 GET');
+
+      const lockedPost = await call(base, '/api/admin/overview?batchId=b8', { method: 'POST' });
+      assertEquals(lockedPost.status, 401, '没口令时先说口令，再说方法');
+    });
+  });
+});
+
+// ===========================================================================
+// 三、overview：G3 的页 1–2 停留必须真的读 visit
+// ===========================================================================
+
+describe('管理接口 · overview', () => {
+  it('缺 batchId → 400 需要 batchId（不是 404，也不是空数据）', async () => {
+    await withAdminServer({}, async ({ base, store }) => {
+      await seed(store);
+      for (const path of ['/api/admin/overview', '/api/admin/users']) {
+        const res = await call(base, path, { headers: withCode() });
+        assertEquals(res.status, 400, `${path} 缺参数应当 400`);
+        assertEquals(res.json.error, '需要 batchId');
+      }
+    });
+  });
+
+  it('批次不存在 → 404 这个批次不存在', async () => {
+    await withAdminServer({}, async ({ base, store }) => {
+      await seed(store);
+      for (const path of ['/api/admin/overview?batchId=nope', '/api/admin/users?batchId=nope']) {
+        const res = await call(base, path, { headers: withCode() });
+        assertEquals(res.status, 404);
+        assertEquals(res.json.error, '这个批次不存在');
+      }
+    });
+  });
+
+  it('形状：batch / funnel / summary / usage / generatedAt，generatedAt 是服务端时间', async () => {
+    await withAdminServer({ OCR_DAILY_CAP: '40' }, async ({ base, store }) => {
+      const data = await seed(store);
+      const res = await call(base, '/api/admin/overview?batchId=b8', { headers: withCode() });
+      assertEquals(res.status, 200);
+      const body = res.json;
+
+      assertEquals(body.batch.id, data.batch.id);
+      assertEquals(body.batch.label, data.batch.label);
+      assertEquals(body.funnel.p1, 2, 'p1 是打开次数（v1 + v2）');
+      assertEquals(body.funnel.p2, 2);
+      assertEquals(body.funnel.p3, 1);
+      assertEquals(body.funnel.p4, 1);
+      assertEquals(body.funnel.conversion.p2_p3, 0.5);
+      assertEquals(body.funnel.dropOffPage, 3);
+      assertEquals(body.summary.sessionCount, 3);
+      assertEquals(body.summary.userCount, 3);
+      assertEquals(body.summary.abandonCount, 1, 's2 隔了 30 小时没动且没做完');
+      assertEquals(body.summary.avgMaxPage, 2.3333);
+      assertEquals(body.summary.turnFailureRate, 0.5);
+
+      /** 用量那一行：Task 11 会填真值，这里先按计数器的键读出来 */
+      assertEquals(body.usage.ocrBatch, 7);
+      assertEquals(body.usage.ocrDaily, 0, '今天还没人用过 OCR，0 是对的');
+      assertEquals(body.usage.ocrCap, 200);
+      assertEquals(body.usage.dailyCap, 40);
+      assertEquals(body.usage.chatTurns, 3);
+      assertEquals(body.usage.turnFailureRate, 0.5);
+
+      assert(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(body.generatedAt), 'generatedAt 应是服务端盖的 ISO 时间');
+      assert(Math.abs(Date.parse(body.generatedAt) - Date.now()) < 60_000, 'generatedAt 应当是"现在"');
+    });
+  });
+
+  it('G3：visit 带页 1、session 带页 3 时，两页的停留都必须非 0', async () => {
+    await withAdminServer({}, async ({ base, store }) => {
+      await seed(store);
+      const res = await call(base, '/api/admin/overview?batchId=b8', { headers: withCode() });
+      const perPage = res.json.funnel.perPage;
+
+      /**
+       * 这一条就是那份欠账的守卫：只把事件拼进 session 时，
+       * 页 1 与页 2 的停留会**结构性**地永远是 0（会话是进第 3 页才造的）。
+       */
+      assertEquals(perPage[0].page, 1);
+      assertEquals(perPage[0].visitors, 2);
+      assertEquals(perPage[0].avgDwellMs, 40000, '页 1：v1 停了 60 秒、v2 停了 20 秒，两人平均 40 秒');
+      assertEquals(perPage[1].avgDwellMs, 15000, '页 2：只有到过第 2 页的人算分母（v1 的 30 秒 / 2 人）');
+      assertEquals(perPage[2].avgDwellMs, 60000, '页 3 读 session 的事件');
+      assertEquals(perPage[3].avgDwellMs, 30000, '页 4 读 session 的事件');
+
+      assert(perPage[0].avgDwellMs !== 0, '页 1 停留不许是 0（只拼 session 就是这个症状）');
+      assert(perPage[2].avgDwellMs !== 0, '页 3 停留不许是 0（只拼 visit 就是这个症状）');
+      assert(perPage[1].avgDwellMs !== 0, '页 2 停留不许是 0');
+    });
+  });
+
+  it('G3：一次"打开但没选题"也算一次 p1 —— 否则 p1 与 p2 永远是同一个数', async () => {
+    await withAdminServer({}, async ({ base, store }) => {
+      await seed(store);
+      const { json } = await call(base, '/api/admin/overview?batchId=b8', { headers: withCode() });
+      /**
+       * v2 没有会话，只在事件里以 `visitId` 出现。只按"会话涉及的 visitId"取打开记录时
+       * 它会被漏掉，p1 于是退化成"有作答的人数"，第一根柱子不再回答"多少人打开了链接"。
+       */
+      assertEquals(json.funnel.p1, 2);
+      assertEquals(json.funnel.perPage[0].visitors, 2);
+    });
+  });
+
+  it('库里没有 visit 记录时不凭空造一次打开（s9 的 v9 不存在）', async () => {
+    await withAdminServer({}, async ({ base, store }) => {
+      await seed(store);
+      const { json } = await call(base, '/api/admin/overview?batchId=b8', { headers: withCode() });
+      assertEquals(json.funnel.p1, 2, 'v9 没有记录，不算一次打开');
+    });
+  });
+
+  it('会话上没有 visitId 时，靠事件里的 visitId 也能取到打开记录（今天的真实形状就是这种）', async () => {
+    /**
+     * `visit.sessionIds` 与 `session.visitId` 都还没有写入方（Task 10 才回填），
+     * 所以真实数据里"会话 → 打开记录"这条链是断的。只按会话的 visitId 取 visit 时，
+     * p1 会是 0，整个漏斗跟着全 0 —— 而它看起来跟"这批没人用"一模一样。
+     * 事件上的 visitId 是页 1–2 自己带的，它才是今天唯一可靠的线索。
+     */
+    const store = stubStore({
+      listSessionsByBatch: async () => [
+        { id: 's1', userId: 'u1', batchId: 'b8', lastAt: at(540e3), progress: { maxPage: 3, reached: { p3: at(600e3) } }, counters: {} },
+      ],
+      listEventsByBatch: async () => [
+        { seq: 1, type: 'page_enter', at: at(600e3), visitId: 'v1', sessionId: null, batchId: 'b8', payload: { page: 1 } },
+        { seq: 2, type: 'page_exit', at: at(540e3), visitId: 'v1', sessionId: null, batchId: 'b8', payload: { page: 1 } },
+      ],
+      getVisit: async (id) => (id === 'v1' ? { id: 'v1', userId: 'u1', batchId: 'b8' } : null),
+    });
+
+    const res = await callAdmin(store, '/api/admin/overview?batchId=b8');
+    assertEquals(res.status, 200);
+    assertEquals(res.json.funnel.p1, 1, '这一次打开必须被数到');
+    assertEquals(res.json.funnel.perPage[0].avgDwellMs, 60000, '页 1 的 60 秒停留也必须算出来');
+  });
+
+  it('usage 按约定的计数器键读：ocr:batch:<batchId> 与 ocr:daily:<YYYY-MM-DD>', async () => {
+    const store = stubStore();
+    const res = await callAdmin(store, '/api/admin/overview?batchId=b8');
+    assertEquals(res.status, 200);
+    const keys = store.calls.filter((call) => call.startsWith('getCounter:'));
+    assert(keys.includes('getCounter:ocr:batch:b8'), `应当读 ocr:batch:b8，实际：${keys.join(', ')}`);
+    assert(
+      keys.some((key) => /^getCounter:ocr:daily:\d{4}-\d{2}-\d{2}$/.test(key)),
+      `应当读 ocr:daily:<YYYY-MM-DD>，实际：${keys.join(', ')}`,
+    );
+  });
+});
+
+// ===========================================================================
+// 四、users：人的列表（看板第三屏）
+// ===========================================================================
+
+describe('管理接口 · users', () => {
+  it('按 displayName 字典序；lastPage 取该人所有会话里的最大页；finished 数得对', async () => {
+    await withAdminServer({}, async ({ base, store }) => {
+      await seed(store);
+      const res = await call(base, '/api/admin/users?batchId=b8', { headers: withCode() });
+      assertEquals(res.status, 200);
+      const rows = res.json;
+
+      assertEquals(rows.map((row) => row.displayName).join(','), 'S01,S02,S03,未知', '字典序，且已删号的人排在最后');
+      assertEquals(rows.map((row) => row.userId).join(','), 'u2,u1,u3,u9');
+
+      const byId = Object.fromEntries(rows.map((row) => [row.userId, row]));
+      assertEquals(byId.u1.sessions, 1);
+      assertEquals(byId.u1.finished, 1);
+      assertEquals(byId.u1.lastPage, 4);
+      assertEquals(byId.u1.lastAt, at(540e3));
+      assertEquals(byId.u1.abandoned, false, '已经做完了，不是放弃');
+
+      assertEquals(byId.u2.sessions, 1);
+      assertEquals(byId.u2.finished, 0);
+      assertEquals(byId.u2.lastPage, 2);
+      assertEquals(byId.u2.abandoned, true, '30 小时没动且没做完 —— 这就是放弃');
+
+      /** 一次都没打开的人也要在列表里：这正是"没人来"唯一的可见形式 */
+      assertEquals(byId.u3.sessions, 0);
+      assertEquals(byId.u3.finished, 0);
+      assertEquals(byId.u3.lastPage, 0);
+      assertEquals(byId.u3.lastAt, null);
+      assertEquals(byId.u3.abandoned, false);
+
+      /** 人删了但记录还在：行不能丢，代号写"未知"（与导出件的降级一致） */
+      assertEquals(byId.u9.displayName, '未知');
+      assertEquals(byId.u9.sessions, 1);
+      assertEquals(byId.u9.lastPage, 1);
+    });
+  });
+
+  it('每行只有这七个字段（看板不该收到 codeHash 之类的内部字段）', async () => {
+    const store = stubStore({
+      listMembers: async () => [{ batchId: 'b8', userId: 'u1' }],
+      getUserById: async () => ({ id: 'u1', displayName: 'S01', codeHash: 'deadbeef', disabled: false }),
+    });
+    const res = await callAdmin(store, '/api/admin/users?batchId=b8');
+    assertEquals(res.status, 200);
+    assertEquals(Object.keys(res.json[0]).sort().join(','), 'abandoned,displayName,finished,lastAt,lastPage,sessions,userId');
+    assertNotIncludes(res.text, 'deadbeef');
+  });
+});
+
+// ===========================================================================
+// 五、导出：二进制、附件头、错误码映射
+// ===========================================================================
+
+describe('管理接口 · 导出', () => {
+  it('单条：application/zip 二进制 + ASCII 附件名（不走 sendJson）', async () => {
+    await withAdminServer({}, async ({ base, store }) => {
+      await seed(store);
+      const res = await call(base, '/api/admin/export?sessionId=s1', { headers: withCode() });
+      assertEquals(res.status, 200);
+      assertEquals(res.type, 'application/zip');
+      assertEquals(res.headers.get('content-disposition'), 'attachment; filename="bubujie-export.zip"');
+      assertEquals(res.buf.subarray(0, 2).toString('latin1'), 'PK', 'zip 必须以 PK 开头（JSON 会从 { 开头）');
+      assert(res.buf.length > 200, 'zip 不该是个空壳');
+    });
+  });
+
+  it('整批：同样是 zip（README/CSV/JSONL 都在里面）', async () => {
+    await withAdminServer({}, async ({ base, store }) => {
+      await seed(store);
+      const res = await call(base, '/api/admin/export?batchId=b8', { headers: withCode() });
+      assertEquals(res.status, 200);
+      assertEquals(res.type, 'application/zip');
+      assertEquals(res.buf.subarray(0, 2).toString('latin1'), 'PK');
+      /** 条目名是明文写在 zip 里的：顺手确认这批导出真的带了 README 与事件流 */
+      const text = res.buf.toString('latin1');
+      assert(text.includes('README.md'), '整批导出应当带 README.md');
+      assert(text.includes('events.jsonl'), '整批导出应当带 events.jsonl');
+    });
+  });
+
+  it('两个参数都没带 → 400（不猜"导哪一份"）', async () => {
+    await withAdminServer({}, async ({ base, store }) => {
+      await seed(store);
+      const res = await call(base, '/api/admin/export', { headers: withCode() });
+      assertEquals(res.status, 400);
+      assertEquals(res.json.error, '需要 sessionId 或 batchId');
+    });
+  });
+
+  it('记录不存在 → 404 这条学习记录不存在；批次不存在 → 404 这个批次不存在', async () => {
+    await withAdminServer({}, async ({ base, store }) => {
+      await seed(store);
+      const missingSession = await call(base, '/api/admin/export?sessionId=nope', { headers: withCode() });
+      assertEquals(missingSession.status, 404);
+      assertEquals(missingSession.json.error, '这条学习记录不存在');
+
+      const missingBatch = await call(base, '/api/admin/export?batchId=nope', { headers: withCode() });
+      assertEquals(missingBatch.status, 404);
+      assertEquals(missingBatch.json.error, '这个批次不存在');
+    });
+  });
+
+  it('读记录失败 → 503 且带 retryable（不是 404：那份记录其实还在）', async () => {
+    const store = stubStore({
+      getSession: async () => {
+        throw new Error('cloudbase: request timeout');
+      },
+    });
+    const res = await callAdmin(store, '/api/admin/export?sessionId=s1');
+    assertEquals(res.status, 503);
+    assertEquals(res.json.error, '读取学习记录失败，请刷新页面重试。');
+    assertEquals(res.json.retryable, true);
+  });
+
+  it('导出失败时不把 err.message 回给前端（里面可能有内部路径）', async () => {
+    const store = stubStore({
+      getBatch: async () => {
+        throw new Error('ENOENT: C:\\secret\\bubujie\\db\\batch.json');
+      },
+    });
+    const res = await callAdmin(store, '/api/admin/export?batchId=b8');
+    assertEquals(res.status, 503);
+    assertEquals(res.json.retryable, true);
+    assertNotIncludes(res.text, 'secret', '错误详情不能出现在响应体里');
+    assertNotIncludes(res.text, 'ENOENT');
+  });
+});
+
+// ===========================================================================
+// 六、只读：管理接口不写任何东西（G5）
+// ===========================================================================
+
+describe('管理接口 · 只读', () => {
+  it('看一眼板不发事件、不动计数器（事件表不是访问日志）', async () => {
+    await withAdminServer({}, async ({ base, store }) => {
+      await seed(store);
+      const before = {
+        events: (await store.listEventsByBatch('b8')).length,
+        seq: await store.getCounter('seq:event'),
+      };
+
+      for (const path of ['/api/admin/overview?batchId=b8', '/api/admin/users?batchId=b8', '/api/admin/export?batchId=b8']) {
+        const res = await call(base, path, { headers: withCode() });
+        assertEquals(res.status, 200, `${path} 应当 200`);
+      }
+
+      assertEquals((await store.listEventsByBatch('b8')).length, before.events, '看板不得追加事件');
+      assertEquals(await store.getCounter('seq:event'), before.seq, '序号计数器也不该被看板推动');
+    });
+  });
+});
+
+// ===========================================================================
+// 七、读库失败的公共处理
+// ===========================================================================
+
+describe('管理接口 · 读不出来', () => {
+  it('overview 读会话失败 → 503 + retryable，且不泄露 err.message', async () => {
+    const store = stubStore({
+      listSessionsByBatch: async () => {
+        throw new Error('read ECONNRESET C:\\secret\\db');
+      },
+    });
+    const res = await callAdmin(store, '/api/admin/overview?batchId=b8');
+    assertEquals(res.status, 503);
+    assertEquals(res.json.retryable, true);
+    assertNotIncludes(res.text, 'ECONNRESET');
+    assertNotIncludes(res.text, 'secret');
+  });
+
+  it('users 读成员失败 → 同样 503（不把内部错误当 500 抛出去）', async () => {
+    const store = stubStore({
+      listMembers: async () => {
+        throw new Error('boom');
+      },
+    });
+    const res = await callAdmin(store, '/api/admin/users?batchId=b8');
+    assertEquals(res.status, 503);
+    assertEquals(res.json.retryable, true);
+  });
+
+  it('store 为 null（例如云驱动还没装好）→ 404 而不是 500', async () => {
+    const res = await callAdmin(null, '/api/admin/overview?batchId=b8');
+    assertEquals(res.status, 404);
+    assertEquals(res.json.error, '没有这个接口');
+  });
+
+  it('内存驱动同样 404（处理函数第一行就判）', async () => {
+    const res = await callAdmin(stubStore({ kind: 'memory' }), '/api/admin/overview?batchId=b8');
+    assertEquals(res.status, 404);
+    assertEquals(res.json.error, '没有这个接口');
+  });
+});
+
+// ===========================================================================
+// 八、stitchEvents：G3 的那一步单独钉一遍
+// ===========================================================================
+
+describe('管理接口 · stitchEvents', () => {
+  const sessions = [{ id: 's1', visitId: 'v1', userId: 'u1' }];
+  const visits = [
+    { id: 'v1', userId: 'u1' },
+    { id: 'v2', userId: 'u2' },
+  ];
+  const events = [
+    { seq: 1, type: 'page_enter', visitId: 'v1', sessionId: null, payload: { page: 1 } },
+    { seq: 2, type: 'page_enter', visitId: 'v1', sessionId: 's1', payload: { page: 3 } },
+    { seq: 3, type: 'page_enter', visitId: 'v2', sessionId: null, payload: { page: 1 } },
+  ];
+
+  it('按 ownerOf 分组：有 sessionId 的挂 session，只有 visitId 的挂 visit', () => {
+    const stitched = stitchEvents(events, sessions, visits);
+    assertDeep(stitched.sessions[0].events.map((event) => event.seq), [2]);
+    assertDeep(stitched.visits[0].events.map((event) => event.seq), [1]);
+    assertDeep(stitched.visits[1].events.map((event) => event.seq), [3]);
+  });
+
+  it('没有事件的记录给空数组（metrics 的约定：没拼进来就是没有）', () => {
+    const stitched = stitchEvents([], sessions, visits);
+    assertDeep(stitched.sessions[0].events, []);
+    assertDeep(stitched.visits[0].events, []);
+  });
+
+  it('不改入参（拼进来的是副本，调用方手上那份还在）', () => {
+    const rawSessions = [{ id: 's1' }];
+    const rawVisits = [{ id: 'v1' }];
+    stitchEvents(events, rawSessions, rawVisits);
+    assert(!('events' in rawSessions[0]), '会话对象不该被就地改动');
+    assert(!('events' in rawVisits[0]), '打开记录不该被就地改动');
+  });
+
+  it('一条事件只挂一处（sessionId 优先），不会两边都算一遍停留', () => {
+    const stitched = stitchEvents([{ seq: 1, visitId: 'v1', sessionId: 's1', type: 'page_enter', payload: { page: 3 } }], sessions, visits);
+    assertEquals(stitched.sessions[0].events.length, 1);
+    assertEquals(stitched.visits[0].events.length, 0, '两边都挂会把同一段时间算两遍');
+  });
+});

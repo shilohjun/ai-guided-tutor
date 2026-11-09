@@ -52,6 +52,7 @@ import { STUDENT_LEVEL_NOTE, inspectVoice } from '../core/prompt.js';
 import { PROBLEMS } from '../core/problems.data.js';
 import { DEFAULT_PERSONA, PERSONA_IDS, PERSONAS, normalizePersona, personaById, stylePersonaReply } from '../core/personas.js';
 import { openStore } from './store/index.js';
+import { handleAdminApi } from './admin.js';
 import { checkLoginRate, login, noteLoginFailure, noteLoginSuccess } from './auth.js';
 import { ownerOf, recordEvent, validateEvent } from './events.js';
 import { resolveUser, tokenFromHeaders } from './demo-gate.js';
@@ -856,6 +857,11 @@ async function acceptEvents(req, body) {
  */
 export async function handleApi(req, res, url) {
   const path = url.pathname;
+
+  // 管理接口：挂在最前面、早于登录守卫（管理员口令与学生令牌是两件事，见 admin.js）
+  if (path.startsWith('/api/admin/')) {
+    return handleAdminApi(req, res, url, { store: await getStore().catch(() => null), env: envFor() });
+  }
 
   /**
    * ① 先解身份，② 再判守卫 —— 顺序不能反过来。
