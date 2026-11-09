@@ -49,7 +49,7 @@ import { STUDENT_LEVEL_NOTE, inspectVoice } from '../core/prompt.js';
 import { PROBLEMS } from '../core/problems.data.js';
 import { DEFAULT_PERSONA, PERSONA_IDS, PERSONAS, normalizePersona, personaById, stylePersonaReply } from '../core/personas.js';
 import { openStore } from './store/index.js';
-import { enforceLoginRate, login, resetLoginFailures } from './auth.js';
+import { checkLoginRate, login, noteLoginFailure, noteLoginSuccess } from './auth.js';
 
 loadEnvFile();
 
@@ -212,11 +212,12 @@ function getSession(sessionId, problemId) {
 // 响应工具（统一封装，本地与 serverless 共用）
 // ---------------------------------------------------------------------------
 
-function sendJson(res, status, payload) {
+function sendJson(res, status, payload, headers = {}) {
   const body = JSON.stringify(payload);
   res.statusCode = status;
   res.setHeader('content-type', 'application/json; charset=utf-8');
   res.setHeader('cache-control', 'no-store');
+  for (const [name, value] of Object.entries(headers)) res.setHeader(name, value);
   res.end(body);
 }
 
@@ -301,8 +302,9 @@ function readJson(req) {
  *
  * `x-forwarded-for` 取**第一段**：代理会把自己一层层追加在后面，
  * 第一段才是客户端地址；整串拿来当键，等于每个 IP 都算成新的一个。
- * 没有这个头（本地直连）时退回 socket 地址 —— 拿不到就统一记 'unknown'，
- * 宁可所有不明来源共用一个桶，也不能因为少一个字段就让限速整条失效。
+ * 没有这个头（本地直连）时退回 socket 地址 —— 拿不到就统一记 'unknown'。
+ * `'unknown'` 这一桶**不参与 IP 维度的锁**（锁它等于锁所有人），
+ * 原因与代价写在 auth.js 的 `checkLoginRate` 上。
  *
  * 前提（按 IP 限速的通用前提，不是这一段能解决的）：部署层必须**自己写**这个头。
  * 若它把客户端带来的 XFF 原样透传，那么每发一个请求换一个伪造的 XFF 就能绕过限速 ——
@@ -564,12 +566,20 @@ export async function handleApi(req, res, url) {
    * 顺序是有讲究的：**先限速，再哈希**。
    * 反过来写的话，被拒绝的那一次其实已经做完了哈希 —— 一次 sha256 不贵，
    * 但乘以"每秒几百次"就是另一回事；限速只挡住了响应，没挡住成本。
+   * 所以 `checkLoginRate` 在读体之后、`login()`（它才是哈希与查库）之前。
    *
-   * 错误只有两种回答（`401 口令不对` / `429 试太多次了`）：
-   * 不区分"没有这个人"与"口令错了"，否则枚举脚本能靠错误文案二分出有效账号。
+   * 两个维度（见 auth.js 的注释，这是本路由必须照做的那一半）：
+   *   `code_locked` —— 这一对 (IP, 口令) 试错太多。换一个口令照样能登。
+   *   `ip_locked`   —— 这个来源 IP 的失败总量到顶。任何口令都不放行。
+   * 两个都回同一句"稍后再试"是不行的：前者的正确下一步是**核对纸条**，
+   * 后者才是**等**。文案分开写，学生才知道该做什么。
    *
-   * 坏请求体（半截 JSON、断网）单独回 400 且**不消耗尝试次数**：
-   * 它不是一次猜号，不该让一个网络不好的人白白少掉一次机会。
+   * 401 只有一句话（`口令不对`）：不区分"没有这个人"与"口令错了"，
+   * 否则枚举脚本能靠错误文案二分出有效账号。
+   *
+   * 只有"真的验过一次且没通过"才记账。**被 429 拒绝的那次不记账**：
+   * 它不是一次验证，记了会让锁自己续期（每次被拒都把窗口往后推），永远解不开。
+   * 坏请求体（半截 JSON、断网）同理，单独回 400 且不消耗任何次数。
    */
   if (path === '/api/auth/login' && req.method === 'POST') {
     /**
@@ -591,20 +601,35 @@ export async function handleApi(req, res, url) {
     }
 
     const ip = clientIp(req);
-    if (!enforceLoginRate(ip)) {
-      sendJson(res, 429, { error: '试太多次了，15 分钟后再试' });
+    const code = typeof body?.code === 'string' ? body.code.trim() : '';
+
+    const verdict = checkLoginRate(ip, code);
+    if (verdict !== 'ok') {
+      /**
+       * `retry-after` 是**提示**不是承诺：两个维度都取 900（15 分钟），
+       * 比 IP 维度最长 60 分钟的窗口短 —— 到点重试可能仍是 429，
+       * 但让学生"先等一会儿再看一眼"比让它消失一小时好。
+       */
+      const locked = verdict === 'ip_locked'
+        ? '这个网络试错的次数太多了，请稍后再试'
+        : '这个口令试错太多次了，请核对老师发给你的 6 位数字，或稍后再试';
+      sendJson(res, 429, { error: locked }, { 'retry-after': '900' });
       return true;
     }
 
-    const code = typeof body?.code === 'string' ? body.code.trim() : '';
     const result = await login(await getStore(), code, ip);
     if (!result) {
+      /** 真的验过一次、没通过：这才叫一次失败 */
+      noteLoginFailure(ip, code);
       sendJson(res, 401, { error: '口令不对' });
       return true;
     }
 
-    /** 登录成功：把这个 IP 的失败记录清掉，别让上一次打错字攒到下一次 */
-    resetLoginFailures(ip);
+    /**
+     * 成功只清**这一对 (IP, 口令)**。
+     * 不清 IP 总量：那是枚举防线，清了就等于"错几次 → 用自己的号登一次 → 重来"。
+     */
+    noteLoginSuccess(ip, code);
     sendJson(res, 200, {
       token: result.token,
       displayName: result.user.displayName,

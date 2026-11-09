@@ -13,8 +13,11 @@
  *   ② **拿到库也猜不出口令**：6 位数字只有 100 万种，靠哈希本身是挡不住的，
  *      所以哈希里拌了胡椒（`PILOT_CODE_PEPPER`，不进数据库）。
  *
- *   ③ **必须配一道闸**：100 万种对脚本来说是几分钟的事。15 分钟 10 次，
- *      才是"可念可抄"的低熵口令能用的真正原因。
+ *   ③ **必须配一道闸，而且是两个维度**：100 万种对脚本来说是几分钟的事。
+ *      单一口令 15 分钟 5 次（一个人反复打错自己那张纸条），
+ *      同一来源 60 分钟 60 次（枚举脚本，**成功不清零**）；
+ *      成功只清掉"这一对 (IP, 口令)"。
+ *      一个班共用一个出口 IP 是产品的正常场景，所以单一口令被锁**不能**牵连别人。
  *
  * 另外还有一条现实约束：同一台电脑换账号是常态（家里共用一台机器）。
  * 两个人的 token 不能互指，否则后登录的人会看到前一个人的作答记录。
@@ -32,9 +35,14 @@ import {
   resolveToken,
   hashCode,
   verifyCode,
-  enforceLoginRate,
-  resetLoginFailures,
+  checkLoginRate,
   noteLoginFailure,
+  noteLoginSuccess,
+  resetLoginRateLimits,
+  CODE_MAX_FAILURES,
+  CODE_WINDOW_MS,
+  IP_MAX_FAILURES,
+  IP_WINDOW_MS,
   TOKEN_TTL_MS,
 } from '../src/server/auth.js';
 import { buildCsv, parseArgs, issueBatch } from '../scripts/issue-accounts.mjs';
@@ -228,41 +236,133 @@ describe('账号 · 登录与 token', () => {
   });
 });
 
-describe('账号 · 6 位数字的暴力枚举必须被拦住', () => {
-  it('同一 IP 15 分钟内第 11 次尝试被拒', () => {
-    const ip = '203.0.113.9';
-    const now = Date.now();
-    let last = true;
-    for (let i = 0; i < 10; i += 1) last = enforceLoginRate(ip, now);
-    assert(last, '前 10 次应放行');
-    assertEquals(enforceLoginRate(ip, now), false, '第 11 次必须拒绝');
-    assert(enforceLoginRate(ip, now + 15 * 60 * 1000 + 1), '窗口过后应恢复');
-  });
+/**
+ * 限速是两个维度，缺一个都不成立：
+ *
+ *   ① **(IP, 口令) 5 次 / 15 分钟** —— 一个人反复打错同一张纸条。
+ *      为什么必须带上"口令"这一维：试点学校的正常形态是**整班一个出口 IP**。
+ *      若只按 IP 计数，第 10 个打错字的学生会把全班锁在门外，
+ *      而唯一的自动恢复途径是"登录成功清零" —— 恰好被锁挡住，只能等窗口过期。
+ *
+ *   ② **IP 总量 60 次 / 60 分钟** —— 枚举脚本。这是唯一的枚举防线，
+ *      所以**成功不清**：只要不清，任何"靠自己一张有效口令换一批新尝试"
+ *      的循环都被这个总量卡住。
+ *
+ * 状态是进程级模块变量，用例之间必须自己 `resetLoginRateLimits()`。
+ */
+describe('账号 · 登录失败限速（两个维度）', () => {
+  /** 清表并返回一个基准时刻；每个用例都从空表开始 */
+  function fresh() {
+    resetLoginRateLimits();
+    return Date.now();
+  }
 
-  it('计数按 IP 分开，一个人试爆了不影响别人', () => {
-    const now = Date.now();
-    for (let i = 0; i < 10; i += 1) enforceLoginRate('203.0.113.20', now);
-    assertEquals(enforceLoginRate('203.0.113.20', now), false, '这个 IP 应已被拦');
-    assert(enforceLoginRate('203.0.113.21', now), '换一个 IP 必须仍然放行');
-  });
+  it(`同一个口令错 ${CODE_MAX_FAILURES} 次 → 只锁这一对 (IP, 口令)`, () => {
+    const now = fresh();
+    const ip = '203.0.113.50';
+    const code = '123456';
 
-  it('成功登录后清零，不会攒到下一次', () => {
-    const ip = '203.0.113.30';
-    const now = Date.now();
-    for (let i = 0; i < 9; i += 1) enforceLoginRate(ip, now);
-    resetLoginFailures(ip);
-    let last = true;
-    for (let i = 0; i < 10; i += 1) last = enforceLoginRate(ip, now);
-    assert(last, '清零后应重新拥有完整的 10 次');
-  });
-
-  it('noteLoginFailure 第 10 次起返回 false', () => {
-    const ip = '203.0.113.40';
-    const now = Date.now();
-    for (let i = 1; i <= 9; i += 1) {
-      assert(noteLoginFailure(ip, now), `第 ${i} 次失败后还不该封`);
+    for (let i = 0; i < CODE_MAX_FAILURES - 1; i += 1) {
+      assertEquals(checkLoginRate(ip, code, now), 'ok', `第 ${i + 1} 次之前应放行`);
+      noteLoginFailure(ip, code, now);
     }
-    assertEquals(noteLoginFailure(ip, now), false, '第 10 次失败起应报告已达上限');
+    assertEquals(checkLoginRate(ip, code, now), 'ok', `${CODE_MAX_FAILURES - 1} 次失败之后还放行`);
+    noteLoginFailure(ip, code, now);
+    assertEquals(
+      checkLoginRate(ip, code, now),
+      'code_locked',
+      `第 ${CODE_MAX_FAILURES} 次失败之后这一对必须锁上`,
+    );
+  });
+
+  it('同一 IP 换一个口令仍然放行（一个班一个出口 IP 的核心用例）', () => {
+    const now = fresh();
+    const ip = '203.0.113.51';
+    for (let i = 0; i < CODE_MAX_FAILURES; i += 1) noteLoginFailure(ip, '111111', now);
+
+    assertEquals(checkLoginRate(ip, '111111', now), 'code_locked', '被 hammer 的那个口令要锁');
+    assertEquals(
+      checkLoginRate(ip, '222222', now),
+      'ok',
+      '别的口令不受牵连 —— 否则一个人打错字就把全班锁在门外',
+    );
+  });
+
+  it(`同一 IP 跨很多口令累计 ${IP_MAX_FAILURES} 次失败 → ip_locked（枚举脚本）`, () => {
+    const now = fresh();
+    const ip = '203.0.113.52';
+    // 每个口令只错一次：单口令维度锁不到，只有 IP 总量能拦住这种"换着号试"
+    for (let i = 0; i < IP_MAX_FAILURES; i += 1) noteLoginFailure(ip, String(100000 + i), now);
+
+    assertEquals(checkLoginRate(ip, '999999', now), 'ip_locked', '换个口令也进不来');
+    assertEquals(checkLoginRate('203.0.113.53', '999999', now), 'ok', '换一个来源 IP 不受牵连');
+  });
+
+  it('成功只清这一对：4 次失败 + 1 次成功之后，IP 总量仍然算那 4 次（再补 56 次才锁）', () => {
+    const now = fresh();
+    const ip = '203.0.113.54';
+    const code = '654321';
+
+    for (let i = 0; i < 4; i += 1) noteLoginFailure(ip, code, now);
+    noteLoginSuccess(ip, code, now);
+    assertEquals(checkLoginRate(ip, code, now), 'ok', '成功必须清掉这一对');
+
+    /**
+     * 这一条是 finding 2 的回归：若成功把 IP 总量一起清了，
+     * 那么"错 4 次 → 用自己那张有效口令登录 → 再错 4 次"就是无限次尝试。
+     * 这里钉住"IP 总量从 4 继续数"：补 55 次是 59（还放行），第 56 次到 60 就锁。
+     */
+    for (let i = 0; i < 55; i += 1) noteLoginFailure(ip, `3000${String(i).padStart(2, '0')}`, now);
+    assertEquals(checkLoginRate(ip, '888888', now), 'ok', '4 + 55 = 59，还没到 60');
+    noteLoginFailure(ip, '888888', now);
+    assertEquals(checkLoginRate(ip, '999999', now), 'ip_locked', '补满 56 次就是 60，必须锁');
+  });
+
+  it("未知来源那一桶永远不锁 IP（锁它等于锁所有人），但仍然记账", () => {
+    const now = fresh();
+    // 100 次、每次一个不同口令：单口令维度锁不到，唯一可能的锁就是 IP 维度
+    for (let i = 0; i < 100; i += 1) noteLoginFailure('unknown', String(400000 + i), now);
+
+    assertEquals(
+      checkLoginRate('unknown', '999999', now),
+      'ok',
+      '没有可归因的身份就不该有"整个网络被锁"这种连带伤害',
+    );
+    assertEquals(
+      checkLoginRate(undefined, '999999', now),
+      'ok',
+      '拿不到地址的请求一律折进同一桶，也不能锁',
+    );
+  });
+
+  it('两个窗口都是滑动的：16 分钟前的口令失败不再锁，61 分钟前的 IP 失败不再计数', () => {
+    const now = fresh();
+
+    // ① 口令维度：锁上之后窗口内仍然锁，滑过去就放行
+    const ipA = '203.0.113.60';
+    for (let i = 0; i < CODE_MAX_FAILURES; i += 1) noteLoginFailure(ipA, '121212', now);
+    assertEquals(checkLoginRate(ipA, '121212', now), 'code_locked');
+    assertEquals(
+      checkLoginRate(ipA, '121212', now + CODE_WINDOW_MS - 1000),
+      'code_locked',
+      '还没滑出窗口，必须仍然锁',
+    );
+    assertEquals(
+      checkLoginRate(ipA, '121212', now + CODE_WINDOW_MS + 1),
+      'ok',
+      '过了 15 分钟必须自动恢复（这是学生唯一的自助出路）',
+    );
+
+    // ② IP 维度：59 次失败在 61 分钟后全部滑出窗口，再错 59 次也不该累计到 60
+    const ipB = '203.0.113.61';
+    for (let i = 0; i < IP_MAX_FAILURES - 1; i += 1) noteLoginFailure(ipB, String(600000 + i), now);
+    const later = now + IP_WINDOW_MS + 1;
+    for (let i = 0; i < IP_MAX_FAILURES - 1; i += 1) noteLoginFailure(ipB, String(700000 + i), later);
+    assertEquals(
+      checkLoginRate(ipB, '999999', later),
+      'ok',
+      '窗口外的旧失败不得累计（固定桶/累加计数会在这里变红）',
+    );
   });
 });
 
@@ -272,8 +372,9 @@ describe('账号 · 6 位数字的暴力枚举必须被拦住', () => {
 
 /**
  * 为什么这几条必须走真服务而不是直接调 login()：
- *   "第 11 次被拦"、"错口令是 401 而不是 500"、"malformed body 不会炸出 500"
- *   这三件事**只发生在路由层**。它们是学生和家长能感知到的那一层，
+ *   "429 的两句文案"、"429 带 Retry-After"、"被拒的那次不记账"、
+ *   "错口令是 401 而不是 500"、"malformed body 不会炸出 500" ——
+ *   这几件事**只发生在路由层**。它们是学生和家长能感知到的那一层，
  *   而 core 层全绿也说明不了这一层没坏。
  */
 describe('账号 · 登录接口（真实 HTTP）', () => {
@@ -349,41 +450,116 @@ describe('账号 · 登录接口（真实 HTTP）', () => {
     });
   });
 
-  it('同一 IP 试 10 次后第 11 次 → 429，换一个 IP 不受影响', async () => {
+  it('同一个口令错 5 次 → 429（口令维度）带 Retry-After，同一网络里的别人照常登录', async () => {
+    resetLoginRateLimits();
     await withServer(async (base) => {
       const headers = { 'x-forwarded-for': '198.51.100.10, 10.0.0.1' };
-      for (let i = 1; i <= 10; i += 1) {
-        const res = await post(base, { code: `wrong-${i}` }, headers);
+      for (let i = 1; i <= CODE_MAX_FAILURES; i += 1) {
+        const res = await post(base, { code: '000001' }, headers);
         assertEquals(res.status, 401, `第 ${i} 次应是口令不对，而不是被限速`);
       }
-      const blocked = await post(base, { code: 'wrong-11' }, headers);
-      assertEquals(blocked.status, 429, '第 11 次必须拒绝');
-      const blockedJson = await blocked.json();
-      assertEquals(blockedJson.error, '试太多次了，15 分钟后再试', '提示要能操作');
+      const blocked = await post(base, { code: '000001' }, headers);
+      assertEquals(blocked.status, 429, '同一对 (IP, 口令) 第 6 次必须拒绝');
+      assertEquals(
+        (await blocked.json()).error,
+        '这个口令试错太多次了，请核对老师发给你的 6 位数字，或稍后再试',
+        '提示必须告诉学生下一步做什么',
+      );
+      assertEquals(blocked.headers.get('retry-after'), '900', '429 要带 Retry-After');
 
-      // x-forwarded-for 取第一段：换一个来源地址就是另一个人，不该被牵连
+      /**
+       * 这条是整个 finding 1 的回归：同一个出口 IP（一个班）里，
+       * 别人手里正确的口令**不能**被牵连。旧实现里这里会是 429。
+       */
       const { code } = await freshAccount('route-b2');
-      const other = await post(base, { code }, { 'x-forwarded-for': '198.51.100.11' });
-      assertEquals(other.status, 200, '别的 IP 不该被这个 IP 的失败拖累');
+      const other = await post(base, { code }, headers);
+      assertEquals(other.status, 200, '同一个网络里的别的学生必须照常登录');
     });
   });
 
-  it('成功登录后同一 IP 的失败计数清零', async () => {
+  it('同一个网络里 12 个人同时用正确口令登录 → 全部 200（一个班一起点"登录"的形态）', async () => {
+    resetLoginRateLimits();
     await withServer(async (base) => {
-      const headers = { 'x-forwarded-for': '198.51.100.20' };
-      for (let i = 0; i < 9; i += 1) {
-        await post(base, { code: `oops-${i}` }, headers);
-      }
-      const { code } = await freshAccount('route-b3');
-      const ok = await post(base, { code }, headers);
-      assertEquals(ok.status, 200, '第 10 次是正确口令，应放行');
+      const { getStore } = await import('../src/server/router.js');
+      const accounts = await issueAccounts(await getStore(), { batchId: 'route-b7', count: 12 });
 
       /**
-       * 若不在这里清零：9 次失败 + 刚才那一次已记满 10 次，
-       * 下一个人（或同一个人打错字）会立刻撞上 429 —— 学生会以为号被封了。
+       * 这是 finding 1 的另一半：旧实现把"这次尝试"记在验证**之前**，
+       * 于是同一个 NAT 下第 11 个并发请求不管口令对不对都撞 429，
+       * 文案还说"试太多次了" —— 而每一次其实都是对的。
+       * 现在只有失败才记账：全对就一次失败都没有，也没有任何理由拦。
        */
-      const after = await post(base, { code: 'typed-wrong' }, headers);
-      assertEquals(after.status, 401, '成功之后应重新拥有完整的尝试次数');
+      const headers = { 'x-forwarded-for': '198.51.100.15' };
+      const results = await Promise.all(accounts.map((a) => post(base, { code: a.code }, headers)));
+      const statuses = results.map((r) => r.status);
+      assert(
+        statuses.every((s) => s === 200),
+        `12 个正确口令都必须 200，实际：${statuses.join(',')}`,
+      );
+    });
+  });
+
+  it('429 是拒绝，不是一次验证尝试：被拒的那些不记入任何计数', async () => {
+    resetLoginRateLimits();
+    await withServer(async (base) => {
+      const headers = { 'x-forwarded-for': '198.51.100.11' };
+      for (let i = 0; i < CODE_MAX_FAILURES; i += 1) await post(base, { code: '000002' }, headers);
+      for (let i = 0; i < IP_MAX_FAILURES; i += 1) {
+        const res = await post(base, { code: '000002' }, headers);
+        assertEquals(res.status, 429, '这一对已经锁上，每次都必须拒绝');
+      }
+
+      /**
+       * 若那 60 次拒绝被记账，IP 总量就是 5 + 60 = 65 ≥ 60，换口令也该 ip_locked。
+       * 记账的后果不只是多算：锁会自己续期（每次被拒都把窗口往后推），永不解锁。
+       */
+      const { code } = await freshAccount('route-b3');
+      const other = await post(base, { code }, headers);
+      assertEquals(other.status, 200, '被拒绝的尝试不能记账（否则锁会自己续期）');
+    });
+  });
+
+  it('同一 IP 跨口令累计 60 次失败 → 429（网络维度）带 Retry-After', async () => {
+    resetLoginRateLimits();
+    await withServer(async (base) => {
+      const headers = { 'x-forwarded-for': '198.51.100.12' };
+      for (let i = 0; i < IP_MAX_FAILURES; i += 1) {
+        const res = await post(base, { code: String(800000 + i) }, headers);
+        assertEquals(res.status, 401, `第 ${i + 1} 次应是正常的口令不对`);
+      }
+      const { code } = await freshAccount('route-b4');
+      const blocked = await post(base, { code }, headers);
+      assertEquals(blocked.status, 429, '这个网络的总量到顶了，正确的口令也进不来');
+      assertEquals((await blocked.json()).error, '这个网络试错的次数太多了，请稍后再试');
+      assertEquals(blocked.headers.get('retry-after'), '900');
+
+      const other = await post(base, { code }, { 'x-forwarded-for': '198.51.100.13' });
+      assertEquals(other.status, 200, '另一个来源 IP 不该被牵连');
+    });
+  });
+
+  it('成功登录不清 IP 总量：59 次失败 + 1 次成功之后，再错 1 次就锁网络', async () => {
+    resetLoginRateLimits();
+    await withServer(async (base) => {
+      const headers = { 'x-forwarded-for': '198.51.100.14' };
+      for (let i = 0; i < IP_MAX_FAILURES - 1; i += 1) {
+        await post(base, { code: String(900000 + i) }, headers);
+      }
+      const { code } = await freshAccount('route-b5');
+      const ok = await post(base, { code }, headers);
+      assertEquals(ok.status, 200, '59 次还没到上限，正确的口令要能登进来');
+
+      /**
+       * 这条是 finding 2 的回归：旧实现里成功会清空这个 IP 的失败记录，
+       * 于是"错几次 → 用自己那张有效口令登录 → 计数器归零"可以无限循环。
+       * 现在成功只清 (IP, 口令) 这一对，IP 总量继续数。
+       */
+      const oneMore = await post(base, { code: '000003' }, headers);
+      assertEquals(oneMore.status, 401, '第 60 次失败仍然是一次正常的 401');
+
+      const blocked = await post(base, { code }, headers);
+      assertEquals(blocked.status, 429, '第 61 次必须被网络维度拦住 —— 成功没有清零');
+      assertEquals(blocked.headers.get('retry-after'), '900');
     });
   });
 });
