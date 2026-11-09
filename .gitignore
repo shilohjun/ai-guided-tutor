@@ -42,5 +42,3 @@ v2*.html
 dist-cloudbase
 cloudbaserc.json
 .cloudbase
-
-physics-big-questions.jsonl

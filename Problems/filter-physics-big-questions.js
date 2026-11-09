@@ -13,6 +13,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadEnvFile } from '../src/core/env.js';
+import { readLLMConfig } from '../src/core/llm.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_INPUT = join(ROOT, 'Problems', 'id_29_records.jsonl');
@@ -21,13 +23,17 @@ const CALCULATION_OUTPUT_DIR = join(ROOT, 'Problems', 'physics-calculation');
 const PER_TYPE_OUTPUT_DIR = join(ROOT, 'Problems', 'physics-calculation-5-per-type');
 const TYPE_OUTPUT_DIR = join(ROOT, 'Problems', 'physics-type');
 
-const PHYSICS_TYPE_IDS = new Set(['2902', '2903', '2904', '2905', '2906', '2907', '2909']);
 const UNIT_RE = /(?:kg|mg|kN|N|km\/h|m\/s(?:\^?2)?|mA|kV|V|A|cm|mm|m|Ω|ohm|J|W|Hz|T|Pa|C|F|H|°|℃|%)/gi;
 const NUMBER_RE = /[-+]?\d+(?:\.\d+)?(?:\/\d+)?/g;
 const SUBQUESTION_RE = /[（(]\s*([1-9]\d*)\s*[）)]/g;
 const TAG_RE = /<[^>]*>/g;
 const SCRIPT_RE = /<script\b[^>]*>[\s\S]*?<\/script\s*>/gi;
 const EVENT_ATTR_RE = /\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
+const CALCULATION_TARGET_RE = /(?:求|计算|算出|算得|求出|求得|求解|求(?:其|该)?(?:大小|范围|最小值|最大值|质量|速度|加速度|位移|时间|电流|电压|电阻|功率|能量|动量|冲量|拉力|压力|摩擦力|支持力|张力|电势|电场强度|磁感应强度))/;
+const NUMERIC_RESULT_RE = /(?:多少|多大|范围|最小值|最大值|表达式|数值|结果|分别为|大小为|等于|取值)/;
+const PHYSICAL_QUANTITY_RE = /(?:质量|重力|速度|速率|加速度|位移|路程|时间|力|拉力|压力|摩擦力|支持力|张力|功|功率|能量|动量|冲量|电流|电压|电阻|电功率|电势|电场|磁场|磁感应|电动势|电荷|电容|频率|角速度|半径|高度|距离|密度)/;
+const NUMERIC_UNIT_RE = /(?:\d+(?:\.\d+)?\s*(?:kg|mg|g|t|N|kN|m\/s(?:\^?2)?|km\/h|m|cm|mm|A|mA|V|kV|Ω|ohm|J|W|Hz|T|Pa|C|F|H|°|℃|%))/i;
+const DERIVATION_RE = /(?:由|根据|可得|解得|代入|联立|由此|因此|所以).{0,80}(?:=|得|可得|解得)/;
 
 function parseArgs(argv) {
   const options = {
@@ -40,7 +46,11 @@ function parseArgs(argv) {
     calculationOnly: false,
     perType: null,
     typeId: null,
+    index: null,
     outputDirExplicit: false,
+    ai: false,
+    aiLimit: 100,
+    aiThreshold: 70,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -62,9 +72,13 @@ function parseArgs(argv) {
     else if (arg === '--calculation-only') options.calculationOnly = true;
     else if (arg === '--per-type') options.perType = parseInteger(next, '--per-type');
     else if (arg === '--type-id') options.typeId = String(next);
+    else if (arg === '--index') options.index = String(next);
+    else if (arg === '--ai') options.ai = true;
+    else if (arg === '--ai-limit') options.aiLimit = parseInteger(next, '--ai-limit');
+    else if (arg === '--ai-threshold') options.aiThreshold = parseNumber(next, '--ai-threshold');
     else if (arg.startsWith('-')) throw new Error(`未知参数：${arg}`);
     else throw new Error(`无法识别的参数：${arg}`);
-    const consumesValue = !['--help', '-h', '--include-answers', '--calculation-only'].includes(arg);
+    const consumesValue = !['--help', '-h', '--include-answers', '--calculation-only', '--ai'].includes(arg);
     if (consumesValue) i += 1;
   }
 
@@ -79,6 +93,10 @@ function parseArgs(argv) {
   }
   if (options.typeId !== null && !options.typeId.trim()) {
     throw new Error('--type-id 不能为空');
+  }
+  if (options.aiLimit < 1) throw new Error('--ai-limit 应为正整数');
+  if (options.aiThreshold < 0 || options.aiThreshold > 100) {
+    throw new Error('--ai-threshold 应在 0 到 100 之间');
   }
   if (options.calculationOnly && !options.outputDirExplicit) {
     options.outputDir = options.typeId !== null
@@ -100,6 +118,81 @@ function parseInteger(value, flag) {
   return number;
 }
 
+function extractJson(value) {
+  const text = String(value ?? '').trim().replace(/^```json\s*/i, '').replace(/```$/i, '').trim();
+  try {
+    return JSON.parse(text);
+  } catch {
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(text.slice(start, end + 1));
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+
+async function classifyWithAI(item, config) {
+  const record = item.record;
+  const stem = stripTags(record.qs_stem ?? record.stem ?? record.html_text ?? '').slice(0, 12000);
+  const prompt = `请只判断这道题是否是“物理计算大题”，不要解题，不要输出答案。
+
+判定标准：
+1. isCalculation=true：需要根据题目条件建立物理关系并计算一个或多个物理量、范围或表达式；
+2. isCalculation=false：选择题、判断题、纯知识问答、只填概念、只填实验步骤/误差、只读图识别；
+3. 实验题即使包含速度/加速度计算，只要核心是实验操作、实验数据处理或误差分析，isExperiment=true；
+4. 只返回 JSON，不要 markdown：
+{"isCalculation":true,"isExperiment":false,"isChoice":false,"confidence":0-100,"score":0-100,"reason":"不超过40字"}
+
+题型ID：${getQuestionType(record)}
+题干：
+${stem}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), config.timeoutMs);
+  try {
+    const response = await fetch(`${config.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.model,
+        temperature: 0,
+        max_tokens: 180,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: '你是严格的高中物理题型审核员。只做分类，不解题。' },
+          { role: 'user', content: prompt },
+        ],
+      }),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`AI 请求失败 ${response.status}: ${(await response.text()).slice(0, 300)}`);
+    }
+    const data = await response.json();
+    const result = extractJson(data?.choices?.[0]?.message?.content);
+    if (!result || typeof result.isCalculation !== 'boolean') {
+      throw new Error('AI 返回格式无效，缺少 isCalculation');
+    }
+    return {
+      isCalculation: result.isCalculation,
+      isExperiment: Boolean(result.isExperiment),
+      isChoice: Boolean(result.isChoice),
+      confidence: Number(result.confidence) || 0,
+      score: Number(result.score) || 0,
+      reason: String(result.reason ?? '').slice(0, 120),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function printHelp() {
   console.log(`
 流式筛选物理大题并生成 HTML
@@ -116,6 +209,10 @@ function printHelp() {
   --calculation-only      剔除选择题和实验题，只保留计算型物理大题
   --per-type <number>     每个题型最多保留多少道，按评分降序选择
   --type-id <id>          只筛选指定题型 ID
+  --index <name>          只筛选指定来源索引
+  --ai                    使用 OpenAI 兼容模型复核计算题
+  --ai-limit <number>     最多送入模型复核的候选数，默认 100
+  --ai-threshold <num>   AI 计算题置信度阈值，默认 70
   --include-answers       HTML 中展开答案和解析（默认不输出，避免报告泄题）
   -h, --help              显示帮助
 `);
@@ -148,6 +245,10 @@ function getQuestionType(record) {
   return String(record.qs_type_id ?? record.type_id ?? '');
 }
 
+function getQuestionTypeName(record) {
+  return String(record.type?.name ?? record.type_name ?? '').trim();
+}
+
 function getQuestionText(record) {
   return stripTags(record.qs_stem ?? record.stem ?? record.html_text ?? '');
 }
@@ -158,11 +259,25 @@ function hasChoiceOptions(html, text) {
   return optionMarkers >= 2 || optionTables > 0;
 }
 
+function getStructuredFormat(record) {
+  const value = String(record.formatted_json ?? '');
+  return {
+    isChoice: /['"]type['"]\s*:\s*['"]choice['"]/.test(value) || /(?:选择题|单选题|多选题|不定项选择)/.test(value),
+    hasBlank: /['"]type['"]\s*:\s*['"]blank['"]/.test(value),
+    hasNumericInput: /(?:数值|number|numeric|formula|expression)/i.test(value),
+    hasOptions: /['"]options['"]\s*:/.test(value),
+  };
+}
+
 function calculateFeatures(record) {
   const html = String(record.qs_stem ?? record.stem ?? record.html_text ?? '');
   const structured = String(record.formatted_json ?? '');
+  const answerText = stripTags(record.qs_answer ?? record.answer_text ?? record.answer ?? '');
+  const explanationText = stripTags(record.qs_explanation ?? record.explanation_text ?? record.explanation ?? '');
   const text = stripTags(`${html}\n${record.html_text ?? ''}\n${structured}`);
   const typeId = getQuestionType(record);
+  const typeName = getQuestionTypeName(record);
+  const format = getStructuredFormat(record);
   const subquestions = getSubquestionCount(text);
   const numbers = countMatches(text, NUMBER_RE);
   const units = [...text.matchAll(UNIT_RE)].map((match) => match[0]);
@@ -174,14 +289,30 @@ function calculateFeatures(record) {
     typeId === '2903' ||
     /实验|探究|打点计时器|纸带|实验数据|实验装置|实验步骤|测量误差/.test(text);
   const hasComplexAsk = /分别求|求范围|求出|说明理由|分析|验证/.test(text);
-  const hasCalculationWords = /计算|求(?:出|得|解|值)?|多大|大小|范围|表达式|速度为|加速度为|电流为|电压为|功率为|质量为|位移为/.test(text);
+  const hasCalculationTarget = CALCULATION_TARGET_RE.test(text);
+  const hasNumericResult = NUMERIC_RESULT_RE.test(text);
+  const hasPhysicalQuantity = PHYSICAL_QUANTITY_RE.test(text);
+  const hasNumericUnit = NUMERIC_UNIT_RE.test(text);
+  const hasDerivation = DERIVATION_RE.test(`${answerText} ${explanationText}`);
+  const hasCalculationWords = hasCalculationTarget || hasNumericResult;
   const isChoiceQuestion =
     hasChoiceOptions(html, text) ||
-    /["']type["']\s*:\s*["']choice["']/.test(structured) ||
-    /(?:选择题|单选题|多选题|不定项选择)/.test(text);
+    format.isChoice;
+  const isObjectiveQuestion =
+    /选择题|单选题|多选题|不定项选择|填空题|知识点填空题|判断题|作图题/.test(typeName) ||
+    new Set(['1', '2901', '2902', '2905', '2906', '2907', '2908']).has(typeId);
   const hasCalculationStructure =
-    hasCalculationWords &&
-    (numbers >= 3 || units.length >= 2 || subquestions >= 2);
+    !isChoiceQuestion &&
+    !isExperimentQuestion &&
+    hasCalculationTarget &&
+    hasPhysicalQuantity &&
+    (hasNumericUnit || numbers >= 3 || subquestions >= 2 || hasDerivation);
+  const isObjectiveBlank =
+    !isChoiceQuestion &&
+    format.hasBlank &&
+    !format.hasNumericInput &&
+    !hasCalculationTarget &&
+    !hasDerivation;
   const length = text.length;
 
   let score = 0;
@@ -226,15 +357,12 @@ function calculateFeatures(record) {
     score += 2;
     reasons.push('计算求解语义');
   }
-  if (PHYSICS_TYPE_IDS.has(typeId)) {
-    score += 1;
-    reasons.push(`综合题型${typeId}`);
-  }
 
   return {
     score,
     reasons,
     typeId,
+    typeName,
     textLength: length,
     numberCount: numbers,
     unitCount: units.length,
@@ -247,8 +375,16 @@ function calculateFeatures(record) {
     isExperimentQuestion,
     hasComplexAsk,
     hasCalculationWords,
+    hasCalculationTarget,
+    hasNumericResult,
+    hasPhysicalQuantity,
+    hasNumericUnit,
+    hasDerivation,
     hasCalculationStructure,
+    isObjectiveBlank,
+    structuredFormat: format,
     isChoiceQuestion,
+    isObjectiveQuestion,
   };
 }
 
@@ -275,6 +411,9 @@ function percent(part, whole) {
 
 function renderCard(item, index, includeAnswers) {
   const record = item.record;
+  const aiTag = item.ai
+    ? `<span class="tag">AI评分 ${item.ai.score}</span><span class="tag">${escapeHtml(item.ai.reason)}</span>`
+    : '';
   const answer = includeAnswers
     ? `<details><summary>查看答案与解析</summary><div class="answer">${safeQuestionHtml(record.qs_answer ?? record.answer ?? '')}</div><div class="explanation">${safeQuestionHtml(record.qs_explanation ?? record.explanation ?? '')}</div></details>`
     : '';
@@ -286,7 +425,7 @@ function renderCard(item, index, includeAnswers) {
         索引：<code>${escapeHtml(record._index)}</code>　
         题型：<code>${escapeHtml(item.features.typeId)}</code>　
         难度：<code>${escapeHtml(record.qs_diff)}</code><br>
-        特征：${item.features.reasons.map((reason) => `<span class="tag">${escapeHtml(reason)}</span>`).join('')}
+        特征：${item.features.reasons.map((reason) => `<span class="tag">${escapeHtml(reason)}</span>`).join('')}${aiTag}
       </p>
       <div class="question">${safeQuestionHtml(record.qs_stem ?? record.stem ?? record.html_text ?? '')}</div>
       ${answer}
@@ -323,7 +462,7 @@ details{margin-top:14px}summary{cursor:pointer;font-weight:600}.answer,.explanat
 <body>
 <main>
 <h1>物理大题筛选结果</h1>
-<p class="muted">生成时间：${escapeHtml(new Date().toISOString())}；最低评分：${options.minScore}；按题目 ID 去重。${options.typeId ? `题型 ID：${escapeHtml(options.typeId)}。` : ''}${options.calculationOnly ? '已剔除选择题和实验题，仅保留计算型题目。' : ''}${options.perType ? `每个题型最多 ${options.perType} 道。` : ''}${options.includeAnswers ? '本报告包含答案和解析。' : '本报告默认不展示答案和解析。'}</p>
+<p class="muted">生成时间：${escapeHtml(new Date().toISOString())}；最低评分：${options.minScore}；按题目 ID 去重。${options.index ? `来源索引：${escapeHtml(options.index)}。` : ''}${options.typeId ? `题型 ID：${escapeHtml(options.typeId)}。` : ''}${options.calculationOnly ? '已剔除选择题和实验题，仅保留计算型题目。' : ''}${options.ai ? `已使用 AI 复核（候选上限 ${options.aiLimit}，阈值 ${options.aiThreshold}）。` : ''}${options.perType ? `每个题型最多 ${options.perType} 道。` : ''}${options.includeAnswers ? '本报告包含答案和解析。' : '本报告默认不展示答案和解析。'}</p>
 <section class="summary">
 <div class="grid">
 <div class="metric"><strong>${stats.selected}</strong>筛选结果</div>
@@ -357,6 +496,8 @@ async function main() {
     excludedNonCalculation: 0,
     byType: Object.create(null),
     byReason: Object.create(null),
+    aiReviewed: 0,
+    aiRejected: 0,
   };
   const inputStream = createReadStream(input, { encoding: 'utf8' });
   const lines = createInterface({ input: inputStream, crlfDelay: Infinity });
@@ -375,6 +516,7 @@ async function main() {
       throw new Error(`JSONL 解析失败（已处理 ${stats.totalRecords} 条）：${error.message}`);
     }
     if (String(getRecordSubjectId(record)) !== options.subjectId) continue;
+    if (options.index !== null && String(record._index ?? record.index ?? '') !== options.index) continue;
     if (options.typeId !== null && getQuestionType(record) !== options.typeId) continue;
     stats.totalRecords += 1;
     const key = getRecordKey(record);
@@ -386,12 +528,16 @@ async function main() {
     stats.uniqueRecords += 1;
 
     const features = calculateFeatures(record);
-    if (options.calculationOnly && features.isChoiceQuestion) {
+    if (options.calculationOnly && (features.isChoiceQuestion || features.isObjectiveQuestion)) {
       stats.excludedChoices += 1;
       continue;
     }
     if (options.calculationOnly && features.isExperimentQuestion) {
       stats.excludedExperiments += 1;
+      continue;
+    }
+    if (options.calculationOnly && features.isObjectiveBlank) {
+      stats.excludedNonCalculation += 1;
       continue;
     }
     if (options.calculationOnly && !features.hasCalculationStructure) {
@@ -403,6 +549,38 @@ async function main() {
     candidates.push(item);
   }
 
+  if (options.ai) {
+    loadEnvFile();
+    const config = readLLMConfig();
+    if (!config.available) {
+      throw new Error('--ai 需要配置 LLM_API_KEY 或 OPENAI_API_KEY');
+    }
+    const aiCandidates = candidates
+      .sort((a, b) =>
+        b.features.score - a.features.score ||
+        b.features.subquestionCount - a.features.subquestionCount ||
+        b.features.numberCount - a.features.numberCount,
+      )
+      .slice(0, options.aiLimit);
+    for (const item of aiCandidates) {
+      item.ai = await classifyWithAI(item, config);
+      stats.aiReviewed += 1;
+      if (
+        !item.ai.isCalculation ||
+        item.ai.isExperiment ||
+        item.ai.isChoice ||
+        item.ai.confidence < options.aiThreshold
+      ) {
+        stats.aiRejected += 1;
+      }
+    }
+    candidates.splice(0, candidates.length, ...aiCandidates.filter((item) =>
+      item.ai.isCalculation &&
+      !item.ai.isExperiment &&
+      !item.ai.isChoice &&
+      item.ai.confidence >= options.aiThreshold,
+    ));
+  }
   const grouped = new Map();
   for (const item of candidates) {
     const typeItems = grouped.get(item.features.typeId) ?? [];
@@ -411,7 +589,7 @@ async function main() {
   }
   for (const typeItems of grouped.values()) {
     typeItems.sort((a, b) =>
-      b.features.score - a.features.score ||
+      (b.ai?.score ?? b.features.score) - (a.ai?.score ?? a.features.score) ||
       b.features.subquestionCount - a.features.subquestionCount ||
       b.features.numberCount - a.features.numberCount,
     );
@@ -429,10 +607,11 @@ async function main() {
     }
   }
 
-  const jsonl = selected.map(({ record, features }) => JSON.stringify({
+  const jsonl = selected.map(({ record, features, ai }) => JSON.stringify({
     ...record,
     _big_question_score: features.score,
     _big_question_features: features,
+    ...(ai ? { _ai_review: ai } : {}),
   })).join('\n') + (selected.length ? '\n' : '');
   const outputJsonl = join(options.outputDir, 'physics-big-questions.jsonl');
   const outputHtml = join(options.outputDir, 'physics-big-questions.html');
