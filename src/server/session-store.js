@@ -29,9 +29,13 @@
  * 写失败与读失败的策略是**不对称**的，这是刻意的
  * ============================================================================
  * 写失败（C6）：记一条 warn，请求照常返回。理由：丢一条记录 < 丢掉学生刚打完的一段话。
- * 读失败（控制者补充 3）：**当作没有这条会话**，交给调用方原有的 404 路径。
- *   理由：一个坏库看起来和一个好库一模一样，是比报错更糟的失败方式。
- *   所以这里会 warn，而不是无痕返回 null。
+ *
+ * 读失败：**必须与"没有这条"分开**（评审 Important 3）。这里抛 `SessionReadError`，
+ *   只有**确实没有**那条记录时才回 null。理由：两者混成同一个答案时，调用方会
+ *   "现造一条新的"并写穿 —— 用一条刚建的空会话盖掉库里那份真记录，学生的历史、
+ *   提示记录、报告快照全没了，而且没有任何一条日志说得清为什么。
+ *   坏库必须看起来像坏库：503 可重试，而不是 404「重新开始」。
+ *   留痕仍在这里（warn）：503 是给学生看的，日志是给我们看的。
  */
 
 import { randomBytes } from 'node:crypto';
@@ -141,11 +145,29 @@ export function snapshotSession(session) {
    * 设计稿 §5.2 的 `session.turns`：导出与看板读它，而报告侧用的是 `record.turns`。
    * 两个名字指同一份东西，落库时由这里统一 —— 下游不必知道"报告那边叫什么"。
    */
-  snap.turns = Array.isArray(session?.turns)
+  const sourceTurns = Array.isArray(session?.turns)
     ? session.turns
     : Array.isArray(session?.record?.turns)
       ? session.record.turns
       : [];
+
+  /**
+   * 三个分支对象必须复制（评审 Minor）：`history` / `record` / `progress` 与活会话
+   * 共享引用时，"落库的那一份"会顺着引用看到内存里后来的修改。file 驱动看不出来
+   * （JSON 往返天然断开），memory / cloudbase 也不该靠驱动实现来兜底 ——
+   * 快照的正确性不能建立在"驱动会克隆"这个假设上。
+   */
+  if (Array.isArray(snap.history)) snap.history = snap.history.slice();
+  if (snap.progress && typeof snap.progress === 'object') {
+    snap.progress = { ...snap.progress, reached: { ...(snap.progress.reached ?? {}) } };
+  }
+  if (snap.record && typeof snap.record === 'object') {
+    snap.record = { ...snap.record };
+    for (const key of ['turns', 'hintLog', 'formulaCards']) {
+      if (Array.isArray(snap.record[key])) snap.record[key] = snap.record[key].slice();
+    }
+  }
+  snap.turns = sourceTurns.slice();
   return snap;
 }
 
@@ -229,18 +251,35 @@ export function hydrateSession(record, { engine = null, adapterTag = 'offline', 
 }
 
 /**
- * 读一条会话记录。**读不出来等于没有**（控制者补充 3），但要留痕。
+ * 读库失败 —— **不是**"没有这条记录"。
  *
- * 为什么不像写失败那样"当作成功"：读失败被吞掉的话，一个坏库和一个好库
- * 看起来一模一样 —— 学生会发现自己"重新开始"了，而我们这边一条日志都没有。
+ * 两者混成同一个 null 的后果是灾难性的（评审 Important 3）：调用方会当成
+ * "新学生第一次说话"而现造一条会话并写穿，把库里那份真记录整条盖掉。
+ * 所以这里带类型地抛出来，让调用方回 503（可重试），而不是 404（叫他重新开始）。
+ */
+export class SessionReadError extends Error {
+  constructor(cause) {
+    super('读取学习记录失败');
+    this.name = 'SessionReadError';
+    this.code = 'SESSION_READ_FAILED';
+    /** 驱动报的原始错误：503 是给学生看的，cause 是给我们看的 */
+    this.cause = cause;
+  }
+}
+
+/**
+ * 读一条会话记录。
+ *
+ * 只有**确实没有**这条记录时才回 null；读不出来（文件坏了、云调用失败、权限不对）
+ * 抛 `SessionReadError`。warn 在这里打一次，调用方不必再打一遍。
  */
 export async function readSessionRecord(store, sessionId) {
   if (!store || !sessionId) return null;
   try {
     return await store.getSession(sessionId);
   } catch (err) {
-    console.warn(`[session] 读取会话失败（按"没有这条会话"处理，不 500）：${err?.message ?? err}`);
-    return null;
+    console.warn(`[session] 读取会话失败（不是"没有这条"，是读不出来）：${err?.message ?? err}`);
+    throw new SessionReadError(err);
   }
 }
 
@@ -272,13 +311,21 @@ export function markActivity(
 }
 
 /**
+ * 写穿被拒绝：库里这条会话属于别人，**故意不写**（与"写失败"不是一回事）。
+ * 调用方照 C6 吞掉即可，但不要把它当成"已经落库"。
+ */
+export const PERSIST_REFUSED = Object.freeze({ refused: true, code: 'NOT_OWNER' });
+
+/**
  * 记一次活动并写穿。**所有写穿点都走这一个函数**（C6）：
  *
  *   · 只在这里刷 `lastAt` 与计数，时间与计数的口径只有一份；
  *   · 写失败只 warn，请求照常返回 —— 丢一条记录比丢掉学生刚打完的一段话好；
- *   · `owner` 只在会话还没有归属时补上（会话可能先匿名创建，登录后才写库）。
+ *   · `owner` 只在会话还没有归属时补上（会话可能先匿名创建，登录后才写库）；
+ *   · **绝不覆盖别人名下的记录**（见下面那段"纵深防御"）。
  *
- * @returns {Promise<object|null>} 落库的那一份快照（没写或写失败时是 null）
+ * @returns {Promise<object|null|{refused: true, code: string}>}
+ *   落库的那一份快照；没写或写失败时是 null；故意不写时是 `PERSIST_REFUSED`
  */
 export async function persistSession(
   store,
@@ -290,6 +337,33 @@ export async function persistSession(
     session.userId = owner.user?.id ?? null;
     session.batchId = owner.batchId ?? null;
   }
+
+  /**
+   * 纵深防御（评审 Important 1）：写之前再看一眼库里那份是谁的。
+   *
+   * restoreSession 已经在"库记录 → 活会话"那条路上拦过同一条规则，这里是第二道：
+   * 只要还有任意一条路径拿到一个 `userId` 被清空的会话对象，写下去就会**永久覆盖**
+   * 别人的记录 —— history / hintLog / reportSnapshot / 进度全丢，而且静默。
+   * 宁可不写，也不覆盖。代价是每次写穿多一次读；试点量级下可以接受。
+   */
+  if (store && session?.id) {
+    let stored;
+    try {
+      stored = await store.getSession(session.id);
+    } catch (err) {
+      /** 读不回来就不写：写下去有可能盖掉那份正读不出来的记录（与读失败同一条理由） */
+      console.warn(`[session] 写穿前读不回库里的记录，这次不写（不覆盖读不出来的记录）：${err?.message ?? err}`);
+      return null;
+    }
+    const storedOwner = typeof stored?.userId === 'string' && stored.userId !== '' ? stored.userId : null;
+    if (storedOwner && storedOwner !== session.userId) {
+      console.warn(
+        `[session] 拒绝写穿：库里这条会话属于 ${storedOwner}，不是 ${session.userId ?? '(匿名)'} —— 不覆盖别人的记录`,
+      );
+      return PERSIST_REFUSED;
+    }
+  }
+
   markActivity(session, { page, hintLevel, chatTurn, formulaOpen }, nowIso);
 
   if (!store) return null;

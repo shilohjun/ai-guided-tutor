@@ -26,6 +26,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openStore } from '../src/server/store/index.js';
+import { PERSIST_REFUSED, persistSession } from '../src/server/session-store.js';
 import {
   handleApi,
   getStore,
@@ -39,6 +40,8 @@ import {
 
 /** 题库题：永久存在，题目与公式卡都有 */
 const P1 = 'phy-emi-01';
+/** 第二道题库题：用来复现"换个 problemId 就能绕过归属判定"那条路 */
+const P2 = 'phy-emi-02';
 
 const uid = (prefix) => `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
 const iso = () => new Date().toISOString();
@@ -219,17 +222,38 @@ describe('会话 · 快照的边界', () => {
     assertIncludes(text, P1, '快照必须能序列化（否则 file 驱动整条写坏）');
   });
 
-  it('落库的那一份与会话对象不是同一个引用（改了会话不会悄悄改库里的历史）', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'bsj-sp-snap-'));
-    const store = await openStore({ STORE: 'file', STORE_DIR: dir });
+  it('落库的那一份与会话对象不共享分支（改了会话不会悄悄改库里的历史）', async () => {
+    /**
+     * 这条钉的是**快照本身**，不是驱动的序列化（评审的 Minor）：`history` / `record` /
+     * `progress` 三个分支对象若与活会话共享引用，内存驱动的库会顺着引用看到内存里后来的修改。
+     * 旧版本只用 file 驱动，而 file 靠 JSON 往返天然断开 —— 那样钉住的是驱动，不是快照。
+     */
+    const store = await openStore({ STORE: 'memory' });
     sessions.delete('snap-ref');
     const live = getSession('snap-ref', P1);
     live.history.push({ role: 'student', text: '第一句', at: iso() });
-    await store.putSession(snapshotSession(live));
+    live.record.turns.push({ role: 'student', text: '第一句', at: iso() });
+    live.record.hintLog.push({ at: iso(), deliveredLevel: 1, stepIndex: 0 });
+
+    const snap = snapshotSession(live);
+    assertEquals(snap.history === live.history, false, 'history 必须是另一份');
+    assertEquals(snap.record === live.record, false, 'record 必须是另一份');
+    assertEquals(snap.record.hintLog === live.record.hintLog, false, 'record.hintLog 也要断开');
+    assertEquals(snap.turns === live.record.turns, false, 'turns 也不能指向内存那一份');
+    assertEquals(snap.progress === live.progress, false, 'progress 必须是另一份');
+    assertEquals(snap.progress.reached === live.progress.reached, false, 'progress.reached 也要断开');
+
+    await store.putSession(snap);
     live.history.push({ role: 'student', text: '第二句', at: iso() });
+    live.record.hintLog.push({ at: iso(), deliveredLevel: 2, stepIndex: 0 });
+    live.record.turns.push({ role: 'student', text: '第二句', at: iso() });
+    live.progress.maxPage = 4;
+
     const stored = await store.getSession('snap-ref');
-    assertEquals(stored.history.length, 1, '库里的那份不能被内存里后来的修改带着走');
-    rmSync(dir, { recursive: true, force: true });
+    assertEquals(stored.history.length, 1, '库里的 history 不能被内存里后来的修改带着走');
+    assertEquals(stored.record.hintLog.length, 1, '库里的 hintLog 同理');
+    assertEquals(stored.turns.length, 1, '库里的 turns 同理');
+    assertEquals(stored.progress.maxPage, 3, '库里的 progress 同理');
   });
 });
 
@@ -330,7 +354,7 @@ describe('会话 · 冷启动回载', () => {
     });
   });
 
-  it('读库失败 → 按"没有这条会话"作答（不 500），但必须留一条 warn 让人看得见', async () => {
+  it('读库失败 ≠ 没有这条会话：/api/report 回 503 可重试，不是 404 让学生重新开始', async () => {
     await withRouterServer({}, async ({ base, store }) => {
       const sessionId = uid('broken');
       await store.putSession(recordFor({ id: sessionId }));
@@ -342,12 +366,17 @@ describe('会话 · 冷启动回载', () => {
       };
       try {
         const { result, lines } = await captureWarn(() => call(base, `/api/report?sessionId=${sessionId}`));
-        assertEquals(result.status, 404, '库读不出来不得变成 500');
-        assertIncludes(String(result.json?.error ?? ''), '会话', '仍然按"会话不存在/已过期"这条路回答');
+        assertEquals(result.status, 503, '读不出来是可重试的故障，不是"会话不存在"');
+        assertEquals(result.json?.retryable, true, '要明确告诉前端这一下可以重试');
+        assertIncludes(String(result.json?.error ?? ''), '读取学习记录失败', '文案说的是"读不出来"，不是"请重新开始"');
         assert(lines.some((l) => l.includes('读取会话失败')), `读库失败必须留一条 warn，实际：${JSON.stringify(lines)}`);
       } finally {
         store.getSession = original;
       }
+
+      /** 真的没有这条记录时仍然是 404 —— 这两种情况的答法必须分得开 */
+      const ghost = await call(base, `/api/report?sessionId=${uid('ghost')}`);
+      assertEquals(ghost.status, 404, '库里确实没有这条时才是 404（此处不钉文案，只钉状态码）');
     });
   });
 });
@@ -396,6 +425,51 @@ describe('会话 · 写穿时机', () => {
     });
   });
 
+  it('读库失败时 /api/chat 回 503，不现造新会话、不写穿（否则一条空会话盖掉真记录）', async () => {
+    await withRouterServer({}, async ({ base, store }) => {
+      const me = await signIn(store);
+      const sessionId = uid('readfail');
+      await chat(base, { sessionId, headers: { 'x-test-token': me.token } });
+      await chat(base, { sessionId, headers: { 'x-test-token': me.token }, utterance: '还是不会' });
+      const before = structuredClone(await store.getSession(sessionId));
+      assert(before.turns.length >= 2 && before.record.hintLog.length > 0, '前提：库里已经有一段对话');
+
+      /** 冷启动：内存里没有它，这一次只能靠读库 */
+      sessions.clear();
+
+      const originalGet = store.getSession;
+      const originalPut = store.putSession;
+      let puts = 0;
+      store.getSession = async () => {
+        throw new Error('云调用超时（故障注入）');
+      };
+      store.putSession = async (snap) => {
+        puts += 1;
+        return originalPut(snap);
+      };
+      try {
+        const { result, lines } = await captureWarn(() =>
+          chat(base, { sessionId, headers: { 'x-test-token': me.token }, utterance: '还是不会' }),
+        );
+        assertEquals(result.status, 503, `读不出来要回 503，实际 ${result.status} ${JSON.stringify(result.json)}`);
+        assertEquals(result.json?.retryable, true, '读失败是可重试的');
+        assertEquals(puts, 0, '读不出来就不许写穿 —— 写下去的是刚现造的那条空会话');
+        assert(lines.some((l) => l.includes('读取会话失败')), `要留一条 warn，实际：${JSON.stringify(lines)}`);
+        assertEquals(sessions.has(sessionId), false, '读失败也不许把新会话塞进内存表');
+      } finally {
+        store.getSession = originalGet;
+        store.putSession = originalPut;
+      }
+
+      const after = await store.getSession(sessionId);
+      assertEquals(
+        JSON.stringify(after),
+        JSON.stringify(before),
+        '库里的记录必须一个字段都没变（对话 / 提示记录 / 快照都在）',
+      );
+    });
+  });
+
   it('公式卡用过之后也写穿（否则重启后"用过卡"这件事消失）', async () => {
     await withRouterServer({}, async ({ base, store }) => {
       const sessionId = uid('formula');
@@ -438,6 +512,37 @@ describe('会话 · 写穿时机', () => {
       assertEquals(after.endState, before.endState, 'endState 不变');
       assertEquals(after.finishedAt, finishedAtBefore, 'finishedAt 不变');
       assertEquals(after.progress.maxPage, before.progress.maxPage, '走到第几页是事实，不能因为重来就改小');
+    });
+  });
+
+  it('写穿绝不覆盖别人名下的记录：库里属于别人就不写，返回 PERSIST_REFUSED（纵深防御）', async () => {
+    await withRouterServer({}, async ({ store }) => {
+      const sessionId = uid('foreign');
+      const before = recordFor({
+        id: sessionId,
+        userId: 'b-owner',
+        turns: [{ role: 'student', text: 'B 的话', at: iso() }],
+      });
+      await store.putSession(before);
+      const snapshot = structuredClone(await store.getSession(sessionId));
+
+      /**
+       * 模拟"某条新路径拿到一个 userId 为空的会话对象"——正是要拦的形状：
+       * 它没有归属，写下去就会把 B 的记录整条盖成 A 的一条空会话。
+       */
+      sessions.delete(sessionId);
+      const live = getSession(sessionId, P1);
+      assertEquals(live.userId, null, '前提：这条活会话没有归属');
+
+      const { result, lines } = await captureWarn(() =>
+        persistSession(store, live, { chatTurn: true, owner: { user: { id: 'a-owner' }, batchId: 'b1' } }),
+      );
+      assertEquals(result, PERSIST_REFUSED, '写穿必须被拒绝，而不是覆盖别人的记录');
+      assertEquals(result.code, 'NOT_OWNER');
+      assert(lines.some((l) => l.includes('拒绝写穿')), `拒绝要留一条 warn，实际：${JSON.stringify(lines)}`);
+
+      const after = await store.getSession(sessionId);
+      assertEquals(JSON.stringify(after), JSON.stringify(snapshot), '库里那条属于 B 的记录必须原封不动');
     });
   });
 
@@ -751,6 +856,80 @@ describe('归属校验 · 会话只能由本人使用', () => {
       const report = await call(base, `/api/report?sessionId=${bSession}`);
       assertEquals(report.status, 200, '未登录时的行为必须与加校验之前一模一样');
       assert(report.json?.report, '照旧返回报告');
+    });
+  });
+
+  it('A 的令牌 + B 的 sessionId + 换一道题 → 403，B 的记录（对话 / 提示 / 快照）一个字节都没变', async () => {
+    await withRouterServer({}, async ({ base, store }) => {
+      const a = await signIn(store);
+      const b = await signIn(store);
+      const bSession = uid('b-owned');
+
+      /** 让 B 的记录里三样东西都有：对话、提示记录、冻结的报告快照 */
+      await chat(base, { sessionId: bSession, headers: { 'x-test-token': b.token } });
+      await chat(base, { sessionId: bSession, headers: { 'x-test-token': b.token }, utterance: '还是不会' });
+      const report = await call(base, `/api/report?sessionId=${bSession}`, { headers: { 'x-test-token': b.token } });
+      assertEquals(report.status, 200, '前提：B 自己能出报告');
+      const before = structuredClone(await store.getSession(bSession));
+      assert(before.reportSnapshot, '前提：库里已经有冻结的快照');
+      assert(before.record.hintLog.length > 0 && before.history.length > 0, '前提：历史与提示记录都在');
+
+      /** 冷启动：内存里什么都没有，只能读库 —— 与换实例之后一模一样 */
+      sessions.clear();
+
+      /**
+       * 这是评审 Important 1 的形状：换了题，旧实现里 restoreSession 会因为 `problemId`
+       * 对不上而回 null，调用方于是 `getSession(...)` 现造一条 `userId: null` 的新会话，
+       * notMine 对空归属放行 ⇒ 200 + 写穿 ⇒ B 的记录被整条盖掉。
+       */
+      const asChat = await chat(base, { sessionId: bSession, problemId: P2, headers: { 'x-test-token': a.token } });
+      assertEquals(asChat.status, 403, `chat 必须拦，实际 ${asChat.status} ${JSON.stringify(asChat.json)}`);
+      assertEquals(asChat.json?.code, 'NOT_OWNER');
+      assertEquals(asChat.json?.error, '这不是你的学习记录');
+      assertEquals(asChat.json?.hint, undefined, '403 不得带出任何提示内容');
+
+      const after = await store.getSession(bSession);
+      assertEquals(JSON.stringify(after), JSON.stringify(before), 'B 的记录必须一个字段都没变');
+      assertEquals(after.userId, b.user.id, '归属不能被 A 覆盖成自己');
+      assertEquals(after.reportSnapshot?.level, before.reportSnapshot?.level, '冻结的报告快照还在');
+      assertEquals(after.record.hintLog.length, before.record.hintLog.length, '提示记录还在');
+      assertEquals(after.history.length, before.history.length, '历史还在');
+    });
+  });
+
+  it('A 的令牌 + B 的 sessionId → /api/reset 也 403，B 的记录一条都不清（热内存与冷启动两条路）', async () => {
+    await withRouterServer({}, async ({ base, store }) => {
+      const a = await signIn(store);
+      const b = await signIn(store);
+      const bSession = uid('b-reset');
+      await chat(base, { sessionId: bSession, headers: { 'x-test-token': b.token } });
+      const before = structuredClone(await store.getSession(bSession));
+      assert(before.turns.length > 0, '前提：B 的会话里有对话');
+
+      /** ① B 的会话还在内存表里：重置会先命中它 */
+      const hot = await call(base, '/api/reset', {
+        method: 'POST',
+        body: { sessionId: bSession },
+        headers: { 'x-test-token': a.token },
+      });
+      assertEquals(hot.status, 403, `reset 必须拦，实际 ${hot.status} ${JSON.stringify(hot.json)}`);
+      assertEquals(hot.json?.code, 'NOT_OWNER');
+      assertEquals(sessions.has(bSession), true, '403 之后内存里那条也不许被删');
+
+      /** ② 冷启动（内存里没有）：只能读库，同样要拦 */
+      sessions.clear();
+      const cold = await call(base, '/api/reset', {
+        method: 'POST',
+        body: { sessionId: bSession },
+        headers: { 'x-test-token': a.token },
+      });
+      assertEquals(cold.status, 403, `冷启动也要拦，实际 ${cold.status} ${JSON.stringify(cold.json)}`);
+      assertEquals(cold.json?.code, 'NOT_OWNER');
+
+      const after = await store.getSession(bSession);
+      assertEquals(JSON.stringify(after), JSON.stringify(before), '重置没发生：对话 / 提示记录 / 计数都没变');
+      assertEquals(after.counters.resetCount, before.counters.resetCount, 'resetCount 不该被加一');
+      assertEquals(after.turns.length, before.turns.length, '对话一条都不许清');
     });
   });
 });

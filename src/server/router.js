@@ -63,6 +63,7 @@ import {
   persistSession,
   pickResumable,
   readSessionRecord,
+  SessionReadError,
   snapshotSession,
 } from './session-store.js';
 
@@ -238,6 +239,22 @@ function getSession(sessionId, problemId) {
 }
 
 /**
+ * 会话是别人的（C10）—— 归属规则的唯一说明在 `notMine` 上方那段注释里。
+ *
+ * 为什么用异常而不是再塞一个 `null`：`null` 已经是"这条会话不存在"，
+ * 两者混用就一定会出现"别人的 → 当成没有 → 现造一条新的"（评审 Important 1 的洞）。
+ * 翻转成 403 的地方是 `restoreForRoute`，四条受保护的路由都走它。
+ */
+class NotOwnerError extends Error {
+  constructor(owner) {
+    super('这不是你的学习记录');
+    this.name = 'NotOwnerError';
+    this.code = 'NOT_OWNER';
+    this.owner = owner ?? null;
+  }
+}
+
+/**
  * 回载：内存命中就直接用，否则从库里读回来、重建引擎、放回内存。
  *
  * 顺序是刻意的 —— **先看内存再看库**：
@@ -248,10 +265,19 @@ function getSession(sessionId, problemId) {
  *   · 库里没有这条（含 problemId 对不上）→ /api/chat 现造一条，/api/report 走 404；
  *   · 题目已经不在注册表（照片/粘贴题过了 TTL）→ 只有报告还能说有快照的那份。
  *
+ * 另外两种失败**不伪装成 null**（伪装过一次，代价是静默覆盖别人的记录）：
+ *   · 库读不出来 → 抛 `SessionReadError`（调用方回 503，且不许写穿）；
+ *   · 会话是别人的 → 抛 `NotOwnerError`（调用方回 403）。
+ *
  * 注意 `problemId` 传 null 表示"不限定题目"（/api/formula、/api/report 只知道
  * sessionId）。这时以库里的 problemId 为准，不会拿一个空 id 去查题目表。
+ *
+ * @param {object} store
+ * @param {string} sessionId
+ * @param {string|null} problemId
+ * @param {{user: object, batchId: string|null}|null} me 调用者身份（没登录就是 null）
  */
-export async function restoreSession(store, sessionId, problemId) {
+export async function restoreSession(store, sessionId, problemId, me = null) {
   const hot = sessions.get(sessionId);
   if (hot && (!problemId || hot.problemId === problemId)) {
     /** 走 getSession 而不是直接返回：TTL 清理与"形态变了要换引擎"都在那里 */
@@ -261,6 +287,17 @@ export async function restoreSession(store, sessionId, problemId) {
 
   const record = await readSessionRecord(store, sessionId);
   if (!record) return null;
+
+  /**
+   * 归属必须在**任何替换之前**判（评审 Important 1）。
+   *
+   * 放到 `problemId` 比对之后就晚了：对不上会先返回 null，调用方于是
+   * `getSession(...)` 现造一条 `userId: null` 的新会话 —— "这是别人的"被洗成
+   * "这是一条新会话"，`notMine` 对空归属放行，随后的写穿把原主人的记录整条盖掉。
+   * 归属只从**库里的记录**读（`record.userId`），不看请求参数。
+   */
+  if (notMine(record, me)) throw new NotOwnerError(record.userId);
+
   if (problemId && record.problemId !== problemId) return null;
 
   const liveProblem = getProblemById(record.problemId);
@@ -277,6 +314,37 @@ export async function restoreSession(store, sessionId, problemId) {
   sessions.set(sessionId, live);
   /** 再走一遍 getSession：TTL 清理、形态判定都不必在这里重复一遍 */
   return getSession(sessionId, live.problemId);
+}
+
+/** 库读不出来：**可重试**，措辞要让人知道刷新一下就好，而不是去重开一道题 */
+function sendStoreUnreadable(res) {
+  sendJson(res, 503, { error: '读取学习记录失败，请刷新页面重试。', retryable: true });
+}
+
+/**
+ * 回载 + 两种失败的统一答法 —— **四条受保护的路由都走它**（chat / formula / report / reset）。
+ *
+ * 返回 `{ replied: true }` 表示已经答复过（调用方直接 `return true`）；
+ * 否则返回 `{ session }`，其中 null 仍是"库里确实没有这条"——新建还是 404
+ * 由各路由自己决定（chat 是"开始一道新题"，report 是 404）。
+ *
+ * 这两种失败都不许落到"现造一条新会话"上：读失败时那条新会话会盖掉真记录，
+ * 归属失败时等于让别人接着写你的历史。
+ */
+async function restoreForRoute(res, store, sessionId, problemId, me) {
+  try {
+    return { session: await restoreSession(store, sessionId, problemId, me) };
+  } catch (err) {
+    if (err instanceof NotOwnerError) {
+      sendNotOwner(res);
+      return { replied: true };
+    }
+    if (err instanceof SessionReadError) {
+      sendStoreUnreadable(res);
+      return { replied: true };
+    }
+    throw err;
+  }
 }
 
 /** 落库快照 —— 从 router 导出是为了让测试与后续任务按计划的那一处取 */
@@ -608,18 +676,32 @@ function loginGuardBlocks(path, user) {
 }
 
 /**
- * 归属校验（C10）：这条会话是不是**别人**的。
+ * 归属规则（C10）—— **唯一的一份，四条受保护的路由全部走它**：
+ *
+ *   · POST /api/chat     别人的 sessionId 不能拿来续聊（续聊会写穿，等于改别人的记录）
+ *   · POST /api/formula  公式卡读的是 `record.hintLog` —— 别人做到了哪一步
+ *   · GET  /api/report   报告是整段对话的结论（也含 `turns`）
+ *   · POST /api/reset    重置会清空对话，比读更狠，必须同样拦
+ *
+ * 归属**只从存储里的那条记录读**（库记录的 `userId` / 活会话的 `session.userId`），
+ * 不由请求参数决定：sessionId 是前端生成的可猜字符串（`'ui-' + Date.now().toString(36)`），
+ * "拿得出 sessionId 就说明是你的"这条推断是错的。判定点三处，缺一不可：
+ *   ① `restoreSession`：库记录 → 活会话之前。**必须在 problemId 比对之前**，
+ *      否则对不上时调用方会现造一条 `userId: null` 的新会话，把"这是别人的"
+ *      洗成"这是新的"，随后的写穿覆盖原主人的记录（评审 Important 1）；
+ *   ② 各路由拿到会话之后：内存里命中的那条不经过库，① 看不到它；
+ *   ③ `persistSession` 写之前：纵深防御 —— 任何新路径都不许覆盖别人名下的记录。
  *
  * 判的是"有归属且不是你"，而不是 `session.userId !== 我`：
- * 会话的 `userId` 起初是 null —— sessionId 由前端生成（`'ui-' + Date.now().toString(36)`），
- * 第一次说话时才由 persistSession 从令牌补上归属。若把 null 也判成"不是你的"，
- * 登录之后**第一句话就会被自己的接口拒掉**：那不是收紧权限，是把门焊死。
+ * 会话的 `userId` 起初是 null —— sessionId 由前端生成，第一次说话时才由
+ * persistSession 从令牌补上归属。若把 null 也判成"不是你的"，登录之后
+ * **第一句话就会被自己的接口拒掉**：那不是收紧权限，是把门焊死。
  *
  * 没有登录态（`req.__user` 为空）时一律放行：没配守卫的环境里不存在"归属"这回事，
  * 行为必须与加这条校验之前一模一样（C10 第三条：不放宽也不收紧）。
  *
  * 为什么判在这里而不是每路由各写一次：它是**身份规则**，不是业务规则。
- * 三处各写一份，就一定会出现"报告拦了、公式卡没拦"这种后门。
+ * 四条各写一份，就一定会出现"报告拦了、重置没拦"这种后门。
  */
 function notMine(session, me) {
   const owner = session?.userId;
@@ -778,9 +860,15 @@ export async function handleApi(req, res, url) {
   /**
    * ① 先解身份，② 再判守卫 —— 顺序不能反过来。
    *
-   * 反过来的话"没登录"与"库读不出来"会混成同一个 401，而这两种情况的下一步
-   * 完全不同（前者去登录，后者是我们在坏着）。解析本身不抛（见 resolveRequestUser），
-   * 所以这里不需要再包一层 try。
+   * 反过来的话令牌还没解出来守卫就先拒了：带对令牌的人也会吃 401。
+   *
+   * 关于"库读不出来"：**这里不区分**，也区分不了。`resolveRequestUser` 把
+   * "没带令牌"、"令牌过期"、"读库失败"一律收敛成"没有身份"（它不抛、也不回 500）。
+   * 于是配了守卫时这三种都是 `401 请先登录` —— 这是 C1 要求的：未登录一律 401，
+   * 而且 401 这个响应不该告诉外面"我们的库坏了"。
+   * 真正的"库坏了"只在**拿到身份之后**的读写路径上暴露：那里回 503 并记 warn
+   * （见 `restoreForRoute` 与 session-store 的 `readSessionRecord`）。
+   * 记法：**401 是"请去登录"，503 才是"我们这边坏了"**。
    *
    * 解析结果挂在 `req.__user` 上：下游（埋点、续做、访问记录）一律读它，
    * 不允许各自再解一遍 —— 一处解析、一处分叉机会。
@@ -1182,11 +1270,16 @@ export async function handleApi(req, res, url) {
      * `??` 而不是"回载失败就报错"：新学生第一次说话时库里本来就没有记录 ——
      * 那不是错误，是开始。回载返回 null 只有两种情形（库里没有 / 题目对不上），
      * 两种都该走"新建"，与加写穿之前的冷启动行为完全一致。
+     *
+     * 真正的失败不在这里，也不许落到"新建"上：读不出来 → 503、是别人的 → 403
+     * （见 restoreForRoute）。旧版本把两者都当成 null，于是"新建"盖掉了真记录。
      */
     const sid = sessionId || 'demo';
     const store = await getStore().catch(() => null);
-    const session = (await restoreSession(store, sid, problemId)) ?? getSession(sid, problemId);
-    /** 归属校验（C10）：别人的 sessionId 不能拿来续聊（新会话 userId 为空，照常放行） */
+    const restored = await restoreForRoute(res, store, sid, problemId, req.__user);
+    if (restored.replied) return true;
+    const session = restored.session ?? getSession(sid, problemId);
+    /** 归属校验（C10）：内存命中的那条不经过库，这里再判一次（新会话 userId 为空，照常放行） */
     if (notMine(session, req.__user)) {
       sendNotOwner(res);
       return true;
@@ -1257,7 +1350,9 @@ export async function handleApi(req, res, url) {
      * 回载：公式卡的开放条件是"同一步给过 L3"，而那条记录在 `record.hintLog` 里 ——
      * 只读内存的话，冷启动之后同一张卡会被判成"还没给过 L3"，学生拿不到。
      */
-    const session = await restoreSession(store, sessionId, null);
+    const restored = await restoreForRoute(res, store, sessionId, null, req.__user);
+    if (restored.replied) return true;
+    const session = restored.session;
     if (!session) {
       sendJson(res, 404, { error: '这个学习会话不存在或已过期，请重新开始一道题。' });
       return true;
@@ -1294,7 +1389,9 @@ export async function handleApi(req, res, url) {
   if (path === '/api/report' && req.method === 'GET') {
     const sessionId = url.searchParams.get('sessionId') || 'demo';
     const store = await getStore().catch(() => null);
-    const session = await restoreSession(store, sessionId, null);
+    const restored = await restoreForRoute(res, store, sessionId, null, req.__user);
+    if (restored.replied) return true;
+    const session = restored.session;
     if (!session) {
       const bankId = url.searchParams.get('problemId');
       const bank = bankId && bankId.startsWith('qbank-') ? getProblemById(bankId) : null;
@@ -1385,7 +1482,7 @@ export async function handleApi(req, res, url) {
     }
     const store = await getStore().catch(() => null);
     if (!store) {
-      sendJson(res, 503, { error: '读取学习记录失败，请刷新页面重试。', retryable: true });
+      sendStoreUnreadable(res);
       return true;
     }
     try {
@@ -1397,7 +1494,7 @@ export async function handleApi(req, res, url) {
        * 而真正的问题是库坏了。宁可说"读不出来"。
        */
       console.warn(`[session] 续做查询失败：${err?.message ?? err}`);
-      sendJson(res, 503, { error: '读取学习记录失败，请刷新页面重试。', retryable: true });
+      sendStoreUnreadable(res);
     }
     return true;
   }
@@ -1445,7 +1542,18 @@ export async function handleApi(req, res, url) {
     const sessionId = body?.sessionId || 'demo';
     const store = await getStore().catch(() => null);
     /** 冷启动之后内存里没有它，但库里可能有 —— 先回载再按"重置"写回去 */
-    const session = sessions.get(sessionId) ?? (await restoreSession(store, sessionId, null));
+    const restored = await restoreForRoute(res, store, sessionId, null, req.__user);
+    if (restored.replied) return true;
+    const session = restored.session;
+    /**
+     * 归属校验（C10）：sessionId 是猜得出来的，而重置**会毁掉数据**（清空对话、把快照
+     * 压进 reportHistory、resetCount +1）。读错别人的记录只是泄露，重置错是永久损失，
+     * 所以判在 `sessions.delete` **之前** —— 判晚了内存里那条已经没了。
+     */
+    if (notMine(session, req.__user)) {
+      sendNotOwner(res);
+      return true;
+    }
     sessions.delete(sessionId);
     if (session) await persistReset(store, session);
     sendJson(res, 200, { ok: true });
