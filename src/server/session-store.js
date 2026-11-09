@@ -63,6 +63,7 @@ export const SNAPSHOT_FIELDS = [
   'record',
   'reportSnapshot',
   'reportBuiltAt',
+  'reportHistory',
 ];
 
 /**
@@ -98,6 +99,11 @@ export function createLiveSession({ id, problemId, engine = null, adapterTag = '
     counters: { resetCount: 0, chatTurns: 0, hintLevels: [], formulaOpens: 0 },
     reportSnapshot: null,
     reportBuiltAt: null,
+    /**
+     * 被重置掉的那些报告（C11）。元素 `{ reportSnapshot, reportBuiltAt, archivedAt, reason }`。
+     * **只追加**：C5 的"冻结一次不覆盖"对历史同样成立，重置不许改写已经压进去的条目。
+     */
+    reportHistory: [],
     history: [],
     record: createSessionRecord(problemId),
     /** 既有的内存字段：createdAt 给日志看，touchedAt 给 TTL 回收算 */
@@ -190,6 +196,13 @@ export function hydrateSession(record, { engine = null, adapterTag = 'offline', 
     };
   }
   if (Array.isArray(record?.history)) live.history = [...record.history];
+
+  /**
+   * 被重置掉的历史快照（C11）：整份带回来。
+   * 少这一步的后果不是"少一列"，而是**导出件里只有最终报告**，
+   * 重置掉的那一份永久消失 —— 而"他重置前看到的是什么"正是看板要回答的问题。
+   */
+  if (Array.isArray(record?.reportHistory)) live.reportHistory = [...record.reportHistory];
 
   /**
    * 报告侧的记录：整份以库里的为准（hintLog 决定了报告与"这一步给过 L3 没有"）。
@@ -301,10 +314,27 @@ export async function persistSession(
  * 清掉 `reportSnapshot` 是**必须**的：报告是"那一轮对话"的结论，
  * 对话被丢弃了它就必须一起走，否则学生会在新对话上看到上一轮的结论。
  *
+ * 但清之前先压进 `reportHistory`（C11）：重置丢掉的是"这一轮对话"，
+ * 学生**重置前看到的那份报告**是既成事实。清掉而不留档，导出件里就只剩最终报告，
+ * "他重置前看到的是什么"永久消失 —— 而设计稿 §5.4 要看"重来"前后的差别。
+ * 只追加、不改写已有条目（C5 的"冻结一次不覆盖"对历史同样成立）。
+ *
  * @returns {Promise<object>} 清空后的那份快照（写失败时也返回，方便调用方断言）
  */
 export async function persistReset(store, session, nowIso = new Date().toISOString()) {
   const cleared = snapshotSession(session);
+  /** C11：清之前先留档。没有快照（还没出过报告）就不压空条目 */
+  if (cleared.reportSnapshot) {
+    cleared.reportHistory = [
+      ...(Array.isArray(cleared.reportHistory) ? cleared.reportHistory : []),
+      {
+        reportSnapshot: cleared.reportSnapshot,
+        reportBuiltAt: cleared.reportBuiltAt ?? null,
+        archivedAt: nowIso,
+        reason: 'reset',
+      },
+    ];
+  }
   cleared.history = [];
   cleared.record = createSessionRecord(session.problemId);
   cleared.turns = [];

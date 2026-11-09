@@ -607,6 +607,31 @@ function loginGuardBlocks(path, user) {
   return !user;
 }
 
+/**
+ * 归属校验（C10）：这条会话是不是**别人**的。
+ *
+ * 判的是"有归属且不是你"，而不是 `session.userId !== 我`：
+ * 会话的 `userId` 起初是 null —— sessionId 由前端生成（`'ui-' + Date.now().toString(36)`），
+ * 第一次说话时才由 persistSession 从令牌补上归属。若把 null 也判成"不是你的"，
+ * 登录之后**第一句话就会被自己的接口拒掉**：那不是收紧权限，是把门焊死。
+ *
+ * 没有登录态（`req.__user` 为空）时一律放行：没配守卫的环境里不存在"归属"这回事，
+ * 行为必须与加这条校验之前一模一样（C10 第三条：不放宽也不收紧）。
+ *
+ * 为什么判在这里而不是每路由各写一次：它是**身份规则**，不是业务规则。
+ * 三处各写一份，就一定会出现"报告拦了、公式卡没拦"这种后门。
+ */
+function notMine(session, me) {
+  const owner = session?.userId;
+  if (!me?.user || typeof owner !== 'string' || owner === '') return false;
+  return owner !== me.user.id;
+}
+
+/** 403 只回一句人话：不确认"这条会话存在"以外的任何事（报告内容、题目、对话都不带） */
+function sendNotOwner(res) {
+  sendJson(res, 403, { error: '这不是你的学习记录', code: 'NOT_OWNER' });
+}
+
 // ---------------------------------------------------------------------------
 // 埋点上报（POST /api/events）
 // ---------------------------------------------------------------------------
@@ -1161,6 +1186,11 @@ export async function handleApi(req, res, url) {
     const sid = sessionId || 'demo';
     const store = await getStore().catch(() => null);
     const session = (await restoreSession(store, sid, problemId)) ?? getSession(sid, problemId);
+    /** 归属校验（C10）：别人的 sessionId 不能拿来续聊（新会话 userId 为空，照常放行） */
+    if (notMine(session, req.__user)) {
+      sendNotOwner(res);
+      return true;
+    }
     const normalizedMode = 'self_training';
 
     let response;
@@ -1232,6 +1262,11 @@ export async function handleApi(req, res, url) {
       sendJson(res, 404, { error: '这个学习会话不存在或已过期，请重新开始一道题。' });
       return true;
     }
+    /** 归属校验（C10）：公式卡读的是 hintLog，也就是别人做到了哪一步 */
+    if (notMine(session, req.__user)) {
+      sendNotOwner(res);
+      return true;
+    }
     const problem = getProblemById(session.problemId);
     if (!problem) {
       sendJson(res, 404, { error: '这道题已不在题库里。' });
@@ -1276,6 +1311,15 @@ export async function handleApi(req, res, url) {
         detail:
           '会话已经写进存储，但这个 id 在库里没有记录：可能是在别的环境开始的，也可能是链接里的 id 不对。请回到题单重新开始一道题。',
       });
+      return true;
+    }
+
+    /**
+     * 归属校验（C10）：sessionId 是前端生成的可猜字符串，写穿之后
+     * "猜中一个 id 就能读走别人的报告"是真漏洞，不是理论风险。
+     */
+    if (notMine(session, req.__user)) {
+      sendNotOwner(res);
       return true;
     }
 

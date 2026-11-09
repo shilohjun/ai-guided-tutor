@@ -573,6 +573,55 @@ describe('会话 · 报告快照', () => {
       assert(stored.reportBuiltAt, 'reportBuiltAt 要记下来，否则没人知道这份快照是哪一刻的');
     });
   });
+
+  it('重置前先把这份快照压进 reportHistory，再清实时快照（C11）', async () => {
+    await withRouterServer({}, async ({ base, store }) => {
+      const sessionId = uid('archive');
+      await chat(base, { sessionId });
+      const shown = await call(base, `/api/report?sessionId=${sessionId}`);
+      assertEquals(shown.status, 200);
+      const shownText = JSON.stringify(shown.json.report);
+
+      const reset = await call(base, '/api/reset', { method: 'POST', body: { sessionId } });
+      assertEquals(reset.status, 200);
+
+      const stored = await store.getSession(sessionId);
+      assertEquals(stored.reportSnapshot, null, '重置后实时快照必须清掉（学生不该在新对话上看到上一轮的结论）');
+      assertEquals(stored.reportBuiltAt, null);
+      assert(Array.isArray(stored.reportHistory), 'reportHistory 必须是数组（导出与看板读它）');
+      assertEquals(stored.reportHistory.length, 1, '重置过几次就压几条，不清空也只压这一次');
+      const entry = stored.reportHistory[0];
+      assertEquals(JSON.stringify(entry.reportSnapshot), shownText, '历史里留的必须是学生重置前看到的那一份');
+      assertEquals(entry.reason, 'reset');
+      assert(entry.reportBuiltAt, '报告是哪一刻生成的也要留住，否则历史条目没法排序');
+      assert(Date.parse(entry.archivedAt), 'archivedAt 必须是服务端时间戳（客户端时钟不可信）');
+    });
+  });
+
+  it('再出一份报告再重置 → history 只追加，不改写已经有那条', async () => {
+    await withRouterServer({}, async ({ base, store }) => {
+      const sessionId = uid('archive2');
+      await chat(base, { sessionId });
+      const first = await call(base, `/api/report?sessionId=${sessionId}`);
+      const firstText = JSON.stringify(first.json.report);
+      await call(base, '/api/reset', { method: 'POST', body: { sessionId } });
+
+      /** 重来之后又聊出一份新报告，再重置一次 */
+      await chat(base, { sessionId });
+      const second = await call(base, `/api/report?sessionId=${sessionId}`);
+      assertEquals(second.status, 200);
+      await call(base, '/api/reset', { method: 'POST', body: { sessionId } });
+
+      const stored = await store.getSession(sessionId);
+      assert(Array.isArray(stored.reportHistory), 'reportHistory 必须是数组');
+      assertEquals(stored.reportHistory.length, 2, '每重置一次追加一条');
+      assertEquals(
+        JSON.stringify(stored.reportHistory[0].reportSnapshot),
+        firstText,
+        '先压进去的那一份不许被后来的重置改写（C5 的"冻结一次不覆盖"对历史同样成立）',
+      );
+    });
+  });
 });
 
 // ===========================================================================
@@ -627,7 +676,87 @@ describe('登录守卫 · PILOT_REQUIRE_LOGIN', () => {
 });
 
 // ===========================================================================
-// 8. 访问记录（C8）
+// 8. 归属校验（C10）：别人的 sessionId 不能拿来读报告 / 领公式卡 / 续聊
+// ===========================================================================
+
+describe('归属校验 · 会话只能由本人使用', () => {
+  it('A 的令牌 + B 的 sessionId → 三条路由一律 403 NOT_OWNER', async () => {
+    await withRouterServer({}, async ({ base, store }) => {
+      const a = await signIn(store);
+      const b = await signIn(store);
+      const bSession = uid('b-session');
+      const bOk = await chat(base, { sessionId: bSession, headers: { 'x-test-token': b.token } });
+      assertEquals(bOk.status, 200, '前提：B 自己的会话是好的');
+
+      /**
+       * 三条一起拦。只拦一条等于没拦 —— sessionId 是前端生成的
+       * （`'ui-' + Date.now().toString(36)`），可猜；猜中就能把别人的对话与报告读走。
+       */
+      const asChat = await chat(base, { sessionId: bSession, headers: { 'x-test-token': a.token } });
+      assertEquals(asChat.status, 403, `chat 必须拦，实际 ${asChat.status} ${JSON.stringify(asChat.json)}`);
+
+      const asReport = await call(base, `/api/report?sessionId=${bSession}`, { headers: { 'x-test-token': a.token } });
+      assertEquals(asReport.status, 403, `report 必须拦，实际 ${asReport.status} ${JSON.stringify(asReport.json)}`);
+      assertEquals(asReport.json?.report, undefined, '403 不得带出任何报告内容');
+
+      const asFormula = await call(base, '/api/formula', {
+        method: 'POST',
+        body: { sessionId: bSession },
+        headers: { 'x-test-token': a.token },
+      });
+      assertEquals(asFormula.status, 403, `formula 必须拦，实际 ${asFormula.status} ${JSON.stringify(asFormula.json)}`);
+
+      for (const [label, res] of [['chat', asChat], ['report', asReport], ['formula', asFormula]]) {
+        assertEquals(res.json?.code, 'NOT_OWNER', `${label} 的错误码要是 NOT_OWNER`);
+        assertEquals(res.json?.error, '这不是你的学习记录', `${label} 要给一句人话`);
+      }
+    });
+  });
+
+  it('A 的令牌 + A 自己的 sessionId → 三条路由都照常，不是 403', async () => {
+    await withRouterServer({}, async ({ base, store }) => {
+      const a = await signIn(store);
+      const sessionId = uid('a-session');
+
+      const asChat = await chat(base, { sessionId, headers: { 'x-test-token': a.token } });
+      assertEquals(asChat.status, 200, '自己的会话当然能聊');
+
+      const asReport = await call(base, `/api/report?sessionId=${sessionId}`, { headers: { 'x-test-token': a.token } });
+      assertEquals(asReport.status, 200, `自己的报告当然能读，实际 ${asReport.status} ${JSON.stringify(asReport.json)}`);
+      assert(asReport.json?.report, '报告内容要在');
+
+      /**
+       * 公式卡这时多半还没到 L3（409 是它的正常门禁），本条要钉的是"不是 403"：
+       * 归属校验管的是"这是不是你的"，不管"你有没有资格用这张卡"。
+       */
+      const asFormula = await call(base, '/api/formula', {
+        method: 'POST',
+        body: { sessionId },
+        headers: { 'x-test-token': a.token },
+      });
+      assert(
+        asFormula.status !== 403,
+        `自己的会话不该被归属校验拦下，实际 ${asFormula.status} ${JSON.stringify(asFormula.json)}`,
+      );
+    });
+  });
+
+  it('没有登录态时保持现状：不带令牌照旧读得到（不放宽也不收紧）', async () => {
+    await withRouterServer({}, async ({ base, store }) => {
+      const b = await signIn(store);
+      const bSession = uid('anon-read');
+      await chat(base, { sessionId: bSession, headers: { 'x-test-token': b.token } });
+
+      /** 没配守卫、也没带令牌 ⇒ 没有"身份"，也就没有"归属"这回事 */
+      const report = await call(base, `/api/report?sessionId=${bSession}`);
+      assertEquals(report.status, 200, '未登录时的行为必须与加校验之前一模一样');
+      assert(report.json?.report, '照旧返回报告');
+    });
+  });
+});
+
+// ===========================================================================
+// 9. 访问记录（C8）
 // ===========================================================================
 
 describe('访问记录 · POST /api/visit', () => {
@@ -658,7 +787,7 @@ describe('访问记录 · POST /api/visit', () => {
 });
 
 // ===========================================================================
-// 9. 存储单例的测试钩子（C7）
+// 10. 存储单例的测试钩子（C7）
 // ===========================================================================
 
 describe('存储单例 · 可以被测试重置', () => {

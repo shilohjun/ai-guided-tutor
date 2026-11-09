@@ -129,6 +129,7 @@ export function buildRequestEnv(gate, source) {
  * 将来哪个入口能提前解析，就不必再改签名。
  */
 export function buildRequestContext({ headers, url, source, user = null }) {
+  // 分工：权威解析在 router.handleApi（结果挂 req.__user）；这里的 user 只是透传槽，别删。
   const gate = resolveDemoGate({ headers, url, source });
   return { gate, gateState: gate.state, env: buildRequestEnv(gate, source), user };
 }
