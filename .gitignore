@@ -43,3 +43,6 @@ dist-cloudbase
 cloudbaserc.json
 .cloudbase
 
+
+# SDD 账本与工作区（本地临时，不进版本库）
+.superpowers/
