@@ -49,7 +49,8 @@ import { STUDENT_LEVEL_NOTE, inspectVoice } from '../core/prompt.js';
 import { PROBLEMS } from '../core/problems.data.js';
 import { DEFAULT_PERSONA, PERSONA_IDS, PERSONAS, normalizePersona, personaById, stylePersonaReply } from '../core/personas.js';
 import { openStore } from './store/index.js';
-import { checkLoginRate, login, noteLoginFailure, noteLoginSuccess } from './auth.js';
+import { checkLoginRate, login, noteLoginFailure, noteLoginSuccess, resolveToken } from './auth.js';
+import { recordEvent, validateEvent } from './events.js';
 
 loadEnvFile();
 
@@ -483,6 +484,109 @@ export function buildStudentTurn(response, mode, problem, personaValue = DEFAULT
 }
 
 // ---------------------------------------------------------------------------
+// 埋点上报（POST /api/events）
+// ---------------------------------------------------------------------------
+
+/**
+ * 从请求里取令牌。
+ *
+ * 为什么两个头都认：`authorization: Bearer …` 是标准形状（Task 4 的守卫会用它）；
+ * 埋点代码分散在各个页面动作里，写法不一定统一，所以额外认一个 `x-pilot-token`。
+ * 两种形状都只是"取串"，判定在 resolveToken 里 —— 这里不做任何安全判断。
+ */
+function bearerToken(req) {
+  const header = req.headers?.authorization ?? req.headers?.['x-pilot-token'];
+  const raw = Array.isArray(header) ? header[0] : header;
+  return String(raw ?? '').replace(/^bearer\s+/i, '').trim();
+}
+
+/** 空串、空白、非字符串一律收敛成 null —— 库里不想出现 `userId: ''` 这种"有值但没意义" */
+function textOrNull(value) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  return text === '' ? null : text;
+}
+
+/**
+ * 一批埋点的全部处理。**永远不抛**，永远返回两个计数（B4）。
+ *
+ * ============================================================================
+ * 为什么这个接口"永远返回 200"
+ * ============================================================================
+ * 埋点是**旁路**：它坏了不能影响学生做题。而它又几乎一定在最糟的时刻坏
+ * （弱网、页面被杀、后台标签页被节流）—— 这时候回 4xx/5xx，前端的常见反应是
+ * 重试，于是坏请求被放大成一串坏请求，还可能顶掉真正的主流程请求。
+ * 所以这里把"丢掉"当成正常结果：逐条判断，能收几条收几条，剩下的计数返回。
+ *
+ * 四类情况都不许 5xx：
+ *   ① 请求体解析失败（半截 JSON / 超过 1MB / 空 body）→ `{ accepted: 0, rejected: 0 }`
+ *   ② 单条不合法（未知 type / 没带 at / payload 超 2KB / 没有归属）→ 跳过并计入 rejected
+ *   ③ 存储写失败（磁盘满、驱动不可用）→ 同样计入 rejected，不往上报错
+ *   ④ 令牌解析失败 → 当作"没有身份"，回落到 body 里的 userId（Task 4 会把它收紧成必须登录）
+ *
+ * `rejected` 存在的意义不是给前端看，而是**让埋点坏掉这件事有数字**：
+ * 没有它，"这周为什么少了三分之一的事件"只能靠猜。
+ *
+ * ============================================================================
+ * 身份与时间都不信客户端
+ * ============================================================================
+ * - `userId` / `batchId`：带了令牌就用令牌里的（`batchId` 是令牌解析出的**当前批次**）。
+ *   令牌缺席时才回落到 body —— 现在还没有登录守卫，脚本与测试需要这条路；
+ *   Task 4 会把"必须登录"补上，届时回落自然失效。
+ * - `at`：值一律由 `recordEvent` 换成服务端时间。这里只校验它**在不在** ——
+ *   缺 `at` 是我们唯一能看出"这条埋点是半截的"的信号（见 events.js 里 validateEvent），
+ *   跳过的代价是一条事件，不是整批。
+ *
+ * @param {object} req
+ * @param {object|null} body 已解析好的请求体；解析失败传 null
+ * @returns {Promise<{ accepted: number, rejected: number }>}
+ */
+async function acceptEvents(req, body) {
+  const items = Array.isArray(body?.events) ? body.events : [];
+  if (!items.length) return { accepted: 0, rejected: 0 };
+
+  /** 存储打不开（例如 STORE=cloudbase 还没实现）时，这一批全部记成 rejected，而不是 500 */
+  const store = await getStore().catch(() => null);
+  if (!store) return { accepted: 0, rejected: items.length };
+
+  const token = bearerToken(req);
+  const identity = token ? await resolveToken(store, token).catch(() => null) : null;
+
+  let accepted = 0;
+  let rejected = 0;
+  for (const item of items) {
+    /**
+     * 非对象一条条看起来很像"数组里混了 null/字符串"（前端拼接出错时就是这样），
+     * 它们连 validateEvent 的入参都不该是 —— 直接计数跳过。
+     */
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      rejected += 1;
+      continue;
+    }
+    if (!validateEvent(item).ok) {
+      rejected += 1;
+      continue;
+    }
+
+    const event = {
+      ...item,
+      /** 令牌优先；body 只在没有身份时兜底（见上面的说明） */
+      userId: identity ? identity.user.id : (textOrNull(item.userId) ?? textOrNull(body?.userId)),
+      batchId: identity ? (identity.batchId ?? null) : (textOrNull(item.batchId) ?? textOrNull(body?.batchId)),
+    };
+
+    try {
+      await recordEvent(store, event);
+      accepted += 1;
+    } catch {
+      /** 单条写失败不牵连整批，也不把异常放到路由外 */
+      rejected += 1;
+    }
+  }
+
+  return { accepted, rejected };
+}
+
+// ---------------------------------------------------------------------------
 // API 处理
 // ---------------------------------------------------------------------------
 
@@ -558,6 +662,27 @@ export async function handleApi(req, res, url) {
         ],
       },
     });
+    return true;
+  }
+
+  // ---- POST /api/events（埋点批量上报：永不因埋点失败返回 4xx/5xx） ----
+  /**
+   * 读体失败**只在本路由内消化**：
+   * 半截 JSON、超过 1MB、空 body 都走同一条路 —— 回 `200 { accepted: 0, rejected: 0 }`。
+   * 埋点坏了不能影响主流程，也不能给学生端一个"内部错误"。
+   *
+   * 外面再包一层 catch：`acceptEvents` 里已经逐段兜过，但"永远不 5xx"是承诺，
+   * 承诺要由最后一道兜底来兑现，而不是靠"我记得里面都兜住了"。
+   */
+  if (path === '/api/events' && req.method === 'POST') {
+    const body = await readJson(req).catch(() => null);
+    let summary;
+    try {
+      summary = await acceptEvents(req, body);
+    } catch {
+      summary = { accepted: 0, rejected: 0 };
+    }
+    sendJson(res, 200, summary);
     return true;
   }
 

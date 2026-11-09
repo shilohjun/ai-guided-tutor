@@ -64,6 +64,50 @@ function byFields(...keys) {
 }
 
 /**
+ * 事件的归属键：`sessionId` 非空就用它，否则用 `visitId`（排序与过滤都按它）。
+ * 写入时用下面的 `ownerOf`（它会抛），读取与排序用这个（不抛）。
+ * 与 memory.js 的 `ownerKey` 必须逐字一致：不一致的后果是同一个事件
+ * 换一个驱动就少一半（见 test/store-equivalence.test.js 的文件头）。
+ */
+function ownerKey(event) {
+  return String(event?.sessionId || event?.visitId || '');
+}
+
+/** 事件的全局序号；没有 seq 的老事件返回 null（统一排到有序号的之后） */
+function seqOf(event) {
+  return typeof event?.seq === 'number' && Number.isFinite(event.seq) ? event.seq : null;
+}
+
+/**
+ * 事件顺序：seq 升序 → at → 归属键。
+ *
+ * 为什么不能只按 `at` 排：同一毫秒里的多条事件在内存驱动里保留写入序、
+ * 在 file 驱动里取决于 `readdirSync` 的顺序 —— 同一份数据在两台机器上导出的
+ * 行序会不同，而导出件是要给人看的。`seq` 在写的那一刻就把顺序定死了。
+ *
+ * 后两档（at、归属键）存在的意义是"没有 seq 的老数据也要有确定顺序"：
+ * 它们排在有序号的之后，内部按 at、再按归属键。少了这两档，顺序就会
+ * 退化成目录的读取序 —— 那正是这个比较器要消掉的东西。
+ * 与 memory.js 的同名逻辑必须逐字一致。
+ */
+function byEventOrder(a, b) {
+  const as = seqOf(a);
+  const bs = seqOf(b);
+  if (as !== bs) {
+    if (as === null) return 1;
+    if (bs === null) return -1;
+    return as - bs;
+  }
+  const atA = String(a?.at ?? '');
+  const atB = String(b?.at ?? '');
+  if (atA !== atB) return atA < atB ? -1 : 1;
+  const ownerA = ownerKey(a);
+  const ownerB = ownerKey(b);
+  if (ownerA !== ownerB) return ownerA < ownerB ? -1 : 1;
+  return 0;
+}
+
+/**
  * id / 计数器键 → 安全文件名。
  *
  * 为什么需要转义：
@@ -134,19 +178,19 @@ export async function openFileStore(env = {}) {
    * 当成没有归属而误抛，白丢一条数据。
    */
   function ownerOf(event) {
-    const owner = event?.sessionId || event?.visitId;
+    const owner = ownerKey(event);
     if (!owner) throw new Error('事件必须带 sessionId 或 visitId');
-    return String(owner);
+    return owner;
   }
 
   function eventsFile(owner) {
     return join(root, EVENTS, `${nameOf(owner)}.jsonl`);
   }
 
-  function readEventLines(owner) {
+  function readEventFile(file) {
     let text;
     try {
-      text = readFileSync(eventsFile(owner), 'utf8');
+      text = readFileSync(file, 'utf8');
     } catch (err) {
       if (err?.code === 'ENOENT') return [];
       throw err;
@@ -155,6 +199,35 @@ export async function openFileStore(env = {}) {
       .split('\n')
       .filter((line) => line.trim())
       .map((line) => JSON.parse(line));
+  }
+
+  function readEventLines(owner) {
+    return readEventFile(eventsFile(owner));
+  }
+
+  /**
+   * 把**所有**归属的事件读出来。
+   *
+   * 为什么需要它：`listEventsByBatch` 改成按事件自带的 batchId 过滤之后，
+   * 就没法再"先查出批次里的 session/visit，再按名字读文件"了 —— 事件是散在
+   * 各个归属文件里的，只能全量扫一遍。试点量级（一个班几十人、几节课）
+   * 完全吃得下；Task 12 搬到 CloudBase 上时这是一次带索引的查询。
+   */
+  function readAllEvents() {
+    let names;
+    try {
+      names = readdirSync(join(root, EVENTS));
+    } catch (err) {
+      if (err?.code === 'ENOENT') return [];
+      throw err;
+    }
+    const out = [];
+    for (const name of names) {
+      if (!name.endsWith('.jsonl')) continue;
+      /** 逐条 push 而不是 `out.push(...lines)`：展开一个几万行的数组会撞上调用栈参数上限 */
+      for (const event of readEventFile(join(root, EVENTS, name))) out.push(event);
+    }
+    return out;
   }
 
   function counterFile(key) {
@@ -244,23 +317,26 @@ export async function openFileStore(env = {}) {
       // 一行一个，只追加：这条链路上没有"改事件"这回事
       appendFileSync(file, `${JSON.stringify(event)}\n`, 'utf8');
     },
-    async listEventsBySession(sessionId) {
-      if (!sessionId) return [];
-      // 不做任何排序：文件里的行序就是写入顺序，这正是不变量
-      return readEventLines(sessionId);
+    /**
+     * 按**归属键**取事件 —— 参数不叫 sessionId，因为它可能是 visitId。
+     * 文件名就是归属键（见 eventsFile），所以传 visitId 天然取得到。
+     * 仍然要排序：行序是写入序，而写入序不等于 seq 序（并发时可能颠倒）。
+     */
+    async listEventsBySession(ownerId) {
+      if (!ownerId) return [];
+      return readEventLines(ownerId).sort(byEventOrder);
     },
+    /**
+     * 按事件**自带的 batchId** 取，不回查会话/访问属于哪个批次。
+     *
+     * 为什么改掉回查：回查要读两张表（session + visit），两个驱动很容易各读各的
+     * —— 事件上的 batchId 是写进去时就确定的事实，直接用它只有一条规则。
+     */
     async listEventsByBatch(batchId) {
-      /**
-       * 按归属取，不按 event.batchId 取：事件上的 batchId 可能漏填，
-       * 而"这个事件属于哪次会话/哪次打开"是写进去时就确定的事实。
-       * 事件是按 sessionId/visitId 分文件存的，所以先找出这一批的归属者。
-       */
-      const owners = new Set();
-      for (const s of readAll(SESSIONS)) if (s.batchId === batchId) owners.add(s.id);
-      for (const v of readAll(VISITS)) if (v.batchId === batchId) owners.add(v.id);
-      const out = [];
-      for (const owner of owners) out.push(...readEventLines(owner));
-      return out.sort(byFields('at'));
+      if (!batchId) return [];
+      return readAllEvents()
+        .filter((e) => e.batchId === batchId)
+        .sort(byEventOrder);
     },
 
     async incrCounter(key, n = 1) {

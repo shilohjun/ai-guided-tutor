@@ -35,9 +35,9 @@
  * @property {(session: object) => Promise<void>} putSession
  * @property {(batchId: string) => Promise<object[]>} listSessionsByBatch
  * @property {(userId: string) => Promise<object[]>} listSessionsByUser
- * @property {(event: object) => Promise<void>} appendEvent
- * @property {(sessionId: string) => Promise<object[]>} listEventsBySession
- * @property {(batchId: string) => Promise<object[]>} listEventsByBatch
+ * @property {(event: object) => Promise<void>} appendEvent  事件原样追加；`seq` 由 events.js 在调用前盖好
+ * @property {(ownerId: string) => Promise<object[]>} listEventsBySession  参数是**归属键**（sessionId 或 visitId），按 seq 升序
+ * @property {(batchId: string) => Promise<object[]>} listEventsByBatch  按事件自带的 batchId 过滤（不回查会话），按 seq 升序
  * @property {(key: string, n?: number) => Promise<number>} incrCounter
  * @property {(key: string) => Promise<number>} getCounter
  * @property {() => Promise<void>} close

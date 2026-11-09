@@ -290,7 +290,7 @@ npm run preview:verify    # file:// 打开验收
 npm test
 ```
 
-当前注册 **383 个用例，全部通过**。`npm test` 跑完测试后会接着跑
+当前注册 **406 个用例，全部通过**。`npm test` 跑完测试后会接着跑
 `scripts/audit-ui-style.js`：它把设计令牌（间距 2/4/6/8/12/16/24/32、字号三档、
 嵌套圆角、语义色）做成可执行规则，样式一跑偏就报出来 —— 只靠人眼看不住。
 字号与控件尺寸参考 LeetCode 做题页后，再按中文密度收一档（中档题干 13/18.9、标签 11、按钮高 32、顶栏 52）。
@@ -366,6 +366,7 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 |---|---|---|
 | `GET` | `/api/health` | 健康检查、当前运行模式、`capabilities.modes`（哪些做题方式能点） |
 | `POST` | `/api/auth/login` | 6 位口令 → 令牌（`200 {token, displayName, batchId, expiresAt}`）；口令不对 `401`，同一 IP 15 分钟内超过 10 次 `429` |
+| `POST` | `/api/events` | 埋点批量上报（13 种事件，见 `src/server/events.js`）→ `200 {accepted, rejected}`。**永不因埋点失败返回 4xx/5xx**：坏请求体、未知 type、超大 payload、存储写失败都只影响那一条，`at` 与身份一律由服务端填 |
 | `GET` | `/api/problems` | 内置题目列表 |
 | `GET` | `/api/related?id=` | 同知识点的同类题（服务端注册表内，最多 6 道）。**前端已不再调用**：第 5 页改为从 152 道题库按双轴标签筛 |
 | `GET` | `/api/problem?id=` | 单个题目（学生可见版本） |
