@@ -203,3 +203,60 @@ describe('看板 · 静态契约（导出）', () => {
     assertIncludes(s, 'body.error', '非 200 时要把 JSON 里的那句人话显示出来，而不是下载一个空文件');
   });
 });
+
+/**
+ * ============================================================================
+ * 单人页（控制者补充 II）
+ * ============================================================================
+ * 漏斗只说"第 3 页掉了 60%"，读完一段对话才知道为什么。这条链有三段，
+ * 任何一段断了都不会报错：
+ *
+ *   ① 人的列表点不动 —— 没有 `data-user-row`，老师只会以为这页只能看不能点；
+ *   ② 展开区没有会话 —— 接口少给 `sessionList`，页面上就是一片空白；
+ *   ③ 对话拼进 DOM 时用了 `innerHTML` —— 学生的原话里只要有一个 `<`，
+ *      那一整段就变成标记（轻则显示错，重则注入）。页面渲染对话必须走 `textContent`。
+ *
+ * 另外两条是"看起来没事、其实是错的"：
+ *   · 未完成 / 已放弃只靠颜色标 —— 打印出来或色觉差异时这两行就一样了；
+ *   · 截断不说 —— 「只有 50 条」会被读成「他只做了 50 道」。
+ */
+describe('看板 · 静态契约（单人页）', () => {
+  it('人的列表点得动：data-user-row + 就地展开的 person-detail', () => {
+    const s = html();
+    assertIncludes(s, 'data-user-row', '行上要有 data-user-row，否则点不开');
+    assertIncludes(s, 'data-testid="person-detail"', '展开区要能被测试与读屏指认');
+    assertIncludes(s, 'nextSibling', '展开区是就地插在该行后面，不是跳转/新窗口');
+  });
+
+  it('对话面板与读对话的接口都在', () => {
+    const s = html();
+    assertIncludes(s, 'data-testid="conversation"');
+    assertIncludes(s, '/api/admin/session?sessionId=');
+    assertIncludes(s, '查看对话');
+    assertIncludes(s, '导出这条');
+  });
+
+  it('对话只用 textContent 渲染（学生原话里的 < 不会被当成标记）', () => {
+    const js = script();
+    for (const sink of ['innerHTML', 'outerHTML', 'insertAdjacentHTML', 'document.write']) {
+      assert(!js.includes(sink), `页面里不该出现 ${sink}：对话必须用 textContent 逐条拼`);
+    }
+    assertIncludes(js, 'textContent');
+  });
+
+  it('未完成 / 已放弃是中文标注，不靠颜色；截断要明说', () => {
+    const s = html();
+    assertIncludes(s, '未完成');
+    assertIncludes(s, '已放弃');
+    assertIncludes(s, 'sessionListTruncated');
+    assertIncludes(s, '只显示最近 50 条');
+  });
+
+  it('空态与错误都是人话，不把 JSON 原文贴出来', () => {
+    const s = html();
+    assertIncludes(s, '还没有作答记录');
+    assertIncludes(s, '这段对话没有内容');
+    assertIncludes(s, '这条学习记录不存在');
+    assert(!s.includes('<pre'), '页面里不贴原始 JSON（连一个 <pre> 块都不该有）');
+  });
+});

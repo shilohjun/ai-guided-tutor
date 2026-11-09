@@ -26,7 +26,7 @@
  * 这里把加载失败记下来交给第一条用例报出来，其余用例各自在调用处失败。
  */
 
-import { describe, it, assert, assertEquals, assertNotIncludes } from './runner.js';
+import { describe, it, assert, assertEquals, assertIncludes, assertNotIncludes } from './runner.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -645,14 +645,17 @@ describe('管理接口 · users', () => {
     });
   });
 
-  it('每行只有这七个字段（看板不该收到 codeHash 之类的内部字段）', async () => {
+  it('每行只有这八个字段（看板不该收到 codeHash 之类的内部字段）', async () => {
     const store = stubStore({
       listMembers: async () => [{ batchId: 'b8', userId: 'u1' }],
       getUserById: async () => ({ id: 'u1', displayName: 'S01', codeHash: 'deadbeef', disabled: false }),
     });
     const res = await callAdmin(store, '/api/admin/users?batchId=b8');
     assertEquals(res.status, 200);
-    assertEquals(Object.keys(res.json[0]).sort().join(','), 'abandoned,displayName,finished,lastAt,lastPage,sessions,userId');
+    assertEquals(
+      Object.keys(res.json[0]).sort().join(','),
+      'abandoned,displayName,finished,lastAt,lastPage,sessionList,sessions,userId',
+    );
     assertNotIncludes(res.text, 'deadbeef');
   });
 });
@@ -843,5 +846,264 @@ describe('管理接口 · stitchEvents', () => {
     const stitched = stitchEvents([{ seq: 1, visitId: 'v1', sessionId: 's1', type: 'page_enter', payload: { page: 3 } }], sessions, visits);
     assertEquals(stitched.sessions[0].events.length, 1);
     assertEquals(stitched.visits[0].events.length, 0, '两边都挂会把同一段时间算两遍');
+  });
+});
+
+// ===========================================================================
+// 九、单人页：人的每一行带他自己的会话，外加"读一段对话"的接口
+// ===========================================================================
+
+/**
+ * 设计稿 §5.6 的第三屏是"点一个人，看他的会话与对话"。漏斗只说**在哪掉**，
+ * 读完一段对话才知道**为什么掉**。而这两件事原本都没有接口：
+ *   · `/api/admin/users` 只回聚合，没有 sessionId，页面点不下去；
+ *   · `/api/admin/export` 回的是 zip，页面读不了。
+ *
+ * 这一节钉的是"补上之后不会顺手把教师字段漏出去"：
+ *   · `hintLog` 里有 `rationale` / `evidenceQuotes` / `guardViolations`，
+ *     它们是给教研复盘的，不是给学生看的；整条 `session` 直接 JSON 回去就会带出去，
+ *     而这种泄漏**不会报错**——页面只显示对话，没人会发现多出来的字段。
+ *   · `turns` 上的 `metaStep` / `metaGraphId` 是同类的漏点：它们指向解题路径。
+ */
+describe('管理接口 · 单人页', () => {
+  /** 一条会话的最小形状：只写 sessionList 与 readSessionRecord 真的会读的那几个字段 */
+  const sessionOf = (over = {}) => ({
+    id: 's-x',
+    userId: 'u1',
+    batchId: 'b8',
+    problemId: 'qbank-1',
+    questionIndex: 0,
+    startedAt: at(60 * MIN),
+    lastAt: at(50 * MIN),
+    finishedAt: null,
+    endState: 'in_progress',
+    progress: { maxPage: 3, reached: { p3: at(55 * MIN) }, backtracks: 0 },
+    counters: { chatTurns: 1, hintLevels: [] },
+    turns: [],
+    ...over,
+  });
+
+  /** 只有一个人的库：会话由每条用例自己给 */
+  const oneUserStore = (sessions, patch = {}) =>
+    stubStore({
+      listMembers: async () => [{ batchId: 'b8', userId: 'u1' }],
+      getUserById: async () => ({ id: 'u1', displayName: 'S01' }),
+      listSessionsByBatch: async () => sessions,
+      ...patch,
+    });
+
+  it('每行带 sessionList：字段固定，按 startedAt 降序、同值按 id 升序', async () => {
+    const store = oneUserStore([
+      sessionOf({ id: 's-mid', startedAt: at(30 * MIN), lastAt: at(25 * MIN) }),
+      sessionOf({ id: 's-old', startedAt: at(90 * MIN), lastAt: at(80 * MIN) }),
+      sessionOf({ id: 's-new', startedAt: at(10 * MIN), lastAt: at(5 * MIN), finishedAt: at(6 * MIN) }),
+      /** 同一毫秒创建的两条：靠 id 码位升序定序，两次刷新必须给出同一个顺序 */
+      sessionOf({ id: 's-tie-b', startedAt: at(30 * MIN), lastAt: at(25 * MIN) }),
+      sessionOf({ id: 's-tie-a', startedAt: at(30 * MIN), lastAt: at(25 * MIN) }),
+      /** 30 小时没动且没做完：这一条要标"已放弃" */
+      sessionOf({ id: 's-gone', startedAt: at(40 * HOUR), lastAt: at(30 * HOUR) }),
+    ]);
+
+    const res = await callAdmin(store, '/api/admin/users?batchId=b8');
+    assertEquals(res.status, 200);
+    const row = res.json[0];
+
+    assertEquals(
+      row.sessionList.map((item) => item.id).join(','),
+      's-new,s-mid,s-tie-a,s-tie-b,s-old,s-gone',
+      '最近的排最前；同一时刻按 id 升序',
+    );
+    assertEquals(row.sessions, 6, 'sessions 仍然是条数（既有字段不改名、不改含义）');
+    assertEquals(row.sessionList.length, row.sessions, '没到 50 条时一条都不许少');
+
+    /** 形状：多一个字段就是"某个内部字段被顺手带出去了" */
+    assertEquals(
+      Object.keys(row.sessionList[0]).sort().join(','),
+      'abandoned,finished,id,lastAt,page,problemId,questionIndex,startedAt',
+    );
+
+    const byId = Object.fromEntries(row.sessionList.map((item) => [item.id, item]));
+    assertEquals(byId['s-new'].finished, true);
+    assertEquals(byId['s-new'].abandoned, false, '做完了的永远不算放弃');
+    assertEquals(byId['s-mid'].finished, false);
+    assertEquals(byId['s-mid'].abandoned, false, '才 25 分钟没动，不算放弃');
+    assertEquals(byId['s-mid'].page, 3, 'page 是该条会话自己走到过的最靠后那一页');
+    assertEquals(byId['s-gone'].abandoned, true, '30 小时没动且没做完 —— 这就是放弃');
+    assertEquals(byId['s-mid'].problemId, 'qbank-1');
+    assertEquals(byId['s-mid'].startedAt, at(30 * MIN));
+  });
+
+  it('每人最多 50 条；超出时带 sessionListTruncated，不静默截断', async () => {
+    const many = Array.from({ length: 51 }, (_, i) =>
+      sessionOf({ id: 's' + String(i).padStart(3, '0'), startedAt: at(i * MIN), lastAt: at(i * MIN) }),
+    );
+    const res = await callAdmin(oneUserStore(many), '/api/admin/users?batchId=b8');
+    assertEquals(res.status, 200);
+
+    const row = res.json[0];
+    assertEquals(row.sessions, 51, '数字仍然是全部条数：截断只发生在列表上');
+    assertEquals(row.sessionList.length, 50);
+    assertEquals(row.sessionList[0].id, 's000', '切掉的是最旧的那一条，不是最新的');
+    assertEquals(row.sessionList[49].id, 's049');
+    assertEquals(row.sessionListTruncated, true, '截断必须说出来，否则"只有 50 条"会被读成"他只做了 50 道"');
+    assertNotIncludes(res.text, 's050', '第 51 条不该出现在响应里');
+  });
+
+  it('正好 50 条时没有 sessionListTruncated（别把刚好够也标成截断）', async () => {
+    const exact = Array.from({ length: 50 }, (_, i) =>
+      sessionOf({ id: 's' + String(i).padStart(3, '0'), startedAt: at(i * MIN), lastAt: at(i * MIN) }),
+    );
+    const res = await callAdmin(oneUserStore(exact), '/api/admin/users?batchId=b8');
+    assertEquals(res.json[0].sessionList.length, 50);
+    assertEquals('sessionListTruncated' in res.json[0], false);
+  });
+
+  it('GET /api/admin/session 200：只回 meta / turns / reportSnapshot', async () => {
+    const store = stubStore({
+      getUserById: async () => ({ id: 'u1', displayName: 'S01' }),
+      getSession: async (id) =>
+        id === 's1'
+          ? sessionOf({
+              id: 's1',
+              record: {
+                problemId: 'qbank-1',
+                turns: [
+                  { role: 'student', text: '先把力分解', at: at(590e3) },
+                  { role: 'ai', text: '先看合力方向\n再看加速度', at: at(589e3), level: 2, metaStep: 3, metaGraphId: 'g-9' },
+                ],
+                hintLog: [],
+                formulaCards: [],
+              },
+              reportSnapshot: { independence: 0.6 },
+            })
+          : null,
+    });
+
+    const res = await callAdmin(store, '/api/admin/session?sessionId=s1');
+    assertEquals(res.status, 200);
+    assertEquals(Object.keys(res.json).sort().join(','), 'meta,reportSnapshot,turns');
+
+    const meta = res.json.meta;
+    assertEquals(
+      Object.keys(meta).sort().join(','),
+      'batchId,displayName,finished,id,lastAt,page,problemId,startedAt,userId',
+    );
+    assertEquals(meta.id, 's1');
+    assertEquals(meta.displayName, 'S01');
+    assertEquals(meta.problemId, 'qbank-1');
+    assertEquals(meta.batchId, 'b8');
+    assertEquals(meta.startedAt, at(60 * MIN));
+    assertEquals(meta.finished, false);
+    assertEquals(meta.page, 3);
+
+    /** turns 按数组顺序，且只保留看对话真的要用的五档（第 1 条没有 level 就不带这个键） */
+    assertEquals(res.json.turns.length, 2);
+    assertEquals(Object.keys(res.json.turns[0]).sort().join(','), 'at,i,role,text');
+    assertEquals(res.json.turns[0].i, 0);
+    assertEquals(res.json.turns[0].role, 'student');
+    assertEquals(res.json.turns[0].text, '先把力分解');
+    assertEquals(res.json.turns[1].i, 1);
+    assertEquals(res.json.turns[1].role, 'ai');
+    assertEquals(res.json.turns[1].level, 2);
+    assertIncludes(res.json.turns[1].text, '\n', '换行要原样带回来（页面用 pre-wrap 保住它）');
+
+    assertDeep(res.json.reportSnapshot, { independence: 0.6 });
+
+    /** 指向解题路径的两个字段不进响应：页面不显示它们，漏出去也没人会发现 */
+    assertNotIncludes(res.text, 'metaStep');
+    assertNotIncludes(res.text, 'metaGraphId');
+    assertNotIncludes(res.text, 'g-9');
+  });
+
+  it('教师字段一条都不许漏：hintLog / rationale / evidenceQuotes / guardViolations / answerFingerprints / solutionGraphs', async () => {
+    const store = stubStore({
+      getSession: async () =>
+        sessionOf({
+          id: 's1',
+          /** 会话顶层若真有这两样（题目侧的内部字段），整条 JSON 回去就会带出去 */
+          answerFingerprints: ['af-secret'],
+          solutionGraphs: ['sg-secret'],
+          record: {
+            problemId: 'qbank-1',
+            turns: [{ role: 'student', text: '说点什么', at: at(590e3) }],
+            hintLog: [
+              {
+                rationale: '不该给学生的推理',
+                evidenceQuotes: ['题干里的原句'],
+                guardViolations: [{ kind: 'leak', text: '被拦下的原话' }],
+              },
+            ],
+            formulaCards: [],
+          },
+          reportSnapshot: { independence: 0.5 },
+        }),
+    });
+
+    const res = await callAdmin(store, '/api/admin/session?sessionId=s1');
+    assertEquals(res.status, 200);
+    for (const needle of [
+      'hintLog',
+      'rationale',
+      'evidenceQuotes',
+      'guardViolations',
+      'answerFingerprints',
+      'solutionGraphs',
+      /** 连值也不许出现：只挡键名的话，换个字段名就漏了 */
+      '不该给学生的推理',
+      '题干里的原句',
+      '被拦下的原话',
+      'af-secret',
+      'sg-secret',
+    ]) {
+      assertNotIncludes(res.text, needle, `响应里出现了 ${needle}：整条 session 被 JSON 回去了`);
+    }
+  });
+
+  it('缺 sessionId → 400；不存在 → 404；读不出来 → 503（三种不许混成一个答案）', async () => {
+    const store = stubStore({
+      getSession: async (id) => {
+        if (id === 'boom') throw new Error('cloudbase: request timeout');
+        return null;
+      },
+    });
+
+    for (const path of ['/api/admin/session', '/api/admin/session?sessionId=']) {
+      const missing = await callAdmin(store, path);
+      assertEquals(missing.status, 400, `${path} 缺参数应当 400`);
+      assertEquals(missing.json.error, '需要 sessionId');
+    }
+
+    const notFound = await callAdmin(store, '/api/admin/session?sessionId=nope');
+    assertEquals(notFound.status, 404);
+    assertEquals(notFound.json.error, '这条学习记录不存在');
+
+    const failed = await callAdmin(store, '/api/admin/session?sessionId=boom');
+    assertEquals(failed.status, 503);
+    assertEquals(failed.json.error, '读取学习记录失败，请刷新页面重试。');
+    assertEquals(failed.json.retryable, true);
+    assertNotIncludes(failed.text, 'timeout', '读失败的详情进日志，不进响应体');
+  });
+
+  it('真 HTTP：这条路由由 handleAdminApi 处理（router.js 没有新增路由）', async () => {
+    await withAdminServer({}, async ({ base, store }) => {
+      await seed(store);
+      const res = await call(base, '/api/admin/session?sessionId=s1', { headers: withCode() });
+      assertEquals(res.status, 200);
+      assertEquals(res.json.meta.id, 's1');
+      assertEquals(res.json.meta.displayName, 'S02', '代号来自 getUserById，与人的列表同源');
+      assertEquals(res.json.meta.finished, true);
+      assertEquals(res.json.meta.page, 4);
+      assertEquals(res.json.turns.length, 1);
+      assertEquals(res.json.turns[0].role, 'student');
+      assertDeep(res.json.reportSnapshot, { independence: 0.6 });
+
+      const missing = await call(base, '/api/admin/session?sessionId=nope', { headers: withCode() });
+      assertEquals(missing.status, 404);
+      assertEquals(missing.json.error, '这条学习记录不存在');
+
+      /** 没有口令就是 401：同一个闸门，不因为路径是新的就绕过去 */
+      const locked = await call(base, '/api/admin/session?sessionId=s1');
+      assertEquals(locked.status, 401);
+    });
   });
 });

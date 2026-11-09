@@ -61,9 +61,20 @@ import { buildFunnel, isAbandoned, summarizeSessions } from './metrics.js';
 import { exportBatch, exportSingle } from './export.js';
 import { ownerOf } from './events.js';
 import { safeEqual } from './demo-gate.js';
+import { readSessionRecord } from './session-store.js';
 
 /** 产品只有四页（`setPage(5)` 只是 4 的别名）。越界的 maxPage 只能是坏数据。 */
 const MAX_PAGE = 4;
+
+/**
+ * 单人页每个人的会话列表最多给这么多条。
+ *
+ * 为什么不给全量：展开区回答的是"这个人最近做了什么"，一次试点里一个人做到
+ * 50 道题已经很反常；真给全量，一个重做很多遍的人会把整页展开区撑成几百行，
+ * 而看板是给一个班用的。截断**必须说出来**（`sessionListTruncated`），
+ * 否则"只有 50 条"会被读成"他只做了 50 道"。
+ */
+const MAX_SESSION_LIST = 50;
 
 const NOT_FOUND = { error: '没有这个接口' };
 const LOCKED = { error: '需要管理员口令' };
@@ -329,6 +340,67 @@ function laterOf(a, b) {
 }
 
 /**
+ * `questionIndex`（题单序号，0 起）。
+ *
+ * 为什么不直接 `Number(...)`：`Number(null)`、`Number('')`、`Number([])` 全是 **0**，
+ * 于是"没记题号"会被显示成"第 1 道"—— 一个具体的、错的位置，读的人不会怀疑它。
+ * 所以只认有限数与非空数字串，其余一律 `null`（页面据此写"题号未知"）。
+ */
+function indexOf(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const num = Number(value.trim());
+    return Number.isFinite(num) ? num : null;
+  }
+  return null;
+}
+
+/**
+ * 会话列表里的一行（单人页展开区的数据）。
+ *
+ * `abandoned` 走 `metrics.isAbandoned`，与人的列表那一行**同一个判定**：
+ * 两处各写一份的话，同一条会话可能在汇总行算"放弃"、在明细行算"没放弃"，
+ * 而两个数都在同一屏上，读的人只会觉得看板不可信。
+ *
+ * `finished` 是布尔（这一条做完没有）；人的列表上的 `finished` 是**条数**。
+ * 同名不同义是刻意的：两个位置各自读起来都自然，改名反而会在页面上多出一层翻译。
+ */
+function sessionSummary(session, batch, now) {
+  return {
+    id: text(session?.id) || null,
+    problemId: text(session?.problemId) || null,
+    questionIndex: indexOf(session?.questionIndex),
+    page: lastPageOf(session),
+    startedAt: text(session?.startedAt) || null,
+    lastAt: text(session?.lastAt) || null,
+    finished: Boolean(session?.finishedAt),
+    abandoned: isAbandoned(session, batch, now),
+  };
+}
+
+/**
+ * 会话列表排序：`startedAt` 降序（最近的在前），同值再按 `id` 升序。
+ *
+ * 三档的理由：
+ *   · 降序是这一屏的方向 —— 点开一个人，先看他刚做的事；
+ *   · 同毫秒的两条（一次连做两道题会出现）必须有确定答案，否则两次刷新顺序不同，
+ *     而"顺序变了"会被读成"数据变了"；
+ *   · 解析不出时间的排在后面：它是坏数据，不该顶在"最近做了什么"的第一行。
+ * 用 `<` 而不是 `localeCompare`：码位序不受运行环境 ICU 版本影响（与人的列表同一理由）。
+ */
+function byStartedDesc(a, b) {
+  const left = Date.parse(String(a?.startedAt ?? ''));
+  const right = Date.parse(String(b?.startedAt ?? ''));
+  const leftOk = Number.isFinite(left);
+  const rightOk = Number.isFinite(right);
+  if (leftOk && rightOk && left !== right) return right - left;
+  if (leftOk !== rightOk) return leftOk ? -1 : 1;
+  const x = String(a?.id ?? '');
+  const y = String(b?.id ?? '');
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
+/**
  * `GET /api/admin/users?batchId=` → 人的列表（看板第三屏）。
  *
  * 名单是**并集**：
@@ -342,6 +414,10 @@ function laterOf(a, b) {
  *
  * `abandoned` 用 `metrics.isAbandoned`（唯一一份判定）套在"这个人最后一次活动"上，
  * 并且要求**还有没做完的会话**：`abandonHours` 是一批人的统一阈值，看板不该另立一份。
+ *
+ * `sessionList` 是这个人自己的会话（单人页展开区，控制者补充 I1），按开始时间降序、
+ * 每人最多 `MAX_SESSION_LIST` 条，超出时在行上带 `sessionListTruncated`。
+ * `sessions` 仍然是**条数**：那个字段已经在看板与用例里，改名会让两处静默对不上。
  */
 async function sendUsers(res, store, url) {
   const found = await batchOf(store, url);
@@ -355,11 +431,12 @@ async function sendUsers(res, store, url) {
   for (const session of sessions) {
     const userId = text(session?.userId);
     if (!userId) continue;
-    const row = stats.get(userId) ?? { sessions: 0, finished: 0, lastPage: 0, lastAt: null };
+    const row = stats.get(userId) ?? { sessions: 0, finished: 0, lastPage: 0, lastAt: null, list: [] };
     row.sessions += 1;
     if (session.finishedAt) row.finished += 1;
     row.lastPage = Math.max(row.lastPage, lastPageOf(session));
     row.lastAt = laterOf(row.lastAt, session.lastAt);
+    row.list.push(sessionSummary(session, batch, now));
     stats.set(userId, row);
   }
 
@@ -373,8 +450,9 @@ async function sendUsers(res, store, url) {
   const rows = [];
   for (const userId of roster) {
     const user = await store.getUserById(userId);
-    const stat = stats.get(userId) ?? { sessions: 0, finished: 0, lastPage: 0, lastAt: null };
-    rows.push({
+    const stat = stats.get(userId) ?? { sessions: 0, finished: 0, lastPage: 0, lastAt: null, list: [] };
+    const list = stat.list.slice().sort(byStartedDesc);
+    const row = {
       userId,
       displayName: text(user?.displayName) || UNKNOWN_STUDENT,
       sessions: stat.sessions,
@@ -383,7 +461,11 @@ async function sendUsers(res, store, url) {
       lastAt: stat.lastAt,
       /** 还有没做完的、且最后一次活动已过阈值 → 放弃。"做完了"永远不算放弃 */
       abandoned: stat.sessions > stat.finished && isAbandoned({ lastAt: stat.lastAt }, batch, now),
-    });
+      sessionList: list.slice(0, MAX_SESSION_LIST),
+    };
+    /** 只在真的切掉了东西时才加这个键：`false` 也会被读成"这里有个开关" */
+    if (list.length > MAX_SESSION_LIST) row.sessionListTruncated = true;
+    rows.push(row);
   }
 
   /**
@@ -398,6 +480,118 @@ async function sendUsers(res, store, url) {
   });
 
   return answer(res, 200, rows);
+}
+
+// ---------------------------------------------------------------------------
+// 一条会话的对话（单人页的第三层）
+// ---------------------------------------------------------------------------
+
+/**
+ * 一条发言 → 页面要的那五档。
+ *
+ * **不 trim `text`**：首尾的空行是学生原话的一部分，而页面用 `pre-wrap` 原样显示
+ * （控制者补充 I3 要求"保留换行"）。这里 trim 一下，界面上看起来只是少了一个空行，
+ * 但抄进教研结论里的引文就和学生说的不一样了。
+ *
+ * `metaStep` / `metaGraphId` 刻意不带：它们指向解题路径上的位置，是教师复盘用的。
+ * 整条 `turn` 直接透传就会把它们带出去，而页面上根本看不出多过什么。
+ */
+function turnOf(turn, index) {
+  const item = {
+    i: index,
+    at: text(turn?.at) || null,
+    role: text(turn?.role) || 'student',
+    text: typeof turn?.text === 'string' ? turn.text : text(turn?.text),
+  };
+  if (turn?.level !== undefined && turn?.level !== null) item.level = turn.level;
+  return item;
+}
+
+/**
+ * 会话里的全部发言，按**数组顺序**（即发生时序）给出去。
+ *
+ * 两个来源：报告侧的 `record.turns`（`appendTurn` 写的那一份）与落库时统一过名字的
+ * `turns`（`snapshotSession` 会把 record.turns 搬过来）。优先前者 —— 它才是原始的
+ * 那一份；后者只是给导出与看板读的同一份拷贝。
+ */
+function turnsOf(record) {
+  const source = Array.isArray(record?.record?.turns)
+    ? record.record.turns
+    : Array.isArray(record?.turns)
+      ? record.turns
+      : [];
+
+  const turns = [];
+  for (let i = 0; i < source.length; i += 1) {
+    const turn = source[i];
+    /** 坏条目（null / 字符串）跳过：它渲染出来只是一个空气泡，而 `i` 保留原位 */
+    if (!turn || typeof turn !== 'object') continue;
+    turns.push(turnOf(turn, i));
+  }
+  return turns;
+}
+
+/**
+ * `GET /api/admin/session?sessionId=` → 一段对话。
+ *
+ * ============================================================================
+ * 为什么必须显式投影，不能 `JSON.stringify(session)`
+ * ============================================================================
+ * 会话记录上挂着 `hintLog`，里面每一条都有 `rationale`（引擎的判断理由）、
+ * `evidenceQuotes`（从题干里摘的原句）、`guardViolations`（被拦下的原话）、
+ * `trace`。它们是教研复盘的原料，也是**这道题的解题路径**。整条回去等于把
+ * 教师视图塞进了一个"看对话"的接口 —— 而这个泄漏不会报错、页面上也看不出来。
+ *
+ * 所以只回三样：`meta`（表头，都是归属与时间）、`turns`（学生说了什么、AI 回了什么）、
+ * `reportSnapshot`（学生当时看到的那份报告，快照里本来就没有答案 —— 它冻结于
+ * 出报告那一刻，导出件读的也是同一份）。
+ *
+ * ============================================================================
+ * 三种"没有"要分开
+ * ============================================================================
+ *   400 缺 `sessionId`  —— 客户端的事，说清楚缺什么；
+ *   404 记录不存在     —— 别再试了（`readSessionRecord` 回 null 只代表"确实没有"）；
+ *   503 读不出来       —— 刷新重试有意义（它还在库里，只是这次没读到）。
+ * 混成一个答案的后果在 `session-store.js` 的文件头写过一遍：调用方会"现造一条新的"。
+ * 这里不回 `err.message`，详情进日志。
+ */
+async function sendSession(res, store, url) {
+  const sessionId = text(url.searchParams.get('sessionId'));
+  if (!sessionId) return answer(res, 400, { error: '需要 sessionId' });
+
+  let record;
+  try {
+    record = await readSessionRecord(store, sessionId);
+  } catch (err) {
+    if (text(err?.code) !== 'SESSION_READ_FAILED') throw err;
+    return answer(res, 503, { error: '读取学习记录失败，请刷新页面重试。', retryable: true });
+  }
+  if (!record) return answer(res, 404, { error: '这条学习记录不存在' });
+
+  /**
+   * 代号只在这条记录**有归属**时才查：匿名创建的会话没有 `userId`，
+   * 去查一次只会拿到 null，还会让驱动处理一个 undefined 的键。
+   * 查不到就写"未知"——与导出件的降级同一句话，不把内部 id 亮出来当人名。
+   */
+  const userId = text(record.userId);
+  const user = userId ? await store.getUserById(userId) : null;
+
+  return answer(res, 200, {
+    meta: {
+      id: text(record.id) || sessionId,
+      userId: userId || null,
+      displayName: text(user?.displayName) || UNKNOWN_STUDENT,
+      problemId: text(record.problemId) || null,
+      batchId: text(record.batchId) || null,
+      startedAt: text(record.startedAt) || null,
+      lastAt: text(record.lastAt) || null,
+      /** 布尔：这一条做完没有（与 `sessionList` 里那一档同义） */
+      finished: Boolean(record.finishedAt),
+      page: lastPageOf(record),
+    },
+    turns: turnsOf(record),
+    reportSnapshot: record.reportSnapshot ?? null,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -498,6 +692,8 @@ export async function handleAdminApi(req, res, url, { store, env } = {}) {
   try {
     if (route === 'overview') return await sendOverview(res, store, env ?? {}, url);
     if (route === 'users') return await sendUsers(res, store, url);
+    /** 单人页：读一条会话的对话。只读，与导出那条路共用 `readSessionRecord` */
+    if (route === 'session') return await sendSession(res, store, url);
     if (route === 'export') return await sendExport(res, store, url);
   } catch (err) {
     /**

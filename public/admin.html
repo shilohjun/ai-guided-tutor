@@ -266,12 +266,63 @@ body{
 .foot-sub{margin-top:6px;color:var(--ink-3);font-size:var(--fs-s)}
 
 /* =====================================================================
-   8. 窄屏
+   8. 单人页：点一行就地展开的会话列表与对话
+
+   状态（未完成 / 已放弃 / 已完成）一律有一句中文，颜色只是第二重提示 ——
+   打印成黑白、或者看的人分不清红绿时，只剩颜色的状态等于没有状态。
+   ===================================================================== */
+.row-person{cursor:pointer}
+.row-person:hover td{background:var(--brand-tint)}
+.row-person:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
+.detail-row td{background:var(--surface-2);border-bottom:1px solid var(--line)}
+.detail{padding:12px 16px;border-left:2px solid var(--brand);border-radius:var(--r-inner);background:var(--surface)}
+.detail-head{margin:0 0 6px;color:var(--ink-3);font-size:var(--fs-s);font-weight:600}
+.detail-empty{margin-top:0}
+.sess-list{list-style:none;margin:0;padding:0}
+.sess{padding:8px 0;border-top:1px solid var(--line)}
+.sess:first-child{border-top:0;padding-top:0}
+.sess-line{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.sess-meta{flex:1 1 320px;min-width:0;color:var(--ink-2);font-size:var(--fs-s);font-variant-numeric:tabular-nums}
+.sess-tag{
+  padding:2px 8px;
+  border:1px solid var(--line-strong);
+  border-radius:var(--r-pill);
+  background:var(--surface-2);
+  color:var(--ink-3);
+  font-size:var(--fs-s);
+  font-weight:600;
+  white-space:nowrap;
+}
+.sess-tag-drop{border-color:var(--coral-line);background:var(--coral-tint);color:var(--coral)}
+.sess-tag-done{border-color:var(--brand-line);background:var(--brand-tint);color:var(--brand-strong)}
+.btn-mini{height:24px;padding:0 12px;font-size:var(--fs-s)}
+.conv-box{
+  margin-top:8px;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:var(--r-inner);
+  background:var(--surface);
+}
+.turn{padding:8px 12px;border-radius:var(--r-inner)}
+.turn + .turn{margin-top:8px}
+/* 学生靠右一点、AI 靠左一点，加上底色与中文角色名：三重区分，缺一样也还认得出来 */
+.turn-me{margin-left:24px;border:1px solid var(--line);background:var(--surface-2)}
+.turn-ai{margin-right:24px;border:1px solid var(--brand-line);background:var(--brand-tint)}
+.turn-other{margin-right:24px;border:1px solid var(--amber-line);background:var(--amber-tint)}
+.turn-role{margin:0 0 2px;color:var(--ink-3);font-size:var(--fs-s);font-weight:700}
+/* pre-wrap：学生原话里的换行与空行就是原话的一部分，不能被 CSS 吃掉 */
+.turn-text{white-space:pre-wrap;word-break:break-word;color:var(--ink);font-size:var(--fs-m)}
+
+/* =====================================================================
+   9. 窄屏
    ===================================================================== */
 @media (max-width:760px){
   .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
   .card{padding:16px}
   .bar-track{height:112px}
+  .sess-meta{flex:1 1 100%}
+  .turn-me{margin-left:12px}
+  .turn-ai,.turn-other{margin-right:12px}
 }
 @media (prefers-reduced-motion:reduce){
   *{transition:none!important}
@@ -415,7 +466,7 @@ body{
     <section class="card" aria-label="人的列表">
       <div class="card-head">
         <h2>人的列表</h2>
-        <p class="card-sub">代号 + 题数 + 最后停在哪一页。真名不进数据库，只在你自己手上的发号表里。</p>
+        <p class="card-sub">代号 + 题数 + 最后停在哪一页。真名不进数据库，只在你自己手上的发号表里。点一行就地展开这个人的作答记录。</p>
       </div>
       <p class="empty" id="usersEmpty" hidden>这个批次还没有人。把链接发出去之后再回来看。</p>
       <p class="alert alert-bad" id="usersNote" role="alert" hidden></p>
@@ -461,6 +512,25 @@ body{
   </footer>
 
 </main>
+
+<!--
+  单人页的展开区。整块是 inert 的模板：点一行才克隆一份插到那一行后面，
+  所以页面上同时只有被点开的那几个人。这里一个数据都没有 ——
+  会话列表、对话全部由 /api/admin/users 与 /api/admin/session 现取。
+
+  对话面板（data-testid="conversation"）整个展开区只有一块，
+  点另一条的「查看对话」是把它**挪**过去（appendChild 移动节点，不是再插一块），
+  于是连点十条也只有一块对话，不会越堆越长。
+-->
+<template id="personTpl">
+  <div class="detail" data-testid="person-detail">
+    <p class="detail-head">这个人的作答记录（最近的在前）</p>
+    <p class="empty detail-empty" hidden>还没有作答记录</p>
+    <ul class="sess-list"></ul>
+    <p class="note detail-note" hidden></p>
+    <div class="conv-box" data-testid="conversation" hidden></div>
+  </div>
+</template>
 
 <script>
 (function () {
@@ -731,6 +801,21 @@ body{
     var data = row || {};
     var tr = document.createElement('tr');
 
+    /**
+     * 每一行都点得开：展开区就插在这一行后面（`tr.nextSibling`），不跳转、不改 URL。
+     * 老师一边看漏斗一边看人，跳走一次就回不来了。键盘也能开（Enter / 空格）。
+     */
+    tr.className = 'row-person';
+    tr.setAttribute('data-user-row', String(data.userId || ''));
+    tr.setAttribute('aria-expanded', 'false');
+    tr.tabIndex = 0;
+    tr.addEventListener('click', function () { togglePerson(tr, data); });
+    tr.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      ev.preventDefault();
+      togglePerson(tr, data);
+    });
+
     var who = document.createElement('td');
     who.className = 'cell-strong';
     who.textContent = txt(data.displayName, '未知');
@@ -766,6 +851,242 @@ body{
     td.textContent = text;
     if (cls) td.className = cls;
     return td;
+  }
+
+  /* ---------------- 单人页：点一行，就地展开 ---------------- */
+
+  /** 这一行后面已经展开的那块（没有就 null）。展开区永远是本行的下一个兄弟节点 */
+  function detailRowOf(tr) {
+    var after = tr.nextSibling;
+    return after && after.getAttribute && after.getAttribute('data-person-row') !== null ? after : null;
+  }
+
+  /**
+   * 收起 / 展开一个人。
+   *
+   * 展开区是**紧跟在那一行后面的另一行**（整行 td 横跨全表），不是新页面，也不改 URL。
+   * 展开块从 `#personTpl` 克隆：页面上同时只有被点开的那几个人，模板里一个数据都没有。
+   */
+  function togglePerson(tr, data) {
+    var open = detailRowOf(tr);
+    if (open) {
+      tr.parentNode.removeChild(open);
+      tr.setAttribute('aria-expanded', 'false');
+      return;
+    }
+
+    var after = tr.nextSibling;
+    var holder = document.createElement('tr');
+    holder.className = 'detail-row';
+    holder.setAttribute('data-person-row', String(data.userId || ''));
+
+    var td = document.createElement('td');
+    td.colSpan = columnCount();
+    td.appendChild(buildDetail(data));
+    holder.appendChild(td);
+
+    /* after 为 null 时（点是最后一行）插到末尾，正好 */
+    tr.parentNode.insertBefore(holder, after);
+    tr.setAttribute('aria-expanded', 'true');
+  }
+
+  /** 展开区那一格要横跨整张表：列数从表头数出来，表加一列也不用回来改这里 */
+  function columnCount() {
+    var head = $('usersBody').parentNode.querySelector('thead tr');
+    return head ? head.children.length : 1;
+  }
+
+  /** 克隆一份展开区，把这个人自己的会话填进去（空态是一句话，不是空白） */
+  function buildDetail(data) {
+    var person = data || {};
+    var region = $('personTpl').content.firstElementChild.cloneNode(true);
+    var list = Array.isArray(person.sessionList) ? person.sessionList : [];
+
+    if (list.length) {
+      var frag = document.createDocumentFragment();
+      for (var i = 0; i < list.length; i += 1) frag.appendChild(sessItem(region, list[i]));
+      region.querySelector('.sess-list').appendChild(frag);
+    } else {
+      region.querySelector('.sess-list').hidden = true;
+      region.querySelector('.detail-empty').hidden = false;
+    }
+
+    /* 截断必须说出来：不说的话「只有 50 条」会被读成「他只做了 50 道」 */
+    if (person.sessionListTruncated) {
+      var note = region.querySelector('.detail-note');
+      note.textContent = '只显示最近 50 条';
+      note.hidden = false;
+    }
+
+    return region;
+  }
+
+  /**
+   * 展开区里的一条会话：`第 N 道 · 题目 id · 停在页 M · 开始时间` + 中文状态 + 两个按钮。
+   *
+   * 顺序（最近的在前）由接口给：`sessionList` 已按 `startedAt` 降序排过，
+   * 页面不再排一遍 —— 两处各排一份，迟早会给出两个不同的"最近"。
+   */
+  function sessItem(region, item) {
+    var session = item || {};
+    var li = document.createElement('li');
+    li.className = 'sess';
+
+    var line = document.createElement('div');
+    line.className = 'sess-line';
+
+    var meta = document.createElement('span');
+    meta.className = 'sess-meta';
+    meta.textContent = sessMeta(session);
+    line.appendChild(meta);
+
+    line.appendChild(sessTag(session));
+    line.appendChild(sessButton('查看对话', function (btn) { readTurns(region, session, li, btn); }));
+    line.appendChild(sessButton('导出这条', function (btn) {
+      var id = txt(session.id, '');
+      /* 没有会话号是数据坏了（接口从不省略它）：说一句，不去下一个空包 */
+      if (!id) { say('这条记录没有会话号，导不出来。', 'bad'); return; }
+      /* 与"导出这一条"同一个下载路径：Blob + 本地下载，非 200 先读服务端那句人话 */
+      download('/api/admin/export?sessionId=' + encodeURIComponent(id), 'bubujie-session.zip', btn);
+    }));
+
+    li.appendChild(line);
+    return li;
+  }
+
+  /** 一行会话的时间线那半句；认不出的字段写"未知"，不编一个具体的错位置 */
+  function sessMeta(session) {
+    var s = session || {};
+    var no = questionNo(s.questionIndex);
+    var page = cnt(s.page);
+    var started = stamp(s.startedAt);
+    var parts = [
+      no > 0 ? '第 ' + no + ' 道' : '题号未知',
+      txt(s.problemId, '题目未知'),
+      page > 0 ? '停在页 ' + page : '没开始作答',
+      started === '—' ? '开始时间未知' : '开始 ' + started
+    ];
+    return parts.join(' · ');
+  }
+
+  /** 题单序号（接口给的是 0 起）→ 人看的第几道；认不出的回 0，页面据此写"题号未知" */
+  function questionNo(value) {
+    if (value === null || value === undefined || value === '') return 0;
+    var num = Number(value);
+    /* 不直接 Number(x)+1：Number(null) 是 0，会把"没记题号"画成"第 1 道" */
+    return Number.isFinite(num) ? Math.floor(num) + 1 : 0;
+  }
+
+  /** 状态是**一句话**，颜色只是第二重提示（打印成黑白也还认得） */
+  function sessTag(session) {
+    var s = session || {};
+    var tag = document.createElement('span');
+    var done = Boolean(s.finished);
+    var dropped = !done && Boolean(s.abandoned);
+    tag.className = 'sess-tag' + (done ? ' sess-tag-done' : dropped ? ' sess-tag-drop' : '');
+    tag.textContent = done ? '已完成' : dropped ? '已放弃' : '未完成';
+    return tag;
+  }
+
+  function sessButton(label, onClick) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-mini';
+    btn.textContent = label;
+    btn.addEventListener('click', function () { onClick(btn); });
+    return btn;
+  }
+
+  /**
+   * 读一条会话的对话。
+   *
+   * 面板是**同一个节点**，只是挪到被点的那一行下面（`appendChild` 是移动，不是再插一块）：
+   * 于是"换一条看"天然就是替换，绝不会堆出一列对话。
+   */
+  function readTurns(region, session, li, btn) {
+    var id = txt(session.id, '');
+    var panel = region.querySelector('[data-testid="conversation"]');
+    if (!id) { say('这条记录没有会话号，读不出对话。', 'bad'); return; }
+
+    panel.hidden = false;
+    panelState(panel, '正在读取这段对话…', 'empty');
+    /* 面板上记住"现在这一块是谁的"：晚到的旧响应据此认出来丢掉 ——
+       否则连点两个人的对话，慢的那份会落在后点的那一行下面，读起来像另一个学生的原话 */
+    panel.setAttribute('data-for', id);
+    li.appendChild(panel);
+    if (btn) btn.disabled = true;
+
+    request('/api/admin/session?sessionId=' + encodeURIComponent(id))
+      .then(function (data) {
+        if (panel.getAttribute('data-for') !== id) return;
+        renderTurns(panel, data && data.turns);
+      })
+      .catch(function (err) {
+        if (panel.getAttribute('data-for') !== id) return;
+        panelState(panel, sessionFriendly(err), 'alert alert-bad');
+      })
+      .then(function () { if (btn) btn.disabled = false; });
+  }
+
+  /**
+   * 401 / 503 用页面统一的那三句（改口令、刷新重试），404 单独一句 ——
+   * 在"看一段对话"这个上下文里说"批次不存在"是答非所问：这条记录不在了，别再点。
+   * 无论哪一种都不把 JSON 原文贴出来。
+   */
+  function sessionFriendly(err) {
+    if (err && err.status === 404) return '这条学习记录不存在，可能已经被清理了。';
+    return (err && err.message) || '读不出这段对话，请刷新重试。';
+  }
+
+  /** 面板里只留一句话（读取中 / 空 / 出错都走这里，省得三种写法各错一处） */
+  function panelState(panel, msg, cls) {
+    panel.textContent = '';
+    var line = document.createElement('p');
+    line.className = cls;
+    line.textContent = String(msg || '');
+    panel.appendChild(line);
+  }
+
+  /**
+   * `turns` → 对话面板。
+   *
+   * **只用 `textContent`**：学生原话里只要出现一个 `<`，拼字符串就把它变成标记
+   * （轻则显示错，重则注入）。换行靠 CSS 的 `pre-wrap`，不靠 `<br>`。
+   */
+  function renderTurns(panel, turns) {
+    var list = Array.isArray(turns) ? turns : [];
+    if (!list.length) { panelState(panel, '这段对话没有内容', 'empty'); return; }
+
+    panel.textContent = '';
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < list.length; i += 1) frag.appendChild(turnBlock(list[i]));
+    panel.appendChild(frag);
+  }
+
+  /** 一条发言：角色名用中文写出来（不靠颜色），正文原样给 */
+  function turnBlock(turn) {
+    var t = turn || {};
+    var role = String(t.role || '');
+    var me = role === 'student';
+    var ai = role === 'ai';
+
+    var box = document.createElement('div');
+    box.className = 'turn ' + (me ? 'turn-me' : ai ? 'turn-ai' : 'turn-other');
+
+    var who = document.createElement('p');
+    who.className = 'turn-role';
+    who.textContent = me ? '学生' : ai ? 'AI 老师' : '其他记录';
+
+    var said = document.createElement('div');
+    said.className = 'turn-text';
+    /* 不 trim：首尾的空行是学生原话的一部分，抄进教研结论时要和他说的一样 */
+    var body = typeof t.text === 'string' ? t.text : (t.text === null || t.text === undefined ? '' : String(t.text));
+    /* 一个字都没有的条目（系统事件）不留一个空气泡 —— 空框看起来像渲染坏了 */
+    said.textContent = body.trim() ? body : '（这条没有文字）';
+
+    box.appendChild(who);
+    box.appendChild(said);
+    return box;
   }
 
   /** 把一份 overview 摊平成对比表要的那几个数（坏输入一律落到 0 / —） */
