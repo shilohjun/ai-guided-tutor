@@ -81,8 +81,45 @@ const USERS = {
 const MEMBERS = [{ userId: 'u1', joinedAt: '2026-11-01T00:00:00.000Z' }, { userId: 'u2' }, { userId: 'u3' }];
 
 /**
+ * 事件：**真实形状**，刻意打乱给进去。
+ *
+ * `chat_send` 的 payload 就是设计稿 §5.3 写的 `{ len, copiedStem }`。
+ * 从前这套夹具自造了 `counters.firstMessageLength` / `counters.copiedStem`——
+ * 而 `counters` 里根本没有这两个字段（设计稿 §5.2 只有 7 个），真实数据上
+ * 「首条消息字数 / 是否复制题干」会永远是 0 / 否。夹具自造字段，所以套件看不出来。
+ * 现在这里只放真实事件：那两列必须从事件流推出来。
+ *
+ * 其中三条没有 `sessionId`（登录、页 1–2 挂在 `visitId` 上）：它们不是"该丢的脏数据"，
+ * 是学生在第 1 页停留的证据 —— 丢了就读成"没有采集"。
+ */
+const EVENTS = [
+  { seq: 11, type: 'page_enter', at: '2026-11-09T10:10:00.000Z', userId: 'u1', batchId: 'b1', sessionId: 's1', payload: { page: 4 } },
+  { seq: 3, type: 'page_enter', at: '2026-11-09T09:59:30.000Z', userId: 'u1', batchId: 'b1', visitId: 'v1', payload: { page: 2 } },
+  { seq: 8, type: 'chat_send', at: '2026-11-09T10:01:10.000Z', userId: 'u1', batchId: 'b1', sessionId: 's1', payload: { len: 12, copiedStem: true } },
+  { seq: 1, type: 'login', at: '2026-11-09T09:58:00.000Z', userId: 'u1', batchId: 'b1', payload: { displayName: 'S01' } },
+  { seq: 15, type: 'page_enter', at: '2026-11-09T10:16:00.000Z', userId: 'u1', batchId: 'b1', sessionId: 's1', payload: { page: 4 } },
+  { seq: 5, type: 'page_enter', at: '2026-11-09T10:01:00.000Z', userId: 'u1', batchId: 'b1', sessionId: 's1', payload: { page: 3 } },
+  { seq: 9, type: 'chat_reply', at: '2026-11-09T10:01:20.000Z', userId: 'u2', batchId: 'b1', sessionId: 's2', payload: {} },
+  { seq: 13, type: 'page_enter', at: '2026-11-09T10:14:00.000Z', userId: 'u1', batchId: 'b1', sessionId: 's1', payload: { page: 3 } },
+  { seq: 7, type: 'chat_send', at: '2026-11-09T10:01:10.000Z', userId: 'u2', batchId: 'b1', sessionId: 's2', payload: { len: 7, copiedStem: false } },
+  { seq: 12, type: 'practice_pick', at: '2026-11-09T10:12:00.000Z', userId: 'u1', batchId: 'b1', sessionId: 's1', payload: {} },
+  { seq: 6, type: 'intake_choose', at: '2026-11-09T10:01:05.000Z', userId: 'u1', batchId: 'b1', sessionId: 's1', payload: { path: 'photo' } },
+  { seq: 16, type: 'chat_send', at: '2026-11-09T10:17:00.000Z', userId: 'u1', batchId: 'b1', sessionId: 's1', payload: { len: 5, copiedStem: false } },
+  { seq: 2, type: 'page_enter', at: '2026-11-09T09:59:00.000Z', userId: 'u1', batchId: 'b1', visitId: 'v1', payload: { page: 1 } },
+  { seq: 10, type: 'chat_reply', at: '2026-11-09T10:01:20.000Z', userId: 'u1', batchId: 'b1', sessionId: 's1', payload: {} },
+  { seq: 4, type: 'page_enter', at: '2026-11-09T10:00:00.000Z', userId: 'u2', batchId: 'b1', sessionId: 's2', payload: { page: 3 } },
+  { seq: 14, type: 'intake_choose', at: '2026-11-09T10:14:30.000Z', userId: 'u1', batchId: 'b1', sessionId: 's1', payload: { path: 'paste' } },
+];
+
+/** 该会话的事件（保持打乱的字面顺序：排序是导出的事，不是夹具的事） */
+const eventsOf = (sessionId) => EVENTS.filter((event) => event.sessionId === sessionId);
+
+/**
  * 三条会话。刻意**不按 id 排序**给进去：条目顺序、报告顺序、jsonl 分组顺序
  * 都由导出自己排，不能靠调用方（或驱动）恰好有序。
+ *
+ * 会话自带 `events`（与 `metrics.js` 的 D1 约定一致）：`renderSessionsCsv` 是纯渲染器，
+ * 事件由调用方按 `sessionId` 分组塞进来 —— `exportBatch` 那边就是把整批事件分组带下来的。
  */
 const SESSIONS = [
   {
@@ -101,7 +138,9 @@ const SESSIONS = [
       { start: '2026-11-09T10:00:00.000Z', lastEventAt: '2026-11-09T10:05:00.000Z' },
     ],
     progress: { maxPage: 3, reached: { p2: '2026-11-08T20:00:00.000Z', p3: '2026-11-09T10:00:00.000Z' }, backtracks: 0 },
-    counters: { resetCount: 0, intakeChanges: 0, chatTurns: 1, hintLevels: [1] },
+    /** 只留设计稿 §5.2 真有的计数器；事件能推的列不再从 counters 里编一个出来 */
+    counters: { resetCount: 0, hintLevels: [1] },
+    events: eventsOf('s2'),
     turns: [{ i: 0, at: '2026-11-09T10:01:00.000Z', role: 'student', text: '我先把力分解' }],
     reportSnapshot: null,
   },
@@ -119,19 +158,21 @@ const SESSIONS = [
     progress: {
       maxPage: 4,
       reached: { p2: '2026-11-09T10:00:00.000Z', p3: '2026-11-09T10:01:00.000Z', p4: '2026-11-09T10:20:00.000Z' },
+      /**
+       * 旧口径写的是 2，事件流数出来是 1（page_enter 的页号只有一次低于此前的最大值）。
+       * 这一列现在以事件流为准：两个数不一致时，CSV 必须是 1。
+       */
       backtracks: 2,
     },
-    counters: {
-      resetCount: 1,
-      intakeChanges: 1,
-      chatTurns: 2,
-      hintLevels: [1, 3, 2],
-      formulaOpens: 2,
-      reportViews: 1,
-      practicePicks: 1,
-      firstMessageLength: 12,
-      copiedStem: true,
+    counters: { resetCount: 1, hintLevels: [1, 3, 2] },
+    /** 公式卡次数的主来源是记录里的公式卡数组（counters.formulaOpens 只在缺失时回落） */
+    record: {
+      formulaCards: [
+        { at: '2026-11-09T10:02:00.000Z', topic: '受力分析', stepIndex: 0 },
+        { at: '2026-11-09T10:12:00.000Z', topic: '受力分析', stepIndex: 1 },
+      ],
     },
+    events: eventsOf('s1'),
     /** 刻意倒序给：组内必须按 `i` 升序 */
     turns: [
       { i: 1, at: '2026-11-09T10:01:20.000Z', role: 'ai', text: '分解之后，哪个方向没有加速度？', level: 1 },
@@ -149,25 +190,14 @@ const SESSIONS = [
     lastAt: '2026-11-07T10:00:00.000Z',
     finishedAt: null,
     progress: { maxPage: 9, reached: {}, backtracks: 0 },
-    /** 残缺的计数（老记录）：缺字段只许退成 0 / 否，不许写 undefined */
+    /**
+     * 残缺的老记录：**没有事件**，counters 里也没有那两个不存在的字段。
+     * 首条消息字数只能是空（不是 0 —— 0 会被读成"他说了一个空消息"）。
+     */
     counters: { hintLevels: [] },
     turns: [],
     reportSnapshot: null,
   },
-];
-
-/**
- * 事件：刻意打乱。
- *
- * 其中两条没有 `sessionId`（页 1–2 挂的是 `visitId`）：它们不是"该丢的脏数据"，
- * 是学生在第 1 页停留的证据 —— 丢了就读成"没有采集"。
- */
-const EVENTS = [
-  { seq: 5, type: 'chat_reply', at: '2026-11-09T10:01:20.000Z', userId: 'u1', batchId: 'b1', sessionId: 's2', payload: {} },
-  { seq: 2, type: 'chat_send', at: '2026-11-09T10:01:00.000Z', userId: 'u1', batchId: 'b1', sessionId: 's1', payload: {} },
-  { seq: 9, type: 'page_enter', at: '2026-11-09T09:59:00.000Z', userId: 'u1', batchId: 'b1', visitId: 'v1', payload: { page: 1 } },
-  { seq: 4, type: 'chat_send', at: '2026-11-09T10:01:10.000Z', userId: 'u2', batchId: 'b1', sessionId: 's2', payload: {} },
-  { seq: 1, type: 'login', at: '2026-11-08T21:30:00.000Z', userId: 'u1', batchId: 'b1', payload: {} },
 ];
 
 /**
@@ -368,7 +398,8 @@ describe('整批导出 · sessions.csv', () => {
     assertEquals(s3['重置次数'], '0');
     assertEquals(s3['改入场次数'], '0');
     assertEquals(s3['公式卡次数'], '0');
-    assertEquals(s3['首条消息字数'], '0');
+    assertEquals(s3['对话轮数'], '0');
+    assertEquals(s3['首条消息字数'], '', '没有事件也没有这个计数器：留空，不写 0');
     assertEquals(s3['是否复制题干'], '否');
     assertEquals(s3['题单序号'], '', '题单序号算不出来时留空，不写 0（0 是"第一道题"）');
   });
@@ -380,15 +411,112 @@ describe('整批导出 · sessions.csv', () => {
     assertEquals(s1['题单序号'], '0');
     assertEquals(s1['开始时间'], '2026-11-09T10:00:00.000Z');
     assertEquals(s1['最后活动时间'], '2026-11-09T10:20:00.000Z');
-    assertEquals(s1['退回次数'], '2');
+    assertEquals(s1['退回次数'], '1', 'page_enter 的页号只有一次低于此前的最大值（progress.backtracks 的 2 不算）');
     assertEquals(s1['重置次数'], '1');
-    assertEquals(s1['改入场次数'], '1');
-    assertEquals(s1['对话轮数'], '2');
-    assertEquals(s1['公式卡次数'], '2');
-    assertEquals(s1['报告次数'], '1');
-    assertEquals(s1['再练次数'], '1');
+    assertEquals(s1['改入场次数'], '1', 'intake_choose 有两种 path（photo / paste）');
+    assertEquals(s1['对话轮数'], '2', '两条 chat_send');
+    assertEquals(s1['公式卡次数'], '2', 'record.formulaCards 的长度');
+    assertEquals(s1['报告次数'], '2', '两次进入页 4');
+    assertEquals(s1['再练次数'], '1', '一条 practice_pick');
+    assertEquals(s1['首条消息字数'], '12', '第一条 chat_send 的 payload.len，不是第二条的 5');
+    assertEquals(s1['是否复制题干'], '是', '第一条 chat_send 的 payload.copiedStem');
+  });
+
+  it('事件流优先于 counters：两边都有时以事件为准（counters 只是补漏的回落）', () => {
+    const session = {
+      id: 's7',
+      batchId: 'b1',
+      /** 每一条都能从事件流算出来，counters 里故意放一组对不上的数 */
+      counters: {
+        resetCount: 0,
+        hintLevels: [],
+        chatTurns: 9,
+        intakeChanges: 8,
+        reportViews: 7,
+        practicePicks: 6,
+        formulaOpens: 5,
+        backtracks: 4,
+      },
+      progress: { backtracks: 4 },
+      /** 公式卡的主来源是记录，不是 counters.formulaOpens：这里 3 张 */
+      record: { formulaCards: [{}, {}, {}] },
+      events: [
+        { seq: 1, type: 'page_enter', at: '2026-11-09T10:00:00.000Z', sessionId: 's7', payload: { page: 3 } },
+        { seq: 2, type: 'page_enter', at: '2026-11-09T10:01:00.000Z', sessionId: 's7', payload: { page: 4 } },
+        { seq: 3, type: 'page_enter', at: '2026-11-09T10:02:00.000Z', sessionId: 's7', payload: { page: 3 } },
+        { seq: 4, type: 'chat_send', at: '2026-11-09T10:03:00.000Z', sessionId: 's7', payload: { len: 4, copiedStem: false } },
+        { seq: 5, type: 'practice_pick', at: '2026-11-09T10:04:00.000Z', sessionId: 's7', payload: {} },
+      ],
+    };
+    const row = rowOf(renderSessionsCsv([session], { batch: BATCH, now: NOW }), 's7');
+    assertEquals(row['对话轮数'], '1', '一条 chat_send：counters.chatTurns 的 9 不算');
+    assertEquals(row['改入场次数'], '0', '没有 intake_choose：counters.intakeChanges 的 8 不算');
+    assertEquals(row['退回次数'], '1', '页 4 之后回页 3：progress / counters 的 4 不算');
+    assertEquals(row['报告次数'], '1', '一次进入页 4：counters.reportViews 的 7 不算');
+    assertEquals(row['再练次数'], '1', '一条 practice_pick：counters.practicePicks 的 6 不算');
+    assertEquals(row['公式卡次数'], '3', '记录里 3 张公式卡：counters.formulaOpens 的 5 不算');
+    assertEquals(row['首条消息字数'], '4');
+    assertEquals(row['是否复制题干'], '否');
+  });
+
+  it('会话没有 counters、只有事件：这几列仍然有正确值（真实数据就是这个形状）', () => {
+    const session = {
+      id: 's9',
+      batchId: 'b1',
+      events: [
+        { seq: 1, type: 'page_enter', at: '2026-11-09T10:00:00.000Z', sessionId: 's9', payload: { page: 3 } },
+        { seq: 2, type: 'page_enter', at: '2026-11-09T10:01:00.000Z', sessionId: 's9', payload: { page: 4 } },
+        { seq: 3, type: 'page_enter', at: '2026-11-09T10:02:00.000Z', sessionId: 's9', payload: { page: 2 } },
+        { seq: 4, type: 'intake_choose', at: '2026-11-09T10:03:00.000Z', sessionId: 's9', payload: { path: 'photo' } },
+        { seq: 5, type: 'intake_choose', at: '2026-11-09T10:04:00.000Z', sessionId: 's9', payload: { path: 'paste' } },
+        { seq: 6, type: 'chat_send', at: '2026-11-09T10:05:00.000Z', sessionId: 's9', payload: { len: 9, copiedStem: true } },
+        { seq: 7, type: 'chat_send', at: '2026-11-09T10:06:00.000Z', sessionId: 's9', payload: { len: 3, copiedStem: false } },
+        { seq: 8, type: 'practice_pick', at: '2026-11-09T10:07:00.000Z', sessionId: 's9', payload: {} },
+        { seq: 9, type: 'practice_pick', at: '2026-11-09T10:08:00.000Z', sessionId: 's9', payload: {} },
+      ],
+    };
+    const row = rowOf(renderSessionsCsv([session], { batch: BATCH, now: NOW }), 's9');
+    assertEquals(row['对话轮数'], '2', '两条 chat_send');
+    assertEquals(row['首条消息字数'], '9', '第一条 chat_send 的 payload.len，不是最后一条的 3');
+    assertEquals(row['是否复制题干'], '是', '第一条 chat_send 的 copiedStem');
+    assertEquals(row['改入场次数'], '1', '两种 path：2 - 1');
+    assertEquals(row['退回次数'], '1', '页 4 之后回到页 2');
+    assertEquals(row['报告次数'], '1');
+    assertEquals(row['再练次数'], '2', '两条 practice_pick');
+    assertEquals(row['公式卡次数'], '0', '没有 record 也没有 counters：没有就是 0');
+    assertEquals(row['重置次数'], '0');
+    assertEquals(row['给过的最高层级'], '0');
+  });
+
+  it('既没有事件也没有 counters：首条消息字数留空（不写 0），是否复制题干写否，数字列写 0', () => {
+    const row = rowOf(renderSessionsCsv([{ id: 's8', batchId: 'b1' }], { batch: BATCH, now: NOW }), 's8');
+    assertEquals(row['首条消息字数'], '', '没有消息 ≠ 消息长度 0：留空才读得出"没有"');
+    assertEquals(row['是否复制题干'], '否', '布尔列空与否同义，写否更清楚');
+    for (const column of ['退回次数', '重置次数', '改入场次数', '对话轮数', '给过的最高层级', '公式卡次数', '报告次数', '再练次数']) {
+      assertEquals(row[column], '0', `${column} 没有数据时写 0`);
+    }
+  });
+
+  it('首条消息字数退到第一条学生消息：没有事件、没有 counters 时量 turns', () => {
+    const session = {
+      id: 's6',
+      batchId: 'b1',
+      turns: [
+        { i: 0, role: 'ai', text: '老师先说' },
+        { i: 1, role: 'student', text: '这一点我不太明白' },
+      ],
+    };
+    const row = rowOf(renderSessionsCsv([session], { batch: BATCH, now: NOW }), 's6');
+    assertEquals(row['首条消息字数'], String('这一点我不太明白'.length), '退到第一条学生消息的字数');
+  });
+
+  it('整批导出真的把事件接到了会话上：CSV 的那几列与事件流一致（不只直调渲染器才对）', async () => {
+    const { store } = makeStore();
+    const s1 = rowOf(entryText(await exportBatch(store, 'b1', { now: NOW }), 'sessions.csv'), 's1');
     assertEquals(s1['首条消息字数'], '12');
     assertEquals(s1['是否复制题干'], '是');
+    assertEquals(s1['对话轮数'], '2');
+    assertEquals(s1['再练次数'], '1');
   });
 
   it('人被删了：代号写"未知"，但会话那一行必须还在', () => {
@@ -511,15 +639,33 @@ describe('整批导出 · jsonl', () => {
       .split('\n')
       .map((line) => JSON.parse(line));
     assertEquals(
-      lines.map((event) => event.sessionId ?? '(挂 visitId)').join(','),
-      '(挂 visitId),(挂 visitId),s1,s2,s2',
-      '空键（挂 visitId 的页面事件）排最前，其余按 sessionId 字典序',
+      lines.map((event) => event.sessionId ?? '(无归属)').join(','),
+      '(无归属),(无归属),(无归属),s1,s1,s1,s1,s1,s1,s1,s1,s1,s1,s2,s2,s2',
+      '空键（登录 + 挂 visitId 的页面事件）排最前，其余按 sessionId 字典序',
     );
     assertEquals(
       lines.map((event) => event.seq).join(','),
-      '1,9,2,4,5',
-      '组内按 seq 升序：两条页面事件虽然 seq 更大，但它们归在空键那一组里',
+      '1,2,3,5,6,8,10,11,12,13,14,15,16,4,7,9',
+      '组内按 seq 升序：空键那一组的三条虽然 seq 更小，也不能混进会话组',
     );
+  });
+
+  it('没有 seq、at 也解不出来时仍按 type 兜底定序（不依赖驱动返回顺序）', async () => {
+    /**
+     * 这一条钉的是排序的**最后一级**：既没有数字 `seq`、`at` 也解不出时间时，
+     * 从前返回 0，于是行序退化成"驱动先读到谁"——同一批数据两个驱动导出不同。
+     * 补上 at 字符串 → type → 归属键之后，这里必须稳定地是 chat_send 在前。
+     */
+    const events = [
+      { type: 'session_reset', at: '不是时间', userId: 'u1', batchId: 'b1', sessionId: 's1', payload: {} },
+      { type: 'chat_send', at: '不是时间', userId: 'u1', batchId: 'b1', sessionId: 's1', payload: {} },
+    ];
+    const { store } = makeStore({ sessions: [], events });
+    const lines = entryText(await exportBatch(store, 'b1', { now: NOW }), 'events.jsonl')
+      .trimEnd()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    assertEquals(lines.map((event) => event.type).join(','), 'chat_send,session_reset');
   });
 
   it('events.jsonl 里一条都不丢：没有 sessionId 的页面事件也在', async () => {
@@ -609,6 +755,12 @@ describe('整批导出 · README.md', () => {
         `字典第 ${index + 1} 项应当是 ${header}，实际是 ${dictionary[index]}`,
       );
     });
+    /**
+     * 缺说明时不能静默写占位符：那份字典是发给教研的唯一字段解释，
+     * 一句"（这一版没有写说明）"会被读成"这列本来就没有含义"。
+     * 加了列却忘了写说明，这一条必须当场变红。
+     */
+    assertNotIncludes(readme(), '这一版没有写说明', '每个表头都必须有对应的说明常量');
   });
 
   it('写明数据覆盖到、批次标识与版本、以及"清理前必须先导出、保留 90 天"', () => {

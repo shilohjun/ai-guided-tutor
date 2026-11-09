@@ -21,21 +21,39 @@ import { openStore } from '../src/server/store/index.js';
 import { EVENT_TYPES, validateEvent, recordEvent } from '../src/server/events.js';
 
 describe('事件 · 字典', () => {
-  it('正好 13 种，且包含 chat_send 与 resume 之外的全部设计项', () => {
-    assertEquals(EVENT_TYPES.length, 13, '事件种类必须被钉在 13');
-    for (const t of ['chat_send', 'chat_reply', 'chat_error', 'page_enter', 'ocr_call']) {
+  it('正好 14 种：设计稿 §5.3 的 13 种 + practice_pick（13 种里没有能观察"再练一道"的）', () => {
+    /**
+     * 为什么是 14 而不是设计稿写的 13：
+     * 设计稿把"第 5 页再练一道"列为成功标准之一，但 §5.3 的 13 种事件里**没有任何一条**
+     * 能观察到它（`page_enter` 只到 4 页，`session_reset` 是清空对话，都不是"再练一道"）。
+     * 没有第 14 种，导出里的「再练次数」在真实数据上永远只能是 0。
+     * 其余 13 种一个字没动；`practice_pick` 带 `sessionId`，归属规则与另外 12 种相同。
+     */
+    assertEquals(EVENT_TYPES.length, 14, '事件种类必须被钉在 14（13 + practice_pick）');
+    for (const t of ['chat_send', 'chat_reply', 'chat_error', 'page_enter', 'ocr_call', 'practice_pick']) {
       assert(EVENT_TYPES.includes(t), `缺事件 ${t}`);
     }
   });
-  it('13 种与设计稿 §5.3 的表格逐条一致（数量对不等于内容对）', () => {
+  it('14 种：13 种与设计稿 §5.3 逐条一致，第 14 种 practice_pick 排在末尾（数量对不等于内容对）', () => {
     /**
-     * 只断言"有 13 个"挡不住"拿掉一个、换上一个"—— 那不是笔误，是语义变了，
+     * 只断言"有 14 个"挡不住"拿掉一个、换上一个"—— 那不是笔误，是语义变了，
      * 而下游（漏斗、看板、导出）会静默地少一整列。所以把整张表钉在这里。
      */
     assertEquals(
       EVENT_TYPES.join(','),
-      'login,visit_open,batch_open,page_enter,page_exit,intake_choose,ocr_call,ocr_result,import_result,chat_send,chat_reply,chat_error,session_reset',
-      '事件字典必须与设计稿 §5.3 逐条一致（顺序也照抄，便于人工对表）',
+      'login,visit_open,batch_open,page_enter,page_exit,intake_choose,ocr_call,ocr_result,import_result,chat_send,chat_reply,chat_error,session_reset,practice_pick',
+      '前 13 种必须与设计稿 §5.3 逐条一致（顺序也照抄，便于人工对表）；practice_pick 追加在末尾',
+    );
+  });
+  it('validateEvent 接受 practice_pick，且没有归属照样被拒（归属规则与另外 12 种相同）', () => {
+    assert(
+      validateEvent({ type: 'practice_pick', at: '2026-11-09T10:00:00.000Z', sessionId: 's1', payload: {} }).ok,
+      'practice_pick 带 sessionId 必须合法',
+    );
+    assertEquals(
+      validateEvent({ type: 'practice_pick', at: '2026-11-09T10:00:00.000Z' }).reason,
+      'missing_owner',
+      'practice_pick 没有归属必须被拒（只有 login 允许无归属）',
     );
   });
   it('同时犯多个错时，按 unknown_type → missing_at → payload_too_big → missing_owner 的顺序报', () => {

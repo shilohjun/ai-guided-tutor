@@ -43,6 +43,7 @@
 
 import { readSessionRecord, snapshotSession } from './session-store.js';
 import { OVERNIGHT_GAP_MS, hasOvernightReturn, isAbandoned } from './metrics.js';
+import { ownerOf } from './events.js';
 import { createZip } from './zip.js';
 
 /** 查不到时的兜底：中文，且一眼能看出是"查不到"而不是"字段叫这个" */
@@ -452,16 +453,16 @@ const FIELD_NOTES = {
   最后活动时间: '最后一次有动作的时刻（UTC），放弃判定读的就是它',
   是否完成: '走到过报告页就是"是"（有结束时间）',
   走到第几页: '最远到达的页码，只有 1–4',
-  退回次数: '往回翻页的次数',
+  退回次数: '往回翻页的次数（数 `page_enter`：进入的页号小于此前到过的最大页号就计 1）',
   重置次数: '把这一轮对话清掉重来的次数',
-  改入场次数: '重新读题（换题干 / 换方式）的次数',
-  对话轮数: '学生发出的消息条数，沉默与否看它',
+  改入场次数: '重新读题（换题干 / 换方式）的次数（数该会话不同 `intake_choose` 的 path，减 1）',
+  对话轮数: '学生发出的消息条数，沉默与否看它（数 `chat_send` 事件）',
   给过的最高层级: '给过的最强一级帮助（L0–L3）；一次都没给过是 0',
-  公式卡次数: '打开公式卡的次数',
-  报告次数: '打开报告页的次数',
-  再练次数: '点"再练一道"的次数',
-  首条消息字数: '第一句话的字数，回答"他到底开不开口"',
-  是否复制题干: '有没有把题干复制走',
+  公式卡次数: '打开公式卡的次数（数记录里的公式卡）',
+  报告次数: '打开报告页的次数（数页号为 4 的 `page_enter`）',
+  再练次数: '点"再练一道"的次数（数 `practice_pick` 事件）',
+  首条消息字数: '第一句话的字数，回答"他到底开不开口"（读第一条 `chat_send` 的 `payload.len`）',
+  是否复制题干: '有没有把题干复制走（读第一条 `chat_send` 的 `payload.copiedStem`）',
   是否放弃: '没有结束时间，且最后活动已超过批次的放弃阈值（默认 24 小时）',
   隔离夜回来: `相邻两段之间断过 ${OVERNIGHT_GAP_MS / 3600e3} 小时以上；这是不受阈值影响的旁证`,
 };
@@ -550,9 +551,92 @@ function highestHintLevel(counters) {
   return highest ?? 0;
 }
 
-/** 学生真的说了几句话。只给 `counters.chatTurns` 缺失的老记录用（见 renderSessionsCsv） */
-function studentTurnCount(turns) {
-  return asList(turns).filter((turn) => turn?.role === 'student').length;
+/**
+ * 首条学生消息的字数 —— 事件流与 counters 都没有时的**最后一档**回落。
+ *
+ * 只认第一条 `role: 'student'`：后面几条回答的不是"他到底开不开口"。
+ * 第一条没有文本（坏记录）时返回 null：跳过它去量第二条会量到另一个人说的话。
+ */
+function firstStudentMessageLength(turns) {
+  for (const turn of asList(turns)) {
+    if (turn?.role !== 'student') continue;
+    return typeof turn?.text === 'string' ? turn.text.length : null;
+  }
+  return null;
+}
+
+/**
+ * 事件流 → 一个会话的派生信号。
+ *
+ * ============================================================================
+ * 本轮的裁决：能从事物流推出来的列，一律从事件流推
+ * ============================================================================
+ * `counters` 只在事件流**给不出这个数**时回落：整条事件流没有，或者（对 `chat_send`
+ * 的两列）第一条消息没带那个字段。只要会话有事件，其余几列一律以事件流为准
+ * （推出来是 0 就写 0，不再看 counters）。
+ * 理由不是"事件更准"，而是 counters 里有一半字段根本没有人写：
+ * `reportViews` / `practicePicks` / `intakeChanges` / `backtracks` 在设计稿里
+ * 有名字，全仓却找不到一处给它们 +1。从 counters 读，那几列在真实数据上
+ * 永远是 0 —— 而 0 看起来像"学生没做"，不像"我们没记"。
+ *
+ * `events` 由调用方按 `sessionId` 分组带进来（`exportBatch` 做这件事）。
+ * 这里再按 `byEventSeq` 排一遍：第一条 `chat_send` 是谁取决于顺序，
+ * 不能靠"调用方拼的时候恰好没弄反"（与 metrics.js 的 D1 约定相同）。
+ */
+function deriveFromEvents(events) {
+  const ordered = asList(events).slice().sort(byEventSeq);
+  const sends = ordered.filter((event) => event?.type === 'chat_send');
+
+  let maxPage = null;
+  let backtracks = 0;
+  let reportViews = 0;
+  let practicePicks = 0;
+  const intakePaths = new Set();
+
+  for (const event of ordered) {
+    const type = event?.type;
+    if (type === 'page_enter') {
+      const page = finiteNumber(event?.payload?.page);
+      /** 页号缺失或不是数字：这条埋点是坏的，不能凭空算一次退回 */
+      if (page === null) continue;
+      /**
+       * 退回的口径（裁决原文）：**进入的页号小于此前出现过的最大页号**就计 1。
+       * 不是"小于上一页" —— 学生从第 4 页直接跳回第 2 页，也是退了一次。
+       */
+      if (maxPage !== null && page < maxPage) backtracks += 1;
+      if (maxPage === null || page > maxPage) maxPage = page;
+      if (page === 4) reportViews += 1;
+    } else if (type === 'intake_choose') {
+      const path = text(event?.payload?.path);
+      if (path !== '') intakePaths.add(path);
+    } else if (type === 'practice_pick') {
+      practicePicks += 1;
+    }
+  }
+
+  return {
+    hasEvents: ordered.length > 0,
+    sendCount: sends.length,
+    firstSend: sends[0] ?? null,
+    backtracks,
+    reportViews,
+    /** 改入场 = 换过几种入场方式：两种 path 是 1 次，一种都没有是 0 */
+    intakeChanges: Math.max(0, intakePaths.size - 1),
+    practicePicks,
+  };
+}
+
+/**
+ * 公式卡次数：记录里的那张卡片清单是第一来源。
+ *
+ * `counters.formulaOpens` 只在投影里没带 `record` 时回落 —— `record.formulaCards`
+ * 是"打开过哪几张"的原始证据，而计数器只是它的一个和。记录在、但 `formulaCards`
+ * 不是数组（更老的形状）时也算"没有记录"，继续往下退。
+ */
+function formulaCardCount(record) {
+  if (!record || typeof record !== 'object') return null;
+  if (!Array.isArray(record.formulaCards)) return null;
+  return record.formulaCards.length;
 }
 
 /**
@@ -623,7 +707,17 @@ export function renderStudentsCsv(students) {
  * 代号（`studentName`）由调用方解析后随会话带进来：这个函数不该为了一个名字去查库，
  * 否则它就从"渲染器"变成了"又一个导出流程"。
  *
- * @param {object[]} sessions
+ * 同理，事件也**随会话带进来**（`session.events`，与 `metrics.js` 的 D1 约定相同）：
+ * 这个渲染器不碰库。`exportBatch` 把整批事件按 `sessionId` 分组后塞进每条会话，
+ * 于是「对话轮数 / 首条消息字数 / 是否复制题干 / 改入场次数 / 退回次数 / 报告次数 /
+ * 再练次数」都能从事件流算出来 —— 而不是去读 counters 里那些**根本没人写**的字段。
+ *
+ * 三类来源的优先级，逐列写在下面的代码注释里：
+ *   ① 事件流（只要这个会话有事件，可推导的列就以它为准）；
+ *   ② `counters` 里真有的字段（事件流给不出这个数时才回落）；
+ *   ③ 都没有：数字列写 0，`首条消息字数` 留空（0 会被读成"他发了个空消息"）。
+ *
+ * @param {object[]} sessions 每条可带 `events`（该会话的事件）与 `studentName`
  * @param {{ batch?: object|null, now?: number|string|Date|null }} [options]
  * @returns {string}
  */
@@ -632,7 +726,30 @@ export function renderSessionsCsv(sessions, { batch = null, now = null } = {}) {
   const rows = asList(sessions).map((session) => {
     const counters = session?.counters ?? {};
     const questionIndex = finiteNumber(session?.questionIndex);
-    const chatTurns = finiteNumber(counters.chatTurns);
+    const derived = deriveFromEvents(session?.events);
+
+    /**
+     * 首条消息字数：第一条 `chat_send` 的 `payload.len` → `counters.firstMessageLength`
+     * （这个计数器在设计稿里并不存在，只兼容手写/迁移来的旧记录）→ 第一条学生消息的
+     * 字数 → 留空。**最后一档不给 0**：没有消息和"消息长度是 0"是两件事。
+     */
+    const firstPayload = derived.firstSend?.payload ?? null;
+    const eventLength = firstPayload ? finiteNumber(firstPayload.len) : null;
+    const firstLength =
+      eventLength ?? finiteNumber(counters.firstMessageLength) ?? firstStudentMessageLength(session?.turns);
+
+    /**
+     * 是否复制题干：第一条 `chat_send` 的 `payload.copiedStem` → `counters.copiedStem`
+     * → 否。布尔列没有"空"这一档：空与否同义，写否更清楚。
+     */
+    const eventCopied =
+      firstPayload && firstPayload.copiedStem !== undefined && firstPayload.copiedStem !== null
+        ? strictTrue(firstPayload.copiedStem)
+        : null;
+    const counterCopied =
+      counters.copiedStem !== undefined && counters.copiedStem !== null ? strictTrue(counters.copiedStem) : null;
+    const copiedStem = eventCopied ?? counterCopied ?? false;
+
     return {
       批次: text(session?.batchId),
       代号: text(session?.studentName, UNKNOWN_STUDENT),
@@ -644,21 +761,31 @@ export function renderSessionsCsv(sessions, { batch = null, now = null } = {}) {
       最后活动时间: text(session?.lastAt),
       是否完成: yesNo(isFinished(session)),
       走到第几页: pagesWalked(session),
-      退回次数: finiteNumber(session?.progress?.backtracks) ?? 0,
-      重置次数: finiteNumber(counters.resetCount) ?? 0,
-      改入场次数: finiteNumber(counters.intakeChanges) ?? 0,
       /**
-       * 计数器缺失时退到"学生轮次条数"，不写 0。写 0 的后果是同一个人既在
-       * `turns.jsonl` 里有好几轮对话、又在 `sessions.csv` 里"一句没说"——
-       * 两个文件互相打架时，读的人只会相信那个比较小的数。
+       * 退回次数：走一遍 `page_enter`（见 `deriveFromEvents`）。没有事件的老记录退到
+       * `progress.backtracks`（模型里的字段，也是这一列原来的口径）；裁决里写的
+       * `counters.backtracks` 一起认，兼容手写/迁移来的记录。
        */
-      对话轮数: chatTurns ?? studentTurnCount(session?.turns),
+      退回次数: derived.hasEvents
+        ? derived.backtracks
+        : (finiteNumber(session?.progress?.backtracks) ?? finiteNumber(counters.backtracks) ?? 0),
+      重置次数: finiteNumber(counters.resetCount) ?? 0,
+      /** 改入场次数：该会话不同 `intake_choose` 的 path 数减 1（一种都没有是 0） */
+      改入场次数: derived.hasEvents ? derived.intakeChanges : (finiteNumber(counters.intakeChanges) ?? 0),
+      /**
+       * 对话轮数：`chat_send` 事件条数。没有事件的老记录才读 `counters.chatTurns`
+       * （那个计数器是 `markActivity` 真在写的）；两者都没有就是 0 —— 这里没有
+       * "空"这一档，0 轮与"没记"在读的人眼里都是"没开口"，不会做出相反的结论。
+       */
+      对话轮数: derived.hasEvents ? derived.sendCount : (finiteNumber(counters.chatTurns) ?? 0),
       给过的最高层级: highestHintLevel(counters),
-      公式卡次数: finiteNumber(counters.formulaOpens) ?? 0,
-      报告次数: finiteNumber(counters.reportViews) ?? 0,
-      再练次数: finiteNumber(counters.practicePicks) ?? 0,
-      首条消息字数: finiteNumber(counters.firstMessageLength) ?? 0,
-      是否复制题干: yesNo(strictTrue(counters.copiedStem)),
+      公式卡次数: formulaCardCount(session?.record) ?? finiteNumber(counters.formulaOpens) ?? 0,
+      /** 报告次数：页号为 4 的 `page_enter` 条数（没有事件才读 counters） */
+      报告次数: derived.hasEvents ? derived.reportViews : (finiteNumber(counters.reportViews) ?? 0),
+      /** 再练次数：`practice_pick` 事件条数（第 14 种事件，见 events.js） */
+      再练次数: derived.hasEvents ? derived.practicePicks : (finiteNumber(counters.practicePicks) ?? 0),
+      首条消息字数: firstLength ?? '',
+      是否复制题干: yesNo(copiedStem),
       是否放弃: yesNo(isAbandoned(session, batch, at)),
       隔离夜回来: yesNo(hasOvernightReturn(session)),
     };
@@ -749,8 +876,13 @@ function bySessionId(left, right) {
  * 事件的排序：`seq` 升序 → 缺 `seq` 的排在有序号的之后 → 再按 `at`。
  *
  * 与 `metrics.js` 的 `byEventOrder`、store 的 `byEventOrder` 同一口径：`seq` 是写入
- * 那一刻盖上的定稿，没有它才退到 `at`。两档都相同时返回 0（`Array#sort` 稳定，
- * 等于保持原顺序）。
+ * 那一刻盖上的定稿，没有它才退到 `at`。
+ *
+ * 最后还有三级 tie-break（`at` 原始字符串 → `type` → 归属键）：两档都相同时返回 0
+ * 等于把行序交给驱动 —— 内存按写入序、file 按目录读取序，同一批数据两个驱动导出
+ * 不同。`seq` 由全局自增保证唯一，所以这几级只对**没有 `seq` 的老记录**起作用，
+ * 而正是那些老记录最可能在同一批里出现并列。归属键走 `events.js` 的 `ownerOf`，
+ * 不在这里再抄一遍 `sessionId || visitId`。
  */
 function byEventSeq(left, right) {
   const a = typeof left?.seq === 'number' && Number.isFinite(left.seq) ? left.seq : null;
@@ -765,7 +897,13 @@ function byEventSeq(left, right) {
   const atA = Date.parse(String(left?.at ?? ''));
   const atB = Date.parse(String(right?.at ?? ''));
   if (Number.isFinite(atA) && Number.isFinite(atB) && atA !== atB) return atA - atB;
-  return 0;
+  const rawA = text(left?.at);
+  const rawB = text(right?.at);
+  if (rawA !== rawB) return rawA < rawB ? -1 : 1;
+  const typeA = text(left?.type);
+  const typeB = text(right?.type);
+  if (typeA !== typeB) return typeA < typeB ? -1 : 1;
+  return compareText(ownerOf(left), ownerOf(right));
 }
 
 /** 对话的排序：`i` 升序；缺 `i` 的那几条保持原相对顺序（不猜，也不排到最前） */
@@ -788,25 +926,38 @@ function jsonLines(records) {
 }
 
 /**
- * 事件 → `events.jsonl`：按 `sessionId` 分组、组内按 `seq` 升序、组间按 `sessionId` 字典序。
+ * 事件按 `sessionId` 分组、组内按 `byEventSeq` 升序。
  *
- * 为什么不直接用 `listEventsByBatch` 的返回顺序：两个驱动的并列顺序可能不同
- * （Task 1 记下的 Minor），而"两次导出能不能 diff"取决于这里。顺序全部自己排一遍，
- * 这条依赖就不存在了。
+ * 两个用途共用这一份：`events.jsonl` 的行序，以及 `sessions.csv` 的派生列
+ * （`session.events` 就是这里分出来的那一份）。分成两套实现的话，"同一批事件
+ * 在两处顺序不同"只会表现为某个计数差 1，而那种差没人查得出来。
  *
  * 没有 `sessionId` 的事件**不丢**：页 1–2 的事件挂的是 `visitId`（设计稿 §5.2），
- * 而"第 1 页停留多久"正是这批数据要回答的问题之一。它们自成一组（空键）排在最前。
+ * 而"第 1 页停留多久"正是这批数据要回答的问题之一。它们自成一组（空键）。
  */
-function renderEventLines(events) {
+function groupEventsBySession(events) {
   const groups = new Map();
   for (const event of asList(events)) {
     const key = text(event?.sessionId);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(event);
   }
+  for (const [key, list] of groups) groups.set(key, list.slice().sort(byEventSeq));
+  return groups;
+}
+
+/**
+ * 事件 → `events.jsonl`：按 `sessionId` 分组、组内按 `seq` 升序、组间按 `sessionId` 字典序。
+ *
+ * 为什么不直接用 `listEventsByBatch` 的返回顺序：两个驱动的并列顺序可能不同
+ * （Task 1 记下的 Minor），而"两次导出能不能 diff"取决于这里。顺序全部自己排一遍，
+ * 这条依赖就不存在了。空键（登录 + 挂 `visitId` 的页面事件）排在最前。
+ */
+function renderEventLines(events) {
+  const groups = groupEventsBySession(events);
   const records = [];
   for (const key of [...groups.keys()].sort(compareText)) {
-    records.push(...groups.get(key).slice().sort(byEventSeq));
+    records.push(...groups.get(key));
   }
   return jsonLines(records);
 }
@@ -941,10 +1092,25 @@ export async function exportBatch(store, batchId, { now } = {}) {
     /** 名单按代号排（码位序）：导出的第一列看着就是一份名单，不是一堆 id */
     .sort((a, b) => compareText(a.displayName, b.displayName) || compareText(a.userId, b.userId));
 
-  /** 代号随会话带进 CSV；报告快照不带（报告是库里那一份，见 `snapshotSession`） */
+  /** 事件按会话分好、组内按 `seq` 排好：`events.jsonl` 的行序与 CSV 的派生列共用这一份 */
+  const eventsBySession = groupEventsBySession(events);
+
+  /**
+   * 代号与事件**一起**随会话带进 CSV：代号给「代号」列，事件给「对话轮数 /
+   * 首条消息字数 / 是否复制题干 / 改入场次数 / 退回次数 / 报告次数 / 再练次数」。
+   * 报告快照不带这两样（报告是库里那一份，见 `snapshotSession`）。
+   *
+   * 没有事件的会话给空数组（而不是不给 `events`）：`deriveFromEvents` 对两者
+   * 一视同仁，都退到 counters —— 而"空数组"比"字段不在"少一种形状要猜。
+   */
   const sessionsWithNames = sessions.map((session) => {
     const displayName = nameByUser.get(text(session?.userId));
-    return displayName ? { ...session, studentName: displayName } : session;
+    const sessionId = text(session?.id);
+    const enriched = {
+      ...session,
+      events: sessionId === '' ? [] : (eventsBySession.get(sessionId) ?? []),
+    };
+    return displayName ? { ...enriched, studentName: displayName } : enriched;
   });
 
   const reportEntries = sessions
