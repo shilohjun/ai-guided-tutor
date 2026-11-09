@@ -25,6 +25,9 @@
  *   因此这里加了 TTL 清理，并且前端对"会话不存在"做了友好降级。
  *   PoC 阶段刻意不引持久化存储 —— 换来的是零依赖，代价是长间隔的对话可能丢上下文。
  *   导入的题目也一样（见 registry.js：用内容哈希做 id，丢了就重新生成同一个 id）。
+ *
+ *   试点之后存储端口（src/server/store/）已经就位，账号与令牌走它；
+ *   会话本身的写穿（/api/chat 落库、冷启动回载）是后面那一步的事。
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -45,6 +48,8 @@ import { runEvaluation, formatEvaluation } from '../core/eval.js';
 import { STUDENT_LEVEL_NOTE, inspectVoice } from '../core/prompt.js';
 import { PROBLEMS } from '../core/problems.data.js';
 import { DEFAULT_PERSONA, PERSONA_IDS, PERSONAS, normalizePersona, personaById, stylePersonaReply } from '../core/personas.js';
+import { openStore } from './store/index.js';
+import { enforceLoginRate, login, resetLoginFailures } from './auth.js';
 
 loadEnvFile();
 
@@ -109,6 +114,31 @@ function resolveCachedShape() {
 
 function rememberShape(shape) {
   if (shape?.url && shape?.imageField) ocrShape = shape;
+}
+
+/**
+ * 存储的进程级单例。
+ *
+ * 缓存的为什么是 Promise 而不是 Store 实例：`openStore` 是异步的，
+ * 两个请求同时到达时各开一次，memory 驱动就会变成两个互不相干的库
+ * （file 驱动也会白开一次目录）。缓存 Promise 让并发请求等同一个打开动作。
+ *
+ * 打开失败要清掉缓存：否则一次瞬时故障（目录没权限、云 SDK 还没装）
+ * 会把这个进程永久钉在一个 rejected promise 上 —— 之后每个请求都 500，
+ * 直到实例重启，而重启之后故障可能已经消失了。
+ *
+ * `STORE` 没配时是 memory，所以本地与现有测试的行为一个字节都不变。
+ */
+let storePromise = null;
+
+export function getStore() {
+  if (!storePromise) {
+    storePromise = openStore(envFor());
+    storePromise.catch(() => {
+      storePromise = null;
+    });
+  }
+  return storePromise;
 }
 
 function adapterTagFor(env) {
@@ -264,6 +294,25 @@ function readJson(req) {
     });
     req.on('error', reject);
   });
+}
+
+/**
+ * 这次请求算谁。
+ *
+ * `x-forwarded-for` 取**第一段**：代理会把自己一层层追加在后面，
+ * 第一段才是客户端地址；整串拿来当键，等于每个 IP 都算成新的一个。
+ * 没有这个头（本地直连）时退回 socket 地址 —— 拿不到就统一记 'unknown'，
+ * 宁可所有不明来源共用一个桶，也不能因为少一个字段就让限速整条失效。
+ *
+ * 前提（按 IP 限速的通用前提，不是这一段能解决的）：部署层必须**自己写**这个头。
+ * 若它把客户端带来的 XFF 原样透传，那么每发一个请求换一个伪造的 XFF 就能绕过限速 ——
+ * 遇到这种部署形态，限速要改成按"口令+IP"或加一层 TTL 缓存来兜底。
+ */
+function clientIp(req) {
+  const forwarded = req.headers?.['x-forwarded-for'];
+  const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  const first = String(raw ?? '').split(',')[0].trim();
+  return first || req.socket?.remoteAddress || 'unknown';
 }
 
 // ---------------------------------------------------------------------------
@@ -506,6 +555,61 @@ export async function handleApi(req, res, url) {
           'solution_insight',
         ],
       },
+    });
+    return true;
+  }
+
+  // ---- POST /api/auth/login（6 位口令 → 令牌） ----
+  /**
+   * 顺序是有讲究的：**先限速，再哈希**。
+   * 反过来写的话，被拒绝的那一次其实已经做完了哈希 —— 一次 sha256 不贵，
+   * 但乘以"每秒几百次"就是另一回事；限速只挡住了响应，没挡住成本。
+   *
+   * 错误只有两种回答（`401 口令不对` / `429 试太多次了`）：
+   * 不区分"没有这个人"与"口令错了"，否则枚举脚本能靠错误文案二分出有效账号。
+   *
+   * 坏请求体（半截 JSON、断网）单独回 400 且**不消耗尝试次数**：
+   * 它不是一次猜号，不该让一个网络不好的人白白少掉一次机会。
+   */
+  if (path === '/api/auth/login' && req.method === 'POST') {
+    /**
+     * 读体失败用一个**本地哨兵变量**记，而不是往 body 里塞 `__readError` 字段：
+     * serverless 平台上 `req.body` 可能是平台已经解析好的对象（也就是学生可控的
+     * JSON），往那个对象里认字段，等于让客户端自己声明"我这次是坏请求"。
+     */
+    let readFailed = null;
+    const body = await readJson(req).catch((err) => {
+      readFailed = err;
+      return null;
+    });
+    if (readFailed) {
+      const tooLarge = String(readFailed.message ?? '').includes('过大');
+      sendJson(res, tooLarge ? 413 : 400, {
+        error: tooLarge ? '请求体过大' : '请求体不是合法 JSON，请重新提交',
+      });
+      return true;
+    }
+
+    const ip = clientIp(req);
+    if (!enforceLoginRate(ip)) {
+      sendJson(res, 429, { error: '试太多次了，15 分钟后再试' });
+      return true;
+    }
+
+    const code = typeof body?.code === 'string' ? body.code.trim() : '';
+    const result = await login(await getStore(), code, ip);
+    if (!result) {
+      sendJson(res, 401, { error: '口令不对' });
+      return true;
+    }
+
+    /** 登录成功：把这个 IP 的失败记录清掉，别让上一次打错字攒到下一次 */
+    resetLoginFailures(ip);
+    sendJson(res, 200, {
+      token: result.token,
+      displayName: result.user.displayName,
+      batchId: result.batchId,
+      expiresAt: result.expiresAt,
     });
     return true;
   }

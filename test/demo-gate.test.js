@@ -289,3 +289,27 @@ describe('公网口令门 · 显式开关仍然有效', () => {
     });
   });
 });
+
+/**
+ * 请求上下文里的学生身份。
+ *
+ * 为什么现在就要钉住这个字段：三个入口（本地 / Vercel / Workers）只调
+ * `buildRequestContext` 一个函数，令牌解析以后也只会加在这里。字段先占位，
+ * 后面接真解析时"有没有拼进去"才有地方验 —— 否则守卫拿到 undefined
+ * 与"没登录"看起来一样，权限判断会静默地永远放行。
+ */
+describe('请求上下文 · 学生身份字段', () => {
+  it('buildRequestContext 带 user 字段，本任务恒为 null', async () => {
+    const { buildRequestContext } = await import('../src/server/demo-gate.js');
+    const ctx = buildRequestContext({
+      headers: {},
+      url: new URL('http://probe.local/api/health'),
+      source: {},
+    });
+    assert('user' in ctx, '上下文必须带 user 字段');
+    assertEquals(ctx.user, null, '本任务还没解析令牌，user 应是 null');
+    /** 老字段一个都不能少：三个入口都靠它们 */
+    assertEquals(ctx.gateState, 'off', '原有判定结果不能被这次改动影响');
+    assert(ctx.gate && typeof ctx.env === 'object', 'gate 与 env 必须照旧返回');
+  });
+});

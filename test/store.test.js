@@ -64,3 +64,28 @@ describe('存储 · file 驱动落盘', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 });
+
+/**
+ * 令牌集合。
+ *
+ * 为什么值得单独钉：登录态是唯一"丢了就全员重新登录"的数据。
+ * 试点期间学生用的是 6 位数字口令，重新发号意味着要重新在微信里发一遍，
+ * 所以令牌必须真的落盘，而不是靠进程还活着。
+ */
+describe('存储 · 令牌集合', () => {
+  it('memory 驱动：按令牌哈希存取，读不到返回 null', async () => {
+    const s = await openStore({});
+    await s.putToken({ tokenHash: 'h1', userId: 'u1', expiresAt: '2027-01-01T00:00:00.000Z' });
+    assertEquals((await s.getToken('h1')).userId, 'u1', '存进去的令牌应能按哈希取回');
+    assertEquals(await s.getToken('nope'), null, '没有的令牌必须返回 null，与其它集合一致');
+  });
+  it('file 驱动：令牌重开实例仍能读回（登录态不能一重启就没了）', async () => {
+    const dir = tmp();
+    const a = await fileStore(dir);
+    await a.putToken({ tokenHash: 'h2', userId: 'u2', expiresAt: '2027-01-01T00:00:00.000Z' });
+    await a.close();
+    const b = await fileStore(dir);
+    assertEquals((await b.getToken('h2')).userId, 'u2', '令牌必须落盘');
+    rmSync(dir, { recursive: true, force: true });
+  });
+});

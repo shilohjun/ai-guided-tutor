@@ -243,7 +243,7 @@ ALIYUN_OCR_PROVIDER=marketplace
 ```bash
 npm start          # 启动本地服务
 npm run dev        # 监听文件变化并重启
-npm test           # 全部单元测试 + UI 令牌审计（当前 324 个注册用例）
+npm test           # 全部单元测试 + UI 令牌审计（用例数见「测试与评测」）
 npm run eval       # 离线评测（19 场景，无需 Key）
 npm run eval:llm   # 使用 .env 中配置的模型重跑评测
 npm run ocr:path   # 探测 OCR 链路连通性
@@ -255,6 +255,10 @@ npm run ui:shots      # 5 页 + 深色截图，输出到 preview/
 npm run preview:build   # 打包单文件离线预览版 → preview/preview.html
 npm run preview:verify  # 用 file:// 打开预览版跑一遍链路验收
 npm run preview:capture # 重新抓取演示数据（需先 npm start）
+
+node scripts/issue-accounts.mjs --batch b2 --count 30 --out accounts-b2.csv
+                    # 给一个批次发号，写 UTF-8 带 BOM 的 CSV（序号,代号,口令,登录链接）；
+                    # STORE 没配时默认落到 file 驱动的 .data/，口令不会随进程退出而丢
 ```
 
 ---
@@ -286,7 +290,7 @@ npm run preview:verify    # file:// 打开验收
 npm test
 ```
 
-当前注册 **347 个用例，全部通过**。`npm test` 跑完测试后会接着跑
+当前注册 **378 个用例，全部通过**。`npm test` 跑完测试后会接着跑
 `scripts/audit-ui-style.js`：它把设计令牌（间距 2/4/6/8/12/16/24/32、字号三档、
 嵌套圆角、语义色）做成可执行规则，样式一跑偏就报出来 —— 只靠人眼看不住。
 字号与控件尺寸参考 LeetCode 做题页后，再按中文密度收一档（中档题干 13/18.9、标签 11、按钮高 32、顶栏 52）。
@@ -361,6 +365,7 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | `GET` | `/api/health` | 健康检查、当前运行模式、`capabilities.modes`（哪些做题方式能点） |
+| `POST` | `/api/auth/login` | 6 位口令 → 令牌（`200 {token, displayName, batchId, expiresAt}`）；口令不对 `401`，同一 IP 15 分钟内超过 10 次 `429` |
 | `GET` | `/api/problems` | 内置题目列表 |
 | `GET` | `/api/related?id=` | 同知识点的同类题（服务端注册表内，最多 6 道）。**前端已不再调用**：第 5 页改为从 152 道题库按双轴标签筛 |
 | `GET` | `/api/problem?id=` | 单个题目（学生可见版本） |

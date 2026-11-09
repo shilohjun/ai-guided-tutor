@@ -110,8 +110,12 @@ export function buildRequestEnv(gate, source) {
 /**
  * 一步到位：给定请求头、URL 与配置来源，算出 { gate, gateState, env }。
  * 两个平台入口都调这个，避免各自拼装出细微差别。
+ *
+ * `user` 是之后要接学生身份的位置：令牌解析（`x-test-token` → 库里的学生记录）
+ * 只会加在这一处，三个入口不必各改一次。本任务先固定为 `null` ——
+ * 字段先存在，后面接真解析时"有没有拼进去"才有地方可验。
  */
 export function buildRequestContext({ headers, url, source }) {
   const gate = resolveDemoGate({ headers, url, source });
-  return { gate, gateState: gate.state, env: buildRequestEnv(gate, source) };
+  return { gate, gateState: gate.state, env: buildRequestEnv(gate, source), user: null };
 }

@@ -23,6 +23,8 @@
  * @property {(id: string) => Promise<object|null>} getUserById
  * @property {(user: object) => Promise<void>} putUser
  * @property {(batchId: string) => Promise<object[]>} listUsers
+ * @property {(tokenHash: string) => Promise<object|null>} getToken
+ * @property {(token: object) => Promise<void>} putToken
  * @property {(id: string) => Promise<object|null>} getBatch
  * @property {(batch: object) => Promise<void>} putBatch
  * @property {(batchId: string, userId: string) => Promise<void>} addMember

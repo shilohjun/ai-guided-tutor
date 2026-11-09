@@ -11,6 +11,7 @@
  * 落盘形状（集合名沿用设计稿 §5.2，Task 12 搬到 CloudBase 时集合名要对得上）：
  *
  *   <STORE_DIR>/test_user/<id>.json
+ *   <STORE_DIR>/token/<tokenHash>.json               键是 token 的 sha256，不是 token
  *   <STORE_DIR>/batch/<id>.json
  *   <STORE_DIR>/batch_member/<batchId>__<userId>.json
  *   <STORE_DIR>/visit/<id>.json
@@ -35,6 +36,7 @@ import { appendFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } f
 import { dirname, join, resolve } from 'node:path';
 
 const USERS = 'test_user';
+const TOKENS = 'token';
 const BATCHES = 'batch';
 const MEMBERS = 'batch_member';
 const VISITS = 'visit';
@@ -180,6 +182,14 @@ export async function openFileStore(env = {}) {
       return readAll(USERS)
         .filter((u) => (u.batches ?? []).includes(batchId))
         .sort(byFields('displayName', 'id'));
+    },
+
+    async getToken(tokenHash) {
+      return readRecord(TOKENS, tokenHash);
+    },
+    async putToken(token) {
+      // 键是 sha256 的十六进制串，本身就适合做文件名（见 nameOf 的注释）
+      writeRecord(TOKENS, token?.tokenHash, token);
     },
 
     async getBatch(id) {

@@ -39,6 +39,8 @@ function byFields(...keys) {
 
 export async function openMemoryStore() {
   const users = new Map();
+  /** 登录令牌：键是 token 的 sha256，**库里没有明文 token** */
+  const tokens = new Map();
   const batches = new Map();
   const members = new Map();
   const visits = new Map();
@@ -83,6 +85,13 @@ export async function openMemoryStore() {
         .filter((u) => (u.batches ?? []).includes(batchId))
         .sort(byFields('displayName', 'id'))
         .map((u) => structuredClone(u));
+    },
+
+    async getToken(tokenHash) {
+      return read(tokens, tokenHash);
+    },
+    async putToken(token) {
+      write(tokens, 'token', token?.tokenHash, token);
     },
 
     async getBatch(id) {
