@@ -14,7 +14,7 @@
  */
 
 import { describe, it, assertEquals, assert } from './runner.js';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openStore } from '../src/server/store/index.js';
@@ -70,6 +70,29 @@ describe('事件 · 字典', () => {
   it('只带 visitId 的事件合法（拍照与选课都发生在第 1 页，那时还没有 session）', () => {
     assert(validateEvent({ type: 'ocr_call', at: '2026-11-09T10:00:00.000Z', userId: 'u1', visitId: 'v1' }).ok);
   });
+  it('login 是唯一允许没有归属的事件（设计稿 §5.3“挂在哪”是 —）', () => {
+    assert(
+      validateEvent({ type: 'login', at: '2026-11-09T10:00:00.000Z' }).ok,
+      '登录发生在任何 visit/session 之前，不带归属也必须合法',
+    );
+    /**
+     * 例外只有一个：其余 12 种照旧必须有归属。
+     * 一条挂不上人的事件落库后没有任何查询能解释它 —— 那正是 missing_owner 要拦的。
+     */
+    for (const type of EVENT_TYPES.filter((t) => t !== 'login')) {
+      assertEquals(
+        validateEvent({ type, at: '2026-11-09T10:00:00.000Z' }).reason,
+        'missing_owner',
+        `${type} 没有归属必须被拒`,
+      );
+    }
+    /** 未知 type 且没有归属时仍先报 unknown_type：豁免只放宽归属这一条，不动检查顺序 */
+    assertEquals(
+      validateEvent({ type: 'click_anything' }).reason,
+      'unknown_type',
+      '未知 type 应当先报类型，而不是缺归属',
+    );
+  });
 });
 
 describe('事件 · 落库', () => {
@@ -87,6 +110,44 @@ describe('事件 · 落库', () => {
     assert(stored.at !== '2020-01-01T00:00:00.000Z', '客户端传的 at 不得被采纳');
     const at = Date.parse(stored.at);
     assert(Number.isFinite(at) && at >= before - 2000, `at 应是这次调用的服务端时间，实际 ${stored.at}`);
+  });
+  it('无归属的 login 两个驱动都收得下，且只能按 batchId 查到（B7 的豁免要真的进得了库）', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bsj-ev-login-'));
+    const drivers = [
+      ['memory', await openStore({})],
+      ['file', await openStore({ STORE: 'file', STORE_DIR: dir })],
+    ];
+    try {
+      for (const [name, s] of drivers) {
+        await recordEvent(s, {
+          type: 'login',
+          at: '2026-11-09T10:00:00.000Z',
+          userId: 'u-login',
+          batchId: 'b-login',
+          payload: { displayName: 'S01' },
+        });
+        assertEquals(
+          (await s.listEventsByBatch('b-login')).map((e) => e.type).join(','),
+          'login',
+          `${name}: 无归属的 login 只能按 batchId 找到`,
+        );
+        assertEquals((await s.listEventsBySession('u-login')).length, 0, `${name}: 它不属于任何会话/访问`);
+        /**
+         * 存储层也守住同一个例外：别的 type 没有归属仍然写不进去。
+         * 校验之外再拦一道，是因为 appendEvent 是端口原语，脚本可以绕过 validateEvent 直接调。
+         */
+        let threw = false;
+        try {
+          await s.appendEvent({ type: 'page_enter', at: '2026-11-09T10:00:00.000Z' });
+        } catch {
+          threw = true;
+        }
+        assert(threw, `${name}: 除 login 外，无归属事件在存储层也必须被拒`);
+      }
+    } finally {
+      for (const [, s] of drivers) await s.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -295,20 +356,24 @@ describe('事件 · 上报接口（真实 HTTP）', () => {
     });
   });
 
-  it('没带 at 的事件在接口上被跳过并计数（服务端不替它编时间）', async () => {
+  it('没带 at 的事件也收下：路由在校验之前就盖了服务端时间（B7）', async () => {
     await withServer(async (base) => {
-      const sessionId = uid('sess');
-      const res = await post(base, {
-        events: [
-          { type: 'page_enter', sessionId },
-          { type: 'page_enter', at: '2026-11-09T10:00:00.000Z', sessionId },
-        ],
-      });
+      const visitId = uid('visit');
+      const res = await post(base, { events: [{ type: 'page_enter', visitId }] });
       assertEquals(res.status, 200);
       const json = await res.json();
-      assertEquals(json.accepted, 1);
-      assertEquals(json.rejected, 1);
-      assertEquals((await (await routeStore()).listEventsBySession(sessionId)).length, 1);
+      assertEquals(json.accepted, 1, '客户端漏发 at 不得丢掉这条埋点');
+      assertEquals(json.rejected, 0);
+      const [stored] = await (await routeStore()).listEventsBySession(visitId);
+      assertEquals(stored.type, 'page_enter');
+      assert(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(stored.at),
+        `at 应是服务端生成的 ISO 字符串（24 字符、带毫秒与 Z），实际 ${stored.at}`,
+      );
+      assert(
+        Number.isFinite(Date.parse(stored.at)) && Math.abs(Date.now() - Date.parse(stored.at)) < 60_000,
+        `at 应是这次请求的服务端时间，实际 ${stored.at}`,
+      );
     });
   });
 });

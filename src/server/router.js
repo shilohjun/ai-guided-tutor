@@ -488,13 +488,18 @@ export function buildStudentTurn(response, mode, problem, personaValue = DEFAULT
 // ---------------------------------------------------------------------------
 
 /**
- * 从请求里取令牌。
+ * 从请求里取出能标识用户的东西（今天是令牌串）。**Task 4 的临时实现。**
+ *
+ * 名字标的是 Task 4 要接管的那条缝：`demo-gate.js` 会用它真正解析出用户，
+ * 并补上"必须登录"。今天这里只做第一步（取串），判定在 `resolveToken` 里 ——
+ * 本函数不做任何安全判断。
  *
  * 为什么两个头都认：`authorization: Bearer …` 是标准形状（Task 4 的守卫会用它）；
  * 埋点代码分散在各个页面动作里，写法不一定统一，所以额外认一个 `x-pilot-token`。
- * 两种形状都只是"取串"，判定在 resolveToken 里 —— 这里不做任何安全判断。
+ *
+ * TODO(Task 4): 用 demo-gate.js 的 `resolveUser(req, store)` 取代本函数（取令牌只留一处）。
  */
-function bearerToken(req) {
+function resolveUserFromRequest(req) {
   const header = req.headers?.authorization ?? req.headers?.['x-pilot-token'];
   const raw = Array.isArray(header) ? header[0] : header;
   return String(raw ?? '').replace(/^bearer\s+/i, '').trim();
@@ -519,7 +524,7 @@ function textOrNull(value) {
  *
  * 四类情况都不许 5xx：
  *   ① 请求体解析失败（半截 JSON / 超过 1MB / 空 body）→ `{ accepted: 0, rejected: 0 }`
- *   ② 单条不合法（未知 type / 没带 at / payload 超 2KB / 没有归属）→ 跳过并计入 rejected
+ *   ② 单条不合法（未知 type / payload 超 2KB / 没有归属）→ 跳过并计入 rejected
  *   ③ 存储写失败（磁盘满、驱动不可用）→ 同样计入 rejected，不往上报错
  *   ④ 令牌解析失败 → 当作"没有身份"，回落到 body 里的 userId（Task 4 会把它收紧成必须登录）
  *
@@ -532,9 +537,9 @@ function textOrNull(value) {
  * - `userId` / `batchId`：带了令牌就用令牌里的（`batchId` 是令牌解析出的**当前批次**）。
  *   令牌缺席时才回落到 body —— 现在还没有登录守卫，脚本与测试需要这条路；
  *   Task 4 会把"必须登录"补上，届时回落自然失效。
- * - `at`：值一律由 `recordEvent` 换成服务端时间。这里只校验它**在不在** ——
- *   缺 `at` 是我们唯一能看出"这条埋点是半截的"的信号（见 events.js 里 validateEvent），
- *   跳过的代价是一条事件，不是整批。
+ * - `at`：**先盖服务端时间、再逐条校验**（B7-2），所以客户端漏发 `at` 不会丢事件；
+ *   值最终仍由 `recordEvent` 换成服务端时间。`missing_at` 作为纯函数契约保留，
+ *   但这条 HTTP 路径上不可达 —— 半截埋点会以别的理由（未知 type / 缺归属）被拒。
  *
  * @param {object} req
  * @param {object|null} body 已解析好的请求体；解析失败传 null
@@ -548,7 +553,7 @@ async function acceptEvents(req, body) {
   const store = await getStore().catch(() => null);
   if (!store) return { accepted: 0, rejected: items.length };
 
-  const token = bearerToken(req);
+  const token = resolveUserFromRequest(req);
   const identity = token ? await resolveToken(store, token).catch(() => null) : null;
 
   let accepted = 0;
@@ -562,13 +567,21 @@ async function acceptEvents(req, body) {
       rejected += 1;
       continue;
     }
-    if (!validateEvent(item).ok) {
+
+    /**
+     * 先盖时间戳、再校验（B7-2）：客户端漏发 `at` 不会因此丢掉事件。
+     * 因为这里已经盖过章，`validateEvent` 的 `missing_at` 分支从 HTTP 不可达 ——
+     * 那条分支作为纯函数的契约保留（测试仍会直接命中）。
+     */
+    const stamped = { ...item, at: new Date().toISOString() };
+
+    if (!validateEvent(stamped).ok) {
       rejected += 1;
       continue;
     }
 
     const event = {
-      ...item,
+      ...stamped,
       /** 令牌优先；body 只在没有身份时兜底（见上面的说明） */
       userId: identity ? identity.user.id : (textOrNull(item.userId) ?? textOrNull(body?.userId)),
       batchId: identity ? (identity.batchId ?? null) : (textOrNull(item.batchId) ?? textOrNull(body?.batchId)),

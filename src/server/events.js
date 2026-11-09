@@ -13,6 +13,16 @@
  * 而那件事只要漏一处，看板上的分母就悄悄变了。
  *
  * ============================================================================
+ * 归属、例外与顺序（三条，一次说清）
+ * ============================================================================
+ * ① 归属：`sessionId` 非空取它，否则取 `visitId`；`listEventsBySession` 的参数
+ *    就是这个归属键，不是"只认 session"。
+ * ② 例外：只有 `login` 可以两个都没有（设计稿 §5.3 的"挂在哪"写的就是 `—`）；
+ *    其余 12 种缺归属一律 `missing_owner`，存储层的 `appendEvent` 同样拦。
+ * ③ 顺序：落库前取 `incrCounter('seq:event', 1)` 作 `seq`，两个列表接口
+ *    都按 `seq` 升序 —— 同一毫秒的两条事件只有它能定序。
+ *
+ * ============================================================================
  * 校验为什么是纯函数、而且顺序被钉死
  * ============================================================================
  * `validateEvent` 不碰存储、不读环境，所以路由、脚本、测试可以用同一个判据，
@@ -25,9 +35,15 @@
  *   ③ payload_too_big  体积问题 —— 先确认它是不是一条真事件，再量它多大；
  *   ④ missing_owner    归属是最后一道：没有 sessionId 也没有 visitId 的事件
  *                      不知道该挂到哪个学生/哪次打开上，落了也是孤儿。
+ *                      例外只有 `login`（见 allowsNoOwner），其余 12 种照旧。
  *
  * 一条事件可能同时犯几个错，先报哪一个决定了调用方拿到的是哪句可操作的话。
  * 顺序改了，测试会红 —— 这是故意的。
+ *
+ * 注意 `missing_at` 在**生产路径**上不可达：HTTP 边界（router.js 的 acceptEvents）
+ * 与 `recordEvent` 都是**先盖服务端时间、再校验**（B7-2），所以从接口进来的事件
+ * 永远带着 `at`。它作为纯函数契约保留 —— 测试与脚本仍会直接命中它，
+ * 而"客户端漏发 at 不丢事件"是刻意的选择，不是漏判。
  *
  * ============================================================================
  * 时间（at）一律由服务端生成
@@ -113,6 +129,20 @@ function payloadBytes(payload) {
 }
 
 /**
+ * 唯一允许没有归属的事件：`login`。
+ *
+ * 设计稿 §5.3 的"挂在哪"一栏对 `login` 写的就是 `—`：登录成功发生在任何
+ * visit/session 之前，硬给它编一个归属只会把这次登录记到上一次打开上。
+ * 其余 12 种没有归属就是孤儿事件 —— 落了库也没有任何查询能解释它。
+ *
+ * 这个判断要同时被三处用到：`validateEvent`、memory / file 的 `appendEvent`。
+ * 各写一遍就迟早会漏一处（B1 那次"同一事件换驱动就少一半"正是这么来的）。
+ */
+export function allowsNoOwner(event) {
+  return event?.type === 'login';
+}
+
+/**
  * 一条事件能不能进库。
  *
  * 返回值是 `{ ok: true }` 或 `{ ok: false, reason }` —— 不抛异常，
@@ -122,7 +152,10 @@ function payloadBytes(payload) {
  * `at` 只判**有没有**，不判值：落库前它一定会被服务端时间覆盖（见文件头），
  * 判一个马上要被丢掉的值没有意义。而"有没有"是有意义的 ——
  * 缺 `at` 说明这条埋点是在网络中断/页面被杀时发出来的半截请求，
- * 这种事件通常还缺后面别的字段。
+ * 这种事件通常还缺后面别的字段。生产路径会先盖章（见文件头），
+ * 所以这条分支只在直接调用本函数时命中。
+ *
+ * `missing_owner` 放行 `login`（见 allowsNoOwner）；别的 type 照旧。
  *
  * @param {object} event
  * @returns {{ ok: true } | { ok: false, reason: 'unknown_type'|'missing_at'|'payload_too_big'|'missing_owner' }}
@@ -135,7 +168,7 @@ export function validateEvent(event) {
 
   if (payloadBytes(event?.payload) > MAX_PAYLOAD_BYTES) return { ok: false, reason: 'payload_too_big' };
 
-  if (!ownerOf(event)) return { ok: false, reason: 'missing_owner' };
+  if (!ownerOf(event) && !allowsNoOwner(event)) return { ok: false, reason: 'missing_owner' };
 
   return { ok: true };
 }
@@ -150,9 +183,9 @@ export function validateEvent(event) {
  * 不合法就**抛**：调用方是服务端代码，把一条不认识的事件写进去是 bug，
  * 应当当场炸出来；而"HTTP 埋点不能因此 5xx"是路由的职责（它自己兜住并计数）。
  *
- * 注意 `missing_at` 在这里轮不到：`at` 就是在本函数里盖的。
- * 那个理由属于**HTTP 边界** —— 路由拿客户端的原样去校验（见 router.js 的 acceptEvents），
- * 用来识别"半截埋点"；到了这里，时间已经由服务端提供。
+ * 注意 `missing_at` 在这里轮不到：`at` 就是在本函数里盖的（先盖、再校验）。
+ * 它属于**纯函数契约** —— HTTP 边界同样先盖后校验，所以生产路径上永远不命中，
+ * 只有直接调 `validateEvent` 的测试与脚本会看到它。
  *
  * 不修改调用方传进来的对象（构造新对象）：同一个事件对象可能被调用方留着，
  * 我们往里面塞 `seq` / `at` 会让它在别处看起来像"已经写过一次了"。

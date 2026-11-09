@@ -17,6 +17,7 @@
  *   <STORE_DIR>/visit/<id>.json
  *   <STORE_DIR>/session/<id>.json
  *   <STORE_DIR>/events/<sessionId 或 visitId>.jsonl   一行一个事件，只追加
+ *   <STORE_DIR>/events/_no-owner/events.jsonl         唯一没有归属的事件（login）
  *   <STORE_DIR>/counter/<key>.json
  *
  * ---------------------------------------------------------------------------
@@ -34,6 +35,9 @@
 
 import { appendFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+
+/** `login` 是唯一允许没有归属的事件 —— 这条例外只写在 events.js 一处（见 allowsNoOwner） */
+import { allowsNoOwner } from '../events.js';
 
 const USERS = 'test_user';
 const TOKENS = 'token';
@@ -65,7 +69,7 @@ function byFields(...keys) {
 
 /**
  * 事件的归属键：`sessionId` 非空就用它，否则用 `visitId`（排序与过滤都按它）。
- * 写入时用下面的 `ownerOf`（它会抛），读取与排序用这个（不抛）。
+ * 写入时由 `appendEvent` 检查它（缺归属且不是 login 就抛），读取与排序用这个（不抛）。
  * 与 memory.js 的 `ownerKey` 必须逐字一致：不一致的后果是同一个事件
  * 换一个驱动就少一半（见 test/store-equivalence.test.js 的文件头）。
  */
@@ -171,20 +175,20 @@ export async function openFileStore(env = {}) {
     writeFileSync(file, `${JSON.stringify(record, null, 2)}\n`, 'utf8');
   }
 
-  /**
-   * 事件挂在哪：一次会话或一次打开。两者都没有就没有地方可落。
-   * 用 `||` 而不是 `??`：前端在第 1–2 页发事件时会带一个空的 sessionId，
-   * 那时候真正的归属是 visitId —— `??` 会选中那个空串，把"有 visitId 的事件"
-   * 当成没有归属而误抛，白丢一条数据。
-   */
-  function ownerOf(event) {
-    const owner = ownerKey(event);
-    if (!owner) throw new Error('事件必须带 sessionId 或 visitId');
-    return owner;
-  }
-
   function eventsFile(owner) {
     return join(root, EVENTS, `${nameOf(owner)}.jsonl`);
+  }
+
+  /**
+   * 没有归属的事件落这里（目前只有 login）。
+   *
+   * 为什么用子目录而不是 `events/_no-owner.jsonl`：归属文件名是
+   * `events/<encodeURIComponent(owner)>.jsonl`，如果某个真实 sessionId 恰好
+   * 叫 `_no-owner`，两者就会写进同一个文件、互相混进对方的查询结果。
+   * 子目录名永远不可能等于一个 `.jsonl` 文件名，从结构上排除了这个碰撞。
+   */
+  function unownedEventsFile() {
+    return join(root, EVENTS, '_no-owner', 'events.jsonl');
   }
 
   function readEventFile(file) {
@@ -227,6 +231,8 @@ export async function openFileStore(env = {}) {
       /** 逐条 push 而不是 `out.push(...lines)`：展开一个几万行的数组会撞上调用栈参数上限 */
       for (const event of readEventFile(join(root, EVENTS, name))) out.push(event);
     }
+    /** 没有归属的事件（唯一例外是 login）也要算进来，否则按批次查会漏掉它们 */
+    for (const event of readEventFile(unownedEventsFile())) out.push(event);
     return out;
   }
 
@@ -312,7 +318,14 @@ export async function openFileStore(env = {}) {
     },
 
     async appendEvent(event) {
-      const file = eventsFile(ownerOf(event));
+      /**
+       * 事件挂在哪：一次会话或一次打开。两者都没有就没有地方可落 ——
+       * 唯一例外是 login（设计稿 §5.3 的"挂在哪"是 —，见 events.js 的 allowsNoOwner）。
+       * 用 `||` 而不是 `??`（见 ownerKey）：空的 sessionId 要让位给 visitId。
+       */
+      const owner = ownerKey(event);
+      if (!owner && !allowsNoOwner(event)) throw new Error('事件必须带 sessionId 或 visitId（login 除外）');
+      const file = owner ? eventsFile(owner) : unownedEventsFile();
       mkdirSync(dirname(file), { recursive: true });
       // 一行一个，只追加：这条链路上没有"改事件"这回事
       appendFileSync(file, `${JSON.stringify(event)}\n`, 'utf8');

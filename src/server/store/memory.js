@@ -18,6 +18,9 @@
  * 两个驱动给出同样的语义，比省这一次克隆重要得多。
  */
 
+/** `login` 是唯一允许没有归属的事件 —— 这条例外只写在 events.js 一处（见 allowsNoOwner） */
+import { allowsNoOwner } from '../events.js';
+
 /**
  * 按若干字段升序排，比较用码位而不是 localeCompare。
  *
@@ -42,7 +45,7 @@ function byFields(...keys) {
  *
  * 为什么用 `||` 而不是 `??`：前端在第 1–2 页发事件时会带一个空的 sessionId，
  * 那时候真正的归属是 visitId —— `??` 会选中那个空串，把"有 visitId 的事件"
- * 当成没有归属。这条规则与 `file.js` 的 `ownerOf` 必须逐字一致：
+ * 当成没有归属。这条规则与 `file.js` 的 `ownerKey` 必须逐字一致：
  * 不一致的后果是同一个事件换一个驱动就少一半（见 test/store-equivalence.test.js）。
  */
 function ownerKey(event) {
@@ -189,8 +192,9 @@ export async function openMemoryStore() {
     },
 
     async appendEvent(event) {
-      // 事件总得挂在某一次会话或某一次打开上，否则它没有归属，落到哪个批次都是猜的
-      if (!ownerKey(event)) throw new Error('事件必须带 sessionId 或 visitId');
+      // 事件总得挂在某一次会话或某一次打开上，否则它没有归属，落到哪个批次都是猜的。
+      // 唯一的例外是 login（设计稿 §5.3 的"挂在哪"是 —，见 events.js 的 allowsNoOwner）。
+      if (!ownerKey(event) && !allowsNoOwner(event)) throw new Error('事件必须带 sessionId 或 visitId（login 除外）');
       events.push(structuredClone(event));
     },
     /**
