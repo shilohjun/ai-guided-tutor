@@ -20,6 +20,16 @@
  * 想泄漏也没有入口。
  *
  * ============================================================================
+ * 颜色档不进导出件，只进数字（控制者裁决 E8）
+ * ============================================================================
+ * `buildReport` **不产**顶层 `level`；页面上那个"掌握 / 待巩固 / 薄弱"的颜色
+ * 是前端拿独立完成度推出来的，不存库。所以导出件不自造颜色：
+ *   · 快照里带 `level` 就照抄（向前兼容），没有就不写这一行；
+ *   · 有没有颜色都写数字：独立完成度、层级分布、卡点、公式卡次数；
+ *   · 报告段末尾用一句话说明"颜色不存库"——单条导出件会一个人出差，
+ *     收件人看不到页面上那个颜色，也看不到批量导出的 README。
+ *
+ * ============================================================================
  * 记录不全时不能崩（控制者补充 E5）
  * ============================================================================
  *   · 会话不存在 → 抛带 `code` 的中文错误，由路由层转 404（不该在路由里猜文案）；
@@ -41,6 +51,21 @@ const UNKNOWN_BATCH = '未知批次';
 /** 导出件只允许两份（E7） */
 const MARKDOWN_NAME = 'session.md';
 const JSON_NAME = 'session.json';
+
+/**
+ * 报告段末尾那句说明（控制者裁决 E8）。
+ *
+ * 为什么必须印在 Markdown 里、而不是只写在批量导出的 README 里：
+ * 单条导出件会**一个人出差**（发给家长、发给教研），它身边没有 README。
+ * 收件人看到一张没有"掌握/待巩固/薄弱"的报告，第一反应会是"报告缺了"。
+ */
+const LEVEL_DISCLAIMER = '掌握程度是页面上由独立完成度推导出的颜色档，不存库；导出件以数字为准。';
+
+/** 卡点最多列 10 条；超出部分写"…另有 K 条" */
+const STUCK_LIMIT = 10;
+
+/** 深层问题 / 下一步各最多 5 条 */
+const LIST_LIMIT = 5;
 
 /**
  * 只接受真正的有限数。
@@ -132,64 +157,132 @@ function renderConversation(turns, startedAt) {
 }
 
 /**
- * 独立完成度。
+ * 0..1 的比例 → 无小数的百分数：`0.6157` → `62%`（控制者裁决 E8）。
  *
- * 两种形状都要认：`buildReport` 给的是对象（`{score, note, …}`），
- * 而手写/迁移过来的快照可能直接是数字。留两位小数：0.6 与 0.60 对学生是同一个数，
- * 但在一列里对不齐就会让人以为精度不同。
+ * 为什么不留小数：读者要的是"大概走了几成"。`61.57%` 那两位是假精度——
+ * `independence` 本身是"走过的步数 / 总步数"再扣分，不是测量值。
+ *
+ * 为什么认"已经是百分数"的输入：手写或从旧版迁移来的快照可能直接存 `62`。
+ * 再乘 100 会让导出件写出 `6200%`——一个一眼就错、却很容易漏掉的数。
  */
-function renderIndependence(independence) {
-  const direct = finiteNumber(independence);
-  if (direct !== null) return direct.toFixed(2);
-  const score = finiteNumber(independence?.score);
-  if (score === null) return null;
-  const note = text(independence?.note);
-  return note ? `${score.toFixed(2)} —— ${note}` : score.toFixed(2);
+function percentText(value) {
+  const n = finiteNumber(value);
+  if (n === null) return null;
+  const percent = n > 1 ? n : n * 100;
+  return `${Math.round(Math.min(100, Math.max(0, percent)))}%`;
 }
 
 /**
- * 卡点清单。
+ * 独立完成度。
  *
- * 只写快照里已有的：`stepTitle` 是**学生可见**的那份说法（`buildReport` 走的是
- * `safeStepRef`，有些步骤标题本身就是结论），所以直接用它，不要回头去查题目。
- * `kind` 是内部枚举名（`precondition_gap` 这种），不写给人看 —— 结构化数据在
- * session.json 里全都有。
+ * 两种形状都要认：`buildReport` 给的是对象（`{score, note, …}`），
+ * 而手写/迁移过来的快照可能直接是数字。
+ *
+ * `note` 为什么不丢：它是"你独立走过了 3 / 6 个关键步骤"这种人话，
+ * 数字替代不了它——`50%` 说不出扣分扣在哪。
  */
-function renderStuckPoints(stuckPoints) {
-  if (!Array.isArray(stuckPoints) || stuckPoints.length === 0) return [];
-  return stuckPoints.map((point) => {
-    const stepIndex = finiteNumber(point?.stepIndex);
-    const where = text(point?.stepTitle) || (stepIndex !== null ? `第 ${stepIndex} 步` : '答题位置未知');
-    const parts = [where];
-    const rounds = finiteNumber(point?.hintRounds);
-    if (rounds !== null) parts.push(`引导 ${rounds} 轮`);
-    const maxLevel = finiteNumber(point?.maxLevel);
-    if (maxLevel !== null) parts.push(`最高 L${maxLevel}`);
-    const labels = Array.isArray(point?.misconceptionLabels)
-      ? point.misconceptionLabels.map((label) => text(label)).filter(Boolean)
-      : [];
-    if (labels.length) parts.push(`错因：${labels.join('、')}`);
-    return `  - ${parts.join(' · ')}`;
-  });
+function renderIndependence(independence) {
+  const direct = percentText(independence);
+  if (direct !== null) return direct;
+  const score = percentText(independence?.score);
+  if (score === null) return null;
+  const note = text(independence?.note);
+  return note ? `${score} —— ${note}` : score;
 }
 
-/** 报告段：只渲染快照，快照没有就写明"未到达报告页" */
+/**
+ * 引导轮次的层级分布：`L0 1 次 · L1 2 次 · L2 1 次 · L3 0 次`（控制者裁决 E8）。
+ *
+ * 为什么 0 次也写：教研看的是分布的形状。"L3 一次都没有"与"这一级没统计"
+ * 是两件事，少一项就会被读成后者。
+ */
+function renderHintLevels(hintStats) {
+  const byLevel = hintStats?.byLevel;
+  if (!byLevel || typeof byLevel !== 'object') return null;
+  const parts = [0, 1, 2, 3].map((level) => `L${level} ${finiteNumber(byLevel[level]) ?? 0} 次`);
+  return `- 引导轮次：${parts.join(' · ')}`;
+}
+
+/**
+ * 卡点清单：`第 N 步 · <kind> · 引导 M 轮`（控制者裁决 E8）。
+ *
+ * `kind` 是内部枚举名，但这一版导出件的读者是教研：`precondition_gap` 对他们
+ * 是分类，不是噪音。`stepTitle` 不进这一行——同一步的标题是学生可见的说法，
+ * 定位用步号；完整字段在 `session.json` 里，随时可以对回去。
+ */
+function renderStuckPoints(stuckPoints) {
+  if (!Array.isArray(stuckPoints)) return [];
+  const shown = stuckPoints.slice(0, STUCK_LIMIT);
+  const lines = shown.map((point) => {
+    const parts = [];
+    const stepIndex = finiteNumber(point?.stepIndex);
+    parts.push(stepIndex === null ? '步骤未知' : `第 ${stepIndex} 步`);
+    const kind = text(point?.kind);
+    if (kind) parts.push(kind);
+    const rounds = finiteNumber(point?.hintRounds);
+    if (rounds !== null) parts.push(`引导 ${rounds} 轮`);
+    return `  - ${parts.join(' · ')}`;
+  });
+  const rest = stuckPoints.length - shown.length;
+  if (rest > 0) lines.push(`  - …另有 ${rest} 条`);
+  return lines;
+}
+
+/**
+ * 字符串清单（深层问题 / 下一步行动）：一行一条，最多 5 条。
+ *
+ * 截断必须留痕：少写的那几条如果静默消失，读的人只会以为"这份报告就这些"。
+ */
+function renderTextList(items, limit = LIST_LIMIT) {
+  if (!Array.isArray(items)) return [];
+  const shown = items.slice(0, limit);
+  const lines = shown.map((item) => text(item)).filter(Boolean).map((s) => `  - ${s}`);
+  const rest = items.length - shown.length;
+  if (rest > 0) lines.push(`  - …另有 ${rest} 条`);
+  return lines;
+}
+
+/**
+ * 报告段：只渲染快照里真有的数，快照没有就写明"未到达报告页"。
+ *
+ * 渲染顺序（控制者裁决 E8，缺的整条跳过）：`level`（只有快照带才写）→
+ * 独立完成度 → 引导轮次 → 卡点 → 公式卡次数 → 深层问题 → 下一步。
+ */
 function renderReport(snapshot) {
   if (!snapshot) {
     return ['## 报告', '', '未到达报告页：这条记录停在报告之前，没有报告快照。'].join('\n');
   }
 
   const lines = ['## 报告', ''];
+
+  /** ① 只有快照自己带 `level` 时才写——不猜、不算、不默认（E8） */
   const level = text(snapshot.level);
   if (level) lines.push(`- 掌握程度：${level}`);
+
+  /** ② 数字优先：没有颜色档的导出件，靠这几行才有内容 */
   const independence = renderIndependence(snapshot.independence);
   if (independence) lines.push(`- 独立完成度：${independence}`);
+
+  const hintLevels = renderHintLevels(snapshot.hintStats);
+  if (hintLevels) lines.push(hintLevels);
 
   const stuck = renderStuckPoints(snapshot.stuckPoints);
   if (stuck.length) lines.push('- 卡点：', ...stuck);
 
+  const formulaCards = finiteNumber(snapshot.formulaCards);
+  if (formulaCards !== null && formulaCards > 0) lines.push(`- 公式卡 ${formulaCards} 次`);
+
+  const issues = renderTextList(snapshot.deeperIssues);
+  if (issues.length) lines.push('- 深层问题：', ...issues);
+
+  const actions = renderTextList(snapshot.nextActions);
+  if (actions.length) lines.push('- 下一步：', ...actions);
+
   /** 一条都没渲染出来时说清是快照空，而不是让段落留白（同 E6 的理由） */
   if (lines.length === 2) lines.push('报告快照是空的：这一版没有记录可展示的内容。');
+
+  /** 末尾单独一句，不并进上面任何一行：它解释的是"为什么没有颜色档" */
+  lines.push('', LEVEL_DISCLAIMER);
   return lines.join('\n');
 }
 

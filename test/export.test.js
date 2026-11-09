@@ -278,6 +278,53 @@ const SESSION = {
 const render = (over = {}) =>
   renderSessionMarkdown({ session: SESSION, user: { displayName: 'S01' }, batch: { label: '第二版' }, ...over });
 
+/**
+ * `buildReport` 真实返回的缩影（`src/core/report.js:177-195`）：**没有顶层 `level`**。
+ *
+ * 页面上的"掌握 / 待巩固 / 薄弱"是前端拿独立完成度推出来的颜色档，不存库。
+ * 所以这份夹具里没有那个词 —— 拿它渲染出来的导出件也不该有。
+ */
+const REAL_SNAPSHOT = {
+  independence: 0.6157,
+  hintStats: { total: 4, byLevel: { 0: 1, 1: 2, 2: 1, 3: 0 }, guardBlocked: 0, confirmed: 0, confirmedComplete: 0 },
+  stuckPoints: [
+    {
+      stepIndex: 2,
+      stepTitle: '第 2 步（条件）',
+      kind: 'precondition_gap',
+      misconceptionLabels: ['漏看前提'],
+      hintRounds: 2,
+      maxLevel: 2,
+      guardBlocked: 0,
+    },
+    {
+      stepIndex: 3,
+      stepTitle: '第 3 步（结论）',
+      kind: 'calculation_slip',
+      misconceptionLabels: [],
+      hintRounds: 1,
+      maxLevel: 1,
+      guardBlocked: 0,
+    },
+  ],
+  formulaCards: 2,
+};
+
+/** 报告段末尾那句说明（控制者裁决 E8）：用例里逐字钉住，也用它把正文摘出来 */
+const LEVEL_DISCLAIMER = '掌握程度是页面上由独立完成度推导出的颜色档，不存库；导出件以数字为准。';
+
+/**
+ * 摘掉末尾那句说明。
+ *
+ * 为什么要摘：裁决 E8 同时要求（a）末尾印这句话——它含"掌握"；（b）没有 `level`
+ * 的快照不许出现"掌握"。两句对同一段文本直接冲突，所以"不许自造颜色档"这条钉在
+ * **正文**上：去掉那句说明之后，全文不许再有颜色档的词。它不是放宽断言——
+ * 那句说明本身正是在说"所以以数字为准"，而自造颜色的错法是"掌握程度：待巩固"。
+ */
+function withoutLevelDisclaimer(md) {
+  return md.split(LEVEL_DISCLAIMER).join('');
+}
+
 describe('导出 · 单条 Markdown', () => {
   it('含题目、每轮对话、报告三段', () => {
     const md = renderSessionMarkdown({
@@ -380,29 +427,92 @@ describe('导出 · 单条 Markdown', () => {
     assertIncludes(md, '未到达报告页');
   });
 
-  it('报告按 buildReport 的真实形状渲染（层级、独立完成度、卡点）', () => {
-    /** 真实快照的 independence 是对象、卡点带 safeStepRef 的 stepTitle —— 用例按真形状走一遍 */
-    const snapshot = {
-      stuckPoints: [
-        {
-          stepIndex: 2,
-          stepTitle: '第 2 步（条件）',
-          kind: 'precondition_gap',
-          hintRounds: 2,
-          maxLevel: 2,
-          misconceptionLabels: ['漏看前提'],
-          guardBlocked: 0,
+  it('报告按 buildReport 的真实形状渲染：没有 level 也给足数字', () => {
+    /**
+     * 这份夹具是照 `buildReport` 的**真实返回**削出来的（`src/core/report.js:177-195`）：
+     * 它不产顶层 `level`，掌握程度是页面上拿独立完成度推出来的颜色。
+     * 导出件不许自己造那个颜色，也不许因此交出一张几乎空白的报告 —— 数字得在。
+     */
+    const md = render({ session: { ...SESSION, reportSnapshot: REAL_SNAPSHOT } });
+    assertIncludes(md, '62%', '独立完成度要写成无小数的百分数');
+    assertIncludes(md, 'L0 1 次 · L1 2 次 · L2 1 次 · L3 0 次', '引导轮次要给层级分布');
+    assertIncludes(md, '第 2 步 · precondition_gap · 引导 2 轮');
+    assertIncludes(md, '第 3 步 · calculation_slip · 引导 1 轮');
+    assertIncludes(md, '公式卡 2 次');
+    assertNotIncludes(md, '- 掌握程度：', '快照里没有 level 时不许自造颜色档');
+    assertNotIncludes(withoutLevelDisclaimer(md), '掌握', '正文里不许出现颜色档的词');
+  });
+
+  it('快照里带 level 时照抄那个词（向前兼容，不自己算）', () => {
+    const md = render({ session: { ...SESSION, reportSnapshot: { ...REAL_SNAPSHOT, level: '待巩固' } } });
+    assertIncludes(md, '- 掌握程度：待巩固');
+  });
+
+  it('卡点最多列 10 条，其余写"…另有 K 条"（少写的必须留痕）', () => {
+    const stuckPoints = Array.from({ length: 12 }, (_, i) => ({
+      stepIndex: i + 1,
+      kind: 'precondition_gap',
+      hintRounds: 1,
+      maxLevel: 1,
+      misconceptionLabels: [],
+      guardBlocked: 0,
+    }));
+    const md = render({ session: { ...SESSION, reportSnapshot: { ...REAL_SNAPSHOT, stuckPoints } } });
+    for (let step = 1; step <= 10; step += 1) {
+      assertIncludes(md, `第 ${step} 步 · precondition_gap`, `第 ${step} 条应当在导出件里`);
+    }
+    assertNotIncludes(md, '第 11 步', '第 11 条不该被写出来');
+    assertIncludes(md, '…另有 2 条');
+  });
+
+  it('有快照时末尾那句说明在（颜色档不存库，导出件以数字为准）', () => {
+    /** 单条导出件会一个人出差：收件人看不到页面，身边也没有批量导出的 README */
+    const md = render({ session: { ...SESSION, reportSnapshot: REAL_SNAPSHOT } });
+    assertIncludes(md, LEVEL_DISCLAIMER);
+    assert(md.trimEnd().endsWith(LEVEL_DISCLAIMER), '那句说明应当是导出件的最后一行');
+  });
+
+  it('没有报告快照时不写那句颜色档说明（没有报告，也就没有颜色可解释）', () => {
+    const md = render({ session: { ...SESSION, reportSnapshot: null } });
+    assertNotIncludes(md, LEVEL_DISCLAIMER);
+    assertNotIncludes(md, '掌握');
+  });
+
+  it('独立完成度认 buildReport 的对象形状：百分比 + 那句人话', () => {
+    const md = render({
+      session: {
+        ...SESSION,
+        reportSnapshot: {
+          independence: { score: 0.5, completedSteps: 3, totalSteps: 6, note: '你独立走过了 3 / 6 个关键步骤。' },
         },
-      ],
-      independence: { score: 0.5, completedSteps: 3, totalSteps: 6, note: '你独立走过了 3 / 6 个关键步骤。' },
-    };
-    const md = render({ session: { ...SESSION, reportSnapshot: snapshot } });
-    assertIncludes(md, '0.50');
-    assertIncludes(md, '第 2 步（条件）');
-    assertIncludes(md, '引导 2 轮');
-    assertIncludes(md, '最高 L2');
-    assertIncludes(md, '漏看前提');
-    assertNotIncludes(md, 'precondition_gap', '导出件是给人看的，不写内部枚举名');
+      },
+    });
+    assertIncludes(md, '50%');
+    assertIncludes(md, '你独立走过了 3 / 6 个关键步骤。');
+  });
+
+  it('已经是百分数的 independence 不再乘 100（否则导出件会写 6200%）', () => {
+    /** 手写/迁移来的快照可能直接存 62 */
+    const md = render({ session: { ...SESSION, reportSnapshot: { independence: 62 } } });
+    assertIncludes(md, '62%');
+    assertNotIncludes(md, '6200%');
+  });
+
+  it('公式卡 0 次时不写那一行（没有的东西不占位）', () => {
+    const md = render({ session: { ...SESSION, reportSnapshot: { ...REAL_SNAPSHOT, formulaCards: 0 } } });
+    assertNotIncludes(md, '公式卡');
+  });
+
+  it('深层问题与下一步各一行一条，最多 5 条', () => {
+    const lines = (n) => Array.from({ length: n }, (_, i) => `第 ${i + 1} 条说明。`);
+    const md = render({
+      session: { ...SESSION, reportSnapshot: { ...REAL_SNAPSHOT, deeperIssues: lines(7), nextActions: lines(7) } },
+    });
+    assertIncludes(md, '- 深层问题：');
+    assertIncludes(md, '- 下一步：');
+    assertIncludes(md, '  - 第 5 条说明。');
+    assertNotIncludes(md, '第 6 条说明。');
+    assertEquals(md.split('…另有 2 条').length - 1, 2, '两个清单各截断一次，各留一次痕');
   });
 
   it('报告快照是空对象时也写清一句，不留空白', () => {
