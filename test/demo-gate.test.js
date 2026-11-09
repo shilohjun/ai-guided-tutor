@@ -299,7 +299,7 @@ describe('公网口令门 · 显式开关仍然有效', () => {
  * 与"没登录"看起来一样，权限判断会静默地永远放行。
  */
 describe('请求上下文 · 学生身份字段', () => {
-  it('buildRequestContext 带 user 字段，本任务恒为 null', async () => {
+  it('buildRequestContext 带 user 字段，默认是 null（没传就不要凭空造一个）', async () => {
     const { buildRequestContext } = await import('../src/server/demo-gate.js');
     const ctx = buildRequestContext({
       headers: {},
@@ -307,9 +307,44 @@ describe('请求上下文 · 学生身份字段', () => {
       source: {},
     });
     assert('user' in ctx, '上下文必须带 user 字段');
-    assertEquals(ctx.user, null, '本任务还没解析令牌，user 应是 null');
+    assertEquals(ctx.user, null, '没有解析出身份时 user 应是 null');
     /** 老字段一个都不能少：三个入口都靠它们 */
     assertEquals(ctx.gateState, 'off', '原有判定结果不能被这次改动影响');
     assert(ctx.gate && typeof ctx.env === 'object', 'gate 与 env 必须照旧返回');
+  });
+
+  /**
+   * Task 4 把"占位字段"接上了真解析。
+   *
+   * 解析本身必须是**异步**的（要读库），所以它发生在 router 的 `handleApi` 里
+   * （那里 store 与请求级 env 都在），结果挂在 `req.__user` 上。
+   * `buildRequestContext` 保持同步，只负责把"已经解析好的身份"原样透出 ——
+   * 这条用例证明它不是个死字段。
+   */
+  it('resolveUser 从令牌解出身份；buildRequestContext 把已解析的身份透出', async () => {
+    const { resolveUser, buildRequestContext } = await import('../src/server/demo-gate.js');
+    const { openStore } = await import('../src/server/store/index.js');
+    const { issueAccounts, login } = await import('../src/server/auth.js');
+
+    const store = await openStore({});
+    const batchId = `gate-batch-${Math.random().toString(36).slice(2, 8)}`;
+    const [{ code }] = await issueAccounts(store, { batchId, count: 1 });
+    const session = await login(store, code);
+
+    const me = await resolveUser({ headers: { 'x-test-token': session.token }, store });
+    assertEquals(me?.user?.id, session.user.id, '令牌要能解出是谁');
+    assertEquals(me?.batchId, batchId, 'batchId 跟着令牌里的当前批次');
+
+    assertEquals(await resolveUser({ headers: {}, store }), null, '没带令牌就是没身份');
+    assertEquals(await resolveUser({ headers: { 'x-test-token': 'nope' }, store }), null, '假令牌不是 500，是没身份');
+    assertEquals(await resolveUser({ headers: { 'x-test-token': session.token }, store: null }), null, '没有 store 时不许抛');
+
+    const ctx = buildRequestContext({
+      headers: {},
+      url: new URL('http://probe.local/api/health'),
+      source: {},
+      user: me,
+    });
+    assertEquals(ctx.user, me, '入口若已解析出身份，必须原样出现在上下文里');
   });
 });

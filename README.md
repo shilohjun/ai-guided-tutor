@@ -290,7 +290,7 @@ npm run preview:verify    # file:// 打开验收
 npm test
 ```
 
-当前注册 **412 个用例，全部通过**。`npm test` 跑完测试后会接着跑
+当前注册 **440 个用例，全部通过**。`npm test` 跑完测试后会接着跑
 `scripts/audit-ui-style.js`：它把设计令牌（间距 2/4/6/8/12/16/24/32、字号三档、
 嵌套圆角、语义色）做成可执行规则，样式一跑偏就报出来 —— 只靠人眼看不住。
 字号与控件尺寸参考 LeetCode 做题页后，再按中文密度收一档（中档题干 13/18.9、标签 11、按钮高 32、顶栏 52）。
@@ -372,11 +372,16 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 | `GET` | `/api/problem?id=` | 单个题目（学生可见版本） |
 | `POST` | `/api/problem/import` | 题目文字 → 结构化题目 |
 | `POST` | `/api/ocr` | 题目照片 → 题干文本 |
-| `POST` | `/api/chat` | 一轮引导对话（已过滤，不含解题路径与答案；`ai_companion` 返回 400） |
-| `GET` | `/api/report?sessionId=` | 学生学习报告 |
+| `POST` | `/api/chat` | 一轮引导对话（已过滤，不含解题路径与答案；`ai_companion` 返回 400）。会话每轮写穿到存储，冷启动/换实例后可从库里回载 |
+| `GET` | `/api/report?sessionId=` | 学生学习报告。**首次生成即冻结快照**，之后再取不重算（导出件不随代码变化） |
 | `POST` | `/api/formula` | L3 之后按知识点取公式卡 |
+| `GET` | `/api/session/resume` | 「继续刚才那道题」：返回该登录用户最近一条**没有 `finishedAt`** 的会话（`{session: {id, problemId, questionIndex, page, idleMinutes, turnCount} \| null}`）。身份只认令牌，`?userId=` 一律忽略；没登录 `401` |
+| `POST` | `/api/visit` | 记一次打开（`visit`），返回 `{visitId}`。同一个人当天重复打开就是新的 visit；没登录 `401` |
 | `POST` | `/api/eval` | 触发评测 |
-| `POST` | `/api/reset` | 重置会话 |
+| `POST` | `/api/reset` | 重置会话：内存里丢掉，库里清空对话但保留会话（`counters.resetCount +1`，`endState` 不变） |
+
+**登录守卫**：配了 `PILOT_REQUIRE_LOGIN=1` 时，除 `/api/health` 与 `/api/auth/login` 之外的 `/api/*`
+一律 `401 {error:'请先登录', code:'AUTH_REQUIRED'}`；不配这个变量时行为与以前完全一致。
 
 ---
 
@@ -488,7 +493,7 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 
 | 限制 | 说明 |
 |---|---|
-| 测试状态 | 324 个注册用例全部通过（含 UI 令牌审计） |
+| 测试状态 | 440 个注册用例全部通过（含 UI 令牌审计） |
 | AI 伴学 | 未上线：`capabilities.modes` 只有 `self_training`，接口对 `ai_companion` 返回 400 `MODE_UNAVAILABLE` |
 | 公式卡范围 | 按知识点表匹配；导入题的知识点不在表内时不发卡 |
 | 场景集规模 | 19 个场景且由人编写，覆盖不了真实学生的表达多样性 |
@@ -498,7 +503,7 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 | 题库题的读题 | 题库题与粘贴题走同一条读题链路，点进去要等大模型现读 3–8 秒；要秒开得先有解题图谱 |
 | 公式的形态 | 题库里的公式是**图片**（原卷截图），不是可排版的 LaTeX；引擎读到的仍是 `〔式〕` 占位文本 |
 | 题库数据 | 152 道题是静态 JSON（`public/qbank/`，约 16MB），暂未落服务端存储 |
-| 会话持久化 | 服务端会话存进程内存，重启后报告可能失效；浏览器不保存学习历史 |
+| 会话持久化 | 会话每轮写穿到存储：`STORE` 未配时是进程内存（重启即丢，公开 Demo 就是这个形态），配 `STORE=file` 才能跨重启回载与续做。浏览器仍不保存学习历史，换设备要重新开始 |
 | 教学质量 | 未做教研盲评；这是下一阶段最重要的工作 |
 
 ---
