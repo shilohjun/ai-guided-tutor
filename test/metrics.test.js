@@ -144,14 +144,31 @@ describe('指标 · 四页漏斗', () => {
     assertEquals(f.perPage.map((r) => r.visitors).join(','), '3,2,2,1', 'perPage 的 visitors 与柱子同源');
     for (const row of f.perPage) assertAllFinite(row, `perPage ${row.page}`);
   });
-  it('没带 events 的会话停留贡献 0，但它仍然算一个人（分母不偷偷变）', () => {
-    const visits = [{ id: 'v1', userId: 'u1' }, { id: 'v2', userId: 'u2' }];
+  it('第 2 页的停留也来自 visit 的 events（会话上的页 2 事件不算）', () => {
+    /**
+     * 设计稿 §5.2：页 1–**2** 的事件挂在 `visit.id` 上，会话要到进第 3 页才创建。
+     * 读会话的 `events` 时，第 2 页那一行和裁定前的第 1 页一样**结构性地**永远是 0 ——
+     * 看板会把"这一页没数据"画成"学生没停"，而两者要做的决定正好相反。
+     *
+     * 这里刻意让会话上也挂一段页 2 的进出（3 小时，比 visit 上的 1 小时长）：
+     * 若实现回头去读会话，平均值会变成 1.5 小时，断言能把它抓出来。
+     * u2 没在 visit 上留事件 → 贡献 0，但仍然是第 2 页分母里的一个人。
+     */
+    const visits = [
+      { id: 'v1', userId: 'u1', events: [pageEv('page_enter', 1, 2), pageEv('page_exit', 2, 2)] },
+      { id: 'v2', userId: 'u2' },
+    ];
     const sessions = [
       {
         id: 's1',
         userId: 'u1',
         progress: { reached: { p1: T(1), p2: T(1), p3: T(1) }, maxPage: 3 },
-        events: [pageEv('page_enter', 1, 3), pageEv('page_exit', 2, 3)],
+        events: [
+          pageEv('page_enter', 1, 2),
+          pageEv('page_exit', 4, 2),
+          pageEv('page_enter', 5, 3),
+          pageEv('page_exit', 6, 3),
+        ],
       },
       { id: 's2', userId: 'u2', progress: { reached: { p1: T(1), p2: T(2) }, maxPage: 2 } },
     ];
@@ -159,10 +176,42 @@ describe('指标 · 四页漏斗', () => {
     const page2 = f.perPage[1];
     const page3 = f.perPage[2];
     assertEquals(page2.visitors, 2, '两个人都在第 2 页待过');
-    assertEquals(page2.avgDwellMs, 0, '两条都没在第 2 页留下配对事件 → 0，而不是跳过');
+    assertEquals(page2.avgDwellMs, H / 2, 'u1 在 visit 上留了 1 小时、u2 没留 → 2 人平均半小时（不是会话上那 3 小时）');
     assertEquals(page3.visitors, 1);
-    assertEquals(page3.avgDwellMs, H, 'u1 在第 3 页待了 1 小时');
+    assertEquals(page3.avgDwellMs, H, '第 3 页的事件在会话上，u1 待了 1 小时');
+    assertAllFinite(page2, 'perPage 第 2 页');
     assertAllFinite(page3, 'perPage 第 3 页');
+  });
+  it('探针：visit 带第 2 页进出、会话只到 p2 且没有 events → 第 2 页停留不是 0', () => {
+    /**
+     * 复审给的探针。修之前这一格读的是 `session.events`，于是"有人停了 1 小时"
+     * 与"没人在这页停过"输出同一个数（0），而 `avgDwellMs` 是必出的字段。
+     */
+    const visits = [{ id: 'v1', userId: 'u1', events: [pageEv('page_enter', 1, 2), pageEv('page_exit', 2, 2)] }];
+    const sessions = [{ id: 's1', userId: 'u1', progress: { reached: { p1: T(1), p2: T(1) }, maxPage: 2 } }];
+    const f = buildFunnel(visits, sessions);
+    assertEquals(f.perPage[1].visitors, 1);
+    assertEquals(f.perPage[1].avgDwellMs, H, '只有他一个人、他停了 1 小时 → 1 小时');
+    assert(f.perPage[1].avgDwellMs !== 0, '不能与"没人在这页停过"混成同一个数');
+  });
+  it('第 2 页：同一人多次打开相加，只算"到了第 2 页的人"', () => {
+    /**
+     * 分母是**到达过第 2 页的人**（与第二根柱子同源）：
+     * · u1 今天打开两次、两次都在第 2 页停了 1 小时 → 这个人贡献 2 小时，再按人平均；
+     * · u2 的 visit 上也挂着页 2 的进出，但他没有到过第 2 页的会话（页 1 就关掉），
+     *   既不在分母里，他那段时间也不许混进分子的总时长。
+     */
+    const visits = [
+      { id: 'v1', userId: 'u1', events: [pageEv('page_enter', 1, 2), pageEv('page_exit', 2, 2)] },
+      { id: 'v2', userId: 'u1', events: [pageEv('page_enter', 3, 2), pageEv('page_exit', 4, 2)] },
+      { id: 'v3', userId: 'u2', events: [pageEv('page_enter', 5, 2), pageEv('page_exit', 6, 2)] },
+    ];
+    const sessions = [{ id: 's1', userId: 'u1', progress: { reached: { p2: T(1) }, maxPage: 2 } }];
+    const f = buildFunnel(visits, sessions);
+    assertEquals(f.p1, 3, '三次打开');
+    assertEquals(f.p2, 1, '只有 u1 到了第 2 页');
+    assertEquals(f.perPage[1].visitors, 1);
+    assertEquals(f.perPage[1].avgDwellMs, 2 * H, 'u1 两次各 1 小时 = 这个人 2 小时；u2 没到第 2 页，不计');
   });
   it('同一个人多条会话：人只算一个，停留是这个人在这页的总时间', () => {
     const visits = [{ id: 'v1', userId: 'u1' }];
@@ -190,6 +239,23 @@ describe('指标 · 四页漏斗', () => {
     const f = buildFunnel(visits, []);
     assertEquals(f.perPage[0].visitors, 2, '带不带事件都算一次打开');
     assertEquals(f.perPage[0].avgDwellMs, H / 2, 'u1 待了 1 小时，u2 没有事件贡献 0：2 次打开平均半小时');
+  });
+  it('会话带第 1 页事件、visit 没带 → 第 1 页停留是 0（不拿会话的事件顶上）', () => {
+    /**
+     * 页 1 的事件挂在 visit 上，会话上的页 1 事件本来就不该存在。若两边都读，
+     * 调用方把同一批事件同时拼到 visit 与会话上时，这段停留会被算两遍 ——
+     * 所以这里钉住"只认 visit"这一条，免得下一个人为了"让数好看点"加一条退路。
+     */
+    const visits = [{ id: 'v1', userId: 'u1' }];
+    const sessions = [{
+      id: 's1',
+      userId: 'u1',
+      progress: { reached: { p2: T(1) }, maxPage: 2 },
+      events: [pageEv('page_enter', 1, 1), pageEv('page_exit', 2, 1)],
+    }];
+    const f = buildFunnel(visits, sessions);
+    assertEquals(f.perPage[0].visitors, 1);
+    assertEquals(f.perPage[0].avgDwellMs, 0, 'visit 没带事件 → 0，不是会话上那 1 小时');
   });
   it('同一个人打开两次：第 1 页停留按打开次数平均（与柱子同源）', () => {
     /**
@@ -352,6 +418,19 @@ describe('指标 · 批次汇总', () => {
     const rate = summarizeSessions([{ id: 's1', events }], BATCH, Date.parse(T(28))).turnFailureRate;
     assertEquals(rate, 0.0025, '400 轮里失败 1 轮');
     assert(rate !== 0, '不能因为两位小数把它抹成 0');
+  });
+  it('事件按 seq 定序：数组给反了也按 seq 配对（不再靠调用方排好）', () => {
+    /**
+     * 按轮配对（D2）只有"事件有序"才成立，而 `session.events` 是不是有序取决于
+     * 调用方有没有按 `seq` 拼。函数自己排一次，这个前提就不用靠调用方的诚实：
+     * 数组顺序反过来时，配对结果必须与 seq 顺序一致（send seq1 → reply seq2 = 成功）。
+     */
+    const events = [
+      { type: 'chat_reply', seq: 2 },
+      { type: 'chat_send', seq: 1 },
+    ];
+    const rate = summarizeSessions([{ id: 's1', events }], BATCH, Date.parse(T(28))).turnFailureRate;
+    assertEquals(rate, 0, '按数组顺序读会得出 1（reply 在 send 之前，这一轮没等到回复）');
   });
   it('多出来的 reply 不许替下一轮背书（按轮配对）', () => {
     const sessions = [{

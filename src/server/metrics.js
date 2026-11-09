@@ -143,19 +143,33 @@ function textOf(value) {
 }
 
 /**
- * "这个人是谁"的唯一判据：`userId` → `visitId` → `id`。
+ * 一条记录（会话 / 打开）属于哪个人：`userId` → `visitId` → `id`。三个都空时返回空串。
+ *
+ * `visitId` 是退路里的关键一档：设计稿 §5.2 说会话创建后的事件「同时带 sessionId 与
+ * visitId」，所以一条没有 `userId` 的会话仍能靠 `visitId` 与那次打开对上是同一个人。
+ */
+function identityOf(record) {
+  for (const field of ['userId', 'visitId', 'id']) {
+    const text = textOf(record?.[field]);
+    if (text !== '') return text;
+  }
+  return '';
+}
+
+/**
+ * "这个人是谁"的唯一判据：`userId` → `visitId` → `id`，都认不出时给独立键 `#序号`。
  *
  * 为什么要有退路：`userId` 是登录后才有的，而 Task 3 的校验允许只带 `visitId`
  * 或什么都不带（只有 `login` 允许全空）。两个都空的时候给这一条一个独立键
  * （`#序号`）—— 宁可把一个人算成两个，也不要把两个不同的人并成一个：
  * 合并是**少算人**，而少算的人不会以任何形式暴露出来。
+ *
+ * 注意 `#序号` 只对"必须是同一个列表里的记录"才成立（会话列表与会话列表）。
+ * 跨列表对账（visit ↔ session）用 `identityOf`：那里的空身份要当"认不出"处理，
+ * 给它编一个号只会让两个不相干的人偶然撞成同一个号。
  */
 function userKeyOf(record, index = 0) {
-  for (const field of ['userId', 'visitId', 'id']) {
-    const text = textOf(record?.[field]);
-    if (text !== '') return text;
-  }
-  return `#${index}`;
+  return identityOf(record) || `#${index}`;
 }
 
 /** 这个会话走到过第 n 页没有。`reached.pN` 有值就是走到过（值只是时间戳）。 */
@@ -193,11 +207,54 @@ function nearestRank(sortedSamples, percentile) {
   return Number.isFinite(value) ? value : 0;
 }
 
+/** 事件的全局序号；没有 `seq`（迁移前的旧记录、部分测试 fixture）时返回 NaN。 */
+function seqOf(event) {
+  const seq = event?.seq;
+  return typeof seq === 'number' && Number.isFinite(seq) ? seq : Number.NaN;
+}
+
+/**
+ * 事件顺序：`seq` 升序 → `at` → 保持调用方给的先后。
+ *
+ * 为什么要在这里排一次：`countTurns` 的按轮配对只有"事件是有序的"才成立，
+ * 而 `session.events` 是不是有序，取决于调用方（Task 8）有没有按 `seq` 拼。
+ * 把这个前提写成一次排序，函数就不再依赖调用方的诚实 —— 它仍然是纯的：
+ * 排的是自己 copy 的那一份，入参不动，也没有额外的 IO。
+ *
+ * 与 store 同一个口径（`src/server/store/file.js` 的 `byEventOrder`）：`seq` 在写入
+ * 那一刻由 `incrCounter` 盖上，所以它才是"谁先谁后"的定稿；没有 `seq` 的旧事件
+ * 退到 `at`。少了第三档（归属键）—— 同一个会话的事件归属键本来相同，排它没有意义。
+ * 两档都一样时返回 0：`Array#sort` 是稳定的，等价于保持数组顺序。
+ */
+function byEventOrder(a, b) {
+  const as = seqOf(a);
+  const bs = seqOf(b);
+  const aHas = !Number.isNaN(as);
+  const bHas = !Number.isNaN(bs);
+  if (aHas && bHas) {
+    if (as !== bs) return as - bs;
+  } else if (aHas !== bHas) {
+    // 缺 seq 的是迁移前的老记录：按 store 的规矩排在有序号的之后
+    return aHas ? -1 : 1;
+  }
+  const atA = msOf(a?.at);
+  const atB = msOf(b?.at);
+  if (Number.isFinite(atA) && Number.isFinite(atB) && atA !== atB) return atA - atB;
+  return 0;
+}
+
+/** 会话自带的事件，按 `seq` 升序的副本。不是数组 → 空数组（D1：没拼进来就是没有）。 */
+function eventsInOrder(events) {
+  return Array.isArray(events) ? events.slice().sort(byEventOrder) : [];
+}
+
 /**
  * 一轮失败率的配对（D2）。
  *
  * 返回 `{ sends, failures }`，由调用方跨会话累加后再相除 —— 而不是每个会话
  * 各算一个比率再平均：后者会让"只发了一轮且失败"的会话权重和"发了二十轮"的一样大。
+ *
+ * `events` 必须已按 `seq` 升序（`summarizeSessions` 用 `eventsInOrder` 排好再传进来）。
  */
 function countTurns(events) {
   const turns = [];
@@ -378,16 +435,20 @@ export function deriveDwell(events, page) {
  * `avgDwellMs` 是**这一页这批人**的平均停留 —— 分母与 `visitors` 同源，
  * 读者不会把"多少个柱子"和"多少个样本"混着引用。
  *
- * 停留的来源按归属键分（设计稿 §5.2）：
- *   · 第 1 页 —— 页 1–2 的事件挂在 `visit.id` 上，所以读 `visit.events`，
- *     分母是**打开次数**（与第一根柱子同源）。没带事件的 visit 贡献 0 但仍然
- *     算一次打开；不读会话的页 1 事件（真实数据里那些事件本来就不在会话上，
- *     两边都读会重复计）。
- *   · 第 2–4 页 —— 读会话自带的 `events`，分母是"到达过这一页的人"。
- *     会话没带事件时贡献 0，但它仍然算一个人（分母不偷偷变小）。
+ * 停留的来源按归属键分（设计稿 §5.2：**页 1–2 的事件挂在 `visit.id` 上，
+ * 会话要到进第 3 页才创建**）：
+ *   · 第 1 页 —— 读 `visit.events`，分母是**打开次数**（与第一根柱子同源）。
+ *     没带事件的 visit 贡献 0，但它仍然算一次打开。
+ *   · 第 2 页 —— 也读 `visit.events`，只记到"到达过第 2 页的人"头上，分母是这些人
+ *     （与第二根柱子同源）：同一个人的多次打开先相加，再按人平均；一次没留事件的
+ *     打开贡献 0，但那个人仍然在分母里。
+ *   · 第 3–4 页 —— 读会话自带的 `events`（这些事件发生在会话已存在之后），
+ *     分母是"到达过这一页的人"。会话没带事件时贡献 0，但它仍然算一个人。
  *
- * 为什么第 1 页非要读 visit：只读会话时这一行**结构性地**永远是 0（会话是进第 3
+ * 为什么第 1、2 页非要读 visit：只读会话时这两行**结构性地**永远是 0（会话是进第 3
  * 页才造的），看板会把"没数据"画成"学生没停"，而这两件事要做的决定正好相反。
+ * 反面同样成立：第 1–2 页**不读**会话的 events、第 3–4 页**不读** visit 的 events ——
+ * 调用方若把同一批事件两边都拼了，两边都读就会把同一段时间算两遍。
  *
  * 若调用方没把 `visits` 传全（弱网下 `visit_open` 丢过），`conversion` 可能大于 1。
  * 这是刻意的：悄悄夹平会让"visit 记录缺了"这件事永远看不见。
@@ -411,42 +472,64 @@ export function buildFunnel(visits, sessions) {
 
   const p1 = visitList.length;
 
-  /** page → Set（这一页出现过的人）—— 只用于页 2–4；页 1 的人数就是打开次数 */
+  /** page → Set（这一页出现过的人）。页 1 的"人数"就是打开次数，不放 Set。 */
   const usersByPage = new Map(PAGES.slice(1).map((page) => [page, new Set()]));
-  /** page → Map<人, 毫秒>（同一个人在这一页的总停留）—— 只用于页 2–4 */
-  const dwellByPage = new Map(PAGES.slice(1).map((page) => [page, new Map()]));
+  /** page → Map<人, 毫秒>（同一个人在这一页的总停留）—— 只有页 3、4 从会话里读。 */
+  const dwellByPage = new Map(PAGES.slice(2).map((page) => [page, new Map()]));
+  /** 人 → 这个人在 visit 上留下的第 2 页停留（同一个人多次打开相加）。 */
+  const page2DwellByUser = new Map();
 
   for (let i = 0; i < sessionList.length; i += 1) {
     const session = sessionList[i];
     if (!session || typeof session !== 'object') continue;
     const key = userKeyOf(session, i);
 
-    // 页 1 的停留来自 visit（见函数注释），这里只算页 2–4
     for (const page of PAGES.slice(1)) {
       if (!reachedOf(session, page)) continue;
       usersByPage.get(page).add(key);
+      // 页 1–2 的事件不在会话上（见函数注释）：那两页只认 visit 的 events
+      if (page < 3) continue;
       const previous = dwellByPage.get(page).get(key) ?? 0;
       dwellByPage.get(page).set(key, previous + deriveDwell(session.events, page));
     }
   }
 
   /**
-   * 第 1 页的总停留 = 每次打开各自 `deriveDwell(events, 1)` 的和。
+   * 第 1 页的总停留 = 每次打开各自 `deriveDwell(events, 1)` 的和；分母是打开次数。
+   *
+   * 第 2 页的停留也从这里来，但只记到"到达过第 2 页的人"头上 —— 分母是这些人
+   * （与第二根柱子同源），所以页 1 就关掉的打开既不该把总时长撑大，也不该把自己的
+   * 0 混进同一个平均里。认不出是谁的 visit（三个归属字段全空）不参与对账：
+   * 给它编一个 `#序号` 只会让它跟另一个同样认不出的会话撞号。
+   *
    * 坏 visit（`null` / 字符串）跳过：它仍然被 `p1` 数进去（那是打开次数），
    * 但没有任何事件可以贡献时长。
    */
+  const page2Reached = usersByPage.get(2);
   let page1DwellTotal = 0;
+
   for (const visit of visitList) {
     if (!visit || typeof visit !== 'object') continue;
     page1DwellTotal += deriveDwell(visit.events, 1);
+
+    const owner = identityOf(visit);
+    if (owner === '' || !page2Reached.has(owner)) continue;
+    const previous = page2DwellByUser.get(owner) ?? 0;
+    page2DwellByUser.set(owner, previous + deriveDwell(visit.events, 2));
   }
 
   const counts = [p1, ...PAGES.slice(1).map((page) => usersByPage.get(page).size)];
   const [p2, p3, p4] = counts.slice(1);
 
+  let page2DwellTotal = 0;
+  for (const key of page2Reached) page2DwellTotal += page2DwellByUser.get(key) ?? 0;
+
   const perPage = PAGES.map((page, index) => {
     if (page === 1) {
       return { page, visitors: p1, avgDwellMs: rate(page1DwellTotal, p1) };
+    }
+    if (page === 2) {
+      return { page, visitors: counts[index], avgDwellMs: rate(page2DwellTotal, page2Reached.size) };
     }
     const perUser = dwellByPage.get(page);
     const totalDwell = [...perUser.values()].reduce((sum, ms) => sum + ms, 0);
@@ -499,6 +582,13 @@ export function buildFunnel(visits, sessions) {
  * 不是一道新题（"重来"由 `resetTotal` / `intakeChangeTotal` 与同题多会话另算）。
  * 认不出题号的会话（照片/粘贴那条路）自己算一道，不互相合并。
  *
+ * `avgMaxPage` 是**每会话**的平均（分母是会话条数，不是人数）：一个人重做五道题就
+ * 贡献五条，它回答的是"一道题通常做到第几页"，与 `avgQuestionsPerUser` 的单位不同，
+ * 两个数不能互相验算。看板上若把它写成"人均走到第几页"就是误读，别按那个改分母。
+ *
+ * 事件顺序不依赖调用方：每个会话的 `events` 都先按 `seq` 排一遍（`eventsInOrder`），
+ * 所以"调用方拼的时候按 seq 拼好了"这个前提不用成立（见 `byEventOrder`）。
+ *
  * 所有比率四位小数；分母为 0 时是 0（D3）。`latencyP50/P90` 例外 ——
  * 它们取的是真实样本值本身（nearest-rank，不插值、不四舍五入），见 `nearestRank`。
  *
@@ -543,7 +633,11 @@ export function summarizeSessions(sessions, batch, now) {
     resetTotal += finiteNumber(session.counters?.resetCount);
     intakeChangeTotal += finiteNumber(session.counters?.intakeChanges);
 
-    const events = Array.isArray(session.events) ? session.events : [];
+    /**
+     * 事件在这里统一按 `seq` 排一遍（`eventsInOrder`）：`countTurns` 的按轮配对只有
+     * "事件有序"才成立，而这个前提不该靠"调用方拼的时候恰好没弄反"。
+     */
+    const events = eventsInOrder(session.events);
     for (const event of events) {
       if (event?.type !== 'chat_reply') continue;
       replyCount += 1;
