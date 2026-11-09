@@ -108,30 +108,37 @@ describe('路由 · 抑制过度帮助', () => {
     assertEquals(d.level, null);
   });
 
-  it('自主训练模式 + 未求助 + 无高置信卡点 ⇒ 静默', () => {
+  it('自主训练模式：学生在作答但没显式求助 ⇒ 也要接住，不再沉默', () => {
+    /**
+     * 规范（languages/00「反馈-意义-留白」、20「探明进度 → 只给方向或肯定 → 留白」）：
+     * 老师给完方向后，学生回一句"对，用动能定理"就是在作答，必须先核验再留白。
+     * 沉默等于把学生晾在那儿 —— 这是旧口径最刺眼的地方。
+     */
     const d = decideLevel({
       problem: P1,
       diagnosis: diag({ confidence: 0.5 }),
-      history: [],
+      history: [turn('ai', '这一问用动能定理。', 1, 3), turn('student', '对，用动能定理')],
       explicitHelpSeeking: false,
       mode: 'self_training',
     });
-    assert(d.suppressed, '自主训练模式应保持静默');
+    assert(!d.suppressed, '学生正在回答时不应静默');
   });
 
-  it('自主训练模式 + 高置信卡点但未求助 ⇒ 仍然静默', () => {
-    const d = decideLevel({
-      problem: P1,
-      diagnosis: diag({
-        confidence: 0.9,
-        mis: [{ id: 'm-ignore-equilibrium', label: '忽略平衡条件', evidence: '不知道力怎么求', confidence: 0.9 }],
-      }),
-      history: [],
-      explicitHelpSeeking: false,
-      mode: 'self_training',
-    });
-    assert(d.suppressed, '自主训练必须由学生主动求助触发');
-    assertEquals(d.level, null);
+  it('自主训练模式：学生说"我先算/我试试"或只是应声 ⇒ 静默，把时间还给他', () => {
+    for (const text of ['我先算算', '我试试', '让我想想', '嗯', '好']) {
+      const d = decideLevel({
+        problem: P1,
+        diagnosis: diag({
+          confidence: 0.9,
+          mis: [{ id: 'm-ignore-equilibrium', label: '忽略平衡条件', evidence: '不知道力怎么求', confidence: 0.9 }],
+        }),
+        history: [turn('student', text)],
+        explicitHelpSeeking: false,
+        mode: 'self_training',
+      });
+      assert(d.suppressed, `学生说"${text}"时应静默`);
+      assertEquals(d.level, null, `学生说"${text}"时不该定层级`);
+    }
   });
 
   it('定位置信度过低时退到 L1 以确认位置', () => {

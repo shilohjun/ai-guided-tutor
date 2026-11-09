@@ -234,6 +234,18 @@ describe('前端 · 五页流程契约（新版单文件）', () => {
     assertNotIncludes(htmlVisible, '迁移', '第 5 页已经不叫"迁移"了');
   });
 
+  it('逐页评审的深链 ?p=N 真的有调用点（只定义不调用等于失效）', () => {
+    /**
+     * 这段曾经是"函数写得挺好、就是没人调"：带 ?p=3 打开会安静地停在首页，
+     * 连截图脚本都被它骗过去 —— 拍出来的五页其实全是首页。
+     * 所以这里盯的不是函数存在，而是**调用点**存在。
+     */
+    assertIncludes(appJs, 'function maybeReviewJump()', '缺少深链落页函数');
+    assert(/maybeReviewJump\(\);/.test(appJs), '?p=N 的落页函数没有任何调用点');
+    assertIncludes(appJs, "if (!S.bank.length) return;", '深链要等题库到货，否则会被空列表挡回去');
+    assertIncludes(appJs, 'maybeReviewJump();', '题库取回后要立刻决定落哪一页');
+  });
+
   it('答案功能与教师功能在新版里一点入口都不留', () => {
     assertNotIncludes(html, '/api/demo/answer', '不该再有任何给答案的入口');
     assertNotIncludes(html, '/api/teacher', '教师端点已下线，前端不该还引用');

@@ -44,6 +44,7 @@ import { looksLikeHelpRequest } from '../core/route.js';
 import { runEvaluation, formatEvaluation } from '../core/eval.js';
 import { STUDENT_LEVEL_NOTE, inspectVoice } from '../core/prompt.js';
 import { PROBLEMS } from '../core/problems.data.js';
+import { DEFAULT_PERSONA, PERSONA_IDS, PERSONAS, normalizePersona, personaById, stylePersonaReply } from '../core/personas.js';
 
 loadEnvFile();
 
@@ -328,22 +329,45 @@ function stepLabelsFor(problem, graphId, completed) {
  * 这个函数是"学生拿不到教研数据"的**唯一执行点** ——
  * 想确认某个字段有没有外泄，只看这里就够了。
  */
-export function buildStudentTurn(response, mode, problem) {
+export function buildStudentTurn(response, mode, problem, personaValue = DEFAULT_PERSONA, turn = 0) {
   const d = response.diagnosis;
   const guardBlocked = (response.meta.guardHistory ?? []).filter((g) => !g.passed).length;
   const stepCount = response.stepCount ?? 0;
+  const personaId = normalizePersona(personaValue);
+  const persona = personaById(personaId);
+  /**
+   * 哪些回复需要补一层措辞。
+   *
+   * 两种情况：
+   *   ① 离线桩：它从来没有收到过《教学规范》与语言风格，所以整轮都要补；
+   *   ② 守卫兜底 / 确认 / 静默：这三类**不是模型写的**，是我方模板写的 ——
+   *      真模型那条路径上它们同样没有老师口气，所以也要补。
+   * 真模型正常起草的那一轮不再套，否则等于把同一套风格叠加两次。
+   */
+  const ours = ['fallback', 'confirm', 'silent'].includes(response.hint.form);
+  const styleIt = String(response.meta.engine).startsWith('offline') || ours;
+  const visible = styleIt
+    ? stylePersonaReply(personaId, {
+        text: response.hint.text,
+        nextAsk: response.hint.nextAsk,
+        form: response.suppressed ? 'silent' : response.hint.form,
+        level: response.hint.level,
+        turn,
+      })
+    : { text: response.hint.text, nextAsk: response.hint.nextAsk };
 
   return {
     message: response.message,
+    persona: { id: personaId, name: persona.name, avatar: persona.avatar },
     hint: {
       level: response.hint.level,
       levelName: LEVEL_NAMES[response.hint.level] ?? '-',
       /** 给学生的人话版本（教研名对学生只会造成"我被分类了"的观感） */
       levelNote: STUDENT_LEVEL_NOTE[response.hint.level] ?? '',
       form: response.hint.form,
-      text: response.hint.text,
+      text: visible.text,
       concepts: response.hint.concepts,
-      nextAsk: response.hint.nextAsk,
+      nextAsk: visible.nextAsk,
     },
     progress: {
       stepIndex: d.position.stepIndex,
@@ -377,7 +401,7 @@ export function buildStudentTurn(response, mode, problem) {
     enginePath: response.enginePath ?? [],
     /** 学生已经想对的地方 —— 学习反馈的主角 */
     understood: d.strengths ?? [],
-    nextStep: response.hint.nextAsk ?? null,
+    nextStep: visible.nextAsk ?? null,
     mode,
     /** 本轮是否经过复核重写（只说"复核过"，不说违规类型） */
     reviewed: guardBlocked > 0,
@@ -455,6 +479,19 @@ export async function handleApi(req, res, url) {
         intakeFallback: true,
         /** 拍图识题：配了凭据才为 true；前端据此决定是否显示拍照入口 */
         ocr: readOcrConfig(env).available,
+        /**
+         * 可选的陪学老师。
+         *
+         * 前端在 index.html 里保留一份同样的展示投影（图片路径、一句简介），
+         * 目的是首屏在 /api/health 返回前就能画出来；test/personas.test.js
+         * 会核对两份的名字与路径，避免服务端和页面各改各的。
+         */
+        personas: PERSONA_IDS.map((id) => {
+          const p = PERSONAS[id];
+          return { id: p.id, name: p.name, tagline: p.tagline, intro: p.intro, quote: p.quote, avatar: p.avatar, fullBody: p.fullBody };
+        }),
+        /** 默认是谁；前端在没存过偏好时用它 */
+        defaultPersona: DEFAULT_PERSONA,
       },
       hintPolicy: {
         levels: ['L0 结构化澄清', 'L1 条件追问', 'L2 方向提示', 'L3 降级示范'],
@@ -671,6 +708,11 @@ export async function handleApi(req, res, url) {
   if (path === '/api/chat' && req.method === 'POST') {
     const body = await readJson(req);
     const { sessionId, problemId, utterance, mode, explicitHelpSeeking } = body ?? {};
+    /**
+     * 老师只影响措辞：不认识的值回落到派蒙，不报错 ——
+     * 前端存的偏好可能来自旧版本，为一个 id 打回整个请求不值得。
+     */
+    const persona = normalizePersona(body?.persona);
     if (!problemId || typeof utterance !== 'string') {
       sendJson(res, 400, { error: '需要 problemId 与 utterance' });
       return true;
@@ -702,6 +744,7 @@ export async function handleApi(req, res, url) {
         // 免得"自主训练"退化成"每句都算求助"或"问破喉咙也没人理"
         explicitHelpSeeking: Boolean(explicitHelpSeeking) || looksLikeHelpRequest(utterance),
         sessionId: session.id,
+        persona,
       });
     } catch (error) {
       if (!['OBSERVATION_UNAVAILABLE', 'REPLY_UNAVAILABLE'].includes(error.code)) throw error;
@@ -724,7 +767,8 @@ export async function handleApi(req, res, url) {
     appendTurn(session.record, { utterance, response, problem });
 
     // 学生载荷 —— 只走白名单投影
-    sendJson(res, 200, buildStudentTurn({ ...response, stepCount: totalSteps(problem, response.diagnosis.position.graphId) }, normalizedMode, problem));
+    const turnIndex = session.history.filter((t) => t.role === 'ai').length;
+    sendJson(res, 200, buildStudentTurn({ ...response, stepCount: totalSteps(problem, response.diagnosis.position.graphId) }, normalizedMode, problem, persona, turnIndex));
     return true;
   }
 

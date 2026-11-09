@@ -227,10 +227,16 @@ export function composeConfirmation({ verdict, problem }) {
     : '这一问的结果是对的，剩下的部分继续推进。';
 }
 
-/** 确认轮的"接着做什么"—— 不催促，只给一个抓手 */
+/**
+ * 确认轮的"接着做什么"。
+ *
+ * 确认轮只负责"我确认你在对的路上"，不负责派活 ——
+ * 规范（languages/00「反馈-意义-留白」）要求肯定之后立刻留白，
+ * 所以这里给的是一个学生自己能回答的反问，而不是一条指派的动作。
+ */
 export function confirmationNextAsk(verdict) {
-  if (verdict.complete) return '把这道题的思路用一句话总结给自己听，然后看学习报告。';
-  return '先挑一个你最有把握的待求量算出来，告诉我结果。';
+  if (verdict.complete) return '这道题最关键的一步，你会怎么用自己的话讲一遍？';
+  return '剩下的待求量里，你打算先处理哪一个？';
 }
 
 /**

@@ -151,6 +151,12 @@ export function createEngine({ adapter, problem, logger } = {}) {
     const sessionKey = request.sessionId ?? 'default';
     const history = request.history ?? [];
     /**
+     * 本轮由哪位老师说话。
+     * 它只影响"怎么说"—— 不参与定位、层级、守卫任何一个判断，
+     * 所以这里不做校验，交给 personas.js 的 normalizePersona 兜底。
+     */
+    const persona = request.persona;
+    /**
      * 这道题是不是"现场读出来的"（intake 导入）。
      * 用途只有一个：学生版判断链路里要不要加一句"读题"。
      * 注意它**不参与任何教学决策** —— 导入题的每一句话术走的是与题库题完全相同的 route + guard。
@@ -349,6 +355,8 @@ export function createEngine({ adapter, problem, logger } = {}) {
           allowedConcepts: routing.allowedConcepts,
           forbidden,
           strategy: routing.strategyInstruction,
+          /** 老师人格只改措辞：真模型据此拼接规范与语言风格，离线桩不使用 */
+          persona,
           /** 传层级统计给适配器：离线桩用它轮换话术，真模型也可用作 few-shot 选择依据 */
           l3Count: routing.l3Count ?? 0,
           history,
