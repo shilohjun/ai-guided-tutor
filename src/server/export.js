@@ -42,6 +42,7 @@
  */
 
 import { readSessionRecord, snapshotSession } from './session-store.js';
+import { isAbandoned } from './metrics.js';
 import { createZip } from './zip.js';
 
 /** 查不到时的兜底：中文，且一眼能看出是"查不到"而不是"字段叫这个" */
@@ -357,5 +358,640 @@ export async function exportSingle(store, sessionId) {
   return createZip([
     { name: MARKDOWN_NAME, data: markdown },
     { name: JSON_NAME, data: json },
+  ]);
+}
+
+// ===========================================================================
+// 整批导出：一个批次一个 zip（设计稿 §5.7，Task 7）
+// ===========================================================================
+/**
+ * 与单条导出是**同一份数据的两种装箱**，不是两套逻辑：
+ *   · 逐条报告不写第二个渲染器，直接 `snapshotSession` 投影成 `reports/<id>.json`
+ *     （控制者补充 F1）—— 库里、看板上、导出件里读到的永远是同一组字段；
+ *   · 容器仍然走 `createZip`（固定时间戳、拒绝危险条目名）；
+ *   · 单条 Markdown 那份人话版留在 `session.md`，整批不出 —— 一批 40 份 Markdown
+ *     没人会逐份打开，要读细节的人直接开 `reports/<id>.json`。
+ *
+ * ===========================================================================
+ * 三件事决定了这个文件的大部分篇幅
+ * ===========================================================================
+ * ① **收到 zip 的人不在我们的页面上。** 他不知道是哪一批、数据到什么时候、
+ *    哪一列是什么意思、颜色档为什么不在这份文件里。所以 `README.md` 不是"附带说明"，
+ *    它是导出件的一半：三句立场文案（F4）**照抄**，字段字典**由表头生成**（F2）。
+ *    手写第二份字段说明一定会和实现在某次改动后分叉，而分叉的字段说明比没有更糟。
+ *
+ * ② **会被 diff。** 同一批数据导出两次要能逐字节比。所以排序全部自己来
+ *    （不能依赖 `listEventsByBatch` 的返回顺序，它的并列顺序在两个驱动下可能不同，
+ *    这是 Task 1 就记下的 Minor），时间戳也不放"导出这一刻"（见 `dataCutoff`）。
+ *
+ * ③ **只在内存里拼一遍。** 一次导出只按批次读库：批次、成员、会话、事件各一次，
+ *    代号按"留下会话的成员"查。逐条回查会话/事件会让库调用从 5 次变成 1 + 2N 次
+ *    —— 40 人的班撑得住，一个学期之后就没人证明得出它还是那个数量级。
+ *
+ * ===========================================================================
+ * 缺件时的降级（F5 / F6）
+ * ===========================================================================
+ *   · 批次查不到 → 抛 `BATCH_NOT_FOUND`（路由回 404，不去猜文案）；
+ *   · 人被删了 → `students.csv` 不出现这个人，`sessions.csv` 的代号写"未知"，
+ *     但**会话那一行留着**：少了的那一行没有任何人会看出来；
+ *   · 某个 `.jsonl` 一条记录都没有 → 仍然出这个**空文件**。缺文件会被读成
+ *     "没有采集"，空文件才是"确实没有"。
+ */
+
+/**
+ * `sessions.csv` 的表头，顺序固定（控制者补充 F2）。
+ *
+ * 它同时是 README 里那份字段字典的**唯一来源**：字典按这张表逐项生成，
+ * 所以"加了一列却忘了写文档"这件事在这套代码里不可能发生。
+ */
+const SESSION_CSV_HEADERS = [
+  '批次',
+  '代号',
+  '会话id',
+  '题目id',
+  '题单序号',
+  '开始时间',
+  '最后活动时间',
+  '是否完成',
+  '走到第几页',
+  '退回次数',
+  '重置次数',
+  '改入场次数',
+  '对话轮数',
+  '给过的最高层级',
+  '公式卡次数',
+  '报告次数',
+  '再练次数',
+  '首条消息字数',
+  '是否复制题干',
+  '是否放弃',
+  '隔离夜回来',
+];
+
+/**
+ * `students.csv` 的列，固定 6 列（F6）。
+ *
+ * 它只回答一个问题：**这批人里谁真的留下了数据**（会话数 / 完成数）。
+ * 发过号却一道题都没做的人不在这张表里 —— 那不是"数据缺失"，是"没来"。
+ */
+const STUDENT_CSV_HEADERS = ['代号', '批次', '首次登录', '最后登录', '会话数', '完成数'];
+
+/**
+ * 字段字典的说明。**只写说明，不写字段名**：字段名的顺序一律来自 `SESSION_CSV_HEADERS`。
+ *
+ * 说明写的是"这一列回答什么问题"，不是"这一列是什么类型"——读这份 CSV 的人是教研，
+ * 他要判断的是"这个数能不能支撑一个结论"，不是字段的 schema。
+ */
+const FIELD_NOTES = {
+  批次: '会话所属批次的标识，与这份导出件的批次一致',
+  代号: '发号时定的代号，不是真名；查不到这个人时写"未知"',
+  会话id: '一道题的一次作答就是一条会话，与 reports/ 下的文件名一致',
+  题目id: '题库里的题号',
+  题单序号: '这道题在批次题单里的位置（从 0 起）；算不出来时留空，不写 0',
+  开始时间: '会话创建的时刻（UTC）',
+  最后活动时间: '最后一次有动作的时刻（UTC），放弃判定读的就是它',
+  是否完成: '走到过报告页就是"是"（有结束时间）',
+  走到第几页: '最远到达的页码，只有 1–4',
+  退回次数: '往回翻页的次数',
+  重置次数: '把这一轮对话清掉重来的次数',
+  改入场次数: '重新读题（换题干 / 换方式）的次数',
+  对话轮数: '学生发出的消息条数，沉默与否看它',
+  给过的最高层级: '给过的最强一级帮助（L0–L3）；一次都没给过是 0',
+  公式卡次数: '打开公式卡的次数',
+  报告次数: '打开报告页的次数',
+  再练次数: '点"再练一道"的次数',
+  首条消息字数: '第一句话的字数，回答"他到底开不开口"',
+  是否复制题干: '有没有把题干复制走',
+  是否放弃: '没有结束时间，且最后活动已超过批次的放弃阈值（默认 24 小时）',
+  隔离夜回来: '相邻两段之间断过 6 小时以上；这是不受阈值影响的旁证',
+};
+
+/**
+ * README 里那三句**固定文案**（控制者补充 F4，照抄，别改写）。
+ *
+ * 为什么一个字都不许改：它们回答的是产品定位 —— 这批数据能得出什么结论、
+ * 不能得出什么结论。把"不回答有没有效果"改写成"不是有没有效果"读起来更顺，
+ * 但那是在替产品改口径，而口径一改，40 个人的数据可以被拿去做一个它撑不住的结论。
+ */
+const README_SCOPE =
+  '这批数据回答的是**会不会用**（学生停在哪一页、在哪一页退回去、一道题重来几次），**不回答有没有效果**。';
+const README_LEVEL = '掌握程度是页面上由独立完成度推导出的颜色档，不存库；本导出件以数字为准。';
+const README_NAMES = '代号与真名的对照表不在导出件里，由发号时的 CSV 保管。';
+
+/** 打包规则变了就 +1：读 README 的人据此判断这份说明是否适用于手上这个 zip */
+const EXPORT_FORMAT_VERSION = 1;
+
+/** 逐条报告的目录（zip 里是 `reports/<sessionId>.json`） */
+const REPORT_PREFIX = 'reports/';
+
+/**
+ * 6 小时：相邻两段之间断过这么久才算"隔离夜回来"。
+ *
+ * 与 `metrics.js` 的 `OVERNIGHT_GAP_MS` 同一口径（那边没导出这个常量，
+ * 而本任务只动这个文件）。改阈值时两处要一起改 —— 记在报告里了。
+ */
+const OVERNIGHT_GAP_MS = 6 * 3600e3;
+
+/** 没登录过的人写这三个字，不写空白：Excel 里的空格看不出是"没登录"还是"导出漏了" */
+const NEVER_SIGNED_IN = '未登录';
+
+/** 布尔列一律写中文，Excel 里看到的是"是/否" */
+const YES = '是';
+const NO = '否';
+
+/**
+ * 码位序比较。
+ *
+ * **不用 `localeCompare`**：各语言环境的排序不一样（与 session-store.js 里
+ * `pickResumable` 的理由相同），而这份导出件要能被逐字节 diff。
+ */
+function compareText(left, right) {
+  const a = text(left);
+  const b = text(right);
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/**
+ * 读回来的列表：不是数组就当空。
+ *
+ * 导出是只读的最后一环 —— 驱动哪怕返回了一个坏形状（`null`、对象、字符串），
+ * 也该出一份"确实没有记录"的导出件，而不是 500。空件能被看出来，500 不能。
+ */
+function asList(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+/** 布尔列写中文 */
+const yesNo = (value) => (value ? YES : NO);
+
+/**
+ * 只认真正的 `true`（字符串 `'true'` 也认）。
+ *
+ * 埋点里出现过字符串 `'false'`（前端把布尔忘了转）：宽松判断会把它读成"复制过题干"，
+ * 而"有没有把题干复制走"是防泄题那条链上唯一能被观察到的信号。
+ */
+function strictTrue(value) {
+  return value === true || value === 'true';
+}
+
+/** 完成 = 走到过报告页（`router.js` 在报告落定时写 `finishedAt`） */
+function isFinished(session) {
+  return typeof session?.finishedAt === 'string' && session.finishedAt.trim() !== '';
+}
+
+/** 走到第几页：产品只有四页，越界一律夹回来（界面上不存在"第 5 页"） */
+function pagesWalked(session) {
+  const raw = finiteNumber(session?.progress?.maxPage);
+  if (raw === null) return 1;
+  return Math.min(4, Math.max(1, Math.trunc(raw)));
+}
+
+/** 给过的最强一级帮助：`hintLevels` 的最大值，一次都没给过是 0（不是 -Infinity） */
+function highestHintLevel(counters) {
+  const levels = asList(counters?.hintLevels);
+  let highest = null;
+  for (const level of levels) {
+    const value = finiteNumber(level);
+    if (value === null) continue;
+    highest = highest === null ? value : Math.max(highest, value);
+  }
+  return highest ?? 0;
+}
+
+/** 学生真的说了几句话。只给 `counters.chatTurns` 缺失的老记录用（见 renderSessionsCsv） */
+function studentTurnCount(turns) {
+  return asList(turns).filter((turn) => turn?.role === 'student').length;
+}
+
+/**
+ * 隔夜回来：相邻两段之间真的断了 6 小时以上。
+ *
+ * 用"上一段的最后一条事件 → 下一段的开始"，不是两个 start 相减：
+ * 段内的最后一条事件才是学生真正离开的时刻（与 metrics.js 同一口径）。
+ * 没有 `lastEventAt`（事件还没组装进来）就退到这一段的开始。
+ */
+function overnightReturn(session) {
+  const segments = asList(session?.segments);
+  for (let i = 1; i < segments.length; i += 1) {
+    const previous = segments[i - 1];
+    const lastEventAt = Date.parse(String(previous?.lastEventAt ?? ''));
+    const before = Number.isFinite(lastEventAt) ? lastEventAt : Date.parse(String(previous?.start ?? ''));
+    const after = Date.parse(String(segments[i]?.start ?? ''));
+    if (!Number.isFinite(before) || !Number.isFinite(after)) continue;
+    if (after - before > OVERNIGHT_GAP_MS) return true;
+  }
+  return false;
+}
+
+/**
+ * 一个值 → CSV 单元格。
+ *
+ * 逗号、引号、换行在 CSV 里是**结构**：不包引号就会多拆一列或一整行，
+ * 而那种错在屏幕上只表现为"这一格内容短了"，没人会去数行数。
+ */
+function csvCell(value) {
+  if (value === null || value === undefined) return '';
+  const cell = String(value);
+  if (!/[",\r\n]/.test(cell)) return cell;
+  return `"${cell.replace(/"/g, '""')}"`;
+}
+
+/**
+ * 二维表 → CSV 文本（UTF-8 带 BOM）。
+ *
+ * @param {Array<object>} rows 每行是以表头为键的对象；缺的键写空单元格
+ * @param {string[]} headers 列顺序（也决定第一行）
+ * @returns {string}
+ */
+export function toCsv(rows, headers) {
+  const columns = asList(headers);
+  const lines = [columns.map(csvCell).join(',')];
+  for (const row of asList(rows)) {
+    lines.push(columns.map((header) => csvCell(row?.[header])).join(','));
+  }
+  /**
+   * BOM 必须在最前面：没有它，Excel（中文 Windows 的默认编码是 GBK）打开就是乱码，
+   * 而 `cat` / `less` 看却完全正常 —— 只有中文用户看得到这个 bug（全局约束）。
+   *
+   * 末尾**不加**换行：行数口径是"表头 1 行 + 数据 N 行"，按 `\r\n` 拆就该正好 N+1 段。
+   * 加一个尾换行会让每个读的人各自过滤一次空行，而这种"各自过滤"迟早有一处漏掉。
+   */
+  return `\uFEFF${lines.join('\r\n')}`;
+}
+
+/**
+ * 学生名单 → `students.csv`。
+ *
+ * 参数是**已经组装好的名单行**（`{ displayName, batchId, firstSeenAt, lastSeenAt,
+ * sessionCount, finishedCount }`），不是库里的 `user` 记录：会话数与完成数不挂在人身上，
+ * 而"哪些人有会话"是存储那边的事实。分工写在 `exportBatch` 里。
+ *
+ * @param {Array<object>} students
+ * @returns {string}
+ */
+export function renderStudentsCsv(students) {
+  const rows = asList(students).map((student) => ({
+    代号: text(student?.displayName, UNKNOWN_STUDENT),
+    批次: text(student?.batchId),
+    首次登录: text(student?.firstSeenAt, NEVER_SIGNED_IN),
+    最后登录: text(student?.lastSeenAt, NEVER_SIGNED_IN),
+    会话数: finiteNumber(student?.sessionCount) ?? 0,
+    完成数: finiteNumber(student?.finishedCount) ?? 0,
+  }));
+  return toCsv(rows, STUDENT_CSV_HEADERS);
+}
+
+/**
+ * 会话明细 → `sessions.csv`（一行一条会话）。
+ *
+ * `batch` / `now` 是**可选第二参**：放弃判定要批次的阈值与"现在"，而这个渲染器
+ * 自己不碰库、不读钟（读钟会让导出件每次跑都不一样）。缺省时按默认 24 小时、
+ * 用当前时刻 —— 与 `isAbandoned` 的缺省口径一致。
+ *
+ * 代号（`studentName`）由调用方解析后随会话带进来：这个函数不该为了一个名字去查库，
+ * 否则它就从"渲染器"变成了"又一个导出流程"。
+ *
+ * @param {object[]} sessions
+ * @param {{ batch?: object|null, now?: number|string|Date|null }} [options]
+ * @returns {string}
+ */
+export function renderSessionsCsv(sessions, { batch = null, now = null } = {}) {
+  const at = now ?? new Date().toISOString();
+  const rows = asList(sessions).map((session) => {
+    const counters = session?.counters ?? {};
+    const questionIndex = finiteNumber(session?.questionIndex);
+    const chatTurns = finiteNumber(counters.chatTurns);
+    return {
+      批次: text(session?.batchId),
+      代号: text(session?.studentName, UNKNOWN_STUDENT),
+      会话id: text(session?.id),
+      题目id: text(session?.problemId),
+      /** 留空 = 算不出来。写 0 会被读成"第一道题"，那是另一个意思 */
+      题单序号: questionIndex === null ? '' : questionIndex,
+      开始时间: text(session?.startedAt),
+      最后活动时间: text(session?.lastAt),
+      是否完成: yesNo(isFinished(session)),
+      走到第几页: pagesWalked(session),
+      退回次数: finiteNumber(session?.progress?.backtracks) ?? 0,
+      重置次数: finiteNumber(counters.resetCount) ?? 0,
+      改入场次数: finiteNumber(counters.intakeChanges) ?? 0,
+      /**
+       * 计数器缺失时退到"学生轮次条数"，不写 0。写 0 的后果是同一个人既在
+       * `turns.jsonl` 里有好几轮对话、又在 `sessions.csv` 里"一句没说"——
+       * 两个文件互相打架时，读的人只会相信那个比较小的数。
+       */
+      对话轮数: chatTurns ?? studentTurnCount(session?.turns),
+      给过的最高层级: highestHintLevel(counters),
+      公式卡次数: finiteNumber(counters.formulaOpens) ?? 0,
+      报告次数: finiteNumber(counters.reportViews) ?? 0,
+      再练次数: finiteNumber(counters.practicePicks) ?? 0,
+      首条消息字数: finiteNumber(counters.firstMessageLength) ?? 0,
+      是否复制题干: yesNo(strictTrue(counters.copiedStem)),
+      是否放弃: yesNo(isAbandoned(session, batch, at)),
+      隔离夜回来: yesNo(overnightReturn(session)),
+    };
+  });
+  return toCsv(rows, SESSION_CSV_HEADERS);
+}
+
+/**
+ * 导出件里的说明手册（`README.md`）。
+ *
+ * 三句立场文案是常量（F4）；字段字典**由 `SESSION_CSV_HEADERS` 生成**，
+ * 不在这里手写第二份（F2）。`generatedAt` 由调用方传：这个渲染器不读钟。
+ *
+ * @param {{ batch?: object|null, generatedAt?: string|null, sessionCount?: number }} [input]
+ *   `generatedAt` 是"这份导出代表到哪一刻为止"（`exportBatch` 传的是本批最新一条记录
+ *   的时间，见 `dataCutoff`）；缺了写"未知"，不写 `undefined`
+ * @returns {string}
+ */
+export function renderBatchReadme({ batch, generatedAt, sessionCount } = {}) {
+  const label = text(batch?.label, UNKNOWN_BATCH);
+  const batchId = text(batch?.id, '未知标识');
+  /** 批次记录里这一版没有 `version` 字段：写"未标注"，不猜一个版本号 */
+  const batchVersion = text(batch?.version, '未标注');
+  const cutoff = text(generatedAt, '未知（本批还没有带时间的记录）');
+  const count = finiteNumber(sessionCount) ?? 0;
+
+  const dictionary = SESSION_CSV_HEADERS.map(
+    (name) => `- \`${name}\`：${FIELD_NOTES[name] ?? '（这一版没有写说明）'}`,
+  );
+
+  return (
+    [
+      `# 批次导出 · ${label}`,
+      '',
+      `- 批次标识：${batchId}`,
+      `- 批次版本：${batchVersion}`,
+      `- 会话数：${count}`,
+      `- 数据截止时间：${cutoff}`,
+      `- 导出格式版本：${EXPORT_FORMAT_VERSION}`,
+      '',
+      '## 这批数据回答什么',
+      '',
+      README_SCOPE,
+      '',
+      '## 关于掌握程度',
+      '',
+      README_LEVEL,
+      '',
+      '## 代号与真名',
+      '',
+      README_NAMES,
+      '',
+      '## 里面有什么',
+      '',
+      '| 文件 | 内容 |',
+      '| --- | --- |',
+      '| `README.md` | 就是这一份 |',
+      '| `students.csv` | 这批学生：代号、首次 / 最后登录、会话数、完成数。**只含有会话的人** |',
+      '| `sessions.csv` | 一道题的一次作答一行：停在哪一页、退回去几次、重来几次、给过多强的帮助 |',
+      '| `events.jsonl` | 埋点原始事件，一行一条；按会话分组，组内按写入顺序（`seq`） |',
+      '| `turns.jsonl` | 对话原文，一行一轮；按会话分组，组内按轮次（`i`） |',
+      '| `reports/<会话id>.json` | 每条会话的报告快照，与库里冻结的那一份完全相同（不重算） |',
+      '',
+      `学生名单（\`students.csv\`）的列：${STUDENT_CSV_HEADERS.join(',')}`,
+      '',
+      `## 字段字典（\`sessions.csv\` 的 ${SESSION_CSV_HEADERS.length} 列，从左到右）`,
+      '',
+      ...dictionary,
+      '',
+      '## 保留与清理',
+      '',
+      '- 清理前必须先导出：账号与作答记录一删就没有第二份。',
+      '- 导出件保留 90 天，到期连同一开始的发号 CSV 一起销毁。',
+      '- 导出件里只有代号：代号与真名的对照表在发号时的那个 CSV 里，不随这个 zip 出去。',
+      '',
+    ].join('\n')
+  );
+}
+
+/** 会话 id 的字典序（报告文件、jsonl 分组都用它，两处必须同一口径） */
+function bySessionId(left, right) {
+  return compareText(left?.id, right?.id);
+}
+
+/**
+ * 事件的排序：`seq` 升序 → 缺 `seq` 的排在有序号的之后 → 再按 `at`。
+ *
+ * 与 `metrics.js` 的 `byEventOrder`、store 的 `byEventOrder` 同一口径：`seq` 是写入
+ * 那一刻盖上的定稿，没有它才退到 `at`。两档都相同时返回 0（`Array#sort` 稳定，
+ * 等于保持原顺序）。
+ */
+function byEventSeq(left, right) {
+  const a = typeof left?.seq === 'number' && Number.isFinite(left.seq) ? left.seq : null;
+  const b = typeof right?.seq === 'number' && Number.isFinite(right.seq) ? right.seq : null;
+  if (a !== null && b !== null) {
+    if (a !== b) return a - b;
+  } else if (a !== null) {
+    return -1;
+  } else if (b !== null) {
+    return 1;
+  }
+  const atA = Date.parse(String(left?.at ?? ''));
+  const atB = Date.parse(String(right?.at ?? ''));
+  if (Number.isFinite(atA) && Number.isFinite(atB) && atA !== atB) return atA - atB;
+  return 0;
+}
+
+/** 对话的排序：`i` 升序；缺 `i` 的那几条保持原相对顺序（不猜，也不排到最前） */
+function byTurnIndex(left, right) {
+  const a = finiteNumber(left?.i);
+  const b = finiteNumber(right?.i);
+  if (a === null || b === null) return 0;
+  return a - b;
+}
+
+/**
+ * JSONL：一行一条 JSON。
+ *
+ * 没有记录时返回**空字符串**（而不是不生成这个文件）：缺文件会被读成"没有采集"，
+ * 空文件才是"确实没有"（F6）。
+ */
+function jsonLines(records) {
+  if (records.length === 0) return '';
+  return `${records.map((record) => JSON.stringify(record)).join('\n')}\n`;
+}
+
+/**
+ * 事件 → `events.jsonl`：按 `sessionId` 分组、组内按 `seq` 升序、组间按 `sessionId` 字典序。
+ *
+ * 为什么不直接用 `listEventsByBatch` 的返回顺序：两个驱动的并列顺序可能不同
+ * （Task 1 记下的 Minor），而"两次导出能不能 diff"取决于这里。顺序全部自己排一遍，
+ * 这条依赖就不存在了。
+ *
+ * 没有 `sessionId` 的事件**不丢**：页 1–2 的事件挂的是 `visitId`（设计稿 §5.2），
+ * 而"第 1 页停留多久"正是这批数据要回答的问题之一。它们自成一组（空键）排在最前。
+ */
+function renderEventLines(events) {
+  const groups = new Map();
+  for (const event of asList(events)) {
+    const key = text(event?.sessionId);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(event);
+  }
+  const records = [];
+  for (const key of [...groups.keys()].sort(compareText)) {
+    records.push(...groups.get(key).slice().sort(byEventSeq));
+  }
+  return jsonLines(records);
+}
+
+/**
+ * 会话 → `turns.jsonl`：按 `sessionId` 字典序、组内按 `i` 升序。
+ *
+ * 每一行都带 `sessionId`：这个文件是给别的程序读的，靠行序猜归属靠不住。
+ * 只读 `session.turns`（不碰 `record.turns`，那是报告侧的名字；两者指同一份东西，
+ * 而统一由 `snapshotSession` 负责）。
+ */
+function renderTurnLines(sessions) {
+  const records = [];
+  for (const session of asList(sessions).slice().sort(bySessionId)) {
+    const sessionId = text(session?.id);
+    const turns = asList(session?.turns).slice().sort(byTurnIndex);
+    for (const turn of turns) records.push({ sessionId, ...turn });
+  }
+  return jsonLines(records);
+}
+
+/**
+ * 数据截止时间：本批**最新一条记录**的时间（ISO）。
+ *
+ * 为什么不是"导出这一刻"：导出件会被逐版本 diff（zip 的时间戳已经固定死了，
+ * 见 zip.js），而墙上时钟每跑一次都不一样 —— 一份每次都变的导出件没法比对。
+ * 用数据自己的最新时刻，这句话也是自明的："这份导出代表到这一刻为止"。
+ *
+ * 一条带时间的记录都没有（空批次）时返回 null，由 `renderBatchReadme` 写"未知"。
+ */
+function dataCutoff(sessions, events) {
+  let latest = Number.NaN;
+  const consider = (value) => {
+    const ms = Date.parse(String(value ?? ''));
+    if (!Number.isFinite(ms)) return;
+    if (!Number.isFinite(latest) || ms > latest) latest = ms;
+  };
+  for (const session of asList(sessions)) {
+    consider(session?.lastAt);
+    consider(session?.finishedAt);
+    consider(session?.startedAt);
+  }
+  for (const event of asList(events)) consider(event?.at);
+  return Number.isFinite(latest) ? new Date(latest).toISOString() : null;
+}
+
+/**
+ * 整批导出：一个批次一个 zip。
+ *
+ * 条目顺序固定（裁决 ⑥）：`README.md` → `students.csv` → `sessions.csv` →
+ * `events.jsonl` → `turns.jsonl` → `reports/<id>.json`（按会话 id 字典序）。
+ * 顺序固定，两次导出才逐字节可比。
+ *
+ * 库调用只有这些，**一条会话一次都不查**：
+ *   `getBatch` / `listMembers` / `listSessionsByBatch` / `listEventsByBatch` 各一次，
+ *   外加"留下会话的成员"各一次 `getUserById`（代号）。
+ *
+ * @param {object} store 存储端口
+ * @param {string} batchId
+ * @param {{ now?: number|string|Date }} [options]
+ *   `now` 是放弃判定的"现在"。缺省用当前时刻；测试与逐版本比对时传固定值
+ *   —— 不钉住它，同一个 fixture 今天算"未放弃"、明天就算"放弃"
+ * @returns {Promise<Buffer>}
+ * @throws {Error & { code: 'BATCH_NOT_FOUND' }} 批次不存在时（Task 8 据此回 404）
+ */
+export async function exportBatch(store, batchId, { now } = {}) {
+  const batch = await store.getBatch(batchId);
+  if (!batch) {
+    const err = new Error('无法导出：这个批次不存在');
+    err.code = 'BATCH_NOT_FOUND';
+    throw err;
+  }
+
+  /** 放弃判定与"数据截止"各用各的时间：前者是判定时刻，后者是数据自身的边界 */
+  const at = now ?? new Date().toISOString();
+
+  const members = asList(await store.listMembers(batchId));
+  const sessions = asList(await store.listSessionsByBatch(batchId));
+  const events = asList(await store.listEventsByBatch(batchId));
+
+  /**
+   * 代号：只查**留下会话的成员**，不按会话逐条回查。
+   *
+   * 为什么按"成员 ∩ 有会话"而不是按会话的 `userId`：会话上的 `userId` 可能是
+   * 一个已经被删掉的人（F5），也可能根本不在这一批的名单里；成员表才是"这个批次
+   * 有哪些人"的事实。两边取交集之后，查询次数只跟"真的做了题的人数"有关。
+   */
+  const owners = new Set();
+  for (const session of sessions) {
+    const userId = text(session?.userId);
+    if (userId !== '') owners.add(userId);
+  }
+
+  const nameByUser = new Map();
+  const roster = [];
+  for (const member of asList(members)) {
+    const userId = text(member?.userId);
+    if (userId === '' || !owners.has(userId)) continue;
+    const user = await store.getUserById(userId);
+    /** 人被删了：这张名单里不出现他（F5）。会话那一边照旧出件，代号写"未知" */
+    if (!user) continue;
+    const displayName = text(user.displayName, UNKNOWN_STUDENT);
+    nameByUser.set(userId, displayName);
+    roster.push({
+      userId,
+      displayName,
+      firstSeenAt: user.firstSeenAt,
+      lastSeenAt: user.lastSeenAt,
+    });
+  }
+
+  /** 会话数 / 完成数按人聚合：`students.csv` 要的就是这两个数 */
+  const statsByUser = new Map();
+  for (const session of sessions) {
+    const userId = text(session?.userId);
+    if (userId === '') continue;
+    const stats = statsByUser.get(userId) ?? { sessionCount: 0, finishedCount: 0 };
+    stats.sessionCount += 1;
+    if (isFinished(session)) stats.finishedCount += 1;
+    statsByUser.set(userId, stats);
+  }
+
+  const batchKey = text(batch?.id) || text(batchId);
+  const students = roster
+    .map((member) => ({
+      ...member,
+      batchId: batchKey,
+      ...(statsByUser.get(member.userId) ?? { sessionCount: 0, finishedCount: 0 }),
+    }))
+    /** 名单按代号排（码位序）：导出的第一列看着就是一份名单，不是一堆 id */
+    .sort((a, b) => compareText(a.displayName, b.displayName) || compareText(a.userId, b.userId));
+
+  /** 代号随会话带进 CSV；报告快照不带（报告是库里那一份，见 `snapshotSession`） */
+  const sessionsWithNames = sessions.map((session) => {
+    const displayName = nameByUser.get(text(session?.userId));
+    return displayName ? { ...session, studentName: displayName } : session;
+  });
+
+  const reportEntries = sessions
+    .slice()
+    .sort(bySessionId)
+    .map((session) => ({
+      name: `${REPORT_PREFIX}${text(session?.id)}.json`,
+      data: `${JSON.stringify(snapshotSession(session), null, 2)}\n`,
+    }));
+
+  return createZip([
+    {
+      name: 'README.md',
+      data: renderBatchReadme({
+        batch,
+        generatedAt: dataCutoff(sessions, events),
+        sessionCount: sessions.length,
+      }),
+    },
+    { name: 'students.csv', data: renderStudentsCsv(students) },
+    { name: 'sessions.csv', data: renderSessionsCsv(sessionsWithNames, { batch, now: at }) },
+    { name: 'events.jsonl', data: renderEventLines(events) },
+    { name: 'turns.jsonl', data: renderTurnLines(sessions) },
+    ...reportEntries,
   ]);
 }
