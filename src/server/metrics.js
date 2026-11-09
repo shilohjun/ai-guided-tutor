@@ -31,11 +31,19 @@
  *      而"第 2 页掉了一半"这句话就成了假的 —— 而且不会报错。
  *
  * ============================================================================
- * 比率：分母为 0 时是 0，不是 NaN（D3）
+ * 比率：四位小数，分母为 0 时是 0，不是 NaN（D3）
  * ============================================================================
  * 绝不允许 NaN / Infinity 流到看板或 CSV：一根 NaN 柱子在界面上会画成一根到天的
- * 柱子，而它看起来像数据。所有比率统一 `Math.round(x * 100) / 100` ——
- * `0.6666666666` 这种尾数会被下一个人当成精度引用。
+ * 柱子，而它看起来像数据。
+ *
+ * 精度留**四位**（`Math.round(x * 10000) / 10000`），不是两位。两位小数只能表达
+ * 1% 的粒度：`0.02` 会把 2.0% 到 2.9% 全吞掉，而 §4 的换平台触发条件正是
+ * "一轮失败率 > 2%" —— 一个分不清"刚好到"和"刚好过"的数，拿去做阈值判定就是
+ * 在掷硬币。也正因为如此，给人看的小数位（百分比、几位小数）是导出/看板层的事，
+ * 不在这里丢精度换整齐。
+ *
+ * 同一条除法规则（`rate()`）也用于平均时长、人均题数这类商：模块里只留一种舍入，
+ * 下一个人不用记"哪些字段是两位、哪些是四位"。
  *
  * ============================================================================
  * 一轮失败率的精确口径（D2 —— §4 的换平台触发条件）
@@ -78,6 +86,14 @@ const DEFAULT_MAX_PAGE = 1;
 const OVERNIGHT_GAP_MS = 6 * 3600e3;
 
 /**
+ * 批次没配 `abandonHours` 时的默认值（设计稿 §5.2 的批次字段、§5.4 的口径都是 24）。
+ *
+ * 为什么不是"缺字段 = 永不放弃"：那会让完成率凭空变高，而完成率是看板头条，
+ * 也是"这个平台有没有用"的结论。阈值缺了要退到一个**保守**的值，不是退到"全是好消息"。
+ */
+const DEFAULT_ABANDON_HOURS = 24;
+
+/**
  * 一轮里算"真失败"的错误码。`GUARD` 不在里面（见文件头）：
  * 它是护栏拦下并给了替代回复的一轮，学生收到了东西。
  */
@@ -87,16 +103,20 @@ const TURN_FAILURE_CODES = new Set(['TURN_SLOW', 'UPSTREAM']);
 // 小工具（都是纯的，且都保证"坏输入 → 0 / NaN 由调用方判"，不抛）
 // ---------------------------------------------------------------------------
 
-/** 两位小数。非有限数一律收成 0 —— 这个模块里没有"未知"，只有"还没算出来"。 */
-function round2(value) {
+/**
+ * 四位小数。非有限数一律收成 0 —— 这个模块里没有"未知"，只有"还没算出来"。
+ *
+ * 为什么是四位：见文件头（两位小数表达不了 §4 那个 2% 阈值附近的差别）。
+ */
+function round4(value) {
   if (!Number.isFinite(value)) return 0;
-  return Math.round(value * 100) / 100;
+  return Math.round(value * 10000) / 10000;
 }
 
-/** 分子 / 分母；分母为 0（或不是有限数）时返回 0，不是 NaN（D3）。 */
+/** 分子 / 分母；分母为 0（或不是有限数）时返回 0，不是 NaN（D3）。比率与平均共用。 */
 function rate(numerator, denominator) {
   if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) return 0;
-  return round2(numerator / denominator);
+  return round4(numerator / denominator);
 }
 
 /**
@@ -238,16 +258,38 @@ function hasOvernightReturn(session) {
 // ---------------------------------------------------------------------------
 
 /**
+ * 批次的放弃阈值（小时）。
+ *
+ * 数字照用；数字字符串也认（批次从 JSON 读回来时可能是 `'24'`）；其余一律退到
+ * 默认 24 小时（设计稿 §5.2）。
+ *
+ * 为什么不直接 `Number(batch?.abandonHours)`：`Number(null)`、`Number('')`、
+ * `Number(false)`、`Number([])` 全是 **0**，于是"没配"会变成"0 小时就放弃"——
+ * 全班当场全成放弃，比"永不放弃"错得更狠；而 `Number({})` 是 NaN，又会让
+ * `isAbandoned` 退成"没人放弃"。同一个坏字段能往两个相反方向错，所以这里显式判类型。
+ */
+function abandonHoursOf(batch) {
+  const raw = batch?.abandonHours;
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : DEFAULT_ABANDON_HOURS;
+  if (typeof raw === 'string') {
+    const text = raw.trim();
+    const parsed = Number(text);
+    return text !== '' && Number.isFinite(parsed) ? parsed : DEFAULT_ABANDON_HOURS;
+  }
+  return DEFAULT_ABANDON_HOURS;
+}
+
+/**
  * 这个会话算不算"放弃了"。
  *
  * 判据只有一条：**没有 `finishedAt`，且 `lastAt` 已经超过 `batch.abandonHours`**。
  * `abandoned` 刻意不落库（设计稿 §5.2）：一旦写成状态，它就会变成续做入口的门槛，
  * 而那个门槛会自己制造数据 —— "一天做一道题"的学生隔夜被判放弃、并且真的回不来。
  *
- * 三个"宁可不变 true"的边界：
- *   · `lastAt` 解析不出来（NaN）→ false。凭空造一个放弃，比漏报一个更危险。
- *   · `now` / `abandonHours` 不是有限数 → false。阈值缺失时全员不算放弃，
- *     而不是全员算放弃 —— 错的方向要选不会误伤学生的那一边。
+ * 三个边界：
+ *   · `lastAt` / `now` 解析不出来（NaN）→ false。凭空造一个放弃，比漏报一个更危险。
+ *   · `batch.abandonHours` 缺失或不是有限数 → 按默认 **24 小时**算（见 `abandonHoursOf`）。
+ *     不返回 false：那等于"没人放弃"，会把完成率撑高，而完成率是看板头条。
  *   · 判据是"**超过**"，不是"达到"：正好 24 小时整的那次不算。
  *
  * @param {object} session 会话（只需要 `lastAt` / `finishedAt`）
@@ -260,10 +302,9 @@ export function isAbandoned(session, batch, now) {
 
   const lastAt = msOf(session.lastAt);
   const at = msOf(now);
-  const hours = Number(batch?.abandonHours);
-  if (!Number.isFinite(lastAt) || !Number.isFinite(at) || !Number.isFinite(hours)) return false;
+  if (!Number.isFinite(lastAt) || !Number.isFinite(at)) return false;
 
-  return at - lastAt > hours * 3600e3;
+  return at - lastAt > abandonHoursOf(batch) * 3600e3;
 }
 
 // ---------------------------------------------------------------------------
@@ -334,12 +375,19 @@ export function deriveDwell(events, page) {
  *
  * `p1 = visits.length`（打开次数），`p2..p4` 是**不同的人**（见文件头）。
  * `perPage` 是看板画柱子要的四行：每行的 `visitors` 就是 p1..p4，
- * `avgDwellMs` 是**这一页的这批人**的平均停留 —— 分母与 `visitors` 同源，
+ * `avgDwellMs` 是**这一页这批人**的平均停留 —— 分母与 `visitors` 同源，
  * 读者不会把"多少个柱子"和"多少个样本"混着引用。
  *
- * 停留的来源只有会话自带的 `events`：一个会话没带事件，它的停留贡献就是 0，
- * 但它仍然算一个人（分母不偷偷变小）。第 1 页的事件挂在 visit 上，
- * 本函数拿不到 —— 那一行的平均停留就诚实地是 0，而不是拿别的页去顶。
+ * 停留的来源按归属键分（设计稿 §5.2）：
+ *   · 第 1 页 —— 页 1–2 的事件挂在 `visit.id` 上，所以读 `visit.events`，
+ *     分母是**打开次数**（与第一根柱子同源）。没带事件的 visit 贡献 0 但仍然
+ *     算一次打开；不读会话的页 1 事件（真实数据里那些事件本来就不在会话上，
+ *     两边都读会重复计）。
+ *   · 第 2–4 页 —— 读会话自带的 `events`，分母是"到达过这一页的人"。
+ *     会话没带事件时贡献 0，但它仍然算一个人（分母不偷偷变小）。
+ *
+ * 为什么第 1 页非要读 visit：只读会话时这一行**结构性地**永远是 0（会话是进第 3
+ * 页才造的），看板会把"没数据"画成"学生没停"，而这两件事要做的决定正好相反。
  *
  * 若调用方没把 `visits` 传全（弱网下 `visit_open` 丢过），`conversion` 可能大于 1。
  * 这是刻意的：悄悄夹平会让"visit 记录缺了"这件事永远看不见。
@@ -363,17 +411,18 @@ export function buildFunnel(visits, sessions) {
 
   const p1 = visitList.length;
 
-  /** page → Set（这一页出现过的人） */
-  const usersByPage = new Map(PAGES.map((page) => [page, new Set()]));
-  /** page → Map<人, 毫秒>（同一个人在这一页的总停留） */
-  const dwellByPage = new Map(PAGES.map((page) => [page, new Map()]));
+  /** page → Set（这一页出现过的人）—— 只用于页 2–4；页 1 的人数就是打开次数 */
+  const usersByPage = new Map(PAGES.slice(1).map((page) => [page, new Set()]));
+  /** page → Map<人, 毫秒>（同一个人在这一页的总停留）—— 只用于页 2–4 */
+  const dwellByPage = new Map(PAGES.slice(1).map((page) => [page, new Map()]));
 
   for (let i = 0; i < sessionList.length; i += 1) {
     const session = sessionList[i];
     if (!session || typeof session !== 'object') continue;
     const key = userKeyOf(session, i);
 
-    for (const page of PAGES) {
+    // 页 1 的停留来自 visit（见函数注释），这里只算页 2–4
+    for (const page of PAGES.slice(1)) {
       if (!reachedOf(session, page)) continue;
       usersByPage.get(page).add(key);
       const previous = dwellByPage.get(page).get(key) ?? 0;
@@ -381,17 +430,27 @@ export function buildFunnel(visits, sessions) {
     }
   }
 
+  /**
+   * 第 1 页的总停留 = 每次打开各自 `deriveDwell(events, 1)` 的和。
+   * 坏 visit（`null` / 字符串）跳过：它仍然被 `p1` 数进去（那是打开次数），
+   * 但没有任何事件可以贡献时长。
+   */
+  let page1DwellTotal = 0;
+  for (const visit of visitList) {
+    if (!visit || typeof visit !== 'object') continue;
+    page1DwellTotal += deriveDwell(visit.events, 1);
+  }
+
   const counts = [p1, ...PAGES.slice(1).map((page) => usersByPage.get(page).size)];
   const [p2, p3, p4] = counts.slice(1);
 
   const perPage = PAGES.map((page, index) => {
+    if (page === 1) {
+      return { page, visitors: p1, avgDwellMs: rate(page1DwellTotal, p1) };
+    }
     const perUser = dwellByPage.get(page);
     const totalDwell = [...perUser.values()].reduce((sum, ms) => sum + ms, 0);
-    return {
-      page,
-      visitors: counts[index],
-      avgDwellMs: perUser.size > 0 ? round2(totalDwell / perUser.size) : 0,
-    };
+    return { page, visitors: counts[index], avgDwellMs: rate(totalDwell, perUser.size) };
   });
 
   const sampleTooSmall = p1 <= 1;
@@ -440,7 +499,7 @@ export function buildFunnel(visits, sessions) {
  * 不是一道新题（"重来"由 `resetTotal` / `intakeChangeTotal` 与同题多会话另算）。
  * 认不出题号的会话（照片/粘贴那条路）自己算一道，不互相合并。
  *
- * 所有比率两位小数；分母为 0 时是 0（D3）。`latencyP50/P90` 例外 ——
+ * 所有比率四位小数；分母为 0 时是 0（D3）。`latencyP50/P90` 例外 ——
  * 它们取的是真实样本值本身（nearest-rank，不插值、不四舍五入），见 `nearestRank`。
  *
  * @param {object[]} sessions 会话（`events` / `progress` / `counters` / `segments` 可选）
@@ -513,8 +572,8 @@ export function summarizeSessions(sessions, batch, now) {
   return {
     sessionCount,
     userCount,
-    avgQuestionsPerUser: userCount > 0 ? round2(questionTotal / userCount) : 0,
-    avgMaxPage: sessionCount > 0 ? round2(maxPageTotal / sessionCount) : 0,
+    avgQuestionsPerUser: rate(questionTotal, userCount),
+    avgMaxPage: rate(maxPageTotal, sessionCount),
     resetTotal,
     intakeChangeTotal,
     suppressedRate: rate(suppressedCount, replyCount),

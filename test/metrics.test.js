@@ -15,6 +15,9 @@
  *      不许替下一轮背书；`chat_error` 只有 `TURN_SLOW` / `UPSTREAM` 才算失败。
  *   ④ 放弃是**读时算**的（`abandoned` 不落库）：`lastAt` 解析不出来时宁可算
  *      "没放弃"，也不凭空造一个放弃。
+ *   ⑤ 精度：比率留**四位小数**（`Math.round(x * 10000) / 10000`）。两位小数只能
+ *      表达 1% 的粒度，而 §4 的换平台触发条件是"一轮失败率 > 2%" —— 0.02 会把
+ *      2.0% 与 2.9% 混成同一个数，那个阈值就判不了。给人看的小数位是导出层的事。
  */
 
 import { describe, it, assertEquals, assert } from './runner.js';
@@ -79,9 +82,9 @@ describe('指标 · 四页漏斗', () => {
     assertEquals(f.dropOffPage, null, 'p1 为 1 时不该得出任何掉点结论');
     assertEquals(f.sampleTooSmall, true);
   });
-  it('转化率是两位小数：3 → 2 → 2 → 1 就是 0.67 / 1 / 0.5', () => {
+  it('转化率是四位小数：3 → 2 → 2 → 1 就是 0.6667 / 1 / 0.5', () => {
     const f = buildFunnel(VISITS, SESSIONS);
-    assertEquals(f.conversion.p1_p2, 0.67, '2/3 按 D3 收到两位小数，不是 0.6666666666');
+    assertEquals(f.conversion.p1_p2, 0.6667, '2/3 收到四位小数，不是 0.6666666666');
     assertEquals(f.conversion.p2_p3, 1);
     assertEquals(f.conversion.p3_p4, 0.5);
     assertEquals(f.sampleTooSmall, false);
@@ -174,6 +177,34 @@ describe('指标 · 四页漏斗', () => {
     assertEquals(f.perPage[2].visitors, 1);
     assertEquals(f.perPage[2].avgDwellMs, 2 * H, '两次各 1 小时 = 这个人一共在这页待了 2 小时');
   });
+  it('第 1 页的停留来自 visit 自带的事件（页 1 的事件挂在 visit 上）', () => {
+    /**
+     * 设计稿 §5.2：页 1–2 的事件挂在 `visit.id` 上，会话要到进第 3 页才创建。
+     * 只读会话的 events 时，第 1 页那一行**结构性地**永远是 0 —— 看板会把
+     * "这一页没数据"画成"学生没停"，而两者要做的决定正好相反。
+     */
+    const visits = [
+      { id: 'v1', userId: 'u1', events: [pageEv('page_enter', 1, 1), pageEv('page_exit', 2, 1)] },
+      { id: 'v2', userId: 'u2' },
+    ];
+    const f = buildFunnel(visits, []);
+    assertEquals(f.perPage[0].visitors, 2, '带不带事件都算一次打开');
+    assertEquals(f.perPage[0].avgDwellMs, H / 2, 'u1 待了 1 小时，u2 没有事件贡献 0：2 次打开平均半小时');
+  });
+  it('同一个人打开两次：第 1 页停留按打开次数平均（与柱子同源）', () => {
+    /**
+     * 第 1 页的柱子高度是**打开次数**（p1 = visits.length），所以平均停留的分母
+     * 也必须是打开次数。若按人去平均，柱子说 2 次、停留说 1 个人，两个数相乘
+     * 回不到总时长，引用的人会拿它们互相验算。
+     */
+    const visits = [
+      { id: 'v1', userId: 'u1', events: [pageEv('page_enter', 1, 1), pageEv('page_exit', 2, 1)] },
+      { id: 'v2', userId: 'u1', events: [pageEv('page_enter', 3, 1), pageEv('page_exit', 4, 1)] },
+    ];
+    const f = buildFunnel(visits, []);
+    assertEquals(f.perPage[0].visitors, 2, 'p1 是打开次数，两次打开就是两根');
+    assertEquals(f.perPage[0].avgDwellMs, H, '两次各 1 小时 ÷ 两次打开 = 1 小时（不是 ÷ 1 个人 = 2 小时）');
+  });
   it('visited 传 null、session 是坏形状时，只有 0 和 null，没有 NaN', () => {
     const f = buildFunnel(null, [null, { id: 'x' }, { progress: null }, { progress: { reached: 'nope' } }]);
     assertEquals(f.p1, 0);
@@ -203,8 +234,28 @@ describe('指标 · 放弃是读时算的', () => {
     assert(!isAbandoned({ lastAt: '不是时间' }, BATCH, Date.parse(T(27))));
     assert(!isAbandoned({}, BATCH, Date.parse(T(27))));
   });
-  it('批次没给 abandonHours 时返回 false，而不是把所有人算成放弃', () => {
-    assert(!isAbandoned({ lastAt: T(1) }, { id: 'b1' }, Date.parse(T(27))));
+  it('批次没给 abandonHours 时按设计稿的默认 24 小时算，而不是"没人放弃"', () => {
+    /**
+     * 缺这个字段就全员不放弃，会让"完成率"凭空变高 —— 而完成率是看板头条，
+     * 也是"这个平台有没有用"的结论。设计稿 §5.2/§5.4 给的默认值是 24 小时。
+     */
+    assert(isAbandoned({ lastAt: T(1) }, { id: 'b1' }, Date.parse(T(27))), '26 小时 > 默认 24 小时');
+    assert(!isAbandoned({ lastAt: T(1) }, { id: 'b1' }, Date.parse(T(25))), '默认阈值同样只认"超过"，正好 24 小时不算');
+  });
+  it('abandonHours 不是有限数时也退回 24 小时（不是变成 0 小时或永不放弃）', () => {
+    /**
+     * `Number(null)` 与 `Number('')` 都是 0 —— 直接把字段塞进 `Number()` 会让
+     * "没配"变成"0 小时就放弃"，比"永不放弃"错得更狠。这里逐个钉住。
+     */
+    for (const abandonHours of ['不是数字', null, '', Number.NaN, Number.POSITIVE_INFINITY, {}, true]) {
+      const batch = { id: 'b1', abandonHours };
+      const label = `abandonHours=${String(abandonHours)}`;
+      assert(isAbandoned({ lastAt: T(1) }, batch, Date.parse(T(27))), `${label} 应退回 24 小时`);
+      assert(!isAbandoned({ lastAt: '不是时间' }, batch, Date.parse(T(27))), `${label}：lastAt 坏仍是 false（D5）`);
+    }
+  });
+  it('abandonHours 是数字字符串时照数字用（批次从 JSON 读回来可能是字符串）', () => {
+    assert(isAbandoned({ lastAt: T(1) }, { id: 'b1', abandonHours: '2' }, Date.parse(T(4))), '2 小时阈值');
   });
 });
 
@@ -278,7 +329,7 @@ describe('指标 · 批次汇总', () => {
     /**
      * 3 次发送里 **2 轮失败**（不是 1 轮，计划里那句注释写错了）：
      * 第 1 轮 send→reply 成功；第 2 轮 send 之后是下一条 send，没等到回复；
-     * 第 3 轮 send 落在会话结尾，也没等到回复。2/3 按 D3 收到两位小数 → 0.67。
+     * 第 3 轮 send 落在会话结尾，也没等到回复。2/3 收到四位小数 → 0.6667。
      */
     const sessions = [{
       id: 's1', turns: [],
@@ -288,7 +339,19 @@ describe('指标 · 批次汇总', () => {
       ],
     }];
     const s = summarizeSessions(sessions, BATCH, Date.parse(T(28)));
-    assertEquals(s.turnFailureRate, 0.67, '3 次发送里有 2 轮没等到回复');
+    assertEquals(s.turnFailureRate, 0.6667, '3 次发送里有 2 次没等到回复');
+  });
+  it('一轮失败率留到四位小数：1/400 = 0.0025，不是两位小数下的 0', () => {
+    /**
+     * §4 的换平台触发条件是"一轮失败率 > 2%"。两位小数下 1/400 会被收成 0，
+     * 0.024 会被收成 0.02 —— "刚好到"和"刚好过"变成同一个数，阈值就判不了。
+     */
+    const events = [];
+    for (let i = 0; i < 399; i += 1) events.push({ type: 'chat_send' }, { type: 'chat_reply' });
+    events.push({ type: 'chat_send' });
+    const rate = summarizeSessions([{ id: 's1', events }], BATCH, Date.parse(T(28))).turnFailureRate;
+    assertEquals(rate, 0.0025, '400 轮里失败 1 轮');
+    assert(rate !== 0, '不能因为两位小数把它抹成 0');
   });
   it('多出来的 reply 不许替下一轮背书（按轮配对）', () => {
     const sessions = [{
@@ -323,7 +386,7 @@ describe('指标 · 批次汇总', () => {
         chatEv('chat_reply', 1, { ms: 100 }),
       ],
     }];
-    assertEquals(summarizeSessions(sessions, BATCH, Date.parse(T(28))).suppressedRate, 0.33, '1/3 收到两位小数');
+    assertEquals(summarizeSessions(sessions, BATCH, Date.parse(T(28))).suppressedRate, 0.3333, '1/3 收到四位小数');
   });
   it('模型延迟取真实样本（nearest-rank），没有样本时是 0', () => {
     const events = [120, 80, 500, 300, 200].map((ms) => chatEv('chat_reply', 1, { ms }));
