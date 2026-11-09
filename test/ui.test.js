@@ -140,13 +140,13 @@ describe('前端 · 文案不会被当成纯文本显示', () => {
   });
 });
 
-describe('前端 · 五页流程契约（新版单文件）', () => {
+describe('前端 · 四步流程契约（新版单文件）', () => {
   /**
    * 这一组守的是"用户点得到、且点了有正确反应"。
    * 之前守的是旧壳里的两张模式卡与一个开关；新版把口径换成了：
    * 五页随时可切、AI 伴学按能力位置灰、第 5 页三张卡。
    */
-  const PAGE_NAMES = ['题目', '方式', '解题', '报告', '巩固'];
+  const PAGE_NAMES = ['题目', '方式', '解题', '报告'];
   const pageMarkup = (n) => {
     const start = html.indexOf('<section class="page" data-page="' + n + '"');
     const end = html.indexOf('<section class="page" data-page="' + (n + 1) + '"');
@@ -155,8 +155,8 @@ describe('前端 · 五页流程契约（新版单文件）', () => {
   const page2 = pageMarkup(2);
   const router = readFileSync(join(ROOT, 'src/server/router.js'), 'utf8');
 
-  it('步骤条就是这五页，而且五页都能点（没有 disabled）', () => {
-    assertIncludes(appJs, "var PAGES = ['题目', '方式', '解题', '报告', '巩固'];", '步骤条文案要与五页一致（第 5 页叫"巩固"）');
+  it('步骤条为四步，报告内可直接开练（没有 disabled）', () => {
+    assertIncludes(appJs, "var PAGES = ['题目', '方式', '解题', '报告'];", '步骤条文案要与五页一致（第 5 页叫"巩固"）');
     const stepper = appJs.slice(appJs.indexOf('function renderStepper'), appJs.indexOf('function setPage'));
     assertIncludes(stepper, 'PAGES.map(', '步骤条要遍历 PAGES 渲染，而不是另抄一份页名');
     assertIncludes(stepper, 'data-goto=', '每个步骤按钮都要带 data-goto，点了才能切页');
@@ -201,19 +201,11 @@ describe('前端 · 五页流程契约（新版单文件）', () => {
     assertIncludes(router, 'safeStepRef', '步骤只允许翻译已经走过的，防提前泄题');
   });
 
-  it('第 5 页是两张卡：重做 / 同类题', () => {
-    for (const id of ['redoBtn', 'startRelated']) {
-      assertIncludes(html, 'id="' + id + '"', '第 5 页缺少 ' + id);
-    }
-    assertIncludes(html, '重做这道题', '缺少"重做"卡');
-    assertIncludes(html, '同类题再练', '缺少"同类题"卡');
-
-    const seg = html.slice(
-      html.indexOf('<section class="page" data-page="5"'),
-      html.indexOf('<section class="page" data-page="5"') + 4000
-    );
-    const cards = (seg.match(/class="bar-card"/g) || []).length;
-    assert(cards === 2, '第 5 页只保留两张卡，实际 ' + cards + ' 张');
+  it('报告操作固定在滚动区上方，原第五页已合并', () => {
+    assertNotIncludes(html, 'data-page="5"', '不保留重复的第五页');
+    for (const id of ['reportRedo', 'reportFinish', 'reportReturnBtn']) assertIncludes(html, 'id="' + id + '"', '缺少必要操作 ' + id);
+    assert(html.indexOf('id="reportRedo"') < html.indexOf('id="reportScroll"'), '重做应位于报告滚动区上方');
+    assertNotIncludes(html, 'id="go5"', '报告底部不再放下一步按钮');
   });
 
   it('同类题按题库的真实双轴标签筛，不再用 topics 字符串猜', () => {
@@ -229,9 +221,10 @@ describe('前端 · 五页流程契约（新版单文件）', () => {
     assertNotIncludes(appJs, "API.req('/api/related", '页五已经不再走服务端的 related 接口');
   });
 
-  it('报告页的下一步是"巩固"，不是"迁移"', () => {
-    assertIncludes(html, '下一步 · 巩固', '报告页的按钮要指向巩固');
-    assertNotIncludes(htmlVisible, '迁移', '第 5 页已经不叫"迁移"了');
+  it('报告卡片按训练目标开练，跳过报告复用抽屉', () => {
+    assertIncludes(appJs, 'data-practice=', '卡片应提供练习入口');
+    assertIncludes(appJs, "$('#skipToPractice').addEventListener", '跳过报告需要直接进入抽屉');
+    assertIncludes(appJs, 'REL.target', '针对性练习不能自动扩大范围');
   });
 
   it('逐页评审的深链 ?p=N 真的有调用点（只定义不调用等于失效）', () => {

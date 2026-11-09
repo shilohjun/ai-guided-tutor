@@ -74,11 +74,12 @@ const PROFILES = {
 };
 
 export function buildReportReview(problem) {
+  if (problem.source === 'qbank' && problem.reportReview) return structuredClone(problem.reportReview);
   const profile = PROFILES[problem.id];
   if (problem.subject === 'physics' && profile) {
     return { source: 'topic-cards', status: 'available',
       knowledge: profile.knowledge.map(id => ({ ...K[id], formulaKey: id, graphPath: [...GRAPH_PATHS[id]] })),
-      methods: profile.methods.map(id => ({ ...M[id] })),
+      methods: profile.methods.map(id => ({ id, ...M[id] })),
       note: '仅复盘本题涉及的知识和方法，不代表已经掌握。' };
   }
   if (problem.id === 'math-proof-01' && problem.subject === 'math') {
