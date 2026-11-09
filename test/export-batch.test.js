@@ -611,10 +611,12 @@ describe('整批导出 · README.md', () => {
     });
   });
 
-  it('写明数据截止时间、批次标识与版本、以及"清理前必须先导出、保留 90 天"', () => {
+  it('写明数据覆盖到、批次标识与版本、以及"清理前必须先导出、保留 90 天"', () => {
     const md = readme();
-    assertIncludes(md, '数据截止时间');
-    assertIncludes(md, NOW, '截止时间取调用方传进来的那一刻，不自己在渲染器里读钟');
+    assertIncludes(md, '数据覆盖到');
+    assertNotIncludes(md, '数据截止时间', '标签必须说明"数据到哪儿"，不能被读成"文件何时生成"');
+    assertIncludes(md, NOW, '数据覆盖到取调用方传进来的那一刻，不自己在渲染器里读钟');
+    assertIncludes(md, '本导出件不含生成时刻，以保证同一批数据两次导出完全一致。');
     assertIncludes(md, 'b1');
     assertIncludes(md, '第二版');
     assertIncludes(md, '批次版本');

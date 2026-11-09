@@ -82,8 +82,12 @@ const DEFAULT_MAX_PAGE = 1;
  * 隔夜：相邻两段之间真的断了 6 小时以上。
  * 用"上一段的最后一条事件 → 下一段的开始"，而不是两个 start 相减 ——
  * 段内的最后一条事件才是学生真正离开的时刻。
+ *
+ * **导出也认这个阈值**（`sessions.csv` 的「隔离夜回来」列），所以它是导出常量：
+ * 阈值只在这里定义一次。`export.js` 直接 import，不许在那边再抄一份 ——
+ * 抄的那份不会报错，只会在某次改阈值之后让看板和 CSV 悄悄说两个数。
  */
-const OVERNIGHT_GAP_MS = 6 * 3600e3;
+export const OVERNIGHT_GAP_MS = 6 * 3600e3;
 
 /**
  * 批次没配 `abandonHours` 时的默认值（设计稿 §5.2 的批次字段、§5.4 的口径都是 24）。
@@ -292,8 +296,11 @@ function countTurns(events) {
  * 用来看这个阈值到底误伤了多少人。
  *
  * 没有 `segments` 的会话（事件还没组装，或 Task 4 之前的旧记录）贡献 0，不猜。
+ *
+ * 导出件里的「隔离夜回来」列也调这个函数：看板上的 `overnightReturns` 与 CSV 的
+ * 那一列必须是同一个判断，否则同一批数据在两处能对不上，而两处都不会报错。
  */
-function hasOvernightReturn(session) {
+export function hasOvernightReturn(session) {
   const segments = session?.segments;
   if (!Array.isArray(segments) || segments.length < 2) return false;
 

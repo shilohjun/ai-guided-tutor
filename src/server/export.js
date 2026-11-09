@@ -42,7 +42,7 @@
  */
 
 import { readSessionRecord, snapshotSession } from './session-store.js';
-import { isAbandoned } from './metrics.js';
+import { OVERNIGHT_GAP_MS, hasOvernightReturn, isAbandoned } from './metrics.js';
 import { createZip } from './zip.js';
 
 /** 查不到时的兜底：中文，且一眼能看出是"查不到"而不是"字段叫这个" */
@@ -463,7 +463,7 @@ const FIELD_NOTES = {
   首条消息字数: '第一句话的字数，回答"他到底开不开口"',
   是否复制题干: '有没有把题干复制走',
   是否放弃: '没有结束时间，且最后活动已超过批次的放弃阈值（默认 24 小时）',
-  隔离夜回来: '相邻两段之间断过 6 小时以上；这是不受阈值影响的旁证',
+  隔离夜回来: `相邻两段之间断过 ${OVERNIGHT_GAP_MS / 3600e3} 小时以上；这是不受阈值影响的旁证`,
 };
 
 /**
@@ -483,14 +483,6 @@ const EXPORT_FORMAT_VERSION = 1;
 
 /** 逐条报告的目录（zip 里是 `reports/<sessionId>.json`） */
 const REPORT_PREFIX = 'reports/';
-
-/**
- * 6 小时：相邻两段之间断过这么久才算"隔离夜回来"。
- *
- * 与 `metrics.js` 的 `OVERNIGHT_GAP_MS` 同一口径（那边没导出这个常量，
- * 而本任务只动这个文件）。改阈值时两处要一起改 —— 记在报告里了。
- */
-const OVERNIGHT_GAP_MS = 6 * 3600e3;
 
 /** 没登录过的人写这三个字，不写空白：Excel 里的空格看不出是"没登录"还是"导出漏了" */
 const NEVER_SIGNED_IN = '未登录';
@@ -561,26 +553,6 @@ function highestHintLevel(counters) {
 /** 学生真的说了几句话。只给 `counters.chatTurns` 缺失的老记录用（见 renderSessionsCsv） */
 function studentTurnCount(turns) {
   return asList(turns).filter((turn) => turn?.role === 'student').length;
-}
-
-/**
- * 隔夜回来：相邻两段之间真的断了 6 小时以上。
- *
- * 用"上一段的最后一条事件 → 下一段的开始"，不是两个 start 相减：
- * 段内的最后一条事件才是学生真正离开的时刻（与 metrics.js 同一口径）。
- * 没有 `lastEventAt`（事件还没组装进来）就退到这一段的开始。
- */
-function overnightReturn(session) {
-  const segments = asList(session?.segments);
-  for (let i = 1; i < segments.length; i += 1) {
-    const previous = segments[i - 1];
-    const lastEventAt = Date.parse(String(previous?.lastEventAt ?? ''));
-    const before = Number.isFinite(lastEventAt) ? lastEventAt : Date.parse(String(previous?.start ?? ''));
-    const after = Date.parse(String(segments[i]?.start ?? ''));
-    if (!Number.isFinite(before) || !Number.isFinite(after)) continue;
-    if (after - before > OVERNIGHT_GAP_MS) return true;
-  }
-  return false;
 }
 
 /**
@@ -688,7 +660,7 @@ export function renderSessionsCsv(sessions, { batch = null, now = null } = {}) {
       首条消息字数: finiteNumber(counters.firstMessageLength) ?? 0,
       是否复制题干: yesNo(strictTrue(counters.copiedStem)),
       是否放弃: yesNo(isAbandoned(session, batch, at)),
-      隔离夜回来: yesNo(overnightReturn(session)),
+      隔离夜回来: yesNo(hasOvernightReturn(session)),
     };
   });
   return toCsv(rows, SESSION_CSV_HEADERS);
@@ -701,8 +673,8 @@ export function renderSessionsCsv(sessions, { batch = null, now = null } = {}) {
  * 不在这里手写第二份（F2）。`generatedAt` 由调用方传：这个渲染器不读钟。
  *
  * @param {{ batch?: object|null, generatedAt?: string|null, sessionCount?: number }} [input]
- *   `generatedAt` 是"这份导出代表到哪一刻为止"（`exportBatch` 传的是本批最新一条记录
- *   的时间，见 `dataCutoff`）；缺了写"未知"，不写 `undefined`
+ *   `generatedAt` 是**这批数据覆盖到哪一刻**（`exportBatch` 传的是本批最新一条记录
+ *   的时间，见 `dataCutoff`），不是"生成这份文件的时刻"；缺了写"未知"，不写 `undefined`
  * @returns {string}
  */
 export function renderBatchReadme({ batch, generatedAt, sessionCount } = {}) {
@@ -724,8 +696,10 @@ export function renderBatchReadme({ batch, generatedAt, sessionCount } = {}) {
       `- 批次标识：${batchId}`,
       `- 批次版本：${batchVersion}`,
       `- 会话数：${count}`,
-      `- 数据截止时间：${cutoff}`,
+      `- 数据覆盖到：${cutoff}`,
       `- 导出格式版本：${EXPORT_FORMAT_VERSION}`,
+      '',
+      '本导出件不含生成时刻，以保证同一批数据两次导出完全一致。',
       '',
       '## 这批数据回答什么',
       '',
@@ -855,11 +829,13 @@ function renderTurnLines(sessions) {
 }
 
 /**
- * 数据截止时间：本批**最新一条记录**的时间（ISO）。
+ * 数据覆盖到：本批**最新一条记录**的时间（ISO）。
  *
  * 为什么不是"导出这一刻"：导出件会被逐版本 diff（zip 的时间戳已经固定死了，
  * 见 zip.js），而墙上时钟每跑一次都不一样 —— 一份每次都变的导出件没法比对。
- * 用数据自己的最新时刻，这句话也是自明的："这份导出代表到这一刻为止"。
+ * 用数据自己的最新时刻，这句话也是自明的："这批数据覆盖到这一刻为止"。
+ * README 里的标签刻意写「数据覆盖到」而不是「数据截止时间」：后者容易被读成
+ * "这份文件是什么时候生成的"，而这个值不是生成时刻。
  *
  * 一条带时间的记录都没有（空批次）时返回 null，由 `renderBatchReadme` 写"未知"。
  */
