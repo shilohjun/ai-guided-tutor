@@ -1371,6 +1371,45 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   .set-mask{display:block;background:rgba(17,17,22,.40)}
   @keyframes setUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 }
+
+/* Report controls stay outside the report's scrolling region. */
+.p4 .report-toolbar{width:min(860px,100%);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid var(--line);background:var(--paper)}
+.report-toolbar>div{display:flex;align-items:center;gap:16px}
+.report-toolbar strong{font-size:var(--fs-body);line-height:var(--lh-body)}
+.report-toolbar .duration{font-size:var(--fs-meta);color:var(--ink-3)}
+.p4 .p4-scroll{justify-content:flex-start;padding-top:16px;padding-bottom:24px}
+.p4 .review-practice{display:inline-flex;margin-top:12px;padding:4px 8px;border:1px solid var(--brand-line);border-radius:var(--r-inner);background:var(--surface);color:var(--brand-ink);font-family:var(--font-sans);font-size:var(--fs-meta);line-height:var(--lh-body);cursor:pointer}
+.p4 .review-practice:hover{background:var(--brand-tint)}
+.p4 .practice-empty{font-size:var(--fs-meta);line-height:var(--lh-body);color:var(--ink-3);margin-top:8px}
+.rel-item .rel-reason{display:block;font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink-2);margin-top:8px}
+.rel-error{font-size:var(--fs-body);line-height:var(--lh-body);color:var(--coral);padding:8px 16px}
+.pane-head .chat-next{margin-left:auto;white-space:nowrap;font-size:var(--fs-meta)}
+@media(max-width:600px){.p4 .report-toolbar{align-items:flex-start;gap:8px;padding:12px 0}.report-toolbar>div:first-child{flex-direction:column;align-items:flex-start;gap:4px}.report-toolbar .report-actions{gap:8px}.report-actions button{padding-left:8px;padding-right:8px}.tb-right #reportReturnBtn{font-size:var(--fs-meta);padding:4px 8px}}
+
+/* Recommended questions: full preview before starting a session. */
+.rel-preview{margin:auto;padding:0;width:min(840px,calc(100vw - 32px));height:min(88vh,900px);max-height:88vh;max-width:none;overflow:hidden;border:1px solid var(--line-strong);border-radius:var(--r-card);background:var(--surface);color:var(--ink);box-shadow:var(--shadow-2)}
+.rel-preview::backdrop{background:rgba(17,17,22,.42)}
+.rel-preview-shell{height:100%;min-height:0;display:flex;flex-direction:column}
+.rel-preview-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-shrink:0;padding:16px 24px;border-bottom:1px solid var(--line)}
+.rel-preview-head h2{font-size:var(--fs-sub);line-height:var(--lh-sub);font-weight:600}
+.rel-preview-head p{font-size:var(--fs-meta);line-height:var(--lh-body);color:var(--ink-3);margin-top:4px}
+.rel-preview-body{flex:1;min-height:0;padding:16px 24px;overscroll-behavior:contain}
+.rel-preview-reason{padding:8px 16px;margin-bottom:16px;background:var(--brand-tint);color:var(--ink-2);border:1px solid var(--brand-line);border-radius:var(--r-inner);font-size:var(--fs-body);line-height:var(--lh-body)}
+.rel-preview .q-rich,.rel-preview .q-opts-r{font-size:var(--fs-sub);line-height:2;overflow-wrap:anywhere}
+.rel-preview .q-rich p{margin:8px 0 16px}
+.rel-preview .q-rich img.qf,.rel-preview .q-opts-r img.qf{display:inline-block;height:1.22em;width:auto;max-width:100%;object-fit:contain;vertical-align:-.22em;margin:0 2px}
+.rel-preview .q-rich img.qfig,.rel-preview .q-opts-r img.qfig{display:block;max-width:100%;max-height:260px;width:auto;height:auto;margin:16px auto;object-fit:contain;border:0;border-radius:var(--r-inner)}
+.rel-preview-options{font-size:var(--fs-body);line-height:var(--lh-body);font-weight:600;margin:16px 0 8px}
+.rel-preview .q-opts-r{list-style:none;padding:0;margin:0}
+.rel-preview .q-opts-r li{display:flex;align-items:baseline;gap:12px;padding:12px 16px;margin:8px 0;border:1px solid var(--line);border-radius:var(--r-inner);background:var(--surface)}
+.rel-preview .q-opts-r li>b{flex:none;color:var(--brand-ink);font-family:var(--font-sans);font-size:var(--fs-body)}
+.rel-preview .q-opts-r li>span{min-width:0;flex:1}
+.rel-preview-footer{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:12px 24px;border-top:1px solid var(--line);background:var(--surface)}
+.rel-preview-note{font-size:var(--fs-meta);line-height:var(--lh-body);color:var(--ink-3)}
+.rel-preview-error{flex-basis:100%;font-size:var(--fs-body);line-height:var(--lh-body);color:var(--coral);margin:0}
+.rel-preview-head .rel-x{font-size:var(--fs-title);line-height:1}
+@media(max-width:600px){.rel-preview{width:calc(100vw - 16px);height:92vh;max-height:92vh}.rel-preview-head{padding:12px 16px}.rel-preview-body{padding:12px 16px}.rel-preview-footer{padding:12px 16px}.rel-preview .q-opts-r li{padding:8px 12px;gap:8px}.rel-preview-footer .btn-primary{white-space:nowrap}}
+html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var(--r-inner)}
 </style>
 <link rel="stylesheet" href="/vendor/katex/katex.min.css">
 </head>
@@ -1392,6 +1431,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   </div>
 
   <div class="tb-right">
+    <button class="bt" id="reportReturnBtn" type="button" hidden>返回原报告</button>
     <div class="bank-tools" id="bankTools">
       <button class="bt" id="bankBack" type="button" aria-label="返回首页"><span aria-hidden="true">←</span><span class="lbl-full"> 返回</span></button>
       <div class="seg bt-seg" id="bankSeg" role="group" aria-label="分类视角">
@@ -1583,7 +1623,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
         <div class="pane-head">
           <strong>对话</strong>
           <span class="tag" id="qIndexTag">0 个提问</span>
-          <span class="tag" id="stepTag">第 1 / 5 步</span>
+          <span class="tag" id="stepTag">第 1 / 5 步</span><button class="btn-ghost chat-next" id="skipToPractice" type="button">继续练习</button>
         </div>
         <div class="chat-wrap">
           <div class="chat-body scroller" id="chatBody"></div>
@@ -1627,7 +1667,11 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   <!-- ================= 页面四 ================= -->
   <section class="page" data-page="4">
     <div class="p4">
-      <div class="p4-scroll scroller">
+      <div class="report-toolbar" aria-label="报告操作">
+        <div><strong>学习报告</strong><span class="duration">学习时长：<strong id="durNum">—</strong> 分钟</span></div>
+        <div class="report-actions"><button class="btn-ghost" id="reportRedo" type="button">重做本题</button><button class="btn-primary" id="reportFinish" type="button">结束学习</button></div>
+      </div>
+      <div class="p4-scroll scroller" id="reportScroll">
         <div class="report-load" id="reportLoad" hidden>
           <span class="spin" aria-hidden="true"></span>
           <span>正在生成学习报告…</span>
@@ -1673,63 +1717,11 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
           <div class="wrong" id="wrongList"></div>
         </div>
       </div>
-
-      <div class="p4-foot">
-        <span class="duration">学习时长：<strong id="durNum">—</strong> 分钟</span>
-        <button class="btn-primary" id="go5" type="button">下一步 · 巩固</button>
-      </div>
     </div>
   </section>
 
   <!-- ================= 页面五 ================= -->
-  <section class="page" data-page="5">
-    <div class="p5">
-      <div class="p5-col scroller">
-        <div class="bar-card">
-          <button class="bar-row" id="redoBtn" type="button">
-            <span class="bar-ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v5h5"></path>
-              </svg>
-            </span>
-            <span class="bar-copy">
-              <span class="bar-title">重做这道题</span>
-              <span class="bar-desc">不看提示，独立再走一遍；卡住的位置会比第一次更清楚</span>
-            </span>
-            <span class="bar-arrow" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
-            </span>
-          </button>
-        </div>
 
-        <div class="bar-card" id="relatedCard">
-          <button class="bar-row" id="startRelated" type="button">
-            <span class="bar-ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="4" width="7" height="7" rx="2"></rect>
-                <rect x="14" y="13" width="7" height="7" rx="2"></rect>
-                <path d="M10 7.5h4.5a2 2 0 0 1 2 2V13"></path>
-                <path d="M14 16.5h-4.5a2 2 0 0 1-2-2V11"></path>
-              </svg>
-            </span>
-            <span class="bar-copy">
-              <span class="bar-title">同类题再练</span>
-              <span class="bar-desc">同一知识点换一道题，把刚学会的规律再用一次</span>
-            </span>
-            <span class="bar-arrow" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
-            </span>
-          </button>
-
-        </div>
-      </div>
-
-      <div class="p5-foot">
-        <span class="note" id="p5note">—</span>
-        <button class="btn-ghost" id="homeBtn2" type="button">返回首页</button>
-      </div>
-    </div>
-  </section>
 
 </div>
 
@@ -1740,28 +1732,46 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     <aside class="rel-drawer" id="relDrawer" role="dialog" aria-modal="true" aria-labelledby="relTitle" aria-hidden="true">
       <div class="rel-head">
         <div class="rel-title">
-          <h2 id="relTitle">同类题再练</h2>
-          <p>同知识点或同思路，换一道再走一遍</p>
+          <h2 id="relTitle">选择练习</h2>
+          <p id="relGoal">按知识点或方法选择题目</p>
         </div>
         <button class="rel-x" id="relClose" type="button" aria-label="关闭同类题">
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </div>
-      <div class="rel-filters">
+      <div class="rel-filters" id="relFilters">
         <label class="rel-f"><span>知识点</span><select id="relKgSel"></select></label>
         <label class="rel-f"><span>思路</span><select id="relThSel"></select></label>
       </div>
-      <div class="rel-list scroller" id="relList"></div>
+      <div class="rel-list scroller" id="relList"></div><p class="rel-error" id="relError" role="alert" hidden></p>
       <div class="rel-busy" id="relBusy" hidden>
         <span class="spin" aria-hidden="true"></span>
         <b>正在读题…</b>
         <em>AI 正在理解题干与公式，几秒钟</em>
       </div>
       <div class="rel-foot">
-        <span id="relCount"></span>
+        <span id="relCount" aria-live="polite"></span>
         <button class="btn-ghost" id="relShuffle" type="button">换一换</button>
       </div>
     </aside>
+
+    <dialog class="rel-preview" id="relPreview" aria-labelledby="relPreviewTitle">
+      <div class="rel-preview-shell">
+        <div class="rel-preview-head">
+          <div><h2 id="relPreviewTitle">完整题目</h2><p id="relPreviewMeta"></p></div>
+          <button class="rel-x" id="relPreviewClose" type="button" aria-label="关闭题目预览">×</button>
+        </div>
+        <div class="rel-preview-body scroller" id="relPreviewBody">
+          <p class="rel-preview-reason" id="relPreviewReason" hidden></p>
+          <div id="relPreviewQuestion"></div>
+        </div>
+        <div class="rel-preview-footer">
+          <p class="rel-preview-error" id="relPreviewError" role="alert" hidden></p>
+          <span class="rel-preview-note">先看完整题目，再开始练习</span>
+          <button class="btn-primary" id="relPreviewStart" type="button" disabled>开始练习</button>
+        </div>
+      </div>
+    </dialog>
 
     <div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-label="题目照片">
       <img id="viewerImg" alt="题目照片">
@@ -1780,7 +1790,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   var SVG_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l4.5 4.5L20 7"/></svg>';
   var AVATAR = '<img src="/brand.png" alt="" width="26" height="26">';
 
-  var PAGES = ['题目', '方式', '解题', '报告', '巩固'];
+  var PAGES = ['题目', '方式', '解题', '报告'];
 
   /* ---------------- 基础工具 ---------------- */
   function esc(s) {
@@ -1954,6 +1964,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   var REDUCED_MQ = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   function setPage(n) {
+    if (n === 5) n = 4; // 兼容旧链接；练习不再占一页。
+    if (n < 1 || n > 4) return;
     // 五页随时可以切：没有数据就进空态，而不是把人弹回第 1 页
     if (n > S.max) S.max = n;
     S.page = n;
@@ -1980,7 +1992,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       if (S.sessionId) loadReport();
       else { S.report = null; S.reportErr = '还没有开始做题。先在第 1 页选题，到第 3 页对话，报告会自动生成。'; renderReport(); }
     }
-    if (n === 5) { loadRelated(); renderP5Note(); }
+    $('#reportReturnBtn').hidden = n !== 3 || !REPORT_ORIGIN;
   }
 
   document.addEventListener('click', function (e) {
@@ -1988,7 +2000,6 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     if (el && !el.disabled) setPage(Number(el.dataset.goto));
   });
   $('#homeBtn').addEventListener('click', function () { setPage(1); });
-  $('#homeBtn2').addEventListener('click', function () { setPage(1); });
 
   /* 输入框跟着内容长高，长题干不会挤在一条缝里，发送键始终贴着文字底部 */
   function autosizeInput() {
@@ -2339,7 +2350,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   });
 
   /* ---------------- 会话 ---------------- */
-  function startSession() {
+  function startSession(preserveReport) {
+    if (!preserveReport) REPORT_ORIGIN = null;
     S.sessionId = 'ui-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
     S.turns = [];
     S.done = false;
@@ -2736,13 +2748,16 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     if (!S.sessionId) return;
     S.reportLoading = true;
     renderReport();
-    API.report(S.sessionId, S.problem && S.problem.id).then(function (d) {
+    var reportSession = S.sessionId;
+    API.report(reportSession, S.problem && S.problem.id).then(function (d) {
+      if (S.sessionId !== reportSession) return;
       S.reportLoading = false;
       S.report = d.report;
       S.reportTurns = d.turns || [];
       S.reportErr = null;
       renderReport();
     }).catch(function (err) {
+      if (S.sessionId !== reportSession) return;
       S.reportLoading = false;
       S.report = null;
       S.reportErr = err.message;
@@ -2778,6 +2793,19 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   }
 
   /** 内容来自报告接口的配套卡，不从参考答案或步骤标题拼出“方法”。 */
+  function availablePractice(entry) {
+    var attempted = S.ledger.map(function (x) { return x.problemId; });
+    return ((entry && entry.items) || []).filter(function (q) {
+      return q.problemId !== (S.problem && S.problem.id) && attempted.indexOf(q.problemId) < 0;
+    }).slice(0, 3);
+  }
+  function practiceButton(entry, kind, index) {
+    if (!availablePractice(entry).length) return kind === 'gaps'
+      ? '<p class="practice-empty">暂无已核验且难度合适的新题，可先按建议重做本题。</p>' : '';
+    var label = kind === 'gaps' ? '针对这处卡点练习' : kind === 'knowledge' ? '巩固这一知识点' : '练习这一方法';
+    return '<button class="review-practice" type="button" data-practice="' + kind + '" data-practice-index="' + index + '">' + label + ' →</button>';
+  }
+
   function renderReportReview(rep) {
     var review = rep && rep.review;
     var host = $('#reportReview');
@@ -2798,13 +2826,13 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
         return (ki === 3 ? '<details class="review-more review-detail"><summary>展开其余知识点</summary><div class="review-knowledge">' : '') + '<article class="review-item"><div class="review-title"><span>' + esc(k.title) + '</span>' +
           (k.formula ? '<span class="review-formula">' + reportFormula(k) + '</span>' : '') + '</div>' +
           '<p class="review-copy">' + esc(k.meaning) + '</p>' +
-          '<details class="review-detail"><summary>适用条件</summary><p>' + esc(k.condition) + '</p></details></article>' + (ki === knowledge.length - 1 && ki >= 3 ? '</div></details>' : '');
+          '<details class="review-detail"><summary>适用条件</summary><p>' + esc(k.condition) + '</p></details>' + practiceButton(rep.practice && rep.practice.knowledge[ki], 'knowledge', ki) + '</article>' + (ki === knowledge.length - 1 && ki >= 3 ? '</div></details>' : '');
       }).join('') + '</div></section><section class="review-part"><h3>思路点拨</h3><div class="review-methods">' +
       methods.map(function (m, mi) {
         return (mi === 2 ? '<details class="review-more review-detail"><summary>展开其余方法</summary><div class="review-methods">' : '') + '<article class="review-method"><h4>' + esc(m.title) + '</h4>' + (m.family ? '<div class="review-family">' + esc(m.family) + '</div>' : '') + '<p><strong>核心原理：</strong>' + esc(m.principle) + '</p>' +
           '<p><strong>本题应用：</strong>' + esc(m.use) + '</p>' +
           '<details class="review-detail"><summary>适用范围与易错点</summary><p><strong>适用范围：</strong>' + esc(m.when) +
-          '</p><p><strong>适用限制与易错点：</strong>' + esc(m.boundary) + '</p></details></article>' + (mi === methods.length - 1 && mi >= 2 ? '</div></details>' : '');
+          '</p><p><strong>适用限制与易错点：</strong>' + esc(m.boundary) + '</p></details>' + practiceButton(rep.practice && rep.practice.methods[mi], 'methods', mi) + '</article>' + (mi === methods.length - 1 && mi >= 2 ? '</div></details>' : '');
       }).join('') + '</div></section><p class="review-note">' + esc(review.note || '') + '</p>';
   }
 
@@ -2830,6 +2858,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   }
 
   function renderReport() {
+    $('#reportRedo').disabled = !S.problem || Boolean(S.busy || S.reportLoading);
     var rep = S.report;
     renderReportReview(rep);
     var assessment = rep && rep.assessment;
@@ -2882,7 +2911,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     var items = assessment ? (assessment.feedback || []).slice(0, 3) : [];
     $('#wrongCount').textContent = items.length + ' 条';
     $('#wrongList').innerHTML = items.length
-      ? items.map(function (item) {
+      ? items.map(function (item, fi) {
           var fixed = item.status === 'corrected';
           var evidence = (item.evidence || []).map(function (e) {
             return '<p>学生原话：' + esc(e.quote) + '</p>';
@@ -2892,13 +2921,13 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
             '<span class="tag">' + (fixed ? '✓ 本题已纠正' : '! 待继续') + '</span></div>' +
             '<p class="review-copy"><strong>卡点：</strong>' + esc(item.finding) + '</p>' +
             '<p class="review-copy"><strong>改进：</strong>' + esc(item.action) + '</p>' +
-            '<details class="review-detail"><summary>查看对话依据</summary>' + evidence + '</details></div>';
+            '<details class="review-detail"><summary>查看对话依据</summary>' + evidence + '</details>' + practiceButton(rep.practice && rep.practice.gaps[fi], 'gaps', fi) + '</div>';
         }).join('')
       : '<div class="wrong-empty">暂无足够证据归纳具体卡点；未发现错误不等于已经掌握。</div>';
 
   }
 
-  $('#go5').addEventListener('click', function () { setPage(5); });
+
 
   /* ---------------- 页面五：迁移 ---------------- */
   /**
@@ -2921,15 +2950,36 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     renderRelList();
   }
 
-  function renderP5Note() {
-    var doneCount = S.ledger.filter(function (x) { return x.done; }).length;
-    $('#p5note').textContent = '本轮共 ' + (S.ledger.length || 1) + ' 题 · ' + durationMinutes() + ' 分钟 · 独立完成 ' + doneCount + ' 题';
+  var REPORT_ORIGIN = null;
+  var REPORT_FIELDS = ['problem','picked','pickedBank','sessionId','turns','done','progress','report','reportTurns','reportErr','sessionStart'];
+  function rememberReport() {
+    if (S.page !== 4 || !S.problem || !S.report || S.reportLoading) return;
+    REPORT_ORIGIN = {};
+    REPORT_FIELDS.forEach(function (k) { REPORT_ORIGIN[k] = S[k]; });
+    REPORT_ORIGIN.scroll = $('#reportScroll').scrollTop;
   }
-
-  $('#redoBtn').addEventListener('click', function () {
-    if (!S.problem) return;
-    startSession();
-    setPage(3);
+  $('#reportRedo').addEventListener('click', function () {
+    if (!S.problem || S.busy || S.reportLoading) return;
+    rememberReport(); startSession(true); setPage(3);
+  });
+  $('#reportFinish').addEventListener('click', function () {
+    closeRelDrawer(); setPage(1);
+    $('#p1note').textContent = '本次学习已结束。刷新前可从报告步骤再次查看本题报告。';
+  });
+  $('#reportReturnBtn').addEventListener('click', function () {
+    if (!REPORT_ORIGIN || S.busy) return;
+    var saved = REPORT_ORIGIN;
+    REPORT_FIELDS.forEach(function (k) { S[k] = saved[k]; });
+    S.reportLoading = false; S.busy = false;
+    setPage(4); renderReport(); $('#reportScroll').scrollTop = saved.scroll || 0;
+  });
+  $('#skipToPractice').addEventListener('click', function () { if (!S.busy) openRelDrawer(); });
+  $('.p4').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-practice]');
+    if (!b || !S.report || !S.report.practice) return;
+    var kind = b.dataset.practice, index = Number(b.dataset.practiceIndex);
+    var entry = (S.report.practice[kind] || [])[index];
+    openRelDrawer({kind:kind, items:availablePractice(entry), origin:b});
   });
 
   $('#readingRetry').addEventListener('click', function () {
@@ -2937,13 +2987,9 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     goPage2();
   });
 
-  $('#startRelated').addEventListener('click', function () {
-    if (!S.problem) return;
-    openRelDrawer();
-  });
 
   /* ---------------- 页五：同类题抽屉 ---------------- */
-  var REL = { open: false, kg: '', th: '', seen: {}, built: false };
+  var REL = { open: false, kg: '', th: '', seen: {}, built: false, target: null, origin: null, offset: 0 };
 
   function currentBankRecord() {
     if (!S.bank) return null;
@@ -3001,9 +3047,10 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   }
 
   function relCandidates() {
+    if (REL.target) return REL.target.items;
     var all = S.bank || [];
     var cur = currentBankRecord();
-    var out = all.filter(function (q) { return !cur || q.bankId !== cur.bankId; });
+    var out = all.filter(function (q) { return (!cur || q.bankId !== cur.bankId) && q.id !== (S.problem && S.problem.id) && !S.ledger.some(function (x) { return x.problemId === q.id; }); });
     if (REL.kg) out = out.filter(function (q) { return q.leafId === REL.kg; });
     if (REL.th) out = out.filter(function (q) { return q.th2Id === REL.th; });
     return out.slice(0, 300);
@@ -3016,22 +3063,27 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   }
 
   function renderRelList() {
-    var list = relCandidates();
-    var box = $('#relList');
-    if (!list.length) {
-      box.innerHTML = '<p class="rel-empty">' + esc(emptyRelText()) + '</p>';
-    } else {
-      box.innerHTML = list.map(function (q) {
-        return '<button class="rel-item" type="button" data-relpick="' + q.bankId + '">' +
-          '<span class="m"><b>' + esc(q.type || '题') + '</b> 难度 ' + (q.difficulty || '—') + '/5 · ' + esc(q.province || '') + '</span>' +
-          '<span class="s">' + esc(q.sub || '') + '</span></button>';
-      }).join('');
-    }
-    $('#relCount').textContent = list.length ? (list.length + ' 道可选') : '没有可选的题';
+    var all = relCandidates(), list = all.slice(REL.offset, REL.offset + 3), box = $('#relList');
+    if (!all.length) box.innerHTML = '<p class="rel-empty">' + esc(REL.target ? '暂无符合当前训练目标的新题，不扩大推荐范围。' : emptyRelText()) + '</p>';
+    else box.innerHTML = list.map(function (q) {
+      return '<button class="rel-item" type="button" data-relpick="' + q.bankId + '">' +
+        '<span class="m"><b>' + esc(q.code || q.type || '题') + '</b> 难度 ' + (q.difficulty || '—') + '/5 · ' + esc(q.province || '') + '</span>' +
+        '<span class="s">' + esc(q.sub || q.preview || q.target || '') + '</span>' +
+        (q.reason ? '<span class="rel-reason">推荐理由：' + esc(q.reason) + '</span>' : '') + '<span class="rel-reason">查看完整题目与选项 →</span></button>';
+    }).join('');
+    $('#relCount').textContent = all.length ? '共 ' + all.length + ' 道，展示 ' + list.length + ' 道' : '没有可选的题';
+    $('#relShuffle').hidden = Boolean(REL.target) || all.length <= 3;
     syncRelUi();
   }
 
-  function openRelDrawer() {
+  function openRelDrawer(target) {
+    REL.target = target && Array.isArray(target.items) ? target : null;
+    REL.origin = (REL.target && REL.target.origin) || document.activeElement;
+    REL.offset = 0;
+    $('#relFilters').hidden = Boolean(REL.target);
+    $('#relTitle').textContent = REL.target ? (REL.target.kind === 'gaps' ? '卡点针对练习' : REL.target.kind === 'knowledge' ? '知识巩固练习' : '方法应用练习') : '选择下一道题';
+    $('#relGoal').textContent = REL.target ? (REL.target.kind === 'gaps' ? '仅推荐已核对卡点与难度的题目，不自动扩大范围。' : '依据本张卡片的知识或方法标签推荐。') : '跳过报告时，可按知识点或方法自行选择练习。';
+    $('#relError').hidden = true;
     REL.open = true;
     var cur = currentBankRecord();
     buildRelFilters();
@@ -3053,11 +3105,13 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     d.focus({ preventScroll: true });
   }
   function closeRelDrawer() {
+    closeRelPreview();
     REL.open = false;
     var d = $('#relDrawer');
     d.classList.remove('on');
     d.setAttribute('aria-hidden', 'true');
     $('#relScrim').hidden = true;
+    if (REL.origin && REL.origin.isConnected) REL.origin.focus({preventScroll:true});
   }
 
   $('#relClose').addEventListener('click', closeRelDrawer);
@@ -3066,63 +3120,170 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     var pick = e.target.closest('[data-relpick]');
     if (pick) {
       var id = Number(pick.dataset.relpick);
-      var q = (S.bank || []).filter(function (x) { return x.bankId === id; })[0];
-      if (q) startBankPractice(q, pick);
+      var q = relCandidates().filter(function (x) { return x.bankId === id; })[0];
+      if (q) openRelPreview(q, pick);
       return;
     }
   });
   $('#relKgSel').addEventListener('change', function (e) {
-    REL.kg = e.target.value;
+    REL.kg = e.target.value; REL.offset = 0;
     renderRelList();
   });
   $('#relThSel').addEventListener('change', function (e) {
-    REL.th = e.target.value;
+    REL.th = e.target.value; REL.offset = 0;
     renderRelList();
   });
   $('#relShuffle').addEventListener('click', function () {
-    var list = relCandidates();
-    if (list.length < 2) return;
-    var first = list.shift();
-    list.push(first);
-    var box = $('#relList');
-    box.innerHTML = list.map(function (q) {
-      return '<button class="rel-item" type="button" data-relpick="' + q.bankId + '">' +
-        '<span class="m"><b>' + esc(q.type || '题') + '</b> 难度 ' + (q.difficulty || '—') + '/5 · ' + esc(q.province || '') + '</span>' +
-        '<span class="s">' + esc(q.sub || '') + '</span></button>';
-    }).join('');
+    var count = relCandidates().length;
+    REL.offset = REL.offset + 3 >= count ? 0 : REL.offset + 3;
+    renderRelList();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (!REL.open || $('#relPreview').open) return;
+    if (e.key === 'Escape') { e.preventDefault(); closeRelDrawer(); return; }
+    if (e.key !== 'Tab') return;
+    var nodes = Array.prototype.filter.call($('#relDrawer').querySelectorAll('button,select,[tabindex="0"]'), function (x) { return !x.disabled && x.getClientRects().length; });
+    if (!nodes.length) return;
+    var first = nodes[0], last = nodes[nodes.length - 1], active = document.activeElement;
+    if (e.shiftKey && (active === first || active === $('#relDrawer'))) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && (active === last || active === $('#relDrawer'))) { e.preventDefault(); first.focus(); }
   });
 
-  /* 从题库挑一道题直接开练：先按纯文本读题，再进第 3 页 */
-  function startBankPractice(q, btn) {
-    if (btn) btn.disabled = true;
-    var busyEl = $('#relBusy');
-    if (busyEl) busyEl.hidden = false;
-    fetch('/qbank/q/' + q.bankId + '.json').then(function (r) {
-      if (!r.ok) throw new Error('题库读取失败');
+  /* Full question preview: browsing never creates or replaces a learning session. */
+  var REL_PREVIEW = null;
+  var BANK_DETAILS = Object.create(null);
+  function fetchBankDetail(bankId) {
+    if (!Number.isInteger(bankId) || bankId < 1) return Promise.reject(new Error('无效的题目编号'));
+    if (BANK_DETAILS[bankId]) return Promise.resolve(BANK_DETAILS[bankId]);
+    return fetch('/qbank/q/' + bankId + '.json').then(function (r) {
+      if (!r.ok) throw new Error('题库读取失败，请关闭预览后重新选择');
       return r.json();
     }).then(function (det) {
-      var opts = (det.options || []).map(function (o) { return o.l + ' ' + o.text; }).join('\n');
-      var text = (det.stemText || q.sub) + (opts ? '\n' + opts : '');
-      $('#input1').value = text;
-      S.picked = null;
-      S.pickedBank = q.bankId;
-      S.problem = null;
+      if (det.i !== bankId || typeof det.stemHtml !== 'string' || !Array.isArray(det.options)) throw new Error('题目内容不完整，请稍后重试');
+      BANK_DETAILS[bankId] = det;
+      return det;
+    });
+  }
+  function safeBankHtml(html) {
+    var t = document.createElement('template');
+    t.innerHTML = String(html || '');
+    var allowed = ['P','DIV','SPAN','STRONG','B','EM','I','SUB','SUP','BR','UL','OL','LI','TABLE','TBODY','TR','TD','TH','IMG'];
+    Array.prototype.forEach.call(t.content.querySelectorAll('*'), function (el) {
+      if (allowed.indexOf(el.tagName) < 0) { el.remove(); return; }
+      Array.prototype.slice.call(el.attributes).forEach(function (a) {
+        var keep = (a.name === 'class' && /^(?:qf|qfig)$/.test(a.value)) ||
+          (a.name === 'src' && el.tagName === 'IMG' && /^data:image\/(?:webp|png|jpeg|gif);base64,/i.test(a.value)) ||
+          (a.name === 'alt' && el.tagName === 'IMG') ||
+          (['width','height','colspan','rowspan'].indexOf(a.name) >= 0 && /^\d{1,5}$/.test(a.value));
+        if (!keep) el.removeAttribute(a.name);
+      });
+      if (el.tagName === 'IMG' && !el.getAttribute('src')) el.remove();
+    });
+    return t.innerHTML;
+  }
+  function fullBankQuestionHtml(det) {
+    var body = '<div class="q-rich">' + safeBankHtml(det.stemHtml) + '</div>';
+    if (det.options.length) body += '<h3 class="rel-preview-options">' + (det.ty === '多选' ? '选项（多选题）' : '选项') + '</h3><ol class="q-opts-r">' +
+      det.options.map(function (o) { return '<li><b>' + esc(o.l) + '</b><span>' + safeBankHtml(o.html || '') + '</span></li>'; }).join('') + '</ol>';
+    return body;
+  }
+  function openRelPreview(q, opener) {
+    var state = {question:q, opener:opener, detail:null, starting:false};
+    REL_PREVIEW = state;
+    $('#relPreviewTitle').textContent = q.code ? q.code + ' · 完整题目' : '第 ' + q.bankId + ' 题';
+    $('#relPreviewMeta').textContent = '正在读取完整题目…';
+    $('#relPreviewQuestion').innerHTML = '<p class="rel-preview-note" role="status">正在加载题干、图片与选项…</p>';
+    $('#relPreviewReason').textContent = q.reason ? '推荐理由：' + q.reason : '';
+    $('#relPreviewReason').hidden = !q.reason;
+    $('#relPreviewError').hidden = true;
+    $('#relPreviewStart').disabled = true;
+    $('#relPreviewStart').textContent = '开始练习';
+    var preview = $('#relPreview');
+    if (!preview.open) preview.showModal();
+    $('#relPreviewBody').scrollTop = 0;
+    $('#relDrawer').inert = true;
+    $('#relDrawer').setAttribute('aria-hidden', 'true');
+    fetchBankDetail(q.bankId).then(function (det) {
+      // Closing a slow request or selecting another question cannot reopen stale content.
+      if (REL_PREVIEW !== state || !preview.open) return;
+      state.detail = det;
+      $('#relPreviewTitle').textContent = det.code + ' · 完整题目';
+      $('#relPreviewMeta').textContent = [det.src,det.ty,'难度：' + det.d].filter(Boolean).join(' ｜ ');
+      $('#relPreviewQuestion').innerHTML = fullBankQuestionHtml(det);
+      $('#relPreviewStart').disabled = false;
+    }).catch(function (err) {
+      if (REL_PREVIEW !== state || !preview.open) return;
+      $('#relPreviewMeta').textContent = '题目暂未加载完成';
+      $('#relPreviewQuestion').textContent = '无法读取完整题目，关闭后可重新选择。';
+      $('#relPreviewError').textContent = err.message;
+      $('#relPreviewError').hidden = false;
+    });
+  }
+  function closeRelPreview() {
+    if ($('#relPreview').open) $('#relPreview').close();
+  }
+  $('#relPreviewClose').addEventListener('click', closeRelPreview);
+  $('#relPreview').addEventListener('close', function () {
+    // A delayed close event from the previous opening must not clear a newly opened one.
+    if ($('#relPreview').open) return;
+    var state = REL_PREVIEW;
+    REL_PREVIEW = null;
+    $('#relDrawer').inert = false;
+    $('#relDrawer').setAttribute('aria-hidden', REL.open ? 'false' : 'true');
+    if (REL.open && state && state.opener && state.opener.isConnected) state.opener.focus({preventScroll:true});
+  });
+  $('#relPreview').addEventListener('click', function (e) {
+    if (e.target !== $('#relPreview')) return;
+    var r = $('#relPreview').getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) closeRelPreview();
+  });
+  $('#relPreviewStart').addEventListener('click', function () {
+    var state = REL_PREVIEW;
+    if (!state || !state.detail || state.starting) return;
+    state.starting = true;
+    $('#relPreviewError').hidden = true;
+    startBankPractice(state.question, $('#relPreviewStart'), state);
+  });
+
+  /* Only confirmation creates a practice session. Failed/cancelled requests keep the report. */
+  function startBankPractice(q, btn, state) {
+    if (btn) { btn.disabled = true; btn.textContent = '正在开始…'; }
+    var details = state && state.detail ? Promise.resolve(state.detail) : fetchBankDetail(q.bankId);
+    return details.then(function (det) {
+      if (state && (REL_PREVIEW !== state || !$('#relPreview').open)) return;
       return API.problem('qbank-' + q.bankId).then(function (res) {
+        if (state && (REL_PREVIEW !== state || !$('#relPreview').open)) return;
+        if (!res.problem || res.problem.id !== 'qbank-' + q.bankId) throw new Error('题目读取失败，请重新选择');
+        var opts = (det.options || []).map(function (o) { return o.l + ' ' + o.text; }).join('\n');
+        rememberReport();
+        $('#input1').value = (det.stemText || q.sub || '') + (opts ? '\n' + opts : '');
+        S.picked = null;
+        S.pickedBank = q.bankId;
         S.problem = res.problem;
-        hydrateBankDetail();
+        // Use exactly the already-previewed assets; no second request or formula flash.
+        S.problem.qbId = q.bankId;
+        S.problem.stemHtml = det.stemHtml;
+        S.problem.richOptions = det.options;
+        S.problem.qbMeta = {ty:det.ty,d:det.d,p:det.p,mod:det.mod,chap:det.chap,leaf:det.leaf};
         $('#p2text').textContent = S.problem.stem;
         $('#p1note').textContent = '';
-        startSession();
+        startSession(Boolean(REPORT_ORIGIN));
+        closeRelPreview();
         closeRelDrawer();
         setPage(3);
       });
     }).catch(function (err) {
-      setNote('无法开始这道题：' + err.message, true);
+      if (state && (REL_PREVIEW !== state || !$('#relPreview').open)) return;
+      var error = state ? $('#relPreviewError') : $('#relError');
+      error.hidden = false;
+      error.textContent = '无法开始这道题：' + err.message;
     }).then(function () {
-      if (btn) btn.disabled = false;
-      if (busyEl) busyEl.hidden = true;
+      if (state && REL_PREVIEW !== state) return;
+      if (state) state.starting = false;
+      if (btn) { btn.disabled = false; btn.textContent = '开始练习'; }
     });
   }
+
 
   /* ---------------- 初始化 ---------------- */
   renderStepper();
@@ -3194,7 +3355,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     window.__openBank = openMap;
     window.__closeBank = closeMap;
     document.addEventListener('keydown', function (e) {
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape' || $('#relPreview').open || e.defaultPrevented) return;
       if (REL.open) { e.stopPropagation(); closeRelDrawer(); return; }
       if (viewerEl && !viewerEl.hidden) { e.stopPropagation(); closeViewer(); return; }
       if (p1 && p1.scrollTop > 40) { e.stopPropagation(); closeMap(); }
@@ -3358,6 +3519,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
           moduleName: q.m, chapId: q.k, leafId: q.l, thId: q.t, th2Id: q.t2, sub: q.s };
       });
       S.bankErr = null;
+      if (REL.open) renderRelated();
     }).catch(function (err) { S.bankErr = err.message; });
   }
   loadQBankList();
@@ -3372,6 +3534,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   function maybeReviewJump() {
     var n = Number(new URLSearchParams(location.search).get('p'));
     if (!n || n < 2 || n > 5) return;
+    if (n === 5) n = 4;
     if (!S.bank.length) return;
     S.picked = S.bank[0];
     API.problem(S.picked.id).then(function (res) {
