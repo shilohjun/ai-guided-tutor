@@ -159,7 +159,7 @@ const SESSIONS = [
       maxPage: 4,
       reached: { p2: '2026-11-09T10:00:00.000Z', p3: '2026-11-09T10:01:00.000Z', p4: '2026-11-09T10:20:00.000Z' },
       /**
-       * 旧口径写的是 2，事件流数出来是 1（page_enter 的页号只有一次低于此前的最大值）。
+       * 旧口径写的是 2，事件流按 n→n−1 数出来是 1（页序 3→4→3→4，只有 4→3 是退一步）。
        * 这一列现在以事件流为准：两个数不一致时，CSV 必须是 1。
        */
       backtracks: 2,
@@ -411,7 +411,7 @@ describe('整批导出 · sessions.csv', () => {
     assertEquals(s1['题单序号'], '0');
     assertEquals(s1['开始时间'], '2026-11-09T10:00:00.000Z');
     assertEquals(s1['最后活动时间'], '2026-11-09T10:20:00.000Z');
-    assertEquals(s1['退回次数'], '1', 'page_enter 的页号只有一次低于此前的最大值（progress.backtracks 的 2 不算）');
+    assertEquals(s1['退回次数'], '1', '3→4→3→4：只有 4→3 是 n→n−1 的一步（progress.backtracks 的 2 不算）');
     assertEquals(s1['重置次数'], '1');
     assertEquals(s1['改入场次数'], '1', 'intake_choose 有两种 path（photo / paste）');
     assertEquals(s1['对话轮数'], '2', '两条 chat_send');
@@ -451,7 +451,7 @@ describe('整批导出 · sessions.csv', () => {
     const row = rowOf(renderSessionsCsv([session], { batch: BATCH, now: NOW }), 's7');
     assertEquals(row['对话轮数'], '1', '一条 chat_send：counters.chatTurns 的 9 不算');
     assertEquals(row['改入场次数'], '0', '没有 intake_choose：counters.intakeChanges 的 8 不算');
-    assertEquals(row['退回次数'], '1', '页 4 之后回页 3：progress / counters 的 4 不算');
+    assertEquals(row['退回次数'], '1', '3→4→3：只有 4→3 是 n→n−1 的一步，counters / progress 的 4 不算');
     assertEquals(row['报告次数'], '1', '一次进入页 4：counters.reportViews 的 7 不算');
     assertEquals(row['再练次数'], '1', '一条 practice_pick：counters.practicePicks 的 6 不算');
     assertEquals(row['公式卡次数'], '3', '记录里 3 张公式卡：counters.formulaOpens 的 5 不算');
@@ -480,7 +480,7 @@ describe('整批导出 · sessions.csv', () => {
     assertEquals(row['首条消息字数'], '9', '第一条 chat_send 的 payload.len，不是最后一条的 3');
     assertEquals(row['是否复制题干'], '是', '第一条 chat_send 的 copiedStem');
     assertEquals(row['改入场次数'], '1', '两种 path：2 - 1');
-    assertEquals(row['退回次数'], '1', '页 4 之后回到页 2');
+    assertEquals(row['退回次数'], '0', '4→2 一次退两页，不是 n→n−1，不计');
     assertEquals(row['报告次数'], '1');
     assertEquals(row['再练次数'], '2', '两条 practice_pick');
     assertEquals(row['公式卡次数'], '0', '没有 record 也没有 counters：没有就是 0');
@@ -537,6 +537,62 @@ describe('整批导出 · sessions.csv', () => {
     const rows = csvRows(renderSessionsCsv(withNames, { batch: BATCH, now: NOW }));
     assertEquals(rows.find((row) => row['会话id'] === 's1')['代号'], 'S01');
     assertEquals(rows.find((row) => row['会话id'] === 's2')['代号'], '未知', '空名字同样降级成"未知"');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sessions.csv · 退回次数的口径
+// ---------------------------------------------------------------------------
+
+/**
+ * 设计稿 §5.2 的原文是「`backtracks`，从 n 页退到 n−1 页的次数」——**相邻两条 `page_enter`
+ * 之间正好退一页**才算一步。不是"比此前最大页号小"：按那个口径，学生退回去再往前翻，
+ * 回程沿途每一页都会再记一次，`4→3→2→3→4` 会记成 3 次，而这段路只退了两步。
+ *
+ * 每个用例只给事件、不给 counters：这一列必须从事件流推出来。
+ */
+function backtracksOf(pages) {
+  const session = {
+    id: 's-page',
+    batchId: 'b1',
+    events: pages.map((page, index) => ({
+      seq: index + 1,
+      type: 'page_enter',
+      at: '2026-11-09T10:00:00.000Z',
+      sessionId: 's-page',
+      payload: { page },
+    })),
+  };
+  return rowOf(renderSessionsCsv([session], { batch: BATCH, now: NOW }), 's-page')['退回次数'];
+}
+
+describe('整批导出 · 退回次数只数 n→n−1', () => {
+  it('4→3→2→3→4 记 2：退两步算两次，回程 2→3 / 3→4 不算', () => {
+    assertEquals(backtracksOf([4, 3, 2, 3, 4]), '2');
+  });
+
+  it('3→3→2 记 1：同一页重进不算，3→2 才是退一步', () => {
+    assertEquals(backtracksOf([3, 3, 2]), '1');
+  });
+
+  it('2→3 记 0：只往前走', () => {
+    assertEquals(backtracksOf([2, 3]), '0');
+  });
+
+  it('只有一条 page_enter 记 0：没有上一条可比', () => {
+    assertEquals(backtracksOf([3]), '0');
+  });
+
+  it('4→2 记 0：一次退两页不是 n→n−1（尺子是设计稿那句话，不是"任何往回走"）', () => {
+    assertEquals(backtracksOf([4, 2]), '0');
+  });
+
+  it('没有事件的老记录仍退到 counters.backtracks（回落不因新口径丢掉）', () => {
+    const row = rowOf(
+      renderSessionsCsv([{ id: 's-old', batchId: 'b1', counters: { backtracks: 3 } }], { batch: BATCH, now: NOW }),
+      's-old',
+    );
+    assertEquals(row['退回次数'], '3', '没有事件时读 counters.backtracks，而不是一律写 0');
   });
 });
 

@@ -453,7 +453,7 @@ const FIELD_NOTES = {
   最后活动时间: '最后一次有动作的时刻（UTC），放弃判定读的就是它',
   是否完成: '走到过报告页就是"是"（有结束时间）',
   走到第几页: '最远到达的页码，只有 1–4',
-  退回次数: '往回翻页的次数（数 `page_enter`：进入的页号小于此前到过的最大页号就计 1）',
+  退回次数: '往回退一页的次数（数 `page_enter`：进入的页号正好比上一条 `page_enter` 小 1 就计 1；`4→2` 跨页退、同一页重进都不计）',
   重置次数: '把这一轮对话清掉重来的次数',
   改入场次数: '重新读题（换题干 / 换方式）的次数（数该会话不同 `intake_choose` 的 path，减 1）',
   对话轮数: '学生发出的消息条数，沉默与否看它（数 `chat_send` 事件）',
@@ -587,7 +587,8 @@ function deriveFromEvents(events) {
   const ordered = asList(events).slice().sort(byEventSeq);
   const sends = ordered.filter((event) => event?.type === 'chat_send');
 
-  let maxPage = null;
+  /** 上一条有效 `page_enter` 的页号：退回是"和它紧挨着的上一条比"，不是和历史最大值比 */
+  let previousPage = null;
   let backtracks = 0;
   let reportViews = 0;
   let practicePicks = 0;
@@ -597,14 +598,22 @@ function deriveFromEvents(events) {
     const type = event?.type;
     if (type === 'page_enter') {
       const page = finiteNumber(event?.payload?.page);
-      /** 页号缺失或不是数字：这条埋点是坏的，不能凭空算一次退回 */
+      /**
+       * 页号缺失或不是数字：这条埋点是坏的，不能凭空算一次退回，也不能让它顶掉
+       * `previousPage` —— 坏记录既不该造出一步，也不该抹掉上一条真实的下标。
+       */
       if (page === null) continue;
       /**
-       * 退回的口径（裁决原文）：**进入的页号小于此前出现过的最大页号**就计 1。
-       * 不是"小于上一页" —— 学生从第 4 页直接跳回第 2 页，也是退了一次。
+       * 退回的口径（设计稿 §5.2 原文）：`backtracks` 是「从 n 页退到 n−1 页的次数」。
+       * 所以只数**紧挨着的上一条 `page_enter` 是 n、这一条正好是 n−1**：`4→3`、`3→2`
+       * 各计 1；`2→3`、`3→4` 是往前走，不计；`4→2` 一次退了两页，也不是 n→n−1，不计
+       * —— 尺子是设计稿那句话，不是"任何往回走"。同一页反复进入（`3→3`）同样不计。
+       *
+       * 不按"低于历史最大页号"计：学生退回去之后再往前翻，回程沿途低于最大页的每一页
+       * 都会被再记一次，`4→3→2→3→4` 记成 3 次，而这段路只退了两步（`4→3`、`3→2`）。
        */
-      if (maxPage !== null && page < maxPage) backtracks += 1;
-      if (maxPage === null || page > maxPage) maxPage = page;
+      if (previousPage !== null && page === previousPage - 1) backtracks += 1;
+      previousPage = page;
       if (page === 4) reportViews += 1;
     } else if (type === 'intake_choose') {
       const path = text(event?.payload?.path);
@@ -762,9 +771,10 @@ export function renderSessionsCsv(sessions, { batch = null, now = null } = {}) {
       是否完成: yesNo(isFinished(session)),
       走到第几页: pagesWalked(session),
       /**
-       * 退回次数：走一遍 `page_enter`（见 `deriveFromEvents`）。没有事件的老记录退到
-       * `progress.backtracks`（模型里的字段，也是这一列原来的口径）；裁决里写的
-       * `counters.backtracks` 一起认，兼容手写/迁移来的记录。
+       * 退回次数：走一遍 `page_enter`，只数相邻两条之间 n→n−1 的那一步（见 `deriveFromEvents`）。
+       * 没有事件的老记录退到 `progress.backtracks`（模型里的字段，也是这一列原来的口径）；
+       * 裁决里写的 `counters.backtracks` 一起认，兼容手写/迁移来的记录 —— 那两条路径上的数
+       * 是别人写的，口径不一定与本轮的 n→n−1 相同，但有数总比写 0 诚实。
        */
       退回次数: derived.hasEvents
         ? derived.backtracks
