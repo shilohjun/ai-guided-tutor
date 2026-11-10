@@ -209,6 +209,12 @@ cp .env.example .env
 | `LLM_TIMEOUT_MS` | 单次请求超时，理科长题建议 ≥ 30s | `45000` |
 | `PORT` / `HOST` | 本地服务地址 | `5173` / `127.0.0.1` |
 | `ALIYUN_OCR_APPCODE` | 拍照识题凭据，留空则该入口显示“未启用” | 空 |
+| `STORE` | 存储驱动：`memory`（默认，重启即丢）/ `file`（落 `.data/`）/ `cloudbase`（试点） | `memory` |
+| `PILOT_REQUIRE_LOGIN` | 配 `1` 时，除健康检查与登录之外的 `/api/*` 一律 `401`（试点必须开，见「已知边界」） | 空 |
+| `PILOT_DEV_CODE` | 调试档口令：用它登录拿到的是 `dev` 批次的临时账号 | 空 |
+| `PILOT_PORT` | 可选第二端口：让试点入口（`/pilot.html`）单独占一个端口；不配就只有一个端口 | 空 |
+| `OCR_DAILY_CAP` | 拍照识题的日上限（UTC 日，按成功调用计）；空或 `0` = 不限 | 空 |
+| `ADMIN_CODE` | `/admin.html` 与 `/api/admin/*` 的口令；不配则一律 `404` | 空 |
 
 ### 接入模型
 
