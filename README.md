@@ -5,7 +5,7 @@
 面向中学生重难题的引导式解题助手。它不直接回答“这道题怎么做”，而是先读懂学生已经想到哪一步，
 再给出一句恰好够用的提示，逼学生自己往下走一步。
 
-**五页流程：题目 → 方式 → 解题 → 报告 → 巩固。** 步骤条五页随时可点，某页还没数据就进空态给一句提示，不把人弹回上一页。
+**四页流程：题目 → 方式 → 解题 → 报告（巩固是报告页上的动作）。** 步骤条四页随时可点，某页还没数据就进空态给一句提示，不把人弹回上一页。
 
 **当前只开放「自主训练」**：AI 伴学标着「暂未更新」，暂时点不了；任何方式都不给答案。
 
@@ -14,7 +14,7 @@
 
 [![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](package.json)
 [![依赖](https://img.shields.io/badge/dependencies-0-brightgreen)](package.json)
-[![测试](https://img.shields.io/badge/tests-324%2F324-brightgreen)](test/run.js)
+[![测试](https://img.shields.io/badge/tests-722%2F722-brightgreen)](test/run.js)
 [![许可](https://img.shields.io/badge/license-UNLICENSED-lightgrey)](LICENSE)
 
 仓库地址：<https://github.com/shilohjun/ai-guided-tutor>
@@ -24,7 +24,7 @@
   <img src="docs/screenshots/qbank-map.png" width="49%" alt="题库地图 · 知识点与思路两棵树，右侧是按分支筛过的题目" />
   <br />
   <img src="docs/screenshots/page3-rich.png" width="49%" alt="页三 · 题干里的公式与图形保留原图" />
-  <img src="docs/screenshots/page5-drawer.png" width="49%" alt="页五 · 同类题再练：抽屉里按知识点/思路换一道" />
+  <img src="docs/screenshots/page5-drawer.png" width="49%" alt="报告页 · 同类题再练：抽屉里按知识点/思路换一道" />
 </p>
 
 ---
@@ -54,7 +54,7 @@
 
 ## 现在是什么
 
-- **五页流程**：题目 → 方式 → 解题 → 报告 → 巩固。步骤条五页随时可点；某页还没数据就进空态并给一句提示，不会把人弹回上一页。
+- **四页流程**：题目 → 方式 → 解题 → 报告（巩固是报告页上的动作）。步骤条四页随时可点；某页还没数据就进空态并给一句提示，不会把人弹回上一页。
 - **真实题库**：`public/qbank/` 下 152 道高考真题（19 套卷 × 8 题），题干里的公式与图形都是原图（公式 967 张、图形 192 张、选项图 349 张）；地图选中后把题干回填到第一页，粘贴文字走 `/api/problem/import`，拍照走 `/api/ocr`。
 - **题库地图**：`public/qbank/map.html`，以 iframe 内嵌在第一页下方。知识点是横向树（物理 → 6 模块 → 22 章 → 75 叶），思路是径向星图（核心 → 9 类 → 28 细分）；分支展开后不收回，点最细一支弹出这批题；右侧面板跟着选中分支过滤。地图里**不显示任何数量**，题号与总数只在第 3 页出现。
 - **公式显示**：第一页输入框下面会实时把 LaTeX 画出来（`$m$`、`$$F = ma$$`、`\(...\)`、`\[...\]` 四种写法都认，KaTeX 渲染，`public/vendor/katex/` + `public/math.js`），对话气泡里的公式同样渲染；发给模型的仍是原始文本。
@@ -180,18 +180,17 @@ cp .env.example .env
 
 | 路径 | 内容 |
 |---|---|
-| `/` | 新五页界面（`public/index.html`），已接真实接口 |
+| `/` | 四页界面（`public/index.html`），已接真实接口 |
 | `/classic.html` | 旧壳的保底副本，计划保留一个版本后下线；它加载的 `/api/demo/*` 与 `/api/teacher/*` 已下线，旧壳里的演示/教师入口会报错 |
 
-新五页与接口的对应关系：
+四页与接口的对应关系：
 
 | 页面 | 接口 | 说明 |
 |---|---|---|
 | ① 题目 | `GET /api/problems`、`GET /qbank/data.json`、`POST /api/problem/import`、`POST /api/ocr` | 题库来自静态文件（地图与第一页共用一份）；选中题目走读题；粘贴文字走读题；拍照只把图变成文字，学生核对后再导入；未配凭据时按钮变灰并说明原因 |
 | ② 方式 | `GET /api/health`（`capabilities.modes`） | 当前只有 `self_training` 可点；`ai_companion` 禁用并标「暂未更新」，服务端收到也直接返回 400 |
 | ③ 解题 | `GET /api/problem`、`POST /api/chat` | 左栏题干/图示/已知/求 + 步骤条；每轮回复、步骤进度、已走过步骤名都来自引擎 |
-| ④ 报告 | `GET /api/report` | 三色档、错题摘要、学习时长；会话过期时给明确提示而不是空白 |
-| ⑤ 巩固 | `GET /qbank/data.json`、`GET /qbank/q/{id}.json` | 重做本题 / 同类题再练（抽屉按真实双轴标签从 152 道里筛）；选中后读该题详情，纯文本走读题、富文本用于展示，随即开新会话 |
+| ④ 报告 | `GET /api/report`、`GET /qbank/data.json`、`GET /qbank/q/{id}.json` | 三色档、错题摘要、学习时长；会话过期时给明确提示而不是空白。**巩固不是单独一页，是这一页上的动作**：重做本题 / 同类题再练（抽屉按真实双轴标签从 152 道里筛），选中后读该题详情，纯文本走读题、富文本用于展示，随即开新会话 |
 
 没有配置模型 Key 也能完整跑通——引擎会自动降级到**离线规则桩**，
 页面、测试、评测全部可用，只是提示文案来自规则而不是模型。
@@ -297,8 +296,8 @@ npm test
 字号与盒子都是显式的整数表（小 ≈ −10%、大 ≈ +15%），审计会核对「三档齐全、整数、小<中<大」——
 省得有人只改一档、另一档悄悄掉回默认值。
 
-前端契约按**新版单文件**（`public/index.html`）检查：五页流程、页二的模式能力位、
-页三"做到第几步"、页五两张卡、答案与旧教师审阅端点不留入口，都在 `test/ui.test.js` 里。
+前端契约按**新版单文件**（`public/index.html`）检查：四页流程、页二的模式能力位、
+页三"做到第几步"、报告页那张同类题抽屉、答案与旧教师审阅端点不留入口，都在 `test/ui.test.js` 里。
 `test/docs.test.js` 会从源码实际数出卡点种类、守卫类别与用例总数，再回头核对本文档。
 设置面板（主题三选 + 字号三档）的静态契约在 `test/settings.test.js`：首屏不落盘、白名单、
 三档递增、小屏抽屉规则的先后顺序都在那里钉着。
@@ -325,7 +324,7 @@ npm run eval:llm
 
 ```text
 public/
-  index.html            新五页（单文件：markup + 内联 CSS + 内联 JS）
+  index.html            四页（单文件：markup + 内联 CSS + 内联 JS）
   qbank/
     map.html            题库地图（独立的单文件页面，以 iframe 内嵌）
     data.json           152 道题的轻量索引（给地图与右栏用）
@@ -365,10 +364,10 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | `GET` | `/api/health` | 健康检查、当前运行模式、`capabilities.modes`（哪些做题方式能点） |
-| `POST` | `/api/auth/login` | 6 位口令 → 令牌（`200 {token, displayName, batchId, expiresAt}`）；口令不对 `401`，同一 IP 15 分钟内超过 10 次 `429` |
-| `POST` | `/api/events` | 埋点批量上报（13 种事件，见 `src/server/events.js`）→ `200 {accepted, rejected}`。**永不因埋点失败返回 4xx/5xx**：坏请求体、未知 type、超大 payload、存储写失败都只影响那一条，`at` 与身份一律由服务端填 |
+| `POST` | `/api/auth/login` | 6 位口令 → 令牌（`200 {token, displayName, batchId, expiresAt}`）；口令不对 `401`。**两维限速**：同一口令（按「来源 IP + 口令」计）15 分钟内错 5 次 → `429`；同一来源 IP 一小时内累计错 60 次 → `429`（这一维不因登录成功而清零，它是唯一的枚举防线） |
+| `POST` | `/api/events` | 埋点批量上报（14 种事件，见 `src/server/events.js`）→ `200 {accepted, rejected}`。**永不因埋点失败返回 4xx/5xx**：坏请求体、未知 type、超大 payload、存储写失败都只影响那一条，`at` 与身份一律由服务端填 |
 | `GET` | `/api/problems` | 内置题目列表 |
-| `GET` | `/api/related?id=` | 同知识点的同类题（服务端注册表内，最多 6 道）。**前端已不再调用**：第 5 页改为从 152 道题库按双轴标签筛 |
+| `GET` | `/api/related?id=` | 同知识点的同类题（服务端注册表内，最多 6 道）。**前端已不再调用**：报告页改为从 152 道题库按双轴标签筛 |
 | `GET` | `/api/problem?id=` | 单个题目（学生可见版本） |
 | `POST` | `/api/problem/import` | 题目文字 → 结构化题目 |
 | `POST` | `/api/ocr` | 题目照片 → 题干文本 |
@@ -379,6 +378,7 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 | `POST` | `/api/visit` | 记一次打开（`visit`），返回 `{visitId}`。同一个人当天重复打开就是新的 visit；没登录 `401` |
 | `POST` | `/api/eval` | 触发评测 |
 | `POST` | `/api/reset` | 重置会话：内存里丢掉，库里清空对话但保留会话（`counters.resetCount +1`，`endState` 不变） |
+| `GET` | `/api/admin/*` | 看板与管理接口：`overview`（漏斗、批次对比、用量）、`users`（一批人的会话列表）、`session`（单条会话的对话）、`export`（单条/整批导出）。**只认 `ADMIN_CODE`**（请求头 `x-admin-code`），学生令牌在这里无效；未配 `ADMIN_CODE` 时一律 `404`（连"这里有个看板"都不承认），配了但没带对是 `401`。内存驱动的部署也一律 `404` —— 看板能打开却永远是空的，比打不开更糟 |
 
 **登录守卫**：配了 `PILOT_REQUIRE_LOGIN=1` 时，除 `/api/health` 与 `/api/auth/login` 之外的 `/api/*`
 一律 `401 {error:'请先登录', code:'AUTH_REQUIRED'}`；不配这个变量时行为与以前完全一致。
@@ -448,16 +448,39 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 看起来像函数里读文件失败，其实是网关自己拒的）。`/` 必须指向 `STATIC_STORE`，
 `/api` 指向 SCF，同域就没有 CORS、前端一行不用改。
 
-三处刻意的复用，防止平台之间行为漂移：
+四处刻意的复用，防止平台之间行为漂移：
 
 - **口令门与凭据裁剪** → `src/server/demo-gate.js`，三个入口都只调 `buildRequestContext()`
 - **业务逻辑** → `src/server/router.js`，连本地 `server/server.js` 也是同一份
 - **函数打包** → `scripts/build-cloudbase.mjs`，把 CJS 入口、ESM 的 `src/`、`public/` 铺成
   `dist-cloudbase/bubujie-api/`（根 `package.json` 是 `"type": "module"`，云函数要 CJS，
-  所以入口用动态 `import()` 接，两边都不用改源码）
+  所以入口用动态 `import()` 接，两边都不用改源码）；`@cloudbase/node-sdk` 只写进
+  **函数包那一份** `package.json`，根 `package.json` 的 `dependencies` 仍然是 `{}`
+- **密钥注入** → `scripts/deploy-cloudbase.mjs`（见下一节）
 
 翻译层的正确性各有测试：`test/worker-adapter.test.js`（9 条，含请求体穿桥）、
 `test/cloudbase-adapter.test.js`（15 条，含网关两种 path 形态、base64 body、静态资源命中）。
+
+### CloudBase 的密钥怎么上去
+
+`cloudbaserc.json` 里**不放任何凭据**（它虽然进了 `.gitignore`，但躺在工作树里 —— 一次截图、
+一次打包发出去就是一份明文副本）。密钥只有一个来源：`.env`。
+
+```bash
+node scripts/build-cloudbase.mjs                     # ① 拼函数包（含 @cloudbase/node-sdk 的清单）
+tcb fn deploy bubujie-api --install-dependency true  # ② 推代码
+node scripts/deploy-cloudbase.mjs                    # ③ 干跑：打印要注入哪些变量，机密只露尾两位
+node scripts/deploy-cloudbase.mjs --apply            #    真的注入
+```
+
+`deploy-cloudbase.mjs` 从 `.env` 读 `LLM_API_KEY` / `ALIYUN_OCR_APPCODE` / `PILOT_DEV_CODE` / `ADMIN_CODE`，
+拼成完整的一份 `envVariables` 写进 `.cloudbase/` 下的临时配置（跑完即删），
+再用 `tcb config update fn … --config-file` 推上去。两条要记住：
+
+- 云端环境变量是**全量覆盖**。少推一个就等于把云上那个删掉，所以缺任何一个机密时脚本会拒绝执行
+  （干跑照常打印，好让人看见缺什么）。
+- **顺序别反**：`tcb fn deploy` 也会应用 `cloudbaserc.json` 里的 `envVariables`（那里已经没有机密了）。
+  先部署代码、最后注入变量，就不会把刚推上去的机密再清掉。
 
 ⚠️ 部署前先把 `compatibility_date` 保持在 `2025-09-01` 或更新：
 `src/core/env.js` 在模块顶层 import 了 `node:fs`（只用来读可选的 `.env`），
@@ -503,7 +526,9 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 | 题库题的读题 | 题库题与粘贴题走同一条读题链路，点进去要等大模型现读 3–8 秒；要秒开得先有解题图谱 |
 | 公式的形态 | 题库里的公式是**图片**（原卷截图），不是可排版的 LaTeX；引擎读到的仍是 `〔式〕` 占位文本 |
 | 题库数据 | 152 道题是静态 JSON（`public/qbank/`，约 16MB），暂未落服务端存储 |
-| 会话持久化 | 会话每轮写穿到存储：`STORE` 未配时是进程内存（重启即丢，公开 Demo 就是这个形态），配 `STORE=file` 才能跨重启回载与续做。浏览器仍不保存学习历史，换设备要重新开始 |
+| 会话持久化 | 会话、账号、埋点、计数器全部走 `STORE` 这一个端口（`memory` / `file` / `cloudbase`）。**公网 Demo 一律 `memory`**（`api/index.js` 与 `api/worker.js` 强制的，那里重启即丢）；试点必须 `STORE=cloudbase`。浏览器仍不保存学习历史，换设备要重新开始 |
+| 试点入口 | 试点入口是 `/pilot.html`（与主页面同域、同一个库）。它只是页面，**必须配 `PILOT_REQUIRE_LOGIN=1` 才真的挡住未登录** —— 不配时未登录也能直接对话，只是埋点缺身份。本地想让试点入口单独占一个端口就配 `PILOT_PORT`；CloudBase 上不适用（那里只有同域 `/pilot.html`） |
+| 看板 0 会话不等于 0 人来 | 一轮都没成功的会话在看板上表现为 **0 会话**（它没有可计入的完成轮次）。所以若看板是 0 会话、而 OCR 或对话计数非零，那不是"没人来"，而是**系统性失败**（模型凭据、超时或被限速）—— 先去看 `chat_error` 事件与一轮失败率 |
 | 教学质量 | 未做教研盲评；这是下一阶段最重要的工作 |
 
 ---
@@ -515,7 +540,7 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 | [`01-hint-ontology-and-contract.md`](docs/01-hint-ontology-and-contract.md) | 提示本体与接口契约 |
 | [`02-prompt-spec.md`](docs/02-prompt-spec.md) | Prompt 规范 |
 | [`03-evaluation-spec.md`](docs/03-evaluation-spec.md) | 评测标准与方法 |
-| [`04-intake-and-views.md`](docs/04-intake-and-views.md) | 读题链路、能力位与五页流程 |
+| [`04-intake-and-views.md`](docs/04-intake-and-views.md) | 读题链路、能力位与四页结构 |
 | [`05-ocr-feasibility.md`](docs/05-ocr-feasibility.md) | 图片识别可行性评估 |
 | [`06-marketplace-ocr-integration.md`](docs/06-marketplace-ocr-integration.md) | 云市场题目 OCR 接入研究 |
 | [`07-prompt-upgrade.md`](docs/07-prompt-upgrade.md) | 回答规范升级与验收 |
