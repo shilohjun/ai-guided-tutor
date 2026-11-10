@@ -3491,6 +3491,8 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       $('#relPreviewTitle').textContent = det.code + ' · 完整题目';
       $('#relPreviewMeta').textContent = [det.src,det.ty,'难度：' + det.d].filter(Boolean).join(' ｜ ');
       $('#relPreviewQuestion').innerHTML = fullBankQuestionHtml(det);
+      /* 新题库的行内公式是 $…$ 原文（旧题是图片），预览里也画出来 */
+      if (typeof window !== 'undefined' && window.BsjMath && window.BsjMath.renderMathIn) window.BsjMath.renderMathIn($('#relPreviewQuestion'));
       $('#relPreviewStart').disabled = false;
     }).catch(function (err) {
       if (REL_PREVIEW !== state || !preview.open) return;

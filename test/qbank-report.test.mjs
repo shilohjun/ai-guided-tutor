@@ -9,10 +9,10 @@ import { getProblemById } from '../src/core/registry.js';
 import { buildReport,createSessionRecord } from '../src/core/report.js';
 import { toStudentProblem,handleApi } from '../src/server/router.js';
 
-test('all 152 source questions retain answers, full images and every knowledge/method association',()=>{
-  assert.equal(QBANK_IDS.length,152);
-  assert.equal(QBANK_GRAPHS.knowledge.flatMap(m=>m.children.flatMap(c=>c.children)).length,75);
-  assert.equal(QBANK_GRAPHS.methods.flatMap(m=>m.children).length,28);
+test('all 835 source questions retain answers, full images and every knowledge/method association',()=>{
+  assert.equal(QBANK_IDS.length,835);
+  assert.equal(QBANK_GRAPHS.knowledge.flatMap(m=>m.children.flatMap(c=>c.children)).length,94);
+  assert.equal(QBANK_GRAPHS.methods.flatMap(m=>m.children).length,29);
   for (const source of QBANK_SOURCE) {
     const p=getProblemById(`qbank-${source.i}`);
     assert.ok(p,p?.id);
@@ -50,7 +50,7 @@ test('knowledge is selected by stable source ID and does not mutate another ques
   const first=getQbankProblem('qbank-1'), second=getQbankProblem('qbank-2');
   assert.ok(first.reportReview.knowledge.some(k=>k.title==='光电效应'));
   assert.ok(second.reportReview.knowledge.some(k=>/折射/.test(k.title)));
-  assert.equal(getQbankProblem('qbank-153'),null);
+  assert.equal(getQbankProblem('qbank-836'),null);
   const r=buildReport(first,createSessionRecord(first.id),{engine:'offline-stub'});
   r.review.knowledge[0].title='mutated';
   assert.ok(!first.reportReview.knowledge.some(k=>k.title==='mutated'));
@@ -94,7 +94,7 @@ test('every bank question has an API report even before the first chat turn',asy
       assert.equal(report.meta.recordMissing,true);
       assert.deepEqual(turns,[]);
     }
-    const invalid=await fetch(`${base}/api/report?sessionId=missing&problemId=qbank-153`);
+    const invalid=await fetch(`${base}/api/report?sessionId=missing&problemId=qbank-836`);
     assert.equal(invalid.status,404);
   } finally {
     server.closeAllConnections();

@@ -9,12 +9,12 @@
 
 **当前只开放「自主训练」**：AI 伴学标着「暂未更新」，暂时点不了；任何方式都不给答案。
 
-**第一页是一句话 + 一个输入框**。粘贴题干、拍照，或者点底部「好题精练」下滑进题库地图——152 道高考真题按
-**知识点**（6 模块 / 22 章 / 75 叶）与**思路**（9 类 / 28 细分）两棵树排开，点最细那一支就弹出这批题目。
+**第一页是一句话 + 一个输入框**。粘贴题干、拍照，或者点底部「好题精练」下滑进题库地图——835 道高考真题按
+**知识点**（6 模块 / 22 章 / 94 叶）与**思路**（9 类 / 29 细分）两棵树排开，点最细那一支就弹出这批题目。
 
 [![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](package.json)
 [![依赖](https://img.shields.io/badge/dependencies-0-brightgreen)](package.json)
-[![测试](https://img.shields.io/badge/tests-728%2F728-brightgreen)](test/run.js)
+[![测试](https://img.shields.io/badge/tests-760%2F760-brightgreen)](test/run.js)
 [![许可](https://img.shields.io/badge/license-UNLICENSED-lightgrey)](LICENSE)
 
 仓库地址：<https://github.com/shilohjun/ai-guided-tutor>
@@ -55,13 +55,14 @@
 ## 现在是什么
 
 - **四页流程**：题目 → 方式 → 解题 → 报告（巩固是报告页上的动作）。步骤条四页随时可点；某页还没数据就进空态并给一句提示，不会把人弹回上一页。
-- **真实题库**：`public/qbank/` 下 152 道高考真题（19 套卷 × 8 题），题干里的公式与图形都是原图（公式 967 张、图形 192 张、选项图 349 张）；地图选中后把题干回填到第一页，粘贴文字走 `/api/problem/import`，拍照走 `/api/ocr`。
-- **题库地图**：`public/qbank/map.html`，以 iframe 内嵌在第一页下方。知识点是横向树（物理 → 6 模块 → 22 章 → 75 叶），思路是径向星图（核心 → 9 类 → 28 细分）；分支展开后不收回，点最细一支弹出这批题；右侧面板跟着选中分支过滤。地图里**不显示任何数量**，题号与总数只在第 3 页出现。
+- **真实题库**：`public/qbank/` 下 835 道高考真题（64 套卷），题干里的公式与图形都是原图（公式 3077 张、图形 1067 张、选项图 353 张）；地图选中后把题干回填到第一页，粘贴文字走 `/api/problem/import`，拍照走 `/api/ocr`。
+- **题库地图**：`public/qbank/map.html`，以 iframe 内嵌在第一页下方。知识点是横向树（物理 → 6 模块 → 22 章 → 94 叶），思路是径向星图（核心 → 9 类 → 29 细分）；**分类视角的切换浮在导图右上角**，导图与右侧题库之间可拖动分隔条调宽（双击复位，键盘 ←/→ 微调，宽度记在本机）。分支展开后不收回，点最细一支弹出这批题；右侧面板跟着选中分支过滤。列表里的题干**直接显示公式**（公式原图内联 + KaTeX 渲染，图形以〔图〕占位），不再是 `⟨式⟩`。地图里**不显示任何数量**，题号与总数只在第 3 页出现。
+- **题库工作台**：`public/qbank/workbench.html`，835 道题的检索台。左边按知识点/思路两棵树筛，中间按题型、难度过滤（各占一行）并分页列表，右边是完整题干与选项；支持关键词搜索、`↑/↓` 换题、`复制题干`、`用这道题开始`（与地图同一条交接口径）。地图顶栏与右侧题库面板都有入口。
 - **公式显示**：第一页输入框下面会实时把 LaTeX 画出来（`$m$`、`$$F = ma$$`、`\(...\)`、`\[...\]` 四种写法都认，KaTeX 渲染，`public/vendor/katex/` + `public/math.js`），对话气泡里的公式同样渲染；发给模型的仍是原始文本。
 - **真实对话**：`/api/chat` 接入真实模型；学生消息、AI 提示、对话进度、完成判定都来自服务端。
 - **真实报告**：`/api/report` 返回独立完成度、引导轮次、卡点、深层问题、推荐与行动建议。
 - **公式卡**：`/api/formula` 在 L3 之后按知识点下发；报告单独统计公式卡次数并扣独立完成度。
-- **巩固页**：重做本题 / 同类题再练——右侧抽屉按「同知识点 / 同思路 / 全部」三档从 152 道题库里换一道，选中直接进第 3 页开练。
+- **巩固页**：重做本题 / 同类题再练——右侧抽屉按「同知识点 / 同思路 / 全部」三档从 835 道题库里换一道，选中直接进第 3 页开练。
 - **只有自主训练**：`/api/health` 的 `capabilities.modes` 只登记 `self_training`；AI 伴学禁用并标「暂未更新」，服务端收到 `ai_companion` 直接返回 400。
 - **设置**：顶栏齿轮打开面板 —— 主题三选（浅色 / 深色 / 跟随系统）、字号三档（小 / 中 / 大，拖到哪档停哪档）。盒子跟着字一起放大，间距与圆角一律不动；偏好记在本机，`?theme=` `?ux=` 只影响这一次。
 
@@ -190,7 +191,7 @@ cp .env.example .env
 | ① 题目 | `GET /api/problems`、`GET /qbank/data.json`、`POST /api/problem/import`、`POST /api/ocr` | 题库来自静态文件（地图与第一页共用一份）；选中题目走读题；粘贴文字走读题；拍照只把图变成文字，学生核对后再导入；未配凭据时按钮变灰并说明原因 |
 | ② 方式 | `GET /api/health`（`capabilities.modes`） | 当前只有 `self_training` 可点；`ai_companion` 禁用并标「暂未更新」，服务端收到也直接返回 400 |
 | ③ 解题 | `GET /api/problem`、`POST /api/chat` | 左栏题干/图示/已知/求 + 步骤条；每轮回复、步骤进度、已走过步骤名都来自引擎 |
-| ④ 报告 | `GET /api/report`、`GET /qbank/data.json`、`GET /qbank/q/{id}.json` | 三色档、错题摘要、学习时长；会话过期时给明确提示而不是空白。**巩固不是单独一页，是这一页上的动作**：重做本题 / 同类题再练（抽屉按真实双轴标签从 152 道里筛），选中后读该题详情，纯文本走读题、富文本用于展示，随即开新会话 |
+| ④ 报告 | `GET /api/report`、`GET /qbank/data.json`、`GET /qbank/q/{id}.json` | 三色档、错题摘要、学习时长；会话过期时给明确提示而不是空白。**巩固不是单独一页，是这一页上的动作**：重做本题 / 同类题再练（抽屉按真实双轴标签从 835 道里筛），选中后读该题详情，纯文本走读题、富文本用于展示，随即开新会话 |
 
 没有配置模型 Key 也能完整跑通——引擎会自动降级到**离线规则桩**，
 页面、测试、评测全部可用，只是提示文案来自规则而不是模型。
@@ -267,6 +268,12 @@ npm run preview:capture # 重新抓取演示数据（需先 npm start）
 node scripts/issue-accounts.mjs --batch b2 --count 30 --out accounts-b2.csv
                     # 给一个批次发号，写 UTF-8 带 BOM 的 CSV（序号,代号,口令,登录链接）；
                     # STORE 没配时默认落到 file 驱动的 .data/，口令不会随进程退出而丢
+
+node scripts/qbank-import/build.mjs --source "高中物理高考真题题库 (4).html"
+                    # 题库换版：解析新导出的 HTML，旧题按题号保 id（题面与答案解析不动），
+                    # 新题接在后面编号；同时重写 data.json、map.html 内嵌数据、服务端题库与两棵分类树
+node scripts/qbank-import/check-review.mjs   # 核对每个知识叶 / 方法细分都有复盘文案
+node scripts/qbank-import/stats.mjs          # 数出题量、套卷、公式图形张数与两棵树的自洽性
 ```
 
 ---
@@ -298,7 +305,7 @@ npm run preview:verify    # file:// 打开验收
 npm test
 ```
 
-当前注册 **760 个用例，全部通过**。`npm test` 跑完测试后会接着跑
+当前注册 **789 个用例，全部通过**。`npm test` 跑完测试后会接着跑
 `scripts/audit-ui-style.js`：它把设计令牌（间距 2/4/6/8/12/16/24/32、字号三档、
 嵌套圆角、语义色）做成可执行规则，样式一跑偏就报出来 —— 只靠人眼看不住。
 字号与控件尺寸参考 LeetCode 做题页后，再按中文密度收一档（中档题干 13/18.9、标签 11、按钮高 32、顶栏 52）。
@@ -336,8 +343,9 @@ public/
   index.html            四页（单文件：markup + 内联 CSS + 内联 JS）
   qbank/
     map.html            题库地图（独立的单文件页面，以 iframe 内嵌）
-    data.json           152 道题的轻量索引（给地图与右栏用）
-    q/1.json … q/152.json  逐题详情：题干/选项/答案/解析，公式与图形内联为 data URL
+    workbench.html      题库工作台（搜索 + 分类筛选 + 详情三栏，独立页面）
+    data.json           835 道题的轻量索引（给地图与右栏用）
+    q/1.json … q/835.json  逐题详情：题干/选项/答案/解析，公式与图形内联为 data URL
   fonts/serif-title-600.woff2  标题宋体子集（12 字，3.4KB）
   classic.html          旧壳保底副本，计划保留一个版本后下线
   app.js / styles.css   旧版页面代码，当前不引用，正在清理
@@ -376,7 +384,7 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 | `POST` | `/api/auth/login` | 6 位口令 → 令牌（`200 {token, displayName, batchId, expiresAt}`）；口令不对 `401`。**两维限速**：同一口令（按「来源 IP + 口令」计）15 分钟内错 5 次 → `429`；同一来源 IP 一小时内累计错 120 次 → `429`（默认值，`PILOT_IP_MAX_FAILURES` 可配；这一维不因登录成功而清零，它是唯一的枚举防线） |
 | `POST` | `/api/events` | 埋点批量上报（14 种事件，见 `src/server/events.js`）→ `200 {accepted, rejected}`。**永不因埋点失败返回 4xx/5xx**：坏请求体、未知 type、超大 payload、存储写失败都只影响那一条，`at` 与身份一律由服务端填 |
 | `GET` | `/api/problems` | 内置题目列表 |
-| `GET` | `/api/related?id=` | 同知识点的同类题（服务端注册表内，最多 6 道）。**前端已不再调用**：报告页改为从 152 道题库按双轴标签筛 |
+| `GET` | `/api/related?id=` | 同知识点的同类题（服务端注册表内，最多 6 道）。**前端已不再调用**：报告页改为从 835 道题库按双轴标签筛 |
 | `GET` | `/api/problem?id=` | 单个题目（学生可见版本） |
 | `POST` | `/api/problem/import` | 题目文字 → 结构化题目 |
 | `POST` | `/api/ocr` | 题目照片 → 题干文本 |
@@ -540,7 +548,7 @@ node scripts/deploy-cloudbase.mjs --apply            #    真的注入
 | 图形类题目 | OCR 只识别文字，读不懂受力图、电路图与几何图 |
 | 题库题的读题 | 题库题与粘贴题走同一条读题链路，点进去要等大模型现读 3–8 秒；要秒开得先有解题图谱 |
 | 公式的形态 | 题库里的公式是**图片**（原卷截图），不是可排版的 LaTeX；引擎读到的仍是 `〔式〕` 占位文本 |
-| 题库数据 | 152 道题是静态 JSON（`public/qbank/`，约 16MB），暂未落服务端存储 |
+| 题库数据 | 835 道题是静态 JSON（`public/qbank/`，约 23MB），暂未落服务端存储。源导出共 861 道，另有 26 道的选项是图片而导出没把图内联（选项位置只剩 `figs/*.png` 文件名），这 26 道挡在库外，清单见 `docs/qbank-import-excluded.json` |
 | 会话持久化 | 会话、账号、埋点、计数器全部走 `STORE` 这一个端口（`memory` / `file` / `cloudbase`）。**公网 Demo 一律 `memory`**（`api/index.js` 与 `api/worker.js` 强制的，那里重启即丢）；试点必须 `STORE=cloudbase`。浏览器仍不保存学习历史，换设备要重新开始 |
 | 试点入口 | 试点入口是 `/pilot.html`（与主页面同域、同一个库）。它只是页面，**必须配 `PILOT_REQUIRE_LOGIN=1` 才真的挡住未登录** —— 不配时未登录也能直接对话，只是埋点缺身份。本地想让试点入口单独占一个端口就配 `PILOT_PORT`；CloudBase 上不适用（那里只有同域 `/pilot.html`） |
 | 看板 0 会话不等于 0 人来 | 一轮都没成功的会话在看板上表现为 **0 会话**（它没有可计入的完成轮次）。所以若看板是 0 会话、而 OCR 或对话计数非零，那不是"没人来"，而是**系统性失败**（模型凭据、超时或被限速）—— 先去看 `chat_error` 事件与一轮失败率 |
@@ -563,6 +571,8 @@ node scripts/deploy-cloudbase.mjs --apply            #    真的注入
 | [`superpowers/specs/2026-11-02-设置面板-主题与字号-design.md`](docs/superpowers/specs/2026-11-02-设置面板-主题与字号-design.md) | 设置面板（主题三选 + 字号三档）设计书与实现踩坑 |
 | [`13-题库双轴选题-数据面与管线.md`](docs/13-题库双轴选题-数据面与管线.md) | 152 道题的数据面、离线管线与验收 |
 | [`14-题库双轴选题-接入与交互.md`](docs/14-题库双轴选题-接入与交互.md) | 题库地图与抽屉的接入口径、动效与降级 |
+| [`19-阿里云ECS免费试用-部署指南.md`](docs/19-阿里云ECS免费试用-部署指南.md) | 免费试用 ECS 上把试点跑起来：领取、安全组、Node 20、systemd、到期备份 |
+| [`20-部署计划书-国内云服务器最小成本方案.md`](docs/20-部署计划书-国内云服务器最小成本方案.md) | 正式试点的选型、首年账单、备案排期与上线前必须补的口子 |
 | [`DESIGN-TOKENS.md`](DESIGN-TOKENS.md) | v3 设计 token 与可访问性说明 |
 | [`PRODUCT.md`](PRODUCT.md) | 产品真源：定位、用户、硬约束、题库口径、anti-goals |
 | [`showcase/`](showcase/) | 项目成果展示页 |
