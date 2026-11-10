@@ -47,6 +47,32 @@
  *
  * 时间戳一律 ISO 字符串（UTC，24 字符），与全局约束一致；
  * `now` 一律是可注入的毫秒数，测试才能验"过期"与"窗口过后恢复"。
+ *
+ * ============================================================================
+ * 一把钥匙不够：三档口令，一扇门（Task 10 重做版）
+ * ============================================================================
+ * 试点期间同一扇门要进三种人，而他们手里的东西**不是同一类东西**：
+ *
+ *   ① **学生** —— 6 位数字，库里存的是哈希，`getUser(codeHash)` 按口令查人。
+ *   ② **开发** —— 环境变量 `PILOT_DEV_CODE`，随便多长。数据写进批次 `dev`。
+ *   ③ **管理员** —— 环境变量 `ADMIN_CODE`，**只用来开看板**（`x-admin-code`）。
+ *      登录口认得它，但**不发令牌** —— 管理员不冒充学生，两把钥匙不许互相开锁。
+ *
+ * 判定顺序写死为 学生 → 开发 → 管理员，三条理由：
+ *   · 学生档按哈希查表，是唯一"库里有记录"的一档；
+ *   · 若某天发号脚本撞巧发了一个等于 `ADMIN_CODE` 的 6 位数，
+ *     它的主人必须还是学生，否则"发号撞号"会静默把学生变成管理员；
+ *   · 开发档排在管理员之前，是因为开发档需要令牌（要真跑一遍 iframe），
+ *     而管理员档只需要一个角色名。
+ *
+ * **开发档的身份不写进 `test_user`。** 它不派生自任何名单，写进去之后
+ * "按批次列人"的每一处都会多出一个不属于任何班级的"调试"。所以开发身份
+ * 由**令牌记录本身**承载（`role` / `displayName` / `batchId`），`resolveToken`
+ * 认这个字段，不去查用户表。代价写在明处：开发档没有"停用"这一说 ——
+ * 它本来就不是一个人，要停掉就把 `PILOT_DEV_CODE` 删掉。
+ *
+ * 三档共用同一套限速（`checkLoginRate` 在判定之前、键是 (来源, 口令)）：
+ * 限速若挂在某一档里面，换一档就绕过去了，而枚举脚本换的正是口令。
  */
 
 import { createHash, randomBytes, randomInt } from 'node:crypto';
@@ -74,6 +100,17 @@ function pepper() {
 
 /** 令牌有效期 60 天，绑账号不绑批次（设计稿 §5.1） */
 export const TOKEN_TTL_MS = 60 * 24 * 60 * 60 * 1000;
+
+/**
+ * 开发档写死的身份。
+ *
+ * `batchId = 'dev'` 是"开发数据不污染真实批次"的**唯一开关**：
+ * 会话、事件、访问记录的批次都从令牌解出来的 `batchId` 走，
+ * 而整批导出按 `listSessionsByBatch` / `listEventsByBatch` 过滤 ——
+ * 只要这里是 `dev`，它就永远进不了 `b1` 的导出件。
+ */
+export const DEV_BATCH_ID = 'dev';
+export const DEV_DISPLAY_NAME = '调试';
 
 /** 6 位数字的取值空间：口令必须落在这个区间里，否则学生会拿到 7 位 */
 const CODE_SPACE = 1_000_000;
@@ -227,37 +264,19 @@ export async function issueAccounts(store, { batchId, count, prefix = 'S', start
 // ---------------------------------------------------------------------------
 
 /**
- * 用口令换令牌。
+ * 学生档：口令命中 `test_user` 里的某个人 → 签发令牌。
  *
- * 找不到人或口令不对一律返回 `null` —— 调用方只需要知道"不通过"，
- * 分成"用户不存在"与"口令错误"两种回答，等于给了枚举脚本一个免费的提示。
- * 停用的账号同样返回 `null`：登录口与旧令牌必须同时失效。
- *
- * `ip` 这一版**不参与判定**：限速必须在哈希之前完成（否则拒绝一次仍然做了
- * 一次哈希，脚本照样能烧），所以它由调用方在调本函数前用 `checkLoginRate` 做完。
- * 保留这个参数是为了后面登录埋点能拿到来源，不必再改一次签名。
+ * 登录是唯一能观察到"这个人今天真的来了"的时刻，所以就在这里回填两个时间。
+ * 看板与导出要的"首次登录 / 最后登录"都由它来，不靠翻事件表
+ * （事件是页面级的，弱网下会掉；登录成功是账本级的事实）。
+ * `firstSeenAt` 只写第一次：用 `??` 而不是直接覆盖，否则它会变成第二个 lastSeenAt。
  *
  * @param {object} store
- * @param {string} code
- * @param {string} ip
- * @param {number} [now] 毫秒时间戳（测试要能验过期）
- * @returns {Promise<{ token: string, user: object, batchId: string|null, expiresAt: string } | null>}
+ * @param {object} found 库里那条学生记录（调用方已确认没被停用）
+ * @param {number} now 毫秒时间戳
  */
-export async function login(store, code, ip, now = Date.now()) {
-  const normalized = String(code ?? '').trim();
-  // 空口令不必查库：库里没有谁的哈希会等于空串，但省一次全表扫描
-  if (!normalized) return null;
-
-  const found = await store.getUser(hashCode(normalized));
-  if (!found || found.disabled) return null;
-
+async function issueStudentToken(store, found, now) {
   const seenAt = new Date(now).toISOString();
-  /**
-   * 登录是唯一能观察到"这个人今天真的来了"的时刻，所以就在这里回填两个时间。
-   * 看板与导出要的"首次登录 / 最后登录"都由它来，不靠翻事件表
-   * （事件是页面级的，弱网下会掉；登录成功是账本级的事实）。
-   * `firstSeenAt` 只写第一次：用 `??` 而不是直接覆盖，否则它会变成第二个 lastSeenAt。
-   */
   const user = { ...found, firstSeenAt: found.firstSeenAt ?? seenAt, lastSeenAt: seenAt };
   await store.putUser(user);
 
@@ -272,7 +291,105 @@ export async function login(store, code, ip, now = Date.now()) {
     createdAt: seenAt,
   });
 
-  return { token, user, batchId: currentBatchId(user), expiresAt };
+  return { role: 'student', token, user, batchId: currentBatchId(user), expiresAt };
+}
+
+/**
+ * 开发档：口令命中 `PILOT_DEV_CODE` → 签发令牌，身份是 `dev-<6 位随机>`。
+ *
+ * 为什么不 putUser 一条记录：那会在"按批次列人"的每一处多出一个不属于任何
+ * 班级的"调试"，而它没有任何一份名单能对上。身份写在**令牌记录**里，
+ * `resolveToken` 认 `role:'dev'` 就地还原，不去查用户表。
+ *
+ * `role` / `batchId` / `displayName` 三个字段是**解析令牌时的唯一依据**，
+ * 所以它们必须只由这里写入。
+ *
+ * @param {object} store
+ * @param {number} now 毫秒时间戳
+ */
+async function issueDevToken(store, now) {
+  const seenAt = new Date(now).toISOString();
+  const userId = `dev-${randomBytes(3).toString('hex')}`;
+  const token = randomBytes(32).toString('hex');
+  const expiresAt = new Date(now + TOKEN_TTL_MS).toISOString();
+
+  await store.putToken({
+    tokenHash: tokenHash(token),
+    userId,
+    role: 'dev',
+    displayName: DEV_DISPLAY_NAME,
+    batchId: DEV_BATCH_ID,
+    expiresAt,
+    createdAt: seenAt,
+  });
+
+  return {
+    role: 'dev',
+    token,
+    user: { id: userId, displayName: DEV_DISPLAY_NAME },
+    batchId: DEV_BATCH_ID,
+    expiresAt,
+  };
+}
+
+/** 环境变量里的两把钥匙。trim 与 admin.js 的 `adminEnabled` 同口径：空白等于没配。 */
+const devCodeOf = (env) => String(env?.PILOT_DEV_CODE ?? '').trim();
+const adminCodeOf = (env) => String(env?.ADMIN_CODE ?? '').trim();
+
+/**
+ * 用口令换身份。**一扇门，三把钥匙，顺序固定。**
+ *
+ * 找不到人或口令不对一律返回 `null` —— 调用方只需要知道"不通过"，
+ * 分成"用户不存在"与"口令错误"两种回答，等于给了枚举脚本一个免费的提示。
+ * 停用的账号同样返回 `null`：登录口与旧令牌必须同时失效。
+ * 三档都不中时，响应里也不会透露"差一点命中哪一档"。
+ *
+ * 一个细节：**被停用的学生直接回 `null`，不往下继续判**。
+ * 若某个被停用的号恰好等于管理员口令，继续往下判就等于"停用一个号"
+ * 反而把它升成了管理员。
+ *
+ * `ip` 这一版**不参与判定**：限速必须在哈希之前完成（否则拒绝一次仍然做了
+ * 一次哈希，脚本照样能烧），所以它由调用方在调本函数前用 `checkLoginRate` 做完。
+ * 保留这个参数是为了登录埋点能拿到来源。
+ *
+ * `env` 由路由传进来（serverless 上配置是**按请求**给的，见 router.js 的
+ * `envFor()`）。默认 `process.env` 是为了让脚本与测试直接调用时行为不变。
+ * 两个比较都走 `safeEqual` —— 与管理员口令闸门同一把尺子。
+ *
+ * @param {object} store
+ * @param {string} code
+ * @param {string} ip
+ * @param {number} [now] 毫秒时间戳（测试要能验过期）
+ * @param {object} [env] 配置来源（`process.env` 或请求作用域里的那份）
+ * @returns {Promise<
+ *   | { role: 'student', token: string, user: object, batchId: string|null, expiresAt: string }
+ *   | { role: 'dev', token: string, user: object, batchId: string, expiresAt: string }
+ *   | { role: 'admin' }
+ *   | null
+ * >}
+ */
+export async function login(store, code, ip, now = Date.now(), env = process.env) {
+  const normalized = String(code ?? '').trim();
+  // 空口令不必查库：库里没有谁的哈希会等于空串，但省一次全表扫描
+  if (!normalized) return null;
+
+  // ① 学生：按口令哈希查表（唯一"库里有记录"的一档）
+  const found = await store.getUser(hashCode(normalized));
+  if (found) return found.disabled ? null : issueStudentToken(store, found, now);
+
+  // ② 开发：环境变量里的那把钥匙，命中就发令牌（批次写死 dev）
+  const expectedDev = devCodeOf(env);
+  if (expectedDev && safeEqual(normalized, expectedDev)) return issueDevToken(store, now);
+
+  /**
+   * ③ 管理员：只回一个角色名，**不发令牌**。
+   * 管理员用 `x-admin-code` 开看板，拿一张学生令牌反而是给错了一把钥匙 ——
+   * 那张令牌能调学生接口，等于把"看数据的人"变成"能替学生做题的人"。
+   */
+  const expectedAdmin = adminCodeOf(env);
+  if (expectedAdmin && safeEqual(normalized, expectedAdmin)) return { role: 'admin' };
+
+  return null;
 }
 
 /**
@@ -281,6 +398,15 @@ export async function login(store, code, ip, now = Date.now()) {
  * 读不到、过期、账号被停用：一律 `null`。
  * 失效判断是"失败关闭"的：`expiresAt` 解析不出来也当过期，
  * 而不是让一个坏字段变成永久有效的令牌。
+ *
+ * 开发档是个例外：它的身份**就在令牌记录里**（`role:'dev'` /
+ * `displayName` / `batchId`），因为开发档刻意不在 `test_user` 里建记录
+ * （否则"按批次列人"的每一处都会多出一个不属于任何班级的"调试"）。
+ * 这个分支只认 `role === 'dev'`，学生令牌没有这个字段，照旧去查用户表 ——
+ * 反过来说，一个学生令牌**永远**走不到这个分支。
+ *
+ * `batchId` 用记录里那个（写的时候就是 `dev`），回落常量而不是 `null`：
+ * 一条缺字段的旧开发令牌不该把它的会话变成"没有批次"（那种数据谁都查不到）。
  *
  * @param {object} store
  * @param {string} token 客户端带来的明文令牌
@@ -296,6 +422,17 @@ export async function resolveToken(store, token, now = Date.now()) {
 
   const expiresAtMs = Date.parse(record.expiresAt);
   if (!Number.isFinite(expiresAtMs) || expiresAtMs <= now) return null;
+
+  if (record.role === 'dev') {
+    return {
+      user: {
+        id: String(record.userId),
+        displayName: String(record.displayName ?? DEV_DISPLAY_NAME),
+      },
+      batchId: typeof record.batchId === 'string' && record.batchId ? record.batchId : DEV_BATCH_ID,
+      expiresAt: record.expiresAt,
+    };
+  }
 
   const user = await store.getUserById(record.userId);
   if (!user || user.disabled) return null;

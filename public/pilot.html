@@ -1,0 +1,836 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>步步解 · 内测入口</title>
+<!--
+  试点入口：一扇门，三把钥匙。
+
+  ============================================================================
+  为什么是**新的一页**，而不是改产品页
+  ============================================================================
+  `public/index.html` 是成品，一个字节都不许改（它已经回到 5ef9948）。
+  所以试点层整层搬到这里：登录屏在外，产品页装进一个**同源 iframe**。
+  好处是产品页里的任何一行都不用动；代价是"身份"只能从外面注进去 ——
+  见下面 injectFrame() 的注释。
+
+  ============================================================================
+  三把钥匙，进的是同一个门，看到的东西不一样
+  ============================================================================
+  · 学生口令 —— 收起登录屏，同一页里用 iframe 载入 /index.html；
+                 令牌留在 localStorage['bsj-token']，由唯一一处 fetch 包装补进请求头。
+  · 开发口令 —— 同上，但顶上多一条调试条（批次固定 dev，数据不进任何真实批次）。
+  · 看板口令 —— **不载入产品页、不发令牌**：口令写 localStorage['bsj-admin']，
+                 然后跳 /admin.html（看板本来就在读那个键、走 x-admin-code）。
+
+  ============================================================================
+  这一页**不做**的三件事（上一版做过，产品负责人看过之后砍掉了）
+  ============================================================================
+  开场说明、题单条、续做条。这里连锚点都不留 —— 留着就会有人顺手接上去。
+-->
+<style>
+[hidden]{display:none!important}
+:root{
+  --ink:#23201d;--ink-2:#5b564f;--ink-3:#8b8479;
+  --line:#e4dfd6;--paper:#fbfaf7;--card:#fff;
+  --brand:#2f6f5e;--warn:#a3432c;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+/* ---------------- 登录屏 ---------------- */
+#gate{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+#gateForm{
+  width:100%;max-width:360px;background:var(--card);
+  border:1px solid var(--line);border-radius:14px;padding:28px 24px 18px;
+}
+#gateForm h1{margin:0 0 4px;font-size:20px;line-height:1.3;letter-spacing:.02em}
+#gateForm .lead{margin:0 0 18px;color:var(--ink-2);font-size:13px}
+#gateCode{
+  width:100%;padding:11px 13px;font-size:16px;letter-spacing:.08em;color:var(--ink);
+  background:#fff;border:1px solid var(--line);border-radius:10px;outline:none;
+  font-family:inherit;
+}
+#gateCode:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(47,111,94,.12)}
+#gateCode::placeholder{color:var(--ink-3);letter-spacing:0}
+#gateGo{
+  margin-top:12px;width:100%;padding:11px;font:inherit;font-size:15px;color:#fff;
+  background:var(--brand);border:0;border-radius:10px;cursor:pointer;
+}
+#gateGo:hover{background:#2a6353}
+#gateGo[disabled]{opacity:.55;cursor:default}
+.msg{min-height:20px;margin:10px 0 0;font-size:13px;color:var(--warn)}
+.msg:empty{margin-top:4px}
+/* ---------------- 进到里面之后 ---------------- */
+#stage{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--paper)}
+#bar{
+  flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  height:38px;padding:0 10px;border-bottom:1px solid var(--line);background:var(--card);
+}
+#bar img{width:20px;height:20px;display:block}
+#out{
+  font:inherit;font-size:12px;line-height:1;color:var(--ink-2);background:none;
+  border:1px solid var(--line);border-radius:8px;padding:5px 10px;cursor:pointer;
+}
+#out:hover{color:var(--ink);border-color:#d6cfc3}
+#devbar{
+  flex:0 0 auto;margin:0;padding:6px 10px;font-size:12px;line-height:1.55;color:var(--ink-2);
+  background:#f4f1ea;border-bottom:1px solid var(--line);word-break:break-word;
+}
+#devbar b{color:var(--ink);font-weight:600}
+#fatal{
+  flex:0 0 auto;margin:0;padding:8px 10px;font-size:13px;color:#fff;
+  background:var(--warn);word-break:break-word;
+}
+#frameBox{flex:1 1 auto;min-height:0}
+#frame{display:block;width:100%;height:100%;border:0;background:#fff}
+@media (max-width:420px){
+  #gateForm{padding:22px 18px 14px}
+  #gateForm h1{font-size:18px}
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== 门：口令 ===================== -->
+<main id="gate" data-testid="login">
+  <form id="gateForm" novalidate>
+    <h1>步步解</h1>
+    <p class="lead">这是内测，输入老师发给你的口令</p>
+    <input id="gateCode" type="text" inputmode="text" autocomplete="off" autocapitalize="off"
+           spellcheck="false" maxlength="64" placeholder="口令" aria-label="口令">
+    <button id="gateGo" type="submit">进入</button>
+    <p id="gateMsg" class="msg" role="status" aria-live="polite"></p>
+  </form>
+</main>
+
+<!-- ===================== 里面：一条最细的壳 + 成品页 ===================== -->
+<div id="stage" hidden>
+  <header id="bar">
+    <img src="/brand.png" alt="步步解" width="20" height="20">
+    <button id="out" type="button">退出</button>
+  </header>
+  <p id="devbar" hidden>
+    <b>调试</b> · 引擎 <span id="devEngine">读取中…</span>
+    · 模型 <span id="devModel">读取中…</span>
+    · 拍照 <span id="devOcr">读取中…</span>
+    · 今日识图 <span id="devOcrToday">读取中…</span>
+    · 批次 <span id="devBatch">dev</span>
+    · 本次已记 <span id="devEvents">0</span> 条事件 / <span id="devTurns">0</span> 轮对话<span id="devLost"></span>
+  </p>
+  <p id="fatal" hidden></p>
+  <div id="frameBox"></div>
+</div>
+
+<!--
+  成品页放在 <template> 里：登录之前**一个字节都不加载**。
+
+  为什么不用"先带着 src 放进隐藏容器"：浏览器不会因为父容器 display:none 就不加载子框架，
+  学生在门口犹豫的那几秒里，产品页已经用自己的（空）身份问过一轮接口了 ——
+  配了登录守卫的部署上那些请求会 401，登录之后还得再重载一次才能干净。
+  放进 template 就只有登录成功那一刻才真的开始载入。
+-->
+<template id="frameTpl"><iframe id="frame" src="/index.html" title="步步解"></iframe></template>
+
+<script>
+(function () {
+  'use strict';
+
+  /* =====================================================================
+     0. 常量与状态
+     ===================================================================== */
+
+  var TOKEN_KEY = 'bsj-token';
+  var VISIT_KEY = 'bsj-visit';
+  var ADMIN_KEY = 'bsj-admin';
+
+  /**
+   * 接口基址 —— 与成品页同一套判断。
+   * 腾讯云静态托管域（*.tcloudbaseapp.com）只发静态文件，接口在同一环境的
+   * HTTP 访问服务上（另一个域）；本地 / Vercel / Workers 都是同源，返回空串。
+   * 两处各写一份是没办法的事（这里不许改产品页），所以规则必须一模一样。
+   */
+  var API_BASE = (function () {
+    var m = /^([a-z0-9-]+?)-[0-9]+\.tcloudbaseapp\.com$/.exec(location.hostname);
+    return m ? 'https://' + m[1] + '.service.tcloudbase.com' : '';
+  })();
+
+  var S = {
+    role: '', displayName: '', batchId: '', token: '',
+    visitId: '', stems: {},
+    page: 0, intake: '',
+    queue: [], timer: null, eventsSent: 0, eventsLost: 0, chatTurns: 0,
+    observer: null, expired: false
+  };
+
+  var gate = document.getElementById('gate');
+  var gateForm = document.getElementById('gateForm');
+  var gateCode = document.getElementById('gateCode');
+  var gateGo = document.getElementById('gateGo');
+  var gateMsg = document.getElementById('gateMsg');
+  var stage = document.getElementById('stage');
+  var outBtn = document.getElementById('out');
+  var devbar = document.getElementById('devbar');
+  var frameBox = document.getElementById('frameBox');
+  var fatal = document.getElementById('fatal');
+  var frameTpl = document.getElementById('frameTpl');
+
+  /* =====================================================================
+     1. 小工具
+     ===================================================================== */
+
+  function text(el, value) {
+    if (el) el.textContent = value === null || value === undefined ? '' : String(value);
+  }
+  function say(msg) { text(gateMsg, msg); }
+  function setBusy(on) {
+    gateGo.disabled = Boolean(on);
+    gateCode.readOnly = Boolean(on);
+  }
+  function readToken() {
+    try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; }
+  }
+  function writeToken(value) {
+    try {
+      if (value) localStorage.setItem(TOKEN_KEY, value);
+      else localStorage.removeItem(TOKEN_KEY);
+    } catch (e) { /* 隐私模式下存不了也用一次性的：S.token 里还有 */ }
+  }
+
+  /**
+   * 令牌请求头**只在这一个函数里写**。
+   *
+   * 页面自己的请求（开访问、上报埋点、健康检查）与被注入的 iframe 里的请求
+   * 都走它。两个地方各写一份的话，迟早会出现"某个接口带了、另一个没带"，
+   * 而那个失败长得像"这个接口就是不给数据"——排查半天。
+   *
+   * 头名只在这里出现一次，测试也钉着这一点。
+   */
+  function withToken(init) {
+    var opts = {};
+    /**
+     * 只拷自有可枚举字段：调用方传的都是普通对象（成品页的 API.post 就是
+     * `{ method, headers, body, signal }`）。传 Request 对象的路径这里没有。
+     */
+    if (init) { for (var key in init) opts[key] = init[key]; }
+    var headers = new Headers(opts.headers || undefined);
+    var token = S.token || readToken();
+    if (token) headers.set('x-test-token', token);
+    opts.headers = headers;
+    return opts;
+  }
+
+  /** 页面自己的接口调用（永远带上令牌） */
+  function apiFetch(path, init) {
+    return fetch(API_BASE + path, withToken(init));
+  }
+
+  /* =====================================================================
+     2. 埋点（客户端那一半）
+     ===================================================================== */
+
+  /**
+   * 客户端只发它算得出来的这九种：login / visit_open / page_enter / page_exit /
+   * intake_choose / ocr_call / ocr_result / import_result / chat_send。
+   *
+   * `chat_reply` 不在这里，而且**不许**在这里：它是服务端在 appendTurn 之后发的，
+   * 客户端也发一条会让"有 send 无 reply"的分母翻倍 —— 那个数是要拿去做告警的。
+   *
+   * 发送是**旁路**：`keepalive` 让关标签页时这一批还能活着送到；
+   * 失败一律静默，也不重试 —— 重试可能把同一条事件写两遍，而分母翻倍的代价
+   * 比偶尔丢几条更高。真正需要"一条都不能丢"的是对话本身，不是埋点。
+   */
+  function send(type, payload, owner) {
+    if (S.expired) return;
+    var event = { type: type, payload: payload || {} };
+    var from = owner || {};
+    var visitId = from.visitId || S.visitId;
+    if (visitId) event.visitId = visitId;
+    if (from.sessionId) event.sessionId = from.sessionId;
+    S.queue.push(event);
+    scheduleFlush();
+  }
+
+  function scheduleFlush() {
+    if (S.timer) return;
+    S.timer = setTimeout(function () { S.timer = null; flush(); }, 400);
+  }
+
+  /**
+   * 把攒下的这一批送到服务端。
+   *
+   * `withToken()` 返回的是**整个 init**（带令牌头的那一份），不是 headers ——
+   * 写成 `headers: withToken(...)` 会让请求丢掉令牌头，而症状是
+   * 服务端回一个 401、埋点一条都进不去，页面上却还显示"已记 N 条"。
+   * 这个坑是真踩过的：单测看不见它（没有浏览器），只有真的跑一遍才知道。
+   */
+  function flush() {
+    if (S.timer) { clearTimeout(S.timer); S.timer = null; }
+    if (!S.queue.length) return;
+    var batch = S.queue.splice(0, S.queue.length);
+    S.eventsSent += batch.length;
+    paintDev();
+    fetch(API_BASE + '/api/events', withToken({
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ events: batch }),
+      keepalive: true
+    })).then(function (res) {
+      /**
+       * 401 说明令牌已经不能用（过期/被停用/守卫拦下）—— 这一批送不出去，
+       * 而且后面每一批都会一样。回到门口，不要让它继续悄悄失败。
+       */
+      if (res.status === 401) { noteEventsLost(); expire(); return; }
+      if (!res.ok) noteEventsLost();
+    }, function () { noteEventsLost(); });
+  }
+
+  /** 送不出去的那一批只记个数：埋点失败绝不影响做题，但"一条都没记上"不该无声无息 */
+  function noteEventsLost() {
+    S.eventsLost += 1;
+    paintDev();
+  }
+
+  /** 学生切走 / 关标签页时冲一次：普通请求会被取消，keepalive 的能活到响应回来 */
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') flush();
+  });
+  window.addEventListener('pagehide', function () { flush(); });
+
+  /* =====================================================================
+     3. 门：登录、三把钥匙的分流
+     ===================================================================== */
+
+  gateForm.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    submitCode(gateCode.value);
+  });
+
+  /**
+   * 一次登录 = 一次新的打开：计数、页号、"已过期"标记全部从头来。
+   *
+   * 这一条不是洁癖。退出或过期之后 `S.expired` 是 true，而所有 `send()` 和
+   * 翻页观察在 true 时**直接返回**。若这里不重置，下一次登录会得到一个
+   * "页面完全正常、埋点全程为零"的会话 —— 而它看起来和第一条会话一模一样。
+   */
+  function resetSession() {
+    S.expired = false;
+    S.page = 0;
+    S.intake = '';
+    S.stems = {};
+    S.visitId = '';
+    S.queue.length = 0;
+    S.eventsSent = 0;
+    S.eventsLost = 0;
+    S.chatTurns = 0;
+    if (S.observer) { try { S.observer.disconnect(); } catch (e) {} S.observer = null; }
+  }
+
+  function submitCode(raw) {
+    /**
+     * **不限制成只能输数字**：学生手里是 6 位数字，而另外两把钥匙是任意串。
+     * 只 trim，不校验形状 —— 校验形状等于在门口贴一张"口令长什么样"的告示。
+     */
+    var code = String(raw === null || raw === undefined ? '' : raw).trim();
+    if (!code) { say('请先输入口令'); gateCode.focus(); return; }
+
+    say('');
+    setBusy(true);
+    fetch(API_BASE + '/api/auth/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ code: code })
+    }).then(function (res) {
+      return res.text().then(function (bodyText) {
+        var data = null;
+        try { data = bodyText ? JSON.parse(bodyText) : null; } catch (e) { data = null; }
+        if (!res.ok) {
+          /** 服务端只说一句「口令不对」，这里原样转述，不自己编原因 */
+          throw new Error((data && data.error) || '登录没成功，请稍后再试');
+        }
+        if (!data || !data.role) throw new Error('服务返回的内容看不懂，请刷新页面重试');
+        return data;
+      });
+    }).then(function (data) {
+      if (data.role === 'admin') {
+        enterDashboard(code);
+        return;
+      }
+      if (!data.token) throw new Error('服务返回的内容看不懂，请刷新页面重试');
+      resetSession();
+      S.token = String(data.token);
+      writeToken(S.token);
+      S.role = data.role === 'dev' ? 'dev' : 'student';
+      S.displayName = data.displayName || '';
+      S.batchId = data.batchId || '';
+      /** 登录事件允许没有归属（这是唯一一条例外，见 events.js 的 allowsNoOwner） */
+      send('login', { displayName: S.displayName });
+      openVisit().then(openStage);
+    }).catch(function (err) {
+      setBusy(false);
+      say(err && err.message ? err.message : '登录没成功，请稍后再试');
+    });
+  }
+
+  /**
+   * 看板那把钥匙：**不发令牌、不载入产品页**。
+   *
+   * 看板自己用 `x-admin-code` 进门（`localStorage['bsj-admin']` 这个键它早就在读了），
+   * 给它一张学生令牌等于把"看数据的人"变成"能替学生做题的人"。
+   */
+  function enterDashboard(code) {
+    try { localStorage.setItem(ADMIN_KEY, code); } catch (e) { /* 存不了就靠人再输一次 */ }
+    location.replace('/admin.html');
+  }
+
+  /**
+   * 落地先开一次访问：页 1–2 的事件挂在 visitId 上（那时还没有会话），
+   * 没有它，漏斗的第一格永远是 0 —— 而且**不会报错**。
+   * 失败不阻塞页面：学生要能做上题，一次打开记录不该挡住它。
+   */
+  function openVisit() {
+    return apiFetch('/api/visit', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}'
+    }).then(function (res) {
+      if (res.status === 401) { expire(); return null; }
+      return res.json().then(function (data) { return data; }, function () { return null; });
+    }).then(function (data) {
+      if (!data) return;
+      S.visitId = String(data.visitId || '');
+      try { if (S.visitId) sessionStorage.setItem(VISIT_KEY, S.visitId); } catch (e) {}
+      var count = Array.isArray(data.questionIds) ? data.questionIds.length : 0;
+      send('visit_open', { questionCount: count });
+    }).catch(function () { /* 开访问失败不阻塞 */ });
+  }
+
+  function openStage() {
+    /**
+     * 开访问那一步可能已经 401 了（令牌一登录就过期/被停用）：那时候
+     * `expire()` 已经把页面送回门口，这里**不能再把成品页盖上去** ——
+     * 否则学生会看见一个所有接口都 401 的产品页，而且不会再被送回登录屏
+     * （`expire()` 有 `S.expired` 守卫，只会执行一次）。
+     */
+    if (S.expired) return;
+    gate.hidden = true;
+    stage.hidden = false;
+    if (S.role === 'dev') {
+      devbar.hidden = false;
+      text(document.getElementById('devBatch'), S.batchId || 'dev');
+      paintDev();
+      loadHealth();
+    }
+    frameBox.textContent = '';
+    frameBox.appendChild(frameTpl.content.cloneNode(true));
+    var frame = document.getElementById('frame');
+    frame.addEventListener('load', function () { injectFrame(frame); });
+  }
+
+  /* =====================================================================
+     4. 注入：令牌头 + 翻页埋点 + 入场方式 + 识图/读题结果
+     ===================================================================== */
+
+  /**
+   * 把成品页装进 iframe 之后，在这里补三件事。
+   *
+   * **为什么只改 `contentWindow.fetch` 一处就够**：成品页里所有接口都走 `API.req`，
+   * 而它是裸调用 `fetch(...)`（不是先存一份引用），所以在全局对象上换掉 fetch
+   * 就能罩住它 —— 产品页里一行都不用动。这是这一层唯一的注入点。
+   *
+   * 注入不成功必须**看得见**：注入失败的症状是"页面照常能做题，但一条埋点都没有"，
+   * 而看板上那一列恒为 0 也不会报错。所以这里每一种失败都落成横幅上的中文。
+   */
+  function injectFrame(frame) {
+    var w = null;
+    try {
+      w = frame.contentWindow;
+      if (!w || !w.document || !w.document.body) throw new Error('读不到 iframe 里的页面');
+      if (typeof w.fetch !== 'function') throw new Error('iframe 里没有可以替换的 fetch');
+      if (typeof w.MutationObserver !== 'function') throw new Error('iframe 里没有 MutationObserver');
+    } catch (err) {
+      failInjection(err);
+      return;
+    }
+
+    try {
+      if (S.observer) { try { S.observer.disconnect(); } catch (e) {} S.observer = null; }
+      S.page = 0;
+
+      var nativeFetch = w.fetch;
+      var wrapped = function (input, init) {
+        var url = typeof input === 'string' ? input : String((input && input.url) || '');
+        var opts = init;
+
+        /**
+         * 埋点自己的异常绝不能影响学生的这一轮请求：整段包在 try 里，
+         * 出错就当作"这次没记上"，请求照发。
+         */
+        try {
+          if (url.indexOf('/api/chat') >= 0) {
+            opts = withVisitInBody(init);
+            noteChatSend(opts);
+          } else if (url.indexOf('/api/ocr') >= 0) {
+            noteOcrCall(init);
+          }
+        } catch (e) { /* 见上 */ }
+
+        var startedAt = Date.now();
+        var pending = nativeFetch.call(w, input, withToken(opts));
+
+        return pending.then(function (res) {
+          try {
+            /**
+             * 任何 `/api/*` 的 401 都只说明一件事：令牌过期或被停用。
+             * 回到登录屏，**不自动重试** —— 自动重试会把一次 401 变成一串 401，
+             * 而登录口那边每一次都算一次失败（同一对攒 5 次就锁）。
+             */
+            if (res.status === 401 && url.indexOf('/api/') >= 0) {
+              expire();
+              return res;
+            }
+            if (url.indexOf('/api/ocr') >= 0) noteOcrResult(res, startedAt);
+            else if (url.indexOf('/api/problem/import') >= 0) noteImportResult(res, startedAt);
+            else if (url.indexOf('/api/problem') >= 0) rememberStem(res);
+          } catch (e) { /* 同上 */ }
+          return res;
+        }, function (err) {
+          try {
+            if (url.indexOf('/api/ocr') >= 0) send('ocr_result', { ok: false, ms: Date.now() - startedAt, quota: null });
+            else if (url.indexOf('/api/problem/import') >= 0) send('import_result', { ok: false, ms: Date.now() - startedAt, warningCount: null });
+          } catch (e) { /* 同上 */ }
+          throw err;
+        });
+      };
+
+      w.fetch = wrapped;
+      /** 赋值失败（某些宿主会把 window 上的属性锁住）必须当场说出来，不能默默跑 */
+      if (w.fetch !== wrapped) throw new Error('替换 iframe 的 fetch 没有生效');
+
+      watchPages(w);
+      watchIntake(w);
+    } catch (err) {
+      failInjection(err);
+    }
+  }
+
+  function failInjection(err) {
+    text(fatal, '这次没有接上埋点：' + (err && err.message ? err.message : '未知原因')
+      + '。学生仍然能做题，但这一轮的数据不会被记下来，请刷新页面重试。');
+    fatal.hidden = false;
+  }
+
+  /**
+   * 把 visitId 塞进 `/api/chat` 的请求体。
+   *
+   * 为什么必须由这一层塞：成品页不知道"这次打开"的 id（那是外面开出来的），
+   * 而服务端把会话挂回这次打开只认请求体里的 `visitId`。不塞的话
+   * `session.visitId` 恒为 null，页 1–2 的停留永远算不出来 —— 而且没有任何报错。
+   */
+  function withVisitInBody(init) {
+    if (!init) return init;
+    var opts = {};
+    for (var key in init) opts[key] = init[key];
+    if (typeof opts.body !== 'string' || !S.visitId) return opts;
+    try {
+      var body = JSON.parse(opts.body);
+      if (body && typeof body === 'object' && !body.visitId) {
+        body.visitId = S.visitId;
+        opts.body = JSON.stringify(body);
+      }
+    } catch (e) { /* 不是 JSON 就原样送出去，服务端自己会回 400 */ }
+    return opts;
+  }
+
+  function parseBody(opts) {
+    try { return JSON.parse(opts && opts.body); } catch (e) { return null; }
+  }
+
+  /**
+   * 去掉空白、标点、公式占位符 `〔式〕` 之后再比。
+   *
+   * 学生复制题干之后常会顺手删掉"〔式〕"或者把标点改掉；不归一化的话
+   * 「有没有复制题干」这一列永远是"否"，而它看起来完全正常。
+   * 只留字母与数字（中文是 `\p{L}`），所以标点、空格、括号全部消失。
+   */
+  function normalizeForCompare(value) {
+    return String(value === null || value === undefined ? '' : value)
+      .replace(/〔式〕/g, '')
+      .replace(/[^\p{L}\p{N}]/gu, '');
+  }
+
+  /** 首条消息长度 ≥ 8 且被题干包含 → 复制了题干。**只发布尔，不发内容。** */
+  function copiedStem(utterance, stem) {
+    var message = normalizeForCompare(utterance);
+    var problem = normalizeForCompare(stem);
+    if (!message || !problem) return false;
+    if (message.length < 8) return false;
+    return problem.indexOf(message) >= 0;
+  }
+
+  function noteChatSend(opts) {
+    var body = parseBody(opts);
+    var utterance = body && typeof body.utterance === 'string' ? body.utterance : '';
+    var sessionId = body && typeof body.sessionId === 'string' ? body.sessionId : '';
+    var stem = (body && body.problemId && S.stems[body.problemId]) || '';
+    S.chatTurns += 1;
+    /**
+     * `len` 是**这一条消息**的长度（原样，用来显示"首条多少字"）；
+     * `copiedStem` 按同一条规则算 —— 导出只读这个会话的第一条，
+     * 所以首条那一份才是真正被用到的那一份。
+     */
+    send('chat_send', {
+      len: utterance.trim().length,
+      copiedStem: copiedStem(utterance, stem)
+    }, { sessionId: sessionId });
+    /**
+     * 立刻发，不等那 400ms 的攒批。
+     *
+     * J7 要的是"在请求发出前先发事件"：这一条是"有 send 无 reply"的**分子**，
+     * 若它跟着下一批一起去，学生关掉页面时它就没了 —— 而那一轮反而会被读成
+     * "没有发生"。同理，先落库再发请求，事件表里的顺序才是真的顺序。
+     */
+    flush();
+    paintDev();
+  }
+
+  function noteOcrCall(init) {
+    var body = null;
+    try { body = init && typeof init.body === 'string' ? JSON.parse(init.body) : null; } catch (e) { body = null; }
+    var image = body && typeof body.image === 'string' ? body.image : '';
+    /** 与服务端口径一致：dataURL 去掉头之后按 base64 估字节数 */
+    var bytes = image ? Math.floor((image.length - (image.indexOf(',') + 1)) * 0.75) : 0;
+    send('ocr_call', { bytes: bytes });
+  }
+
+  function noteOcrResult(res, startedAt) {
+    /**
+     * `quota`（剩余额度）服务端**没有**回这个字段，所以照实写 null，
+     * 不编一个数：调试条上编出来的数字比没有数字更糟。
+     */
+    send('ocr_result', { ok: res.ok, ms: Date.now() - startedAt, quota: null });
+  }
+
+  function noteImportResult(res, startedAt) {
+    var ms = Date.now() - startedAt;
+    var ok = res.ok;
+    if (!res.clone) { send('import_result', { ok: ok, ms: ms, warningCount: null }); return; }
+    res.clone().json().then(function (data) {
+      var intake = data && data.intake;
+      var warnings = intake && Number.isFinite(intake.warningCount) ? intake.warningCount : null;
+      if (ok && data && data.problem && typeof data.problem.stem === 'string' && data.problem.id) {
+        S.stems[data.problem.id] = data.problem.stem;
+      }
+      send('import_result', { ok: ok, ms: ms, warningCount: warnings });
+    }).catch(function () {
+      send('import_result', { ok: ok, ms: ms, warningCount: null });
+    });
+  }
+
+  /** 记住当前题目的题干：判断"有没有复制题干"要用它，而它是随请求下来的 */
+  function rememberStem(res) {
+    if (!res.clone) return;
+    res.clone().json().then(function (data) {
+      var problem = data && data.problem;
+      if (problem && problem.id && typeof problem.stem === 'string') S.stems[problem.id] = problem.stem;
+    }).catch(function () { /* 记不住就不记，copiedStem 会退回 false */ });
+  }
+
+  /**
+   * 翻页埋点：观察成品页 `<body data-page>` 的变化。
+   *
+   * `page_enter` / `page_exit` **只在页真的变了**时才发：成品页的 setPage 在
+   * 同一页上重复调用是常事（重渲染、点同一个 tab），按"调了几次"记会把停留时长
+   * 算成好几段。`via` 尽力判定：页号变大是 `next`，变小是 `back`，其余（读不出页号）是 `idle`。
+   */
+  function watchPages(w) {
+    var body = w.document.body;
+    function sync() {
+      if (S.expired) return;
+      var page = Number(body.getAttribute('data-page'));
+      var known = page === 1 || page === 2 || page === 3 || page === 4;
+      if (known && page === S.page) return;
+      if (S.page) {
+        var via = 'idle';
+        if (known) via = page > S.page ? 'next' : 'back';
+        send('page_exit', { page: S.page, via: via });
+      }
+      S.page = known ? page : 0;
+      if (known) send('page_enter', { page: page });
+    }
+    S.observer = new w.MutationObserver(sync);
+    S.observer.observe(body, { attributes: true, attributeFilter: ['data-page'] });
+    /** 落地就在第 1 页：属性不会自己变一次，这一次得手动记 */
+    sync();
+  }
+
+  /**
+   * 入场方式：题库 / 粘贴 / 拍照。
+   *
+   * 命中成品页现有的入口（好题精练 #goodBar、相机 #cam1、输入框 #input1）——
+   * 这三个 id 是成品页的公开结构，改它们等于改产品页，所以只读不写。
+   *
+   * 一次打开只记**第一次**选的方式：之后再换入口改变不了"他是怎么进来的"，
+   * 多发只会把漏斗的入口分布算重。
+   */
+  function watchIntake(w) {
+    var doc = w.document;
+    function intake(path) {
+      if (S.intake || S.expired) return;
+      S.intake = path;
+      send('intake_choose', { path: path });
+    }
+    doc.addEventListener('click', function (ev) {
+      var target = ev.target;
+      if (!target || typeof target.closest !== 'function') return;
+      if (target.closest('#goodBar')) intake('qbank');
+      else if (target.closest('#cam1')) intake('photo');
+    }, true);
+    doc.addEventListener('paste', function (ev) {
+      if (ev.target && ev.target.id === 'input1') intake('paste');
+    }, true);
+    doc.addEventListener('input', function (ev) {
+      if (ev.target && ev.target.id === 'input1' && String(ev.target.value || '').trim()) intake('paste');
+    }, true);
+  }
+
+  /* =====================================================================
+     5. 调试条（只有开发那把钥匙看得到）
+     ===================================================================== */
+
+  function loadHealth() {
+    apiFetch('/api/health').then(function (res) {
+      return res.json();
+    }).then(function (health) {
+      var h = health || {};
+      var llm = Boolean(h.llmConfigured);
+      text(document.getElementById('devEngine'), h.engine ? (llm ? '真模型' : '离线桩') + '（' + h.engine + '）' : '未接入');
+      text(document.getElementById('devModel'), h.model ? String(h.model) : '未配置');
+      text(document.getElementById('devOcr'), h.ocr && h.ocr.configured ? '可用' : '未接入');
+      text(document.getElementById('devOcrToday'), ocrToday(h));
+    }).catch(function () {
+      text(document.getElementById('devEngine'), '未接入');
+      text(document.getElementById('devModel'), '未接入');
+      text(document.getElementById('devOcr'), '未接入');
+      text(document.getElementById('devOcrToday'), '未接入');
+    });
+  }
+
+  /**
+   * 今日拍照识题次数。
+   *
+   * `/api/health` 现在**没有这个字段**（配额计数还没接上），所以这里一律写「未接入」。
+   * 留一个函数而不是写死一句文案，是为了等字段真出现时只改这里 ——
+   * 而在那之前**绝不编一个数**：调试条上编出来的数字比没有数字更糟。
+   */
+  function ocrToday(health) {
+    var candidates = [
+      health && health.ocrToday,
+      health && health.ocr && health.ocr.today,
+      health && health.usage && health.usage.ocrToday
+    ];
+    for (var i = 0; i < candidates.length; i += 1) {
+      if (Number.isFinite(candidates[i])) return String(candidates[i]) + ' 次';
+    }
+    return '未接入';
+  }
+
+  function paintDev() {
+    if (S.role !== 'dev') return;
+    text(document.getElementById('devEvents'), S.eventsSent);
+    text(document.getElementById('devTurns'), S.chatTurns);
+    /**
+     * 送不出去的批次单独记一笔。
+     *
+     * 学生那一侧埋点失败是**静默**的（旁路，不能因为埋点坏了就弹错误）；
+     * 但调试条上必须看得见 —— 否则"已记 3 条"会变成一个谎话，
+     * 而真正的症状（服务端一条都没收到）要等看板上数不对了才发现。
+     */
+    text(
+      document.getElementById('devLost'),
+      S.eventsLost ? '（另有 ' + S.eventsLost + ' 批没送出去，检查登录态与网络）' : ''
+    );
+  }
+
+  /* =====================================================================
+     6. 过期与退出：都把页面带回门口
+     ===================================================================== */
+
+  /**
+   * 登录过期：**不自动重试**。
+   *
+   * 令牌过期或被停用时，学生看到的第一句话必须告诉他下一步做什么。
+   * 自动重试在这里是有害的：它会把一次 401 变成一串 401，而登录口那边
+   * 每一次都算一次失败（同一对 (来源, 口令) 攒满 5 次就锁十五分钟）。
+   *
+   * 顺手清掉这一次打开的痕迹：换账号是常态（同一台电脑、同一个浏览器），
+   * 上一个人的 visitId 留在 sessionStorage 里就会被下一个人接着用。
+   */
+  function expire() {
+    if (S.expired) return;
+    S.expired = true;
+    S.queue.length = 0;
+    S.token = '';
+    writeToken('');
+    try { sessionStorage.removeItem(VISIT_KEY); } catch (e) {}
+    teardown();
+    say('登录过期了，请重新输入口令');
+  }
+
+  function quit() {
+    flush();
+    S.expired = true;
+    S.token = '';
+    writeToken('');
+    try { sessionStorage.removeItem(VISIT_KEY); } catch (e) {}
+    teardown();
+    say('');
+  }
+
+  function teardown() {
+    if (S.observer) { try { S.observer.disconnect(); } catch (e) {} S.observer = null; }
+    stage.hidden = true;
+    gate.hidden = false;
+    frameBox.textContent = '';
+    fatal.hidden = true;
+    text(fatal, '');
+    devbar.hidden = true;
+    S.page = 0;
+    S.visitId = '';
+    S.intake = '';
+    S.stems = {};
+    setBusy(false);
+    gateCode.value = '';
+    gateCode.focus();
+  }
+
+  outBtn.addEventListener('click', quit);
+
+  /* =====================================================================
+     7. 启动
+     ===================================================================== */
+
+  /**
+   * 每次打开都从门口进。
+   *
+   * 上一轮留下的令牌在这里**主动清掉**，不做"自动续用"：
+   * 试点期间同一台机器换人是常态，而"打开就是上一个人的页面"是最难解释的一种错。
+   * 代价说在明处：刷新页面要重新输一次口令，会话也从新的一轮开始 ——
+   * 续做那条**本来就是产品负责人砍掉的那一块**，这里不偷偷留一个后门。
+   */
+  (function boot() {
+    S.token = '';
+    writeToken('');
+    try { sessionStorage.removeItem(VISIT_KEY); } catch (e) {}
+    setBusy(false);
+    gateCode.focus();
+  })();
+})();
+</script>
+</body>
+</html>

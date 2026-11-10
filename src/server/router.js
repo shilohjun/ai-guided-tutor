@@ -1062,7 +1062,13 @@ export async function handleApi(req, res, url) {
       return true;
     }
 
-    const result = await login(await getStore(), code, ip);
+    /**
+     * 配置按**请求**取（`envFor()`）：试点只跑 CloudBase，那边配置是平台逐请求
+     * 交进来的，不是进程环境。开发钥匙与看板钥匙都从这同一份里读，
+     * 与 `admin.js` 的 `x-admin-code` 闸门用的是同一个来源 —— 两处各读一份，
+     * 迟早会出现"登录口认、看板不认"这种谁也复现不了的分叉。
+     */
+    const result = await login(await getStore(), code, ip, Date.now(), envFor());
     if (!result) {
       /** 真的验过一次、没通过：这才叫一次失败 */
       noteLoginFailure(ip, code);
@@ -1075,7 +1081,26 @@ export async function handleApi(req, res, url) {
      * 不清 IP 总量：那是枚举防线，清了就等于"错几次 → 用自己的号登一次 → 重来"。
      */
     noteLoginSuccess(ip, code);
+
+    /**
+     * 管理员那把钥匙只回一个角色名 —— **不发令牌**。
+     *
+     * 若这里顺手也发一张学生令牌，"看数据的人"立刻变成"能替学生做题的人"：
+     * 那张令牌调得动 `/api/chat`，写进去的会话挂的是管理员的 userId。
+     * 看板自己用 `x-admin-code` 进门，不需要令牌。
+     */
+    if (result.role === 'admin') {
+      sendJson(res, 200, { role: 'admin' });
+      return true;
+    }
+
+    /**
+     * 学生档与开发档的响应形状**刻意一样**（多一个 `role`）：
+     * 前端只需按 `role` 决定"加载产品页"还是"加载产品页 + 调试条"，
+     * 而两档拿到的都是同一张令牌、同一套接口。
+     */
     sendJson(res, 200, {
+      role: result.role,
       token: result.token,
       displayName: result.user.displayName,
       batchId: result.batchId,
