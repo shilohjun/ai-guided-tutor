@@ -87,6 +87,16 @@ body{
   flex:0 0 auto;margin:0;padding:8px 10px;font-size:13px;color:#fff;
   background:var(--warn);word-break:break-word;
 }
+/*
+  超时提示（brief L6）：只在壳上显示一句话，**不加按钮、不改产品页**。
+  为什么不做成"重试"按钮：重发要用同一句 utterance，而那句话在学生按下发送之后就
+  只存在于产品页的输入框里 —— 从壳上去驱动它，等于让壳去改产品页的状态，
+  而产品页一个字节都不许动。提示他说"再发一次"，动一次手指，是这一步最划算的做法。
+*/
+#slow{
+  flex:0 0 auto;margin:0;padding:7px 10px;font-size:13px;color:#7a5a12;
+  background:#fdf5e2;border-bottom:1px solid #f0e3c2;
+}
 #frameBox{flex:1 1 auto;min-height:0}
 #frame{display:block;width:100%;height:100%;border:0;background:#fff}
 @media (max-width:420px){
@@ -124,6 +134,7 @@ body{
     · 本次已记 <span id="devEvents">0</span> 条事件 / <span id="devTurns">0</span> 轮对话<span id="devLost"></span>
   </p>
   <p id="fatal" hidden></p>
+  <p id="slow" hidden role="status" aria-live="polite"></p>
   <div id="frameBox"></div>
 </div>
 
@@ -165,7 +176,7 @@ body{
     visitId: '', stems: {},
     page: 0, intake: '',
     queue: [], timer: null, eventsSent: 0, eventsLost: 0, chatTurns: 0,
-    observer: null, expired: false
+    slowTimer: null, observer: null, expired: false
   };
 
   var gate = document.getElementById('gate');
@@ -178,6 +189,7 @@ body{
   var devbar = document.getElementById('devbar');
   var frameBox = document.getElementById('frameBox');
   var fatal = document.getElementById('fatal');
+  var slow = document.getElementById('slow');
   var frameTpl = document.getElementById('frameTpl');
 
   /* =====================================================================
@@ -497,6 +509,11 @@ body{
             if (url.indexOf('/api/ocr') >= 0) noteOcrResult(res, startedAt);
             else if (url.indexOf('/api/problem/import') >= 0) noteImportResult(res, startedAt);
             else if (url.indexOf('/api/problem') >= 0) rememberStem(res);
+            /**
+             * 一轮超时（L6）：服务端已经判过"没等到回复"并回了 503 TURN_SLOW，
+             * 壳只负责把它翻译成一句话 —— 产品页自己那条错误提示学生看不懂。
+             */
+            if (res.status === 503 && url.indexOf('/api/chat') >= 0) noteChatSlow(res);
           } catch (e) { /* 同上 */ }
           return res;
         }, function (err) {
@@ -597,6 +614,32 @@ body{
      */
     flush();
     paintDev();
+  }
+
+  /**
+   * 一轮超时（brief L6）：壳上显示一句，三秒后自己消失。**不加按钮。**
+   *
+   * 只读响应的克隆体：产品页自己还要读它，抢着读会把它弄空。
+   * 这里也**不发** `chat_error`（L4）—— 那是服务端的事，而且它比我们知道得多
+   * （状态码、有没有落库）。客户端再发一条，一次失败会被记成两条，失败率直接翻倍。
+   */
+  function noteChatSlow(res) {
+    if (!res.clone) return;
+    res.clone().json().then(function (data) {
+      if (!data || data.code !== 'TURN_SLOW') return;
+      showSlow();
+    }).catch(function () { /* 读不出响应体就不提示：宁可少一句，也不猜 */ });
+  }
+
+  function showSlow() {
+    if (!slow) return;
+    text(slow, '这一轮没等到回复，再发一次就好。');
+    slow.hidden = false;
+    if (S.slowTimer) clearTimeout(S.slowTimer);
+    S.slowTimer = setTimeout(function () {
+      S.slowTimer = null;
+      slow.hidden = true;
+    }, 3000);
   }
 
   function noteOcrCall(init) {
@@ -722,22 +765,21 @@ body{
   }
 
   /**
-   * 今日拍照识题次数。
+   * 今日拍照识题用量（L2）。
    *
-   * `/api/health` 现在**没有这个字段**（配额计数还没接上），所以这里一律写「未接入」。
-   * 留一个函数而不是写死一句文案，是为了等字段真出现时只改这里 ——
-   * 而在那之前**绝不编一个数**：调试条上编出来的数字比没有数字更糟。
+   * 服务端 `/api/health` 的 `ocr` 里现在有三个值：`configured` / `usedToday` / `dailyCap`。
+   * 读不到仍然写「未接入」—— **绝不编数**：调试条上编出来的数字比没有数字更糟，
+   * 因为它会被当成真的用量去做"要不要加额度"的判断。
+   *
+   * `usedToday` 为 null 也表示"不知道"（服务端读不出库时就是 null，不是 0）。
    */
   function ocrToday(health) {
-    var candidates = [
-      health && health.ocrToday,
-      health && health.ocr && health.ocr.today,
-      health && health.usage && health.usage.ocrToday
-    ];
-    for (var i = 0; i < candidates.length; i += 1) {
-      if (Number.isFinite(candidates[i])) return String(candidates[i]) + ' 次';
-    }
-    return '未接入';
+    var ocr = health && health.ocr;
+    var used = ocr && ocr.usedToday;
+    if (!Number.isFinite(used)) return '未接入';
+    var cap = ocr && ocr.dailyCap;
+    if (Number.isFinite(cap) && cap > 0) return used + ' / ' + cap + ' 次';
+    return used + ' 次';
   }
 
   function paintDev() {
@@ -799,6 +841,9 @@ body{
     frameBox.textContent = '';
     fatal.hidden = true;
     text(fatal, '');
+    if (S.slowTimer) { clearTimeout(S.slowTimer); S.slowTimer = null; }
+    slow.hidden = true;
+    text(slow, '');
     devbar.hidden = true;
     S.page = 0;
     S.visitId = '';

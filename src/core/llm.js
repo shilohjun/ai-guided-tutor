@@ -413,10 +413,17 @@ export function createOpenAIAdapter(config = readLLMConfig()) {
    * 输出被截断成半截 JSON，解析失败。
    * 而当时的报错是"读题阶段无法解析 JSON"，看起来像模型不听话，
    * 实际原因是**输出被截断** —— 错误信息指错了方向，排查会白走很远。
+   *
+   * `opts.timeoutMs`（可选）：调用方按**这一轮**的剩余预算给的超时。
+   * 为什么必须能按次覆盖：配置里的 45 秒是"一次调用最多等多久"，
+   * 而一轮里串着三次调用 —— 每次都等满 45 秒，总时长会远超部署方的硬超时，
+   * 那时函数被网关砍掉，连"记一条失败"的代码都跑不到。
    */
-  async function chat(system, user, { temperature = 0.2, maxTokens = 900 } = {}) {
+  async function chat(system, user, { temperature = 0.2, maxTokens = 900, timeoutMs } = {}) {
+    /** 非法值退回配置值：0 / NaN / 负数交给 setTimeout 会变成"立刻超时一次"，看起来像上游坏了 */
+    const budgetMs = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : config.timeoutMs;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), config.timeoutMs);
+    const timer = setTimeout(() => controller.abort(), budgetMs);
     try {
       const res = await fetch(`${config.baseUrl}/chat/completions`, {
         method: 'POST',
@@ -447,6 +454,23 @@ export function createOpenAIAdapter(config = readLLMConfig()) {
         finishReason: choice?.finish_reason ?? null,
         usage: data?.usage ?? null,
       };
+    } catch (err) {
+      /**
+       * 把 abort 翻译成**我们自己认得的错误**。
+       *
+       * 两层理由：
+       *   ① 原始的 AbortError 消息是英文的 "This operation was aborted"，
+       *      一路冒上去就是一句学生看不懂的话；
+       *   ② 引擎要能分辨"没时间了"（TURN_SLOW、可以再发一次）与"上游坏了"（UPSTREAM）——
+       *      两者的下一步动作不同，混成一个就分不出该修哪里。
+       */
+      if (err?.name === 'AbortError') {
+        const timeout = new Error(`模型调用超时（${budgetMs} ms）`);
+        timeout.code = 'LLM_TIMEOUT';
+        timeout.timeoutMs = budgetMs;
+        throw timeout;
+      }
+      throw err;
     } finally {
       clearTimeout(timer);
     }
@@ -466,7 +490,10 @@ export function createOpenAIAdapter(config = readLLMConfig()) {
     config,
 
     async observeStudent(input) {
-      const { content: raw, finishReason } = await chat(OBSERVE_SYSTEM_PROMPT, buildObserveUserPrompt(input));
+      const { content: raw, finishReason } = await chat(OBSERVE_SYSTEM_PROMPT, buildObserveUserPrompt(input), {
+        /** 预算由引擎按这一轮的剩余量给；没给（旧调用点）就走配置值 */
+        timeoutMs: input?.timeoutMs,
+      });
       if (finishReason === 'length') throw truncatedError('observe 阶段', raw);
       const parsed = extractJson(raw);
       if (!parsed) throw new Error(`observe 阶段无法解析 JSON：${clip(raw, 200)}`);
@@ -489,6 +516,8 @@ export function createOpenAIAdapter(config = readLLMConfig()) {
       const system = `${DRAFT_SYSTEM_PROMPT}\n\n${personaPromptBlock(input?.persona)}`;
       const { content: raw, finishReason } = await chat(system, buildDraftUserPrompt(input), {
         temperature: 0.3,
+        /** 同上：起草是这一轮里**第二次**调用，拿到的是更少的那份剩余预算 */
+        timeoutMs: input?.timeoutMs,
       });
       if (finishReason === 'length') throw truncatedError('draft 阶段', raw);
       const parsed = extractJson(raw);
@@ -628,7 +657,14 @@ export function createOfflineAdapter() {
     kind: 'offline-stub',
     model: undefined,
 
-    async observeStudent({ problem, utterance, history }) {
+    /**
+     * 离线桩**收下** `timeoutMs` 但不做超时处理，这是刻意的，不是漏了：
+     * 它是一次纯内存的规则计算（没有网络、没有可中断的 I/O），
+     * 没有"等到超时"这回事。接口上照收，是为了与真模型适配器保持同一个契约 ——
+     * 引擎那一侧就不必知道"这次接的是谁"。
+     * 真模型的超时在 createOpenAIAdapter 的 `chat()` 里（AbortController）。
+     */
+    async observeStudent({ problem, utterance, history, timeoutMs: _timeoutMs }) {
       const text = canonicalize(utterance);
       const raw = normalize(utterance);
       /** 命中的路径（由定位通道直接给出，避免下游再猜） */
@@ -733,7 +769,7 @@ export function createOfflineAdapter() {
      *
      * 返回形状必须与真模型一致：**JSON 字符串**。
      */
-    async draftHint({ problem, diagnosis, level, allowedConcepts, history = [], l3Count = 0 }) {
+    async draftHint({ problem, diagnosis, level, allowedConcepts, history = [], l3Count = 0, timeoutMs: _timeoutMs }) {
       const step = findStep(problem, diagnosis.position);
       const graph = problem.solutionGraphs.find((g) => g.id === diagnosis.position.graphId);
       const concept = allowedConcepts[0] ?? step?.concepts[0] ?? '这一步';

@@ -105,6 +105,17 @@ const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
 /** 会话数量上限（防内存被打满） */
 const MAX_SESSIONS = 500;
 
+/**
+ * 一轮 `/api/chat` 的时间预算（默认值）。
+ *
+ * 为什么是 22 秒而不是 30 秒：部署方的硬超时是 30 秒（云函数），而网关到点会
+ * **把整个函数掐掉** —— 那时函数里的代码一行都不跑，`chat_error` 写不进去、
+ * 503 也发不出去。留出 8 秒，是为了让"写事件 + 回响应"这两件事在被掐之前做完。
+ *
+ * 可以用 `TURN_DEADLINE_MS` 覆盖（测试把它设成 1 就能走到超时那条路径）。
+ */
+const TURN_DEADLINE_MS = 22000;
+
 const sessions = new Map();
 /**
  * adapter 缓存按「形态」分键，而不是单例。
@@ -716,6 +727,43 @@ function sendNotOwner(res) {
   sendJson(res, 403, { error: '这不是你的学习记录', code: 'NOT_OWNER' });
 }
 
+/**
+ * 这一轮给多少毫秒（`TURN_DEADLINE_MS`，默认 22 秒）。
+ *
+ * 非法值（非数字 / 0 / 负数）一律退回默认，而不是"用 0 秒"：
+ * 一个配错的环境变量不应该让**所有**对话都变成 TURN_SLOW —— 那会让人以为服务坏了。
+ */
+function turnDeadlineMs(env = envFor()) {
+  const raw = Number(env?.TURN_DEADLINE_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : TURN_DEADLINE_MS;
+}
+
+/**
+ * 一轮失败事件（L3 的后半句）—— **只由服务端发**（L4）。
+ *
+ * payload 形状钉死为 `{ code, status }`：
+ *   `code`  `TURN_SLOW`（我们没时间了）| `UPSTREAM`（对方坏了）—— 两者的下一步不一样；
+ *   `status` 这一轮回给客户端的 HTTP 状态码。
+ * 不放消息正文、不放耗时：事件表是按"每轮"增长的，往里塞自由文本的代价是成千上万倍。
+ *
+ * 写失败只 warn：这一轮该回的 503 比埋点重要，而且调用方是失败路径，
+ * 不能因为记不上而再抛一次。
+ */
+async function recordChatError(store, { session, req, visitId, code, status }) {
+  try {
+    await recordEvent(store, {
+      type: 'chat_error',
+      sessionId: session?.id ?? null,
+      visitId: visitId || session?.visitId || null,
+      userId: req?.__user?.user?.id ?? session?.userId ?? null,
+      batchId: req?.__user?.batchId ?? session?.batchId ?? null,
+      payload: { code, status },
+    });
+  } catch (err) {
+    console.warn(`[events] chat_error 没写进去（这一轮照常回 503）：${err?.message ?? err}`);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 埋点上报（POST /api/events）
 // ---------------------------------------------------------------------------
@@ -882,6 +930,118 @@ async function acceptEvents(req, body) {
 }
 
 // ---------------------------------------------------------------------------
+// 拍照识题 · 两道额度闸
+// ---------------------------------------------------------------------------
+
+/**
+ * ============================================================================
+ * 键名是**契约**：写错一个字符，看板那一格永远是 0，而且没人会发现
+ * ============================================================================
+ * 看板（`admin.js` 的 `usageOf`）读的是同一对键：
+ *   `ocr:batch:<batchId>`    整批累计（按成功调用计）
+ *   `ocr:daily:<YYYY-MM-DD>` 当日累计（**UTC**，与全项目所有时间戳同一口径）
+ *
+ * 为什么把拼键收成两个函数而不是在调用点各写一遍：这里有三个使用点
+ * （闸门读、成功后写、健康检查读），三处各拼一遍就一定会有一处漂移 ——
+ * 而漂移的症状是"看板是 0"，不是报错，比挂掉难查得多。
+ */
+function ocrBatchCounterKey(batchId) {
+  return `ocr:batch:${batchId}`;
+}
+
+function ocrDailyCounterKey(now = new Date()) {
+  /** UTC 日：`toISOString()` 的前 10 位就是 YYYY-MM-DD，与看板同一个表达式 */
+  return `ocr:daily:${now.toISOString().slice(0, 10)}`;
+}
+
+/** 计数与上限的归一化：非数字、负数、NaN 一律 0；0 表示"没配 = 不限" */
+function countOf(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+/**
+ * 两道闸的判定 —— 纯函数，不碰存储、不读环境，所以路由与测试用的是同一个判据。
+ *
+ * 两道闸是**且**的关系：批内额度管"这一班能用多少"，当日额度管"这个部署一天能烧多少"，
+ * 任一触顶即拒。上限为 0 或未配视为不限（本地开发不受影响）。
+ *
+ * @param {{ batchUsed?: number, batch?: object|null, dailyUsed?: number, dailyCap?: number }} input
+ * @returns {{ blocked: boolean, remaining: number|null, reason: 'batch'|'daily'|null }}
+ *   `remaining` 是两道闸里**更紧**的那一个剩余量；都没配上限时是 `null`（不限，不是 0 次）
+ */
+export function ocrQuotaState({ batchUsed = 0, batch = null, dailyUsed = 0, dailyCap = 0 } = {}) {
+  const batchCap = countOf(batch?.ocrCap);
+  const dayCap = countOf(dailyCap);
+
+  const lefts = [];
+  if (batchCap > 0) lefts.push(Math.max(0, batchCap - countOf(batchUsed)));
+  if (dayCap > 0) lefts.push(Math.max(0, dayCap - countOf(dailyUsed)));
+
+  const blockedByBatch = batchCap > 0 && countOf(batchUsed) >= batchCap;
+  const blockedByDaily = dayCap > 0 && countOf(dailyUsed) >= dayCap;
+
+  return {
+    blocked: blockedByBatch || blockedByDaily,
+    remaining: lefts.length ? Math.min(...lefts) : null,
+    reason: blockedByBatch ? 'batch' : blockedByDaily ? 'daily' : null,
+  };
+}
+
+/**
+ * 读两道闸的当前状态。
+ *
+ * 库打不开时**一律放行**（用量按 0 算）。理由与埋点那条一致：这时看板也读不出数，
+ * 而"把学生挡在门外"比"可能少记了一次"更糟 —— 拍照识题不是唯一的入口，
+ * 但它被误拒时学生只会认为这个功能坏了。
+ */
+async function readOcrQuota({ store, batchId, env, now = new Date() }) {
+  const dailyCap = countOf(env?.OCR_DAILY_CAP);
+  let batch = null;
+  let batchUsed = 0;
+  let dailyUsed = 0;
+  if (store) {
+    try {
+      if (batchId) batch = await store.getBatch(batchId);
+      batchUsed = batchId ? await store.getCounter(ocrBatchCounterKey(batchId)) : 0;
+      dailyUsed = await store.getCounter(ocrDailyCounterKey(now));
+    } catch (err) {
+      console.warn(`[ocr] 额度读不出来，这一轮按不限放行：${err?.message ?? err}`);
+    }
+  }
+  return ocrQuotaState({ batchUsed, batch, dailyUsed, dailyCap });
+}
+
+/**
+ * 成功之后记账：**两个计数器各加 1**。
+ *
+ * 失败不加 —— 供应商按**成功调用**计费，我们按同一个口径计，
+ * 否则"额度用完了"会比真实账单先到，学生会莫名其妙被拦。
+ *
+ * 写失败只 warn：额度计数是旁路，学生这一张图已经识别出来了，不能因为记账失败就回 500。
+ */
+async function recordOcrUsage({ store, batchId, now = new Date() }) {
+  if (!store) return;
+  try {
+    await store.incrCounter(ocrDailyCounterKey(now), 1);
+    /** 没有批次（未登录 / 开发档）时不写批次那一格：它不是一个真实批次 */
+    if (batchId) await store.incrCounter(ocrBatchCounterKey(batchId), 1);
+  } catch (err) {
+    console.warn(`[ocr] 用量没记上（这一轮照常返回）：${err?.message ?? err}`);
+  }
+}
+
+/** 健康检查用：今日用量。读不出来时是 `null`（不知道），不是 0（一个事实） */
+async function readOcrUsedToday(store, now = new Date()) {
+  if (!store) return null;
+  try {
+    return countOf(await store.getCounter(ocrDailyCounterKey(now)));
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // API 处理
 // ---------------------------------------------------------------------------
 
@@ -924,6 +1084,8 @@ export async function handleApi(req, res, url) {
     const env = envFor();
     const config = readLLMConfig(env);
     const adapter = getAdapter();
+    /** 用量要读库；读不出来就是 `null`（"不知道"），绝不编一个 0 充数 */
+    const store = await getStore().catch(() => null);
     sendJson(res, 200, {
       ok: true,
       /**
@@ -942,7 +1104,18 @@ export async function handleApi(req, res, url) {
        * 拍照识题状态：只报"配没配 / 走哪个通道"，**绝不回传 AppCode**。
        * 与 llmConfigured 同一口径 —— 健康检查是用来判断可用性的，不是用来泄密的。
        */
-      ocr: ocrStatus(env),
+      ocr: {
+        ...ocrStatus(env),
+        /**
+         * 今日用量与日上限（L2）：试点的调试条读这两个数。
+         *
+         * `usedToday` 拿不到时是 `null` 而不是 0：0 是一个**事实**（今天还没用过），
+         * null 是"不知道" —— 调试条上把后者写成前者，等于让人拿一个假的用量去做判断。
+         * 键名与看板/闸门同源（见 ocrDailyCounterKey），三处不许各拼一遍。
+         */
+        usedToday: await readOcrUsedToday(store),
+        dailyCap: countOf(env.OCR_DAILY_CAP),
+      },
       capabilities: {
         /**
          * 本部署支持的学习方式。
@@ -1191,6 +1364,23 @@ export async function handleApi(req, res, url) {
     }
 
     /**
+     * ---- 两道额度闸（L1）：**拦在调用之前** ----
+     *
+     * 位置很关键：在 `recognizeProblemImage` 之前。拦在调用之后（先花钱再回 503）
+     * 等于没拦 —— 而 OCR 按成功调用计费，是这套系统里唯一"学生点一下就会花钱"的入口。
+     * 被拦下的那一次**不发起调用、也不计数**。
+     */
+    const store = await getStore().catch(() => null);
+    const batchId = req.__user?.batchId ?? null;
+    if ((await readOcrQuota({ store, batchId, env: ocrEnv })).blocked) {
+      sendJson(res, 503, {
+        error: '今日的拍照识题额度用完了，可以直接粘贴题目文字。',
+        code: 'OCR_QUOTA',
+      });
+      return true;
+    }
+
+    /**
      * 命中过的调用形状缓存在进程里。
      *
      * 为什么要缓存：候选形状（地址 + 传图字段名）在首次调用前是未知的，
@@ -1204,6 +1394,8 @@ export async function handleApi(req, res, url) {
     });
 
     if (result.ok && result.shape) rememberShape(result.shape);
+    /** 成功才记账（与供应商同一个口径：按成功调用计费） */
+    if (result.ok) await recordOcrUsage({ store, batchId });
 
     if (!result.ok) {
       /**
@@ -1351,6 +1543,18 @@ export async function handleApi(req, res, url) {
     }
     const normalizedMode = 'self_training';
 
+    /**
+     * 这一轮的截止时间（L3）—— **按轮算，不按次算**。
+     *
+     * 一次 `/api/chat` 最多串三次模型调用（observe + 两次 draft），而部署方的硬超时
+     * 是 30 秒。若把预算写成"每次调用 25 秒"，最坏是 75 秒：网关在第 30 秒把函数掐掉，
+     * 于是 503 发不出去、`chat_error` 也写不进去 —— 而"有 send 无 reply 的一轮"
+     * 正是换平台的触发条件。把同一个截止时间交给引擎，三次调用分它一个，总时长才有上界。
+     */
+    const deadlineAt = Date.now() + turnDeadlineMs(envFor());
+    /** 提前取出来：失败路径也要能用它给事件挂归属（本来它只在下游被读一次） */
+    const visitId = typeof body?.visitId === 'string' ? body.visitId.trim() : '';
+
     let response;
     try {
       response = await session.engine.handleTurn({
@@ -1363,9 +1567,25 @@ export async function handleApi(req, res, url) {
         explicitHelpSeeking: Boolean(explicitHelpSeeking) || looksLikeHelpRequest(utterance),
         sessionId: session.id,
         persona,
+        deadlineAt,
       });
     } catch (error) {
+      /**
+       * 超时：**由我们自己回** 503，并且先留一条 `chat_error`。
+       *
+       * 为什么这一步非做不可：网关把函数掐掉时，函数里的代码一行都不跑 ——
+       * 那一轮在事件表里就只剩一条客户端发的 `chat_send`，看起来像"学生没等到就关了页面"。
+       * 由我们主动判定超时，失败率才有分子（brief L3 的那一段）。
+       */
+      if (error?.code === 'TURN_SLOW') {
+        console.warn(`[chat] 这一轮超出预算（${session.id}）：${error.detail ?? error.message}`);
+        await recordChatError(store, { session, req, visitId, code: 'TURN_SLOW', status: 503 });
+        sendJson(res, 503, { error: error.message, code: 'TURN_SLOW', retryable: true });
+        return true;
+      }
       if (!['OBSERVATION_UNAVAILABLE', 'REPLY_UNAVAILABLE'].includes(error.code)) throw error;
+      /** 其余上游故障单独一个码：它要的动作是"等一会儿"，与超时的"再发一次"不同 */
+      await recordChatError(store, { session, req, visitId, code: 'UPSTREAM', status: 503 });
       sendJson(res, 503, { error: error.message, retryable: true });
       return true; // 系统故障不写入学生学习记录。
     }
@@ -1392,7 +1612,6 @@ export async function handleApi(req, res, url) {
      * 传活会话进去，所以只改内存；这个函数自己会去 append `visit.sessionIds`。
      * 失败只 warn —— 认不出这次打开不该让学生的这一轮变成 500。
      */
-    const visitId = typeof body?.visitId === 'string' ? body.visitId.trim() : '';
     if (visitId) {
       try {
         await linkSessionToVisit(store, { visitId, sessionId: session.id, session, owner: req.__user });
