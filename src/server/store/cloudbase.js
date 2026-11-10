@@ -299,14 +299,13 @@ export async function openCloudbaseStore(env = {}) {
       /**
        * 已经有了就不再加一行：发号脚本会拿同一批人反复跑，
        * "加两次"应当还是一个人，而且不该把首次加入时间冲掉。
-       * 文档 id 直接用 `<batchId>__<userId>`：这两个 id 都是我们自己发的
-       * （字母、数字、下划线、连字符），天然是合法的文档 id。
+       *
+       * 写入也走 putRecord（不直接碰 SDK）：文档 id 用 `<batchId>__<userId>`，
+       * 这两个 id 都是我们自己发的（字母、数字、下划线、连字符），天然是合法的文档 id，
+       * 而且键相同就意味着重复调用落在同一条上 —— 与 memory/file 同语义。
        */
       if (await queryOne(MEMBERS, { batchId: String(batchId), userId: String(userId) })) return;
-      await db
-        .collection(MEMBERS)
-        .doc(`${batchId}__${userId}`)
-        .set({ batchId, userId, joinedAt: new Date().toISOString() });
+      await putRecord(MEMBERS, `${batchId}__${userId}`, { batchId, userId, joinedAt: new Date().toISOString() });
     },
     async listMembers(batchId) {
       const rows = await queryAll(MEMBERS, { batchId: String(batchId) });
