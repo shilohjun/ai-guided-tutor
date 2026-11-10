@@ -32,6 +32,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { handleApi, getStore, requestEnv, __resetStoreForTests } from '../src/server/router.js';
+import { renderSessionsCsv } from '../src/server/export.js';
 
 /** 模块还不存在时不要炸掉整个套件（见文件头） */
 const loadErrors = [];
@@ -591,6 +592,36 @@ describe('管理接口 · overview', () => {
     assertEquals(res.json.funnel.perPage[0].avgDwellMs, 60000, '页 1 的 60 秒停留也必须算出来');
   });
 
+  it('打开记录是**并发**取的（Promise.all），不是一条一条串行', async () => {
+    /**
+     * 这一条守的是"一次看板要等多久"：打开记录只能按 id 取（存储端口没有
+     * `listVisitsByBatch`），串行时库调用是 1 + 2N 次、每次一个网络往返。
+     * 试点班 40 人量级还能忍，一个学期之后就是看板转圈的直接原因。
+     * 用"同时在飞的请求数"来验：串行时峰值恒为 1。
+     */
+    let inFlight = 0;
+    let peak = 0;
+    const store = stubStore({
+      listSessionsByBatch: async () => [
+        { id: 's1', visitId: 'v1', userId: 'u1', batchId: 'b8', lastAt: at(500e3), progress: { maxPage: 2, reached: { p2: at(600e3) } }, counters: {} },
+        { id: 's2', visitId: 'v2', userId: 'u2', batchId: 'b8', lastAt: at(400e3), progress: { maxPage: 2, reached: { p2: at(500e3) } }, counters: {} },
+        { id: 's3', visitId: 'v3', userId: 'u3', batchId: 'b8', lastAt: at(300e3), progress: { maxPage: 2, reached: { p2: at(400e3) } }, counters: {} },
+      ],
+      getVisit: async (id) => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight -= 1;
+        return { id, userId: 'u1', batchId: 'b8' };
+      },
+    });
+
+    const res = await callAdmin(store, '/api/admin/overview?batchId=b8');
+    assertEquals(res.status, 200);
+    assertEquals(peak, 3, `三份打开记录应当同时在取，实际并发峰值 ${peak}（1 = 仍然是串行）`);
+    assertEquals(res.json.funnel.p1, 3, '并发不许把结果弄丢');
+  });
+
   it('usage 按约定的计数器键读：ocr:batch:<batchId> 与 ocr:daily:<YYYY-MM-DD>', async () => {
     const store = stubStore();
     const res = await callAdmin(store, '/api/admin/overview?batchId=b8');
@@ -821,10 +852,14 @@ describe('管理接口 · stitchEvents', () => {
     { seq: 3, type: 'page_enter', visitId: 'v2', sessionId: null, payload: { page: 1 } },
   ];
 
-  it('按 ownerOf 分组：有 sessionId 的挂 session，只有 visitId 的挂 visit', () => {
+  it('按归属键分组，且会话连自己那次打开的事件一起拿到（B2）', () => {
     const stitched = stitchEvents(events, sessions, visits);
-    assertDeep(stitched.sessions[0].events.map((event) => event.seq), [2]);
-    assertDeep(stitched.visits[0].events.map((event) => event.seq), [1]);
+    assertDeep(
+      stitched.sessions[0].events.map((event) => event.seq),
+      [1, 2],
+      '会话 s1 属于打开 v1：页 1 的事件只带 visitId，但它就是这条会话的',
+    );
+    assertDeep(stitched.visits[0].events.map((event) => event.seq), [1], 'visit 那一侧仍然只有它自己的事件');
     assertDeep(stitched.visits[1].events.map((event) => event.seq), [3]);
   });
 
@@ -1104,6 +1139,178 @@ describe('管理接口 · 单人页', () => {
       /** 没有口令就是 401：同一个闸门，不因为路径是新的就绕过去 */
       const locked = await call(base, '/api/admin/session?sessionId=s1');
       assertEquals(locked.status, 401);
+    });
+  });
+});
+
+// ===========================================================================
+// 十、页事件挂到会话（B2，终审阻塞项）
+// ===========================================================================
+
+/**
+ * ============================================================================
+ * 为什么会话必须拿到"自己那次打开"的事件
+ * ============================================================================
+ * 设计稿 §5.2：页 1–2 的事件挂在 `visit.id` 上（会话要到进第 3 页才创建），
+ * 之后的才同时带 `sessionId` 与 `visitId`。而漏斗的页 3–4 与导出的
+ * 「退回次数 / 报告次数 / 改入场次数」读的都是 **`session.events`**。
+ *
+ * 只按 `sessionId` 分组时，这几列在真实数据上**恒为 0** —— 而且是"确定的 0"：
+ * `hasEvents` 为真（会话自己有 chat_send），于是连 counters 兜底也不会走。
+ * 一个恒为 0 的操作列，比一个空列更难发现：0 看起来像"学生没做"。
+ *
+ * 页 1–2 的停留仍只从 `visit.events` 读（metrics 的约定），所以两边都拼**不会**重复计。
+ */
+describe('管理接口 · 页事件挂到会话', () => {
+  const T = Date.parse('2026-11-10T09:00:00.000Z');
+  const iso = (offset) => new Date(T + offset).toISOString();
+
+  const VISIT = { id: 'v1', userId: 'u1', batchId: 'b8', openedAt: iso(0), lastAt: iso(60_000) };
+
+  /**
+   * 真实形状：页 3 / 页 2 的事件**只带 `visitId`**（会话那时还不存在），
+   * 会话自己只有那条 `chat_send`。
+   */
+  const pageEvents = () => [
+    { seq: 1, type: 'page_enter', at: iso(0), batchId: 'b8', userId: 'u1', visitId: 'v1', sessionId: null, payload: { page: 3 } },
+    { seq: 2, type: 'page_enter', at: iso(30_000), batchId: 'b8', userId: 'u1', visitId: 'v1', sessionId: null, payload: { page: 2 } },
+    { seq: 3, type: 'page_exit', at: iso(60_000), batchId: 'b8', userId: 'u1', visitId: 'v1', sessionId: null, payload: { page: 2 } },
+    { seq: 4, type: 'chat_send', at: iso(90_000), batchId: 'b8', userId: 'u1', visitId: 'v1', sessionId: 's1', payload: { len: 8 } },
+  ];
+
+  const SESSION = {
+    id: 's1',
+    visitId: 'v1',
+    userId: 'u1',
+    batchId: 'b8',
+    problemId: 'qbank-1',
+    questionIndex: 0,
+    startedAt: iso(0),
+    lastAt: iso(90_000),
+    finishedAt: null,
+    progress: { maxPage: 3, reached: { p2: iso(30_000), p3: iso(0) } },
+    counters: {},
+    turns: [],
+  };
+
+  /** CSV 的第一条数据行（表头当键）。导出件的形状在 export-batch.test.js 里另有整组用例。 */
+  function firstCsvRow(csv) {
+    const lines = csv.replace(/^\uFEFF/, '').split('\r\n');
+    const headers = lines[0].split(',');
+    const cells = lines[1].split(',');
+    return Object.fromEntries(headers.map((header, index) => [header, cells[index] ?? '']));
+  }
+
+  it('overview 的页 3 停留不再是 0（事件只挂 visit 时它是结构性的 0）', async () => {
+    const store = stubStore({
+      listSessionsByBatch: async () => [SESSION],
+      listEventsByBatch: async () => pageEvents(),
+      getVisit: async () => VISIT,
+    });
+
+    const res = await callAdmin(store, '/api/admin/overview?batchId=b8');
+    assertEquals(res.status, 200);
+
+    const page3 = res.json.funnel.perPage.find((row) => row.page === 3);
+    assertEquals(page3.visitors, 1, '这一页应当有一个到过的人');
+    assert(page3.avgDwellMs > 0, `页 3 停留必须是正数，实际 ${page3.avgDwellMs}（0 就是"会话没拿到 visit 的事件"）`);
+  });
+
+  it('renderSessionsCsv 的「退回次数」是 1（3→2），不是硬 0', () => {
+    const stitched = stitchEvents(pageEvents(), [SESSION], [VISIT]);
+    const row = firstCsvRow(
+      renderSessionsCsv(stitched.sessions, { batch: { id: 'b8', abandonHours: 24 }, now: iso(90_000) }),
+    );
+
+    assertEquals(row['会话id'], 's1');
+    assertEquals(row['退回次数'], '1', '3→2 是"从 n 页退到 n−1 页"的一步；写 0 说明会话没拿到 visit 的事件');
+    /** 反过来也要成立：页事件不能把会话自己的事件挤掉 */
+    assertEquals(row['对话轮数'], '1', '会话自己的 chat_send 仍在');
+  });
+
+  it('会话自己的事件与 visit 的事件按 seq 合并（不是"先自己的、再 visit 的"）', () => {
+    const stitched = stitchEvents(pageEvents(), [SESSION], [VISIT]);
+    assertEquals(
+      stitched.sessions[0].events.map((event) => event.seq).join(','),
+      '1,2,3,4',
+      'deriveDwell 读的是数组顺序，不是 seq：合并成 4,1,2,3 会让"下一条事件"变成更早的时刻',
+    );
+  });
+
+  it('一次打开下的每条会话都拿到这次打开的事件（同一份数据，不重复挂同一个会话）', () => {
+    const second = { ...SESSION, id: 's2', problemId: 'qbank-2' };
+    const stitched = stitchEvents(pageEvents(), [SESSION, second], [VISIT]);
+    const byId = Object.fromEntries(stitched.sessions.map((session) => [session.id, session.events.map((event) => event.seq).join(',')]));
+
+    assertEquals(byId.s1, '1,2,3,4', '两条会话都在 v1 里：页 1–2 的事件两边都要拿到');
+    assertEquals(byId.s2, '1,2,3', '带 sessionId 的 chat_send 只属于 s1，不挂给 s2');
+    /** 一条带 sessionId 的事件只挂它自己那条会话：两边都挂会把同一段时间算两遍 */
+    assertEquals(stitched.visits[0].events.map((event) => event.seq).join(','), '1,2,3', 'visit 那一侧仍然只有它自己的事件');
+  });
+});
+
+// ===========================================================================
+// 十一、系统失败轮次（B3，终审阻塞项）
+// ===========================================================================
+
+/**
+ * ============================================================================
+ * 为什么要有这个数：一个"全失败"的批次和"没人来"的批次，在页面上长得一模一样
+ * ============================================================================
+ * `TURN_SLOW` / `UPSTREAM` 在会话落库之前就返回了（那一轮没写成学习记录），
+ * 于是这一批只剩客户端发的 `chat_send`，一条会话行都没有。看板于是显示
+ * 「0 会话 · 0.0% 一轮失败率」，而 `p1 > 0` 又让空态不触发 ——
+ * 这个数正是决定"要不要换平台"的那一屏，它现在把系统性失败读成"学生没来"。
+ *
+ * 口径：**有 `chat_send`、但这一批里没有任何会话认领它**的轮数。
+ * 会话行的归属键（`sessionId` / `visitId`）都不在会话表里，就说明那一轮
+ * 没写进学习记录 —— 要么是模型 Key 不对，要么是超时。
+ */
+describe('管理接口 · 系统失败轮次（orphanTurns）', () => {
+  const T = Date.parse('2026-11-10T09:00:00.000Z');
+  const iso = (offset) => new Date(T + offset).toISOString();
+
+  /** 三条客户端发的 chat_send：会话 id 是前端造的，服务端从来没有落成一条会话行 */
+  const orphanSends = () => [0, 1, 2].map((i) => ({
+    seq: i + 1,
+    type: 'chat_send',
+    at: iso(i * 1000),
+    batchId: 'b8',
+    userId: 'u1',
+    sessionId: `lost-${i}`,
+    visitId: null,
+    payload: { len: 3 },
+  }));
+
+  it('三条 chat_send、没有会话行 → usage.orphanTurns 是 3', async () => {
+    const store = stubStore({ listEventsByBatch: async () => orphanSends() });
+    const res = await callAdmin(store, '/api/admin/overview?batchId=b8');
+
+    assertEquals(res.status, 200);
+    assertEquals(res.json.summary.sessionCount, 0, '这一批确实没有一条会话（失败发生在落库之前）');
+    assertEquals(res.json.usage.orphanTurns, 3, '三条 chat_send 没有任何会话认领');
+  });
+
+  it('有会话认领其中一条 → orphanTurns 变成 2', async () => {
+    const store = stubStore({
+      listSessionsByBatch: async () => [
+        { id: 'lost-0', batchId: 'b8', userId: 'u1', startedAt: iso(0), lastAt: iso(500), progress: {}, counters: {}, turns: [] },
+      ],
+      listEventsByBatch: async () => orphanSends(),
+    });
+    const res = await callAdmin(store, '/api/admin/overview?batchId=b8');
+
+    assertEquals(res.status, 200);
+    assertEquals(res.json.summary.sessionCount, 1);
+    assertEquals(res.json.usage.orphanTurns, 2, '被会话认领的那条不算孤儿');
+  });
+
+  it('正常批次是 0（看板据此不显示这一项，不留一行恒为 0 的噪音）', async () => {
+    await withAdminServer({}, async ({ base, store }) => {
+      await seed(store);
+      const res = await call(base, '/api/admin/overview?batchId=b8', { headers: withCode() });
+      assertEquals(res.status, 200);
+      assertEquals(res.json.usage.orphanTurns, 0, '夹具里的每条 chat_send 都属于某条会话');
     });
   });
 });

@@ -544,3 +544,43 @@ describe('隔离 · 开发档的数据不许落进真实批次', () => {
     );
   });
 });
+
+// ===========================================================================
+// 五、配了登录守卫的部署里，/api/eval 不存在（F3）
+// ===========================================================================
+
+/**
+ * 为什么这一条属于"试点安全"而不是"评测功能"：
+ *
+ * `/api/eval` 一次能跑几十轮模型调用（`scenarioIds` 由请求体指定），
+ * 而它只需要一个学生令牌就能打。配了 `PILOT_REQUIRE_LOGIN=1` 的部署里，
+ * 每个学生手里都有那个令牌 —— 留着它等于给每个学生一个"烧钱按钮"，
+ * 而它跟这个产品要做的任何一件事都没有关系。
+ *
+ * 回 404 而不是 403：403 等于承认"这里有东西，只是你不能用"。
+ * 在这个部署里它本来就该像不存在一样。
+ */
+describe('隔离 · 配了登录守卫时 /api/eval 不存在', () => {
+  it('带令牌的学生调用也 404「没有这个接口」', async () => {
+    await withPilotServer({ PILOT_DEV_CODE: DEV_CODE, PILOT_REQUIRE_LOGIN: '1' }, async ({ base }) => {
+      const dev = await postLogin(base, DEV_CODE, { 'x-forwarded-for': '198.21.0.1' });
+      assertEquals(dev.status, 200, '先拿到一个有效的学生令牌');
+
+      const res = await call(base, '/api/eval', {
+        method: 'POST',
+        body: {},
+        headers: { 'x-test-token': dev.json.token },
+      });
+      assertEquals(res.status, 404, '守卫开着的部署里这个接口不该存在');
+      assertEquals(res.json.error, '没有这个接口');
+    });
+  });
+
+  it('没配守卫的部署行为不变（本地 / 离线演示仍然可评测）', async () => {
+    await withPilotServer({}, async ({ base }) => {
+      const res = await call(base, '/api/eval', { method: 'POST', body: {} });
+      assertEquals(res.status, 200, '不配守卫时这条分支根本不存在');
+      assert(res.json && res.json.metrics, '离线规则桩的评测结果仍然要回来');
+    });
+  });
+});

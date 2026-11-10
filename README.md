@@ -209,9 +209,12 @@ cp .env.example .env
 | `LLM_TIMEOUT_MS` | 单次请求超时，理科长题建议 ≥ 30s | `45000` |
 | `PORT` / `HOST` | 本地服务地址 | `5173` / `127.0.0.1` |
 | `ALIYUN_OCR_APPCODE` | 拍照识题凭据，留空则该入口显示“未启用” | 空 |
+| `ALIYUN_OCR_TIMEOUT_MS` | 单次识别超时；必须小于部署方的 30 秒墙，否则函数先被网关掐掉 | `12000` |
 | `STORE` | 存储驱动：`memory`（默认，重启即丢）/ `file`（落 `.data/`）/ `cloudbase`（试点） | `memory` |
-| `PILOT_REQUIRE_LOGIN` | 配 `1` 时，除健康检查与登录之外的 `/api/*` 一律 `401`（试点必须开，见「已知边界」） | 空 |
+| `PILOT_REQUIRE_LOGIN` | 配 `1` 时，除健康检查与登录之外的 `/api/*` 一律 `401`（试点必须开，见「已知边界」）；`/api/eval` 同时变成 `404` | 空 |
 | `PILOT_DEV_CODE` | 调试档口令：用它登录拿到的是 `dev` 批次的临时账号 | 空 |
+| `PILOT_CODE_PEPPER` | 口令哈希的胡椒（`sha256(PEPPER + ':' + code)`）。发号脚本与云函数必须用同一个；改它等于现有口令全部失效 | 空（本地退回开发默认值） |
+| `PILOT_IP_MAX_FAILURES` | 同一来源 IP 一小时内允许的登录失败次数。整班共用一个出口 IP，配小了会锁全班 | `120` |
 | `PILOT_PORT` | 可选第二端口：让试点入口（`/pilot.html`）单独占一个端口；不配就只有一个端口 | 空 |
 | `OCR_DAILY_CAP` | 拍照识题的日上限（UTC 日，按成功调用计）；空或 `0` = 不限 | 空 |
 | `ADMIN_CODE` | `/admin.html` 与 `/api/admin/*` 的口令；不配则一律 `404` | 空 |
@@ -295,7 +298,7 @@ npm run preview:verify    # file:// 打开验收
 npm test
 ```
 
-当前注册 **728 个用例，全部通过**。`npm test` 跑完测试后会接着跑
+当前注册 **760 个用例，全部通过**。`npm test` 跑完测试后会接着跑
 `scripts/audit-ui-style.js`：它把设计令牌（间距 2/4/6/8/12/16/24/32、字号三档、
 嵌套圆角、语义色）做成可执行规则，样式一跑偏就报出来 —— 只靠人眼看不住。
 字号与控件尺寸参考 LeetCode 做题页后，再按中文密度收一档（中档题干 13/18.9、标签 11、按钮高 32、顶栏 52）。
@@ -370,7 +373,7 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | `GET` | `/api/health` | 健康检查、当前运行模式、`capabilities.modes`（哪些做题方式能点） |
-| `POST` | `/api/auth/login` | 6 位口令 → 令牌（`200 {token, displayName, batchId, expiresAt}`）；口令不对 `401`。**两维限速**：同一口令（按「来源 IP + 口令」计）15 分钟内错 5 次 → `429`；同一来源 IP 一小时内累计错 60 次 → `429`（这一维不因登录成功而清零，它是唯一的枚举防线） |
+| `POST` | `/api/auth/login` | 6 位口令 → 令牌（`200 {token, displayName, batchId, expiresAt}`）；口令不对 `401`。**两维限速**：同一口令（按「来源 IP + 口令」计）15 分钟内错 5 次 → `429`；同一来源 IP 一小时内累计错 120 次 → `429`（默认值，`PILOT_IP_MAX_FAILURES` 可配；这一维不因登录成功而清零，它是唯一的枚举防线） |
 | `POST` | `/api/events` | 埋点批量上报（14 种事件，见 `src/server/events.js`）→ `200 {accepted, rejected}`。**永不因埋点失败返回 4xx/5xx**：坏请求体、未知 type、超大 payload、存储写失败都只影响那一条，`at` 与身份一律由服务端填 |
 | `GET` | `/api/problems` | 内置题目列表 |
 | `GET` | `/api/related?id=` | 同知识点的同类题（服务端注册表内，最多 6 道）。**前端已不再调用**：报告页改为从 152 道题库按双轴标签筛 |
@@ -382,12 +385,13 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 | `POST` | `/api/formula` | L3 之后按知识点取公式卡 |
 | `GET` | `/api/session/resume` | 「继续刚才那道题」：返回该登录用户最近一条**没有 `finishedAt`** 的会话（`{session: {id, problemId, questionIndex, page, idleMinutes, turnCount} \| null}`）。身份只认令牌，`?userId=` 一律忽略；没登录 `401` |
 | `POST` | `/api/visit` | 记一次打开（`visit`），返回 `{visitId}`。同一个人当天重复打开就是新的 visit；没登录 `401` |
-| `POST` | `/api/eval` | 触发评测 |
+| `POST` | `/api/eval` | 触发离线评测（公开演示用）。配了 `PILOT_REQUIRE_LOGIN=1` 的部署里**一律 `404`**：它一次能跑几十轮模型调用，不该让学生点到 |
 | `POST` | `/api/reset` | 重置会话：内存里丢掉，库里清空对话但保留会话（`counters.resetCount +1`，`endState` 不变） |
 | `GET` | `/api/admin/*` | 看板与管理接口：`overview`（漏斗、批次对比、用量）、`users`（一批人的会话列表）、`session`（单条会话的对话）、`export`（单条/整批导出）。**只认 `ADMIN_CODE`**（请求头 `x-admin-code`），学生令牌在这里无效；未配 `ADMIN_CODE` 时一律 `404`（连"这里有个看板"都不承认），配了但没带对是 `401`。内存驱动的部署也一律 `404` —— 看板能打开却永远是空的，比打不开更糟 |
 
 **登录守卫**：配了 `PILOT_REQUIRE_LOGIN=1` 时，除 `/api/health` 与 `/api/auth/login` 之外的 `/api/*`
 一律 `401 {error:'请先登录', code:'AUTH_REQUIRED'}`；不配这个变量时行为与以前完全一致。
+守卫开着时 `/api/eval` 直接 `404`（见上表）—— 学生手里的令牌不该能烧模型额度。
 
 ---
 
@@ -465,7 +469,8 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 - **密钥注入** → `scripts/deploy-cloudbase.mjs`（见下一节）
 
 翻译层的正确性各有测试：`test/worker-adapter.test.js`（9 条，含请求体穿桥）、
-`test/cloudbase-adapter.test.js`（15 条，含网关两种 path 形态、base64 body、静态资源命中）。
+`test/cloudbase-adapter.test.js`（18 条，含网关两种 path 形态、base64 body、静态资源命中，
+以及 zip 导出必须按 base64 回传）。
 
 ### CloudBase 的密钥怎么上去
 
@@ -479,12 +484,16 @@ node scripts/deploy-cloudbase.mjs                    # ③ 干跑：打印要注
 node scripts/deploy-cloudbase.mjs --apply            #    真的注入
 ```
 
-`deploy-cloudbase.mjs` 从 `.env` 读 `LLM_API_KEY` / `ALIYUN_OCR_APPCODE` / `PILOT_DEV_CODE` / `ADMIN_CODE`，
-拼成完整的一份 `envVariables` 写进 `.cloudbase/` 下的临时配置（跑完即删），
-再用 `tcb config update fn … --config-file` 推上去。两条要记住：
+`deploy-cloudbase.mjs` 从 `.env` 读 `LLM_API_KEY` / `ALIYUN_OCR_APPCODE` / `PILOT_DEV_CODE` /
+`ADMIN_CODE` / `PILOT_CODE_PEPPER`，拼成完整的一份 `envVariables` 写进 `.cloudbase/` 下的临时配置
+（跑完即删），再用 `tcb config update fn … --config-file` 推上去。四条要记住：
 
 - 云端环境变量是**全量覆盖**。少推一个就等于把云上那个删掉，所以缺任何一个机密时脚本会拒绝执行
   （干跑照常打印，好让人看见缺什么）。
+- `PILOT_CODE_PEPPER` **必须在里面**：发号脚本在本机用它算口令哈希，云函数得用同一个算。
+  两边不一致时，学生每一个口令都"不对"，而这不会报任何错。
+- 默认值是**安全的那一侧**：`PILOT_REQUIRE_LOGIN=1`（未登录一律 401）。要关掉得在 `.env` 里
+  显式写 `0`，那时 `--apply` 会拒绝执行并说明原因 —— 一个谁都能打开的试点网址会被转发到班级群。
 - **顺序别反**：`tcb fn deploy` 也会应用 `cloudbaserc.json` 里的 `envVariables`（那里已经没有机密了）。
   先部署代码、最后注入变量，就不会把刚推上去的机密再清掉。
 

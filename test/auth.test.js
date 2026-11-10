@@ -15,7 +15,7 @@
  *
  *   ③ **必须配一道闸，而且是两个维度**：100 万种对脚本来说是几分钟的事。
  *      单一口令 15 分钟 5 次（一个人反复打错自己那张纸条），
- *      同一来源 60 分钟 60 次（枚举脚本，**成功不清零**）；
+ *      同一来源 60 分钟 120 次（枚举脚本，**成功不清零**；`PILOT_IP_MAX_FAILURES` 可配）；
  *      成功只清掉"这一对 (IP, 口令)"。
  *      一个班共用一个出口 IP 是产品的正常场景，所以单一口令被锁**不能**牵连别人。
  *
@@ -244,9 +244,9 @@ describe('账号 · 登录与 token', () => {
  *      若只按 IP 计数，第 10 个打错字的学生会把全班锁在门外，
  *      而唯一的自动恢复途径是"登录成功清零" —— 恰好被锁挡住，只能等窗口过期。
  *
- *   ② **IP 总量 60 次 / 60 分钟** —— 枚举脚本。这是唯一的枚举防线，
- *      所以**成功不清**：只要不清，任何"靠自己一张有效口令换一批新尝试"
- *      的循环都被这个总量卡住。
+ *   ② **IP 总量 120 次 / 60 分钟（默认，`PILOT_IP_MAX_FAILURES` 可配）** —— 枚举脚本。
+ *      这是唯一的枚举防线，所以**成功不清**：只要不清，任何"靠自己一张有效口令
+ *      换一批新尝试"的循环都被这个总量卡住。
  *
  * 状态是进程级模块变量，用例之间必须自己 `resetLoginRateLimits()`。
  */
@@ -298,7 +298,7 @@ describe('账号 · 登录失败限速（两个维度）', () => {
     assertEquals(checkLoginRate('203.0.113.53', '999999', now), 'ok', '换一个来源 IP 不受牵连');
   });
 
-  it('成功只清这一对：4 次失败 + 1 次成功之后，IP 总量仍然算那 4 次（再补 56 次才锁）', () => {
+  it('成功只清这一对：4 次失败 + 1 次成功之后，IP 总量仍然算那 4 次（再补满才锁）', () => {
     const now = fresh();
     const ip = '203.0.113.54';
     const code = '654321';
@@ -310,12 +310,13 @@ describe('账号 · 登录失败限速（两个维度）', () => {
     /**
      * 这一条是 finding 2 的回归：若成功把 IP 总量一起清了，
      * 那么"错 4 次 → 用自己那张有效口令登录 → 再错 4 次"就是无限次尝试。
-     * 这里钉住"IP 总量从 4 继续数"：补 55 次是 59（还放行），第 56 次到 60 就锁。
+     * 这里钉住"IP 总量从 4 继续数"：补到上限前一次还放行，再补一次就锁。
+     * 数一律从 `IP_MAX_FAILURES` 推，不写死 —— 默认值是可配的（B5）。
      */
-    for (let i = 0; i < 55; i += 1) noteLoginFailure(ip, `3000${String(i).padStart(2, '0')}`, now);
-    assertEquals(checkLoginRate(ip, '888888', now), 'ok', '4 + 55 = 59，还没到 60');
+    for (let i = 0; i < IP_MAX_FAILURES - 5; i += 1) noteLoginFailure(ip, `3000${String(i).padStart(2, '0')}`, now);
+    assertEquals(checkLoginRate(ip, '888888', now), 'ok', `4 + ${IP_MAX_FAILURES - 5} = ${IP_MAX_FAILURES - 1}，还没到上限`);
     noteLoginFailure(ip, '888888', now);
-    assertEquals(checkLoginRate(ip, '999999', now), 'ip_locked', '补满 56 次就是 60，必须锁');
+    assertEquals(checkLoginRate(ip, '999999', now), 'ip_locked', `补满到 ${IP_MAX_FAILURES} 就必须锁`);
   });
 
   it("未知来源那一桶永远不锁 IP（锁它等于锁所有人），但仍然记账", () => {
@@ -353,7 +354,7 @@ describe('账号 · 登录失败限速（两个维度）', () => {
       '过了 15 分钟必须自动恢复（这是学生唯一的自助出路）',
     );
 
-    // ② IP 维度：59 次失败在 61 分钟后全部滑出窗口，再错 59 次也不该累计到 60
+    // ② IP 维度：上限前一次失败在 61 分钟后全部滑出窗口，再来一轮也不该累计
     const ipB = '203.0.113.61';
     for (let i = 0; i < IP_MAX_FAILURES - 1; i += 1) noteLoginFailure(ipB, String(600000 + i), now);
     const later = now + IP_WINDOW_MS + 1;
@@ -363,6 +364,85 @@ describe('账号 · 登录失败限速（两个维度）', () => {
       'ok',
       '窗口外的旧失败不得累计（固定桶/累加计数会在这里变红）',
     );
+  });
+});
+
+/**
+ * ============================================================================
+ * 阈值可配（B5，终审阻塞项）
+ * ============================================================================
+ * 上一版的 IP 总量是模块里的一个常量 60。而试点学校的正常形态是**整班一个出口 IP**：
+ * 一个班第一节课的正常手误（看错行、把 O 当 0、纸条放错）加起来就有几十次，
+ * 60 一次都不富余 —— 全班会被一起锁一小时，而提示语读起来像"平台坏了"。
+ *
+ * 现在：默认 120（安全的那一侧仍然有界），可以用 `PILOT_IP_MAX_FAILURES` 按学校调。
+ * 每次调用现读而不是模块顶层取常量：部署里改一个环境变量就该生效，
+ * 测试也才能注入一个小值来验"第 N 次就锁"（改常量做不到这件事）。
+ *
+ * 这一组把**默认数字**写死在断言里（120）：只写 `>= IP_MAX_FAILURES` 的话，
+ * 退回 60 也照样绿 —— 而 60 正是那个会把全班锁死的值。
+ */
+describe('账号 · 来源总量阈值可配（PILOT_IP_MAX_FAILURES）', () => {
+  /** 改环境变量跑一段，跑完一律还原（限速表也要清） */
+  function withMaxFailures(value, fn) {
+    const before = process.env.PILOT_IP_MAX_FAILURES;
+    if (value === undefined) delete process.env.PILOT_IP_MAX_FAILURES;
+    else process.env.PILOT_IP_MAX_FAILURES = value;
+    resetLoginRateLimits();
+    try {
+      return fn();
+    } finally {
+      if (before === undefined) delete process.env.PILOT_IP_MAX_FAILURES;
+      else process.env.PILOT_IP_MAX_FAILURES = before;
+      resetLoginRateLimits();
+    }
+  }
+
+  it('默认是 120：119 次失败仍放行，第 120 次就锁', () => {
+    withMaxFailures(undefined, () => {
+      const now = Date.now();
+      const ip = '203.0.113.90';
+      assertEquals(IP_MAX_FAILURES, 120, '默认值必须是 120（60 会把一个正常手误的班锁死）');
+
+      for (let i = 0; i < 119; i += 1) noteLoginFailure(ip, String(500000 + i), now);
+      assertEquals(checkLoginRate(ip, '999999', now), 'ok', '119 次还在额度内');
+
+      noteLoginFailure(ip, '999999', now);
+      assertEquals(checkLoginRate(ip, '111111', now), 'ip_locked', '第 120 次必须锁');
+    });
+  });
+
+  it('设成 3 就是第 3 次锁（每次调用现读，不必重启进程）', () => {
+    withMaxFailures('3', () => {
+      const now = Date.now();
+      const ip = '203.0.113.91';
+
+      noteLoginFailure(ip, 'a-1', now);
+      noteLoginFailure(ip, 'a-2', now);
+      assertEquals(checkLoginRate(ip, 'a-3', now), 'ok', '2 次还没到 3');
+      noteLoginFailure(ip, 'a-3', now);
+      assertEquals(checkLoginRate(ip, 'a-4', now), 'ip_locked', '设成 3，第 3 次就该锁');
+    });
+  });
+
+  it('坏值（空 / 0 / 负数 / 非数字）一律退回默认 120：不能变成"永不锁"或"立刻锁"', () => {
+    /**
+     * 这四种都不是"更严或更松"，而是**换了一个意思**：
+     *   空 / 非数字 → 若当成 0，`length >= 0` 恒真 → 所有人第一次请求就被锁；
+     *   0         → 同上；
+     *   负数      → `length >= -5` 也恒真 → 第一次请求就锁死全网。
+     * 所以只认有限的正数，其余一律退回 120。
+     */
+    for (const value of ['', '0', '-5', 'abc']) {
+      withMaxFailures(value, () => {
+        const now = Date.now();
+        const ip = `203.0.113.${value === '' ? 92 : 93}`;
+        for (let i = 0; i < 119; i += 1) noteLoginFailure(ip, `${value}-${i}`, now);
+        assertEquals(checkLoginRate(ip, 'x', now), 'ok', `PILOT_IP_MAX_FAILURES=${JSON.stringify(value)} 应当按默认 120 算`);
+        noteLoginFailure(ip, 'x', now);
+        assertEquals(checkLoginRate(ip, 'y', now), 'ip_locked', `坏值不能等于"永不锁"（${JSON.stringify(value)}）`);
+      });
+    }
   });
 });
 
@@ -510,7 +590,7 @@ describe('账号 · 登录接口（真实 HTTP）', () => {
       }
 
       /**
-       * 若那 60 次拒绝被记账，IP 总量就是 5 + 60 = 65 ≥ 60，换口令也该 ip_locked。
+       * 若那批被拒的请求也被记账，IP 总量就会超过上限，换一个正确口令也该 ip_locked。
        * 记账的后果不只是多算：锁会自己续期（每次被拒都把窗口往后推），永不解锁。
        */
       const { code } = await freshAccount('route-b3');
@@ -519,7 +599,7 @@ describe('账号 · 登录接口（真实 HTTP）', () => {
     });
   });
 
-  it('同一 IP 跨口令累计 60 次失败 → 429（网络维度）带 Retry-After', async () => {
+  it(`同一 IP 跨口令累计 ${IP_MAX_FAILURES} 次失败 → 429（网络维度）带 Retry-After`, async () => {
     resetLoginRateLimits();
     await withServer(async (base) => {
       const headers = { 'x-forwarded-for': '198.51.100.12' };
@@ -538,7 +618,7 @@ describe('账号 · 登录接口（真实 HTTP）', () => {
     });
   });
 
-  it('成功登录不清 IP 总量：59 次失败 + 1 次成功之后，再错 1 次就锁网络', async () => {
+  it(`成功登录不清 IP 总量：${IP_MAX_FAILURES - 1} 次失败 + 1 次成功之后，再错 1 次就锁网络`, async () => {
     resetLoginRateLimits();
     await withServer(async (base) => {
       const headers = { 'x-forwarded-for': '198.51.100.14' };
@@ -547,7 +627,7 @@ describe('账号 · 登录接口（真实 HTTP）', () => {
       }
       const { code } = await freshAccount('route-b5');
       const ok = await post(base, { code }, headers);
-      assertEquals(ok.status, 200, '59 次还没到上限，正确的口令要能登进来');
+      assertEquals(ok.status, 200, `${IP_MAX_FAILURES - 1} 次还没到上限，正确的口令要能登进来`);
 
       /**
        * 这条是 finding 2 的回归：旧实现里成功会清空这个 IP 的失败记录，
@@ -555,10 +635,10 @@ describe('账号 · 登录接口（真实 HTTP）', () => {
        * 现在成功只清 (IP, 口令) 这一对，IP 总量继续数。
        */
       const oneMore = await post(base, { code: '000003' }, headers);
-      assertEquals(oneMore.status, 401, '第 60 次失败仍然是一次正常的 401');
+      assertEquals(oneMore.status, 401, `第 ${IP_MAX_FAILURES} 次失败仍然是一次正常的 401`);
 
       const blocked = await post(base, { code }, headers);
-      assertEquals(blocked.status, 429, '第 61 次必须被网络维度拦住 —— 成功没有清零');
+      assertEquals(blocked.status, 429, '越过上限必须被网络维度拦住 —— 成功没有清零');
       assertEquals(blocked.headers.get('retry-after'), '900');
     });
   });

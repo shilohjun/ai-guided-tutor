@@ -135,6 +135,75 @@ export function ownerOf(event) {
 }
 
 /**
+ * 一条会话能看到的**全部**事件 = 它自己的 + 它那次打开（`visitId`）留下的。
+ *
+ * ============================================================================
+ * 为什么必须有这一步（B2，终审阻塞项）
+ * ============================================================================
+ * 设计稿 §5.2：页 1–2 的事件挂在 `visit.id` 上（会话要到进第 3 页才创建），
+ * 之后的事件才同时带 `sessionId` 与 `visitId`。而看板的漏斗（页 3–4 的停留）
+ * 与导出的「退回次数 / 报告次数 / 改入场次数」读的都是 **`session.events`**。
+ *
+ * 只按 `sessionId` 分组时，那三列在真实数据上**恒为 0** —— 而且是"确定的 0"：
+ * 会话自己有 `chat_send`，`hasEvents` 为真，于是连 counters 兜底也不会走。
+ * 一个恒为 0 的操作列比一个空列更难发现：0 读起来像"学生没做"。
+ *
+ * ============================================================================
+ * 两个刻意的取舍
+ * ============================================================================
+ * ① **顺序沿用入参**（`listEventsByBatch` 已按 `seq` 升序），所以这里按原顺序
+ *    一次遍历把事件推进去，而不是"先攒自己的、再拼 visit 的"：`metrics.deriveDwell`
+ *    读的是数组顺序而不是 `seq`，拼接顺序一错，"这一页之后的第一条事件"就会
+ *    取到更早的时刻（停留变 0，而且不报错）。
+ * ② **一条事件只认一个归属**：`sessionId` 非空就只挂那条会话（与 `ownerOf` 同一口径）。
+ *    会话创建之后的事件两个字段都带，两边都挂会把同一段时间算两遍。
+ *
+ * 页 1–2 的停留仍只从 `visit.events` 读（metrics 的约定），所以"visit 的事件也挂在
+ * 会话上"不会重复计。一次打开下有多条会话时（同一份 visit 连做几道题），
+ * 这几列按"这次打开里发生过"的口径各算一遍 —— 页 1–2 的事件本来就没有
+ * 更细的归属可用，硬分给某一条会话才是编数据。
+ *
+ * @param {object[]} events 该批次的事件（已按 `seq` 升序）
+ * @param {object[]} sessions
+ * @returns {Map<string, object[]>} `sessionId` → 该会话可见的事件（按入参顺序）
+ */
+export function eventsForSessions(events, sessions) {
+  const sessionList = Array.isArray(sessions) ? sessions.filter((item) => item && typeof item === 'object') : [];
+
+  /** `visitId` → 这次打开下的会话 id（一次打开可能做了好几道题） */
+  const sessionIdsByVisit = new Map();
+  for (const session of sessionList) {
+    const visitId = String(session?.visitId ?? '').trim();
+    const sessionId = String(session?.id ?? '').trim();
+    if (!visitId || !sessionId) continue;
+    const bucket = sessionIdsByVisit.get(visitId);
+    if (bucket) bucket.push(sessionId);
+    else sessionIdsByVisit.set(visitId, [sessionId]);
+  }
+
+  const bySession = new Map();
+  const push = (sessionId, event) => {
+    const bucket = bySession.get(sessionId);
+    if (bucket) bucket.push(event);
+    else bySession.set(sessionId, [event]);
+  };
+
+  for (const event of Array.isArray(events) ? events : []) {
+    if (!event || typeof event !== 'object') continue;
+    const sessionId = String(event.sessionId ?? '').trim();
+    if (sessionId) {
+      push(sessionId, event);
+      continue;
+    }
+    const visitId = String(event.visitId ?? '').trim();
+    if (!visitId) continue;
+    for (const id of sessionIdsByVisit.get(visitId) ?? []) push(id, event);
+  }
+
+  return bySession;
+}
+
+/**
  * payload 的字节数。
  *
  * 用 JSON 序列化后的 UTF-8 字节而不是字符数：库里存的就是这段 JSON，

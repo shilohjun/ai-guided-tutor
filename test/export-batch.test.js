@@ -538,6 +538,41 @@ describe('整批导出 · sessions.csv', () => {
     assertEquals(rows.find((row) => row['会话id'] === 's1')['代号'], 'S01');
     assertEquals(rows.find((row) => row['会话id'] === 's2')['代号'], '未知', '空名字同样降级成"未知"');
   });
+
+  /**
+   * B2：页 1–2 的事件挂在 `visitId` 上（设计稿 §5.2），会话要到第 3 页才创建。
+   * 导出只按 `sessionId` 分组时，「退回次数 / 报告次数 / 改入场次数」在真实数据上
+   * **恒为 0**，而 0 看起来像"学生没做"，不像"我们没记"。
+   */
+  it('页事件只带 visitId 时，导出也要把它算给会话（退回次数不能是硬 0）', async () => {
+    const sessions = [
+      {
+        id: 's-visit',
+        visitId: 'v1',
+        userId: 'u1',
+        batchId: 'b1',
+        problemId: 'qbank-1',
+        questionIndex: 0,
+        startedAt: '2026-11-09T10:00:00.000Z',
+        lastAt: '2026-11-09T10:05:00.000Z',
+        finishedAt: null,
+        progress: { maxPage: 3, reached: { p3: '2026-11-09T10:00:00.000Z' } },
+        counters: {},
+        turns: [],
+      },
+    ];
+    const events = [
+      { seq: 1, type: 'page_enter', at: '2026-11-09T10:00:00.000Z', userId: 'u1', batchId: 'b1', visitId: 'v1', payload: { page: 3 } },
+      { seq: 2, type: 'page_enter', at: '2026-11-09T10:01:00.000Z', userId: 'u1', batchId: 'b1', visitId: 'v1', payload: { page: 2 } },
+      { seq: 3, type: 'chat_send', at: '2026-11-09T10:02:00.000Z', userId: 'u1', batchId: 'b1', visitId: 'v1', sessionId: 's-visit', payload: { len: 6 } },
+    ];
+
+    const { store } = makeStore({ sessions, events });
+    const row = rowOf(entryText(await exportBatch(store, 'b1', { now: NOW }), 'sessions.csv'), 's-visit');
+
+    assertEquals(row['退回次数'], '1', '3→2 是一步退回：事件挂在 visit 上，导出必须把它算给这条会话');
+    assertEquals(row['对话轮数'], '1', '会话自己的 chat_send 仍在');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -837,6 +872,18 @@ describe('整批导出 · README.md', () => {
     for (const name of ['students.csv', 'sessions.csv', 'events.jsonl', 'turns.jsonl', 'reports/']) {
       assertIncludes(md, name, `README 应当说明 ${name} 是什么`);
     }
+  });
+
+  /**
+   * B3：一份"一条会话都没有"的导出件，读的人会得出"这批没人来"的结论 ——
+   * 而真实原因往往是系统性失败（模型 Key 不对 / 全线超时），那一轮根本没落成会话。
+   * 这句固定文案必须逐字出现在 README 里（与看板页脚同一句）。
+   */
+  it('一条会话都没有时的诊断句：0 会话不等于学生没来', () => {
+    assertIncludes(
+      readme(),
+      '看板显示 0 会话、但对话或系统失败轮次非零，说明这一批发生了系统性失败（多半是模型 Key 或超时），不是学生没来。',
+    );
   });
 
   it('缺参数时不写 undefined：只给 batch 也能渲染', () => {

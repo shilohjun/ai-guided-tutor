@@ -159,8 +159,16 @@ export function readOcrConfig(env = process.env) {
 
   const endpoint = String(env.ALIYUN_OCR_ENDPOINT ?? '').trim();
   const imageField = String(env.ALIYUN_OCR_IMAGE_FIELD ?? '').trim();
-  /** 超时：拍题图通常 1MB 以内，官方建议 30s；给足但不无限等 */
-  const timeoutMs = Number(env.ALIYUN_OCR_TIMEOUT_MS || 30000);
+  /**
+   * 超时：拍题图通常 1MB 以内，默认 **12 秒**（F1）。
+   *
+   * 为什么不是 30 秒：部署方的硬超时就是 30 秒，取 30 秒等于让网关先掐掉函数 ——
+   * 那时错误回不来（学生看到的是"一直在转"），额度也已经记不上了。
+   * 留出 18 秒给"写事件 + 回响应"，与一轮对话的预算（TURN_DEADLINE_MS = 22 秒）
+   * 是同一个思路。本地的 node 服务没有这道墙，所以这个默认值只会在线上把
+   * "识别总是失败"变成常态，而本地永远复现不出来。
+   */
+  const timeoutMs = Number(env.ALIYUN_OCR_TIMEOUT_MS || 12000);
   /** 默认 0 次重试 —— 按次计费，重试就是再花钱（见文件头红线 ①） */
   const retries = Math.max(0, Math.min(2, Number(env.ALIYUN_OCR_RETRIES ?? 0)));
 

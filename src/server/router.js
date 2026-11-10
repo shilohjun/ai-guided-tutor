@@ -1858,6 +1858,21 @@ export async function handleApi(req, res, url) {
   // ---- POST /api/eval ----
   // 默认走离线规则桩：公开演示绝不能因为配了 Key 就发几十轮真实请求。
   if (path === '/api/eval' && req.method === 'POST') {
+    /**
+     * 配了登录守卫的部署里，这个接口**不存在**（F3）。
+     *
+     * 为什么不靠守卫挡住：守卫只挡"没登录"的人，而每个学生手里都有令牌。
+     * `/api/eval` 一次能跑几十轮模型调用（`scenarioIds` 由请求体指定），
+     * 留着它等于给每个学生一个烧钱按钮 —— 而它跟课堂上要做的任何一件事都没有关系。
+     *
+     * 回 404 而不是 403：403 等于承认"这里有东西，只是你不能用"。
+     * 在这个部署里它本来就该像不存在一样（与看板未配置时同一句话）。
+     */
+    if (envFor().PILOT_REQUIRE_LOGIN === '1') {
+      sendJson(res, 404, { error: '没有这个接口' });
+      return true;
+    }
+
     const body = await readJson(req).catch(() => ({}));
     const { createOfflineAdapter } = await import('../core/llm.js');
     const useLlm = Boolean(body?.useLlm);

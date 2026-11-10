@@ -59,7 +59,7 @@
 
 import { buildFunnel, isAbandoned, summarizeSessions } from './metrics.js';
 import { exportBatch, exportSingle } from './export.js';
-import { ownerOf } from './events.js';
+import { ownerOf, eventsForSessions } from './events.js';
 import { safeEqual } from './demo-gate.js';
 import { readSessionRecord } from './session-store.js';
 
@@ -178,9 +178,15 @@ export function checkAdmin(req, env) {
  * 不在这里再写一次 `sessionId || visitId`：第四份手抄迟早会多一个 `??`，
  * 而那次分叉的症状正是"页 2 的停留翻倍"。
  *
+ * **会话还要拿到"它那次打开"的事件**（B2）：页 1–2 的事件只带 `visitId`，
+ * 而漏斗的页 3–4 与导出的三个操作列读的都是 `session.events` —— 不挂上来，
+ * 「退回次数 / 报告次数 / 改入场次数」在真实数据上恒为 0（见 `eventsForSessions`）。
+ * 页 1–2 的停留仍只从 `visit.events` 读，所以两边都有不会重复计。
+ *
  * 顺序：直接沿用入参的顺序。入参是 `listEventsByBatch` 的产物（驱动已按 `seq` 升序），
  * 而 `metrics.js` 对会话的事件还会再排一次、对 visit 的不再排 —— 所以调用方必须
- * 按库里读出来的那份顺序给，不能自己拼一个乱序数组进来。
+ * 按库里读出来的那份顺序给，不能自己拼一个乱序数组进来。会话那一侧的合并
+ * （自己 + visit）也走 `eventsForSessions`，它保证仍是同一个顺序。
  *
  * @param {object[]} events 该批次的事件（`listEventsByBatch` 的产物，已按 seq 升序）
  * @param {object[]} sessions 会话
@@ -197,14 +203,21 @@ export function stitchEvents(events, sessions, visits) {
     else byOwner.set(owner, [event]);
   }
 
-  const attach = (record) => ({
+  /** 会话侧的归属比 `ownerOf` 多一档：它自己那次打开的事件也算它的 */
+  const bySession = eventsForSessions(events, sessions);
+
+  const attachOwner = (record) => ({
     ...record,
     events: byOwner.get(text(record?.id)) ?? [],
   });
+  const attachSession = (record) => ({
+    ...record,
+    events: bySession.get(text(record?.id)) ?? [],
+  });
 
   return {
-    sessions: asList(sessions).map(attach),
-    visits: asList(visits).map(attach),
+    sessions: asList(sessions).map(attachSession),
+    visits: asList(visits).map(attachOwner),
   };
 }
 
@@ -238,12 +251,58 @@ async function loadVisits(store, sessions, events) {
     if (id) ids.add(id);
   }
 
-  const visits = [];
-  for (const id of [...ids].sort()) {
-    const visit = await store.getVisit(id);
-    if (visit) visits.push(visit);
+  /**
+   * 并发取（F2），不是一条一条串行。
+   *
+   * 为什么：存储端口没有 `listVisitsByBatch`，只能按 id 一份一份取；
+   * 串行时一次看板就是 1 + 2N 次库调用、每次一个网络往返 —— 40 人的班还能忍，
+   * 一个学期之后它就会变成"看板一直转圈"。这里的 id 最多几十个，并发没有风险。
+   *
+   * `getVisit` 读不到就跳过（见上），所以只把成功的那几份收进结果；
+   * 顺序按 id 排好再发，两次刷新给同一批人（看板不该因为并发完成的先后而抖动）。
+   */
+  const visitIds = [...ids].sort();
+  const found = await Promise.all(visitIds.map((id) => store.getVisit(id)));
+  return found.filter(Boolean);
+}
+
+/**
+ * 系统失败轮次（B3）：有 `chat_send`、但**这一批里没有任何会话认领它**的轮数。
+ *
+ * ============================================================================
+ * 为什么这个数必须有一个名字
+ * ============================================================================
+ * `TURN_SLOW` / `UPSTREAM` 在落会话之前就返回了（那一轮本来就不该写成学习记录），
+ * 于是这一批只剩客户端发的 `chat_send`，一条会话行都没有。看板于是显示
+ * 「0 会话 · 0.0% 一轮失败率」，而 `p1 > 0` 又让空态不触发 ——
+ * **"模型 Key 不对"和"学生没来"在屏幕上完全一样**，而这两件事要做的动作相反。
+ * 这个数就是给那一屏用的一条可见的线，不是一个新的指标。
+ *
+ * ============================================================================
+ * 判据是"有没有会话认领"，不是"事件有没有归属键"
+ * ============================================================================
+ * 事件一定有归属键（服务端写入时就拦了），所以"孤儿"不是"没归属"，
+ * 而是"它指向的那条会话**不在会话表里**"。用对象身份对账而不是再拼一次 id：
+ * `sessions` 是 `stitchEvents` 的产物，它里面的事件就是 `events` 里的同一批对象
+ * （合并只搬引用、不复制），所以一次 Set 查找就够，也不会因为 `'s1'` 与 `' s1 '`
+ * 这种脏值分叉出第二套口径。
+ *
+ * 认领包括"经由 visit 认领"：页 1–2 的 `chat_send`（若有）会挂在它那次打开下的
+ * 每一条会话上，那种轮次不算孤儿 —— 它确实写进了某条学习记录。
+ */
+function orphanTurnsOf(events, sessions) {
+  const claimed = new Set();
+  for (const session of asList(sessions)) {
+    for (const event of asList(session?.events)) claimed.add(event);
   }
-  return visits;
+
+  let turns = 0;
+  for (const event of asList(events)) {
+    if (event?.type !== 'chat_send') continue;
+    if (claimed.has(event)) continue;
+    turns += 1;
+  }
+  return turns;
 }
 
 /**
@@ -257,8 +316,11 @@ async function loadVisits(store, sessions, events) {
  *
  * `ocrCap` 取批次上的整批额度，`dailyCap` 取环境变量（日粒度是部署级的，
  * 不属于某一批）。两个都是 0 表示没配，怎么解释留给 Task 11 的闸门。
+ *
+ * `orphanTurns` 见 `orphanTurnsOf`：它不是"失败率"，而是"这一批有多少轮
+ * 根本没进学习记录" —— 必须和失败率分开看，否则 0.0% 会读成"一切正常"。
  */
-async function usageOf(store, batch, batchId, env, sessions, summary) {
+async function usageOf(store, batch, batchId, env, sessions, summary, events) {
   const today = new Date().toISOString().slice(0, 10);
 
   let chatTurns = 0;
@@ -276,6 +338,8 @@ async function usageOf(store, batch, batchId, env, sessions, summary) {
     chatTurns,
     /** 与 summary 同源：同一个数只许有一处算它（这里只是把它挪到用量行） */
     turnFailureRate: countOf(summary?.turnFailureRate),
+    /** 有 `chat_send` 却没有会话认领的轮数（B3）：非 0 说明这一批系统性失败了 */
+    orphanTurns: orphanTurnsOf(events, sessions),
   };
 }
 
@@ -316,7 +380,7 @@ async function sendOverview(res, store, env, url) {
     batch,
     funnel: buildFunnel(stitched.visits, stitched.sessions),
     summary,
-    usage: await usageOf(store, batch, batchId, env, stitched.sessions, summary),
+    usage: await usageOf(store, batch, batchId, env, stitched.sessions, summary, events),
     generatedAt: new Date().toISOString(),
   });
 }

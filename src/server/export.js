@@ -43,7 +43,7 @@
 
 import { readSessionRecord, snapshotSession } from './session-store.js';
 import { OVERNIGHT_GAP_MS, hasOvernightReturn, isAbandoned } from './metrics.js';
-import { ownerOf } from './events.js';
+import { ownerOf, eventsForSessions } from './events.js';
 import { createZip } from './zip.js';
 
 /** 查不到时的兜底：中文，且一眼能看出是"查不到"而不是"字段叫这个" */
@@ -479,6 +479,17 @@ const README_SCOPE =
 const README_LEVEL = '掌握程度是页面上由独立完成度推导出的颜色档，不存库；本导出件以数字为准。';
 const README_NAMES = '代号与真名的对照表不在导出件里，由发号时的 CSV 保管。';
 
+/**
+ * 空导出件的诊断句（B3，与看板页脚**逐字同一句**）。
+ *
+ * 为什么必须印在导出件里：`TURN_SLOW` / `UPSTREAM` 在落会话之前就返回了，
+ * 于是"模型 Key 不对 / 全线超时"会导出一份**一条会话都没有**的 zip。
+ * 收到它的人只能得出一个结论："这批没人来" —— 而这个结论会让平台被换掉，
+ * 换掉的原因却是错的。空文件是"确实没有"，但"确实没有"有两种，必须分开说。
+ */
+const README_SYSTEM_FAILURE =
+  '看板显示 0 会话、但对话或系统失败轮次非零，说明这一批发生了系统性失败（多半是模型 Key 或超时），不是学生没来。';
+
 /** 打包规则变了就 +1：读 README 的人据此判断这份说明是否适用于手上这个 zip */
 const EXPORT_FORMAT_VERSION = 1;
 
@@ -838,6 +849,10 @@ export function renderBatchReadme({ batch, generatedAt, sessionCount } = {}) {
       '',
       '本导出件不含生成时刻，以保证同一批数据两次导出完全一致。',
       '',
+      '## 一条会话都没有时',
+      '',
+      README_SYSTEM_FAILURE,
+      '',
       '## 这批数据回答什么',
       '',
       README_SCOPE,
@@ -1102,8 +1117,17 @@ export async function exportBatch(store, batchId, { now } = {}) {
     /** 名单按代号排（码位序）：导出的第一列看着就是一份名单，不是一堆 id */
     .sort((a, b) => compareText(a.displayName, b.displayName) || compareText(a.userId, b.userId));
 
-  /** 事件按会话分好、组内按 `seq` 排好：`events.jsonl` 的行序与 CSV 的派生列共用这一份 */
-  const eventsBySession = groupEventsBySession(events);
+  /**
+   * 事件按会话分好：`events.jsonl` 用 `groupEventsBySession`（只按 `sessionId`，
+   * 组间顺序要固定），而 CSV 的派生列用 `eventsForSessions` —— 后者把该会话
+   * **那次打开（`visitId`）** 的事件也算了进来。两件事刻意分开：
+   * jsonl 要的是"这条事件原来归谁"，CSV 要的是"这条会话发生过什么"。
+   *
+   * 不带上 visit 的事件时，「退回次数 / 报告次数 / 改入场次数」在真实数据上
+   * 恒为 0（页 1–2 的事件只带 `visitId`，会话要到第 3 页才创建），
+   * 而 0 读起来像"学生没做"（B2）。
+   */
+  const eventsBySession = eventsForSessions(events, sessions);
 
   /**
    * 代号与事件**一起**随会话带进 CSV：代号给「代号」列，事件给「对话轮数 /
@@ -1118,7 +1142,7 @@ export async function exportBatch(store, batchId, { now } = {}) {
     const sessionId = text(session?.id);
     const enriched = {
       ...session,
-      events: sessionId === '' ? [] : (eventsBySession.get(sessionId) ?? []),
+      events: eventsBySession.get(sessionId) ?? [],
     };
     return displayName ? { ...enriched, studentName: displayName } : enriched;
   });

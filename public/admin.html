@@ -149,6 +149,8 @@ body{
   font-size:var(--fs-s);
 }
 .usage b{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+/* 系统失败轮次用警示色：它非 0 时这一屏的头条数字（0 会话 / 0.0%）是假的 */
+.usage .usage-warn{color:var(--coral)}
 .usage-dot{color:var(--line-strong)}
 .batch-line{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-top:16px}
 .batch-name{font-size:var(--fs-l);font-weight:700}
@@ -373,6 +375,13 @@ body{
       <span>对话 <b data-use="chat">—</b> 轮</span>
       <span class="usage-dot">·</span>
       <span>一轮失败率 <b data-use="fail">—</b></span>
+      <!--
+        系统失败轮次：只在非 0 时出现。
+        一批全是 TURN_SLOW / UPSTREAM 时，那几轮在落会话之前就返回了 ——
+        看板会显示「0 会话 · 0.0% 一轮失败率」，和"学生没来"长得一模一样。
+        这个数存在的唯一理由就是让那一屏看得出来是平台坏了。
+      -->
+      <span id="orphanItem" hidden><span class="usage-dot">·</span> 系统失败轮次 <b class="usage-warn" data-use="orphanTurns">—</b></span>
     </div>
 
     <div class="batch-line">
@@ -509,6 +518,7 @@ body{
   <footer class="foot">
     <p>这批数据回答的是<b>会不会用</b>，不回答有没有效果。</p>
     <p class="foot-sub">口径：打开人数按打开次数算，其余按不同的人算；时长为该页的平均停留；时间一律服务端生成的 UTC。</p>
+    <p class="foot-sub">看板显示 0 会话、但对话或系统失败轮次非零，说明这一批发生了系统性失败（多半是模型 Key 或超时），不是学生没来。</p>
   </footer>
 
 </main>
@@ -698,22 +708,30 @@ body{
 
   /* ---------------- 渲染 ---------------- */
 
-  /** 用量行：今日 OCR / 本批 OCR（上限 0 显示"不限"）· 对话轮数 · 一轮失败率 */
+  /** 用量行：今日 OCR / 本批 OCR（上限 0 显示"不限"）· 对话轮数 · 一轮失败率 · 系统失败轮次 */
   function renderUsage(usage) {
     var data = usage || {};
+    var orphan = cnt(data.orphanTurns);
     var map = {
       ocrDaily: int(data.ocrDaily),
       dailyCap: cap(data.dailyCap),
       ocrBatch: int(data.ocrBatch),
       ocrCap: cap(data.ocrCap),
       chat: int(data.chatTurns),
-      fail: pct(data.turnFailureRate)
+      fail: pct(data.turnFailureRate),
+      orphanTurns: int(orphan)
     };
     var nodes = document.querySelectorAll('[data-use]');
     for (var i = 0; i < nodes.length; i += 1) {
       var key = nodes[i].getAttribute('data-use');
       nodes[i].textContent = map[key] === undefined ? '—' : map[key];
     }
+    /**
+     * 系统失败轮次为 0 时整项收起（连前面的分隔点一起）。
+     * 留一行恒为 0 的项，只会让真正非 0 的那一行更难被看见 ——
+     * 而这个数存在的唯一理由就是"平台坏了"必须和"学生没来"长得不一样。
+     */
+    $('orphanItem').hidden = orphan === 0;
   }
 
   /** 四个数：打开人数 / 答题人数 / 走到报告 / 一轮失败率 */
