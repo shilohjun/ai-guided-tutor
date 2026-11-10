@@ -17,7 +17,7 @@
  * 两层各用各的，互不干扰。零依赖，跑 `node scripts/build-cloudbase.mjs` 即可。
  */
 
-import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readdirSync, rmdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -39,12 +39,37 @@ function copyDir(from, to) {
   }
 }
 
+/**
+ * 清空输出目录。
+ *
+ * 为什么不用 `fs.rmSync({recursive:true})`：这台机器上它**静默地什么都不删**
+ * （不抛错、文件还在，实测把文件放进 dist-cloudbase 再打包，文件仍然在）。
+ * 后果不会报错，而是"上一次打包留下的文件悄悄进了部署包"——
+ * 比如一个已经删掉的源文件还留在函数里，读代码的人会以为它还在用。
+ * 这里只用 readdirSync / unlinkSync / rmdirSync，与 copyDir 是同一套原语。
+ */
+function clearDir(dir) {
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch (err) {
+    if (err?.code === 'ENOENT') return;
+    throw err;
+  }
+  for (const entry of entries) {
+    const target = join(dir, entry.name);
+    if (entry.isDirectory()) clearDir(target);
+    else unlinkSync(target);
+  }
+  rmdirSync(dir);
+}
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'dist-cloudbase');
 const FN_NAME = 'bubujie-api';
 const FN_DIR = join(OUT, FN_NAME);
 
-rmSync(OUT, { recursive: true, force: true });
+clearDir(OUT);
 mkdirSync(FN_DIR, { recursive: true });
 
 // ① 源码原样复制（src/ 自包含，不引用公共目录外的任何文件）
