@@ -46,3 +46,6 @@ cloudbaserc.json
 
 # SDD 账本与工作区（本地临时，不进版本库）
 .superpowers/
+
+# file 驱动的默认落盘目录（STORE_DIR 的缺省值）：本地跑开发与测试时才会出现
+.data/
