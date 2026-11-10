@@ -12,10 +12,18 @@
  * 驱动选择规则（写死，不给配置项开新口子）
  * ============================================================================
  *   STORE=file      → file：<STORE_DIR>/<collection>/<id>.json，看得见、拷得走
- *   STORE=cloudbase → 云驱动：**现在调用即抛**。试点只跑 CloudBase，但驱动是 Task 12
- *                     才实现的；这时候静默退回内存，会让"账号写进去了"变成
- *                     一个只有重启后才发现是假的幻觉，宁可当场报错。
+ *   STORE=cloudbase → 云驱动（试点唯一在跑的）。**打开失败一律退回内存**并记一句
+ *                     可读的原因：本地与 CI 的 dependencies 是 {}，永远没有云 SDK，
+ *                     那不是故障而是预期；真正的故障（缺 TCB_ENV、库连不上）也在同一句日志里。
+ *                     宁可降级到"数据只在进程里"，也不让本地开发因为一个云驱动起不来。
  *   其它（含没配）  → memory。没配必须退回内存：现有线上 Demo 一个字节都不该变。
+ *
+ * ----------------------------------------------------------------------------
+ * 两种"没起来"要分得开（都写在 warn 那一行里）
+ * ----------------------------------------------------------------------------
+ *   ① 缺 SDK（本地、CI）→ 预期之内，不是问题，别去"修"它；
+ *   ② 缺 TCB_ENV / 连不上库 → 真问题，部署时没人看日志就等于没有告警。
+ * 所以降级日志带的是驱动自己抛出来的那一句中文原因，而不是统一的一句"失败了"。
  *
  * @typedef {object} Store
  * @property {'memory'|'file'|'cloudbase'} kind  驱动名（属性，不是方法）
@@ -43,6 +51,7 @@
  * @property {() => Promise<void>} close
  */
 
+import { openCloudbaseStore } from './cloudbase.js';
 import { openFileStore } from './file.js';
 import { openMemoryStore } from './memory.js';
 
@@ -59,6 +68,23 @@ export async function openStore(env) {
     .toLowerCase();
 
   if (kind === 'file') return openFileStore(config);
-  if (kind === 'cloudbase') throw new Error('cloudbase 驱动在 Task 12 实现');
+  if (kind === 'cloudbase') {
+    try {
+      return await openCloudbaseStore(config);
+    } catch (err) {
+      /**
+       * 降级到内存，而不是让进程起不来。
+       *
+       * 理由：①本地与 CI 根本没装云 SDK（dependencies 是 {}），抛错等于"想跑这个
+       * 仓库先装一个云依赖"；②真正跑在云函数里时，缺 TCB_ENV 这种配置错也应当让
+       * 站点先起来、把原因留在日志里，而不是整个函数 500 —— 那样连健康检查都打不开。
+       *
+       * 代价写在明处：降级之后数据只在进程内存里，重启即丢。所以这一行 warn 是
+       * **唯一**的告警信号，文案必须能被值班的人读懂（原因来自驱动自己抛的那一句）。
+       */
+      console.warn(`云数据库驱动没起来，退回内存：${err?.message ?? err}`);
+      return openMemoryStore();
+    }
+  }
   return openMemoryStore();
 }

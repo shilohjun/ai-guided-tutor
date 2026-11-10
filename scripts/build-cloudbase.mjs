@@ -105,6 +105,16 @@ writeFileSync(
       type: 'commonjs',
       main: 'index.js',
       engines: { node: '>=18' },
+      /**
+       * 云 SDK 只写进**这一份**清单。
+       *
+       * 根 `package.json` 的 `dependencies` 必须保持 `{}`：那个文件决定的是
+       * "clone 下来要不要先装依赖"，而这个文件只存在于打包产物里、只被云函数
+       * 安装（`cloudbaserc.json` 的 `installDependency: true`）。
+       * 源码侧用动态 `import()` 懒加载（见 src/server/store/cloudbase.js），
+       * 所以本地不装它照样能跑 —— 这两件事是配套的，改一处必须改另一处。
+       */
+      dependencies: { '@cloudbase/node-sdk': '^3' },
     },
     null,
     2,
