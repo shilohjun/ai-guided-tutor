@@ -299,7 +299,63 @@ describe('OCR · 路由级：真的调一次、只计一次、到顶就不发请
 });
 
 // ---------------------------------------------------------------------------
-// 三、健康检查把用量透出来（L2：让调试条读得到，而不是编一个数）
+// 三、库读不出来时 fail closed（闸门必须在"最需要它的时候"还在）
+// ---------------------------------------------------------------------------
+
+describe('OCR · 额度读不出来时 fail closed', () => {
+  /**
+   * 这一组盯的是花钱闸门的**故障姿态**。
+   *
+   * 原来的写法是"三次读共用一个 try，读失败就当 0 放行"，等于在库坏掉的时候
+   * 把闸门静默解除 —— 而那正是最需要它的时候。正确的姿态是反过来的：
+   * **证明不了还有额度，就当没有**。代价是学生这一次要自己粘贴文字，
+   * 而那条链路一直是可用的；不这么做的代价是库故障期间无限烧额度。
+   */
+
+  it('计数器抛错时 503 OCR_QUOTA_UNKNOWN，且上游一次都没被调用', async () => {
+    await withOcrServer({ ...OCR_ENV, OCR_DAILY_CAP: '5' }, async ({ base, store, upstreamCalls }) => {
+      /**
+       * 故障注入点选在真实的 file 驱动对象上：只弄坏"读计数"这一个方法，
+       * 写入、读会话等其余路径保持原样 —— 这样"读不出来"才是唯一的变量。
+       */
+      store.getCounter = async () => {
+        throw new Error('模拟云库读超时');
+      };
+      const res = await ocr(base);
+      assertEquals(res.status, 503, `读不出额度时必须拒绝，实际：${JSON.stringify(res.json)}`);
+      assertEquals(res.json.code, 'OCR_QUOTA_UNKNOWN', '与"真的到顶"要分开报：前者值得等一会儿再试，后者要等明天');
+      assertIncludes(res.json.error, '粘贴题目文字', '拒绝的同时必须给出仍然可用的那条路');
+      assertEquals(upstreamCalls.length, 0, '**钱一分都不许花** —— 这才是 fail closed 的意义');
+    });
+  });
+
+  it('三次读互不牵连：批次读挂了，当日额度照样读得出来，并如实说"额度用完"', async () => {
+    await withOcrServer({ ...OCR_ENV, OCR_DAILY_CAP: '1' }, async ({ base, store, upstreamCalls }) => {
+      await store.putBatch({ id: 'b1', label: '一班', ocrCap: 5 });
+      const [issued] = await issueAccounts(store, { batchId: 'b1', count: 1 });
+      const token = (await login(store, issued.code, '10.9.0.9', Date.now(), {})).token;
+
+      /** 先把当日额度真的用掉一次（走完整链路，计数器变成 1） */
+      const first = await ocr(base, { 'x-test-token': token });
+      assertEquals(first.status, 200, `第一次应当成功：${JSON.stringify(first.json)}`);
+      assertEquals(upstreamCalls.length, 1);
+
+      /** 再只弄坏"读批次"这一维：当日计数仍然可读，那就必须读出来 */
+      store.getBatch = async () => {
+        throw new Error('模拟批次读失败');
+      };
+
+      const second = await ocr(base, { 'x-test-token': token });
+      assertEquals(second.status, 503, '批次读不出来也不能放行');
+      assertEquals(second.json.code, 'OCR_QUOTA', '知道是哪道闸到顶时要说清，而不是笼统说"查不到"');
+      assertIncludes(second.json.error, '额度用完');
+      assertEquals(upstreamCalls.length, 1, '被拦下的那一次一次请求都不许发');
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 四、健康检查把用量透出来（L2：让调试条读得到，而不是编一个数）
 // ---------------------------------------------------------------------------
 
 describe('OCR · 用量透出', () => {

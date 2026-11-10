@@ -14,7 +14,7 @@
 
 [![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](package.json)
 [![依赖](https://img.shields.io/badge/dependencies-0-brightgreen)](package.json)
-[![测试](https://img.shields.io/badge/tests-726%2F726-brightgreen)](test/run.js)
+[![测试](https://img.shields.io/badge/tests-728%2F728-brightgreen)](test/run.js)
 [![许可](https://img.shields.io/badge/license-UNLICENSED-lightgrey)](LICENSE)
 
 仓库地址：<https://github.com/shilohjun/ai-guided-tutor>
@@ -289,7 +289,7 @@ npm run preview:verify    # file:// 打开验收
 npm test
 ```
 
-当前注册 **726 个用例，全部通过**。`npm test` 跑完测试后会接着跑
+当前注册 **728 个用例，全部通过**。`npm test` 跑完测试后会接着跑
 `scripts/audit-ui-style.js`：它把设计令牌（间距 2/4/6/8/12/16/24/32、字号三档、
 嵌套圆角、语义色）做成可执行规则，样式一跑偏就报出来 —— 只靠人眼看不住。
 字号与控件尺寸参考 LeetCode 做题页后，再按中文密度收一档（中档题干 13/18.9、标签 11、按钮高 32、顶栏 52）。
@@ -516,7 +516,7 @@ node scripts/deploy-cloudbase.mjs --apply            #    真的注入
 
 | 限制 | 说明 |
 |---|---|
-| 测试状态 | 726 个注册用例全部通过（含 UI 令牌审计） |
+| 测试状态 | 728 个注册用例全部通过（含 UI 令牌审计） |
 | AI 伴学 | 未上线：`capabilities.modes` 只有 `self_training`，接口对 `ai_companion` 返回 400 `MODE_UNAVAILABLE` |
 | 公式卡范围 | 按知识点表匹配；导入题的知识点不在表内时不发卡 |
 | 场景集规模 | 19 个场景且由人编写，覆盖不了真实学生的表达多样性 |

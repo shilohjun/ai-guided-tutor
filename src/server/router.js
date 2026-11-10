@@ -991,25 +991,89 @@ export function ocrQuotaState({ batchUsed = 0, batch = null, dailyUsed = 0, dail
 /**
  * 读两道闸的当前状态。
  *
- * 库打不开时**一律放行**（用量按 0 算）。理由与埋点那条一致：这时看板也读不出数，
- * 而"把学生挡在门外"比"可能少记了一次"更糟 —— 拍照识题不是唯一的入口，
- * 但它被误拒时学生只会认为这个功能坏了。
+ * ============================================================================
+ * 读不出来 = 已达上限（fail closed），不是"按 0 算"
+ * ============================================================================
+ * 这一环是**花钱的闸门**：OCR 按成功调用计费（约 0.083 元/次），是这套系统里
+ * 唯一"学生自己点一下就会花钱"的入口。
+ *
+ * 原来的写法是三次读共用一个 try、失败就把用量当 0 —— 也就是"库坏了就当没用量"。
+ * 那等于在**最需要闸门的时候**把它静默解除，而日志里只留一句 warn，没人会看到
+ * 额度在涨。所以改成：
+ *
+ *   ① 三次读各自 try/catch，一次失败不牵连另外两维；
+ *   ② 任一维读不出来 → 该维记成"未知"；
+ *   ③ 有未知维 → **整道闸按已达上限处理**，由调用方回 503。
+ *
+ * 代价是学生这一次要自己粘贴文字（那条链路一直是可用的），换来的是
+ * "库故障期间不会无限烧额度"。这个方向不能反过来：少放行一次是体验问题，
+ * 多花钱是账问题。
+ *
+ * 两种拒绝要分开报（见 /api/ocr 的调用点）：
+ *   · `reason` 非空 → 真的到顶（OCR_QUOTA，"今日额度用完了"，学生知道该等明天）；
+ *   · `reason` 为空但有未知维 → 查不到（OCR_QUOTA_UNKNOWN，"稍后再试"）。
+ * 不分开的话，库故障会被说成"今天的额度用完了" —— 那是假话，而且会让人去查账单
+ * 而不是查库，把真正的故障藏起来。
  */
 async function readOcrQuota({ store, batchId, env, now = new Date() }) {
   const dailyCap = countOf(env?.OCR_DAILY_CAP);
+
   let batch = null;
   let batchUsed = 0;
   let dailyUsed = 0;
-  if (store) {
+  /** 读不出来的维度；非空即"证明不了还有额度" */
+  const unknown = [];
+
+  /**
+   * 读一次，失败只标记自己那一维。
+   *
+   * 返回值是 `{ ok, value }` 而不是"失败时给的默认值"：默认值 0 与"真的读到 0"
+   * 在下游分不开，而这两件事的处置正好相反（一个是"还没用过，放行"，
+   * 一个是"不知道，拒绝"）。
+   */
+  const readOne = async (dimension, fn, fallback) => {
     try {
-      if (batchId) batch = await store.getBatch(batchId);
-      batchUsed = batchId ? await store.getCounter(ocrBatchCounterKey(batchId)) : 0;
-      dailyUsed = await store.getCounter(ocrDailyCounterKey(now));
+      return { ok: true, value: await fn() };
     } catch (err) {
-      console.warn(`[ocr] 额度读不出来，这一轮按不限放行：${err?.message ?? err}`);
+      console.warn(`[ocr] 额度读不出来（${dimension}），这一道闸按已达上限处理：${err?.message ?? err}`);
+      return { ok: false, value: fallback };
     }
+  };
+
+  if (store) {
+    /**
+     * 批次这一维只在"有批次"时存在：未登录不是读失败，是一个事实（没有批次）。
+     * 读回来是 null（批次记录被删了）也不算读失败 —— 那也是事实，不是故障；
+     * 那种情况下日额度那道闸照常守着，不必让整批学生都改用粘贴。
+     */
+    if (batchId) {
+      const batchRead = await readOne('batch', () => store.getBatch(batchId), null);
+      if (!batchRead.ok) unknown.push('batch');
+      batch = batchRead.value;
+
+      const batchUsedRead = await readOne('ocr:batch', () => store.getCounter(ocrBatchCounterKey(batchId)), 0);
+      if (!batchUsedRead.ok) unknown.push('batchUsed');
+      batchUsed = countOf(batchUsedRead.value);
+    }
+
+    const dailyRead = await readOne('ocr:daily', () => store.getCounter(ocrDailyCounterKey(now)), 0);
+    if (!dailyRead.ok) unknown.push('dailyUsed');
+    dailyUsed = countOf(dailyRead.value);
+  } else {
+    /**
+     * 库压根没打开（`getStore()` 失败）：这不是"用量是 0"，是"不知道"。
+     * 与读失败同一档 —— 否则"库打不开"就成了花钱最自由的那种状态。
+     */
+    unknown.push('store');
   }
-  return ocrQuotaState({ batchUsed, batch, dailyUsed, dailyCap });
+
+  const state = ocrQuotaState({ batchUsed, batch, dailyUsed, dailyCap });
+  return {
+    ...state,
+    /** 未知维也算 blocked：以后别处只判 `.blocked` 一个字段时，默认仍然是拒绝的 */
+    blocked: state.blocked || unknown.length > 0,
+    unknown: unknown.length > 0,
+  };
 }
 
 /**
@@ -1369,14 +1433,28 @@ export async function handleApi(req, res, url) {
      * 位置很关键：在 `recognizeProblemImage` 之前。拦在调用之后（先花钱再回 503）
      * 等于没拦 —— 而 OCR 按成功调用计费，是这套系统里唯一"学生点一下就会花钱"的入口。
      * 被拦下的那一次**不发起调用、也不计数**。
+     *
+     * 两种拒绝分开说（见 readOcrQuota 的文件头）：
+     *   · `reason` 非空 → 真的到顶，学生该等明天；
+     *   · 只有未知维 → 查不到额度，值得过一会儿再试。
+     * 两句都给出"粘贴文字"这条仍然可用的路 —— 拒绝必须带一个下一步，
+     * 否则学生只会以为这个功能坏了。
      */
     const store = await getStore().catch(() => null);
     const batchId = req.__user?.batchId ?? null;
-    if ((await readOcrQuota({ store, batchId, env: ocrEnv })).blocked) {
-      sendJson(res, 503, {
-        error: '今日的拍照识题额度用完了，可以直接粘贴题目文字。',
-        code: 'OCR_QUOTA',
-      });
+    const quota = await readOcrQuota({ store, batchId, env: ocrEnv });
+    if (quota.blocked) {
+      if (quota.reason) {
+        sendJson(res, 503, {
+          error: '今日的拍照识题额度用完了，可以直接粘贴题目文字。',
+          code: 'OCR_QUOTA',
+        });
+      } else {
+        sendJson(res, 503, {
+          error: '暂时查不到额度，请稍后再试，或直接粘贴题目文字。',
+          code: 'OCR_QUOTA_UNKNOWN',
+        });
+      }
       return true;
     }
 
