@@ -1496,10 +1496,70 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
 .rel-preview-head .rel-x{font-size:var(--fs-title);line-height:1}
 @media(max-width:600px){.rel-preview{width:calc(100vw - 16px);height:92vh;max-height:92vh}.rel-preview-head{padding:12px 16px}.rel-preview-body{padding:12px 16px}.rel-preview-footer{padding:12px 16px}.rel-preview .q-opts-r li{padding:8px 12px;gap:8px}.rel-preview-footer .btn-primary{white-space:nowrap}}
 html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var(--r-inner)}
+
+/* ================= 内测准入：登录屏 / 开场说明 / 题单条 / 续做条 ================= */
+/* 未登录时主干整块不可见：不要让人先点一遍、再告诉他没登录 */
+body[data-locked="1"] .topbar,
+body[data-locked="1"] #app{display:none}
+.lock{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--paper);overflow:auto}
+.lock[hidden]{display:none}
+.lock-card{width:100%;max-width:360px;box-sizing:border-box;padding:24px;border:1px solid var(--line);border-radius:var(--r-card);background:var(--surface);box-shadow:var(--shadow-1)}
+.lock-card[hidden]{display:none}
+.lock-mark{width:44px;height:44px;margin-bottom:12px}
+.lock-mark img{display:block;width:44px;height:44px}
+.lock-title{font-size:var(--fs-title);line-height:var(--lh-title);font-weight:600;margin:0 0 8px}
+.lock-copy{margin:0 0 12px;font-size:var(--fs-body);line-height:1.7;color:var(--ink-2);overflow-wrap:anywhere}
+.lock-copy.sub{font-size:var(--fs-meta);color:var(--ink-3)}
+.lock-copy b{color:var(--brand-ink);font-weight:600}
+.lock-label{display:block;margin:0 0 6px;font-size:var(--fs-meta);color:var(--ink-3)}
+.lock-num{display:block;width:100%;box-sizing:border-box;height:var(--input-h);padding:0 12px;border:1px solid var(--line-strong);border-radius:var(--r-inner);background:var(--surface);color:var(--ink);font-family:var(--font-sans);font-size:var(--fs-title);line-height:var(--input-h);letter-spacing:.34em;text-align:center}
+.lock-num:focus{outline:none;border-color:var(--brand-line);box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 14%,transparent)}
+.lock-go{display:flex;align-items:center;justify-content:center;width:100%;box-sizing:border-box;min-height:36px;margin-top:12px;padding:6px 16px;font-size:var(--fs-sub)}
+.lock-err{margin:8px 0 0;font-size:var(--fs-meta);line-height:1.6;color:var(--coral)}
+.lock-err[hidden]{display:none}
+.acct-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.acct-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-body);color:var(--ink-2)}
+.qbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:min(748px,100%);max-width:100%;box-sizing:border-box;margin:0 0 8px;padding:8px 12px;border:1px solid var(--line);border-radius:var(--r-inner);background:var(--surface-2)}
+.qbar-pos{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-meta);line-height:1.6;color:var(--ink-2)}
+.qbar-next{flex:none;font-size:var(--fs-meta)}
+.resume{display:flex;align-items:center;flex-wrap:wrap;width:min(748px,100%);max-width:100%;box-sizing:border-box;margin:0 0 8px;padding:8px 12px;border:1px solid var(--brand-line);border-radius:var(--r-inner);background:var(--brand-tint)}
+.resume[hidden]{display:none}
+.resume-go{flex:1;min-width:0;padding:0;border:0;background:none;font-family:var(--font-sans);font-size:var(--fs-meta);line-height:1.6;text-align:left;color:var(--brand-ink);cursor:pointer;overflow-wrap:anywhere}
+.resume-go:hover{text-decoration:underline}
+@media(max-width:600px){
+.lock{padding:16px;align-items:center}
+.lock-card{max-width:100%;padding:16px;border-radius:var(--r-sub)}
+.lock-go{min-height:40px}
+.qbar,.resume{padding:6px 8px;gap:6px}
+.qbar-pos,.resume-go{white-space:normal;overflow:visible}
+}
 </style>
 <link rel="stylesheet" href="/vendor/katex/katex.min.css">
 </head>
-<body data-page="1">
+<body data-page="1" data-locked="1">
+
+<!-- ================= 内测准入：登录屏 / 开场说明 =================
+     首屏就锁住（body 上的 data-locked="1"）：令牌有效才解锁，解不开就一直看这两屏。
+     两块都在 #app 外面 —— 它们是"门"，不是第五页。 -->
+<div class="lock" id="lockWrap" hidden>
+  <section class="lock-card" id="loginWrap" data-page="login" data-testid="login">
+    <div class="lock-mark" aria-hidden="true"><img src="/brand.png" alt="" width="44" height="44"></div>
+    <h1 class="lock-title">步步解 · 内测</h1>
+    <p class="lock-copy">这是内测，输入老师给你的 6 位数字。做题记录会交给老师看，用来改这套练习。</p>
+    <label class="lock-label" for="loginCode">6 位数字</label>
+    <input class="lock-num" id="loginCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="······" aria-label="老师给的 6 位数字">
+    <button class="btn-primary lock-go" id="loginGo" type="button">进入</button>
+    <p class="lock-err" id="loginErr" role="alert" hidden></p>
+  </section>
+
+  <section class="lock-card" id="introWrap" data-page="intro" data-testid="intro" hidden>
+    <div class="lock-mark" aria-hidden="true"><img src="/brand.png" alt="" width="44" height="44"></div>
+    <h1 class="lock-title">开始之前</h1>
+    <p class="lock-copy">这是步步解的内测。这一轮有 <b id="introCount">几</b> 道题，大概 15–25 分钟，可以分两次做；下次回来点『继续刚才那道题』就行。</p>
+    <p class="lock-copy sub">做题时我会一步一步问你，不直接给答案。卡住了就说说你卡在哪。</p>
+    <button class="btn-primary lock-go" id="introGo" type="button">开始</button>
+  </section>
+</div>
 
 <header class="topbar">
   <div class="tb-left">
@@ -1551,6 +1611,14 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     <input class="set-range" id="uxRange" type="range" min="0" max="2" step="1" value="1" aria-label="字号" aria-valuetext="中">
     <div class="set-ticks" id="uxTicks" aria-hidden="true"><span>小</span><span class="is-on">中</span><span>大</span></div>
   </div>
+  <!-- 一台电脑几个人轮流用：换人要能把账号态清干净（主题与字号是这台设备的偏好，保留） -->
+  <div class="set-grp">
+    <div class="set-label">账号</div>
+    <div class="acct-row">
+      <span class="acct-name" id="acctName">—</span>
+      <button class="btn-ghost acct-out" id="acctOut" type="button">换人</button>
+    </div>
+  </div>
 </div>
 
 <div id="app">
@@ -1559,6 +1627,15 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
   <section class="page is-active" data-page="1">
     <div class="p1" id="p1">
       <div class="p1-screen" id="p1Home">
+      <!-- 续做条：有没做完的会话才显示（没有就整条不显示，不是显示"没有"） -->
+      <div class="resume" id="resumeBar" data-testid="resume-bar" hidden>
+        <button class="resume-go" id="resumeGo" type="button"><span id="resumeText">继续刚才那道题</span></button>
+      </div>
+      <!-- 题单条：第 N 道 / 共 M 道 + 下一道；批次没配题单时写一句话并把「下一道」置灰 -->
+      <div class="qbar" id="qlistBar" data-testid="question-list">
+        <span class="qbar-pos" id="qlistPos">正在读题单…</span>
+        <button class="qbar-next btn-ghost" id="qlistNext" type="button" disabled>下一道</button>
+      </div>
       <div class="p1-hero">
         <div class="hero-mark" aria-hidden="true">
           <img src="/brand.png" alt="" width="40" height="40">
@@ -1963,6 +2040,46 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     concept_confusion: '概念混淆'
   };
 
+  /* ---------------- 身份（内测准入） ----------------
+   *
+   * 三个键：令牌、代号、批次。代号与批次不只是"记住你" ——
+   * 账号级的缓存（开场说明看过没有、题单做到第几道）都按这两个拼键，
+   * 否则一台电脑换个人登录就会看到上一个人的进度（Review Focus 1）。
+   */
+  var AUTH = { token: '', name: '', batch: '' };
+  var AUTH_KEYS = { token: 'bsj-token', name: 'bsj-name', batch: 'bsj-batch' };
+  /** 这台设备的偏好（主题 / 字号 / 老师）：登录过期不该把它们一起抹掉 */
+  var DEVICE_KEYS = { 'bsj-theme': 1, 'bsj-ux': 1, 'bsj-mentor': 1 };
+
+  function readKey(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+  function writeKey(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function dropKey(k) { try { localStorage.removeItem(k); } catch (e) {} }
+
+  /**
+   * 账号级缓存键，形如 `bsj-intro-S01-bx` / `bsj-progress-S01-bx`。
+   * 键里必须同时有代号与批次：同一台机器上两个人共用浏览器，
+   * 只有批次的话，同班的两个人会看到彼此的题单进度与开场说明。
+   */
+  function acctKey(kind) {
+    return 'bsj-' + kind + '-' + (AUTH.name || 'anon') + '-' + (AUTH.batch || 'nobatch');
+  }
+
+  function loadAuth() {
+    AUTH = { token: readKey(AUTH_KEYS.token), name: readKey(AUTH_KEYS.name), batch: readKey(AUTH_KEYS.batch) };
+    return AUTH;
+  }
+
+  function saveAuth(d) {
+    AUTH = {
+      token: String((d && d.token) || ''),
+      name: String((d && d.displayName) || ''),
+      batch: String((d && d.batchId) || '')
+    };
+    writeKey(AUTH_KEYS.token, AUTH.token);
+    writeKey(AUTH_KEYS.name, AUTH.name);
+    writeKey(AUTH_KEYS.batch, AUTH.batch);
+  }
+
   /* ---------------- 接口层 ---------------- */
   /**
    * 接口基址。
@@ -1978,11 +2095,33 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
 
   var API = {
     req: function (path, opt) {
-      return fetch(API_BASE + path, opt).then(function (res) {
+      var init = opt || {};
+      if (AUTH.token) {
+        var headers = {};
+        var given = init.headers || {};
+        for (var k in given) {
+          if (Object.prototype.hasOwnProperty.call(given, k)) headers[k] = given[k];
+        }
+        /**
+         * 令牌**只在这一处**注入（J2）。
+         *
+         * 为什么不是每个调用点各加一次：那样一定会有一处忘，而忘掉的表现是
+         * "这个接口偶尔 401"，看起来像登录过期，不像漏了个头。
+         */
+        headers['x-test-token'] = AUTH.token;
+        init = { method: init.method, headers: headers, body: init.body, signal: init.signal, keepalive: init.keepalive };
+      }
+      return fetch(API_BASE + path, init).then(function (res) {
         return res.text().then(function (raw) {
           var data = null;
           try { data = raw ? JSON.parse(raw) : null; } catch (e) { data = null; }
           if (!res.ok) {
+            /**
+             * 401 = 令牌不认了：清账号态、回登录屏，**不自动重试**。
+             * 登录接口自己的 401 是「口令不对」，不是登录失效 —— 那条不能走这里，
+             * 否则输错一次口令就被当成"登录过期"，学生连再输一次的机会都没有。
+             */
+            if (res.status === 401 && path !== '/api/auth/login') authLost();
             var msg = (data && (data.error || data.detail)) || ('请求失败（HTTP ' + res.status + '）');
             var err = new Error(msg);
             err.status = res.status;
@@ -2025,9 +2164,106 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     mentor: readMentor(),
     turns: [], progress: { index: null, count: 0, done: [], labels: {} },
     done: false, busy: false,
+    /** 这一轮是不是从"继续刚才那道题"接回来的（决定聊天区那行提示） */
+    resumed: false,
     report: null, reportTurns: [], reportErr: null,
     ledger: [], sessionStart: 0
   };
+
+  /* ---------------- 埋点（客户端只发一半，另一半必须服务端发） ----------------
+   *
+   * 为什么分工是这个样子：`chat_send` 只有这里知道"这条消息多长、是不是把题干
+   * 复制过来了"；`chat_reply` 只有服务端知道"耗时多少、层级几、有没有被抑制"。
+   * 两边各发一半，「有 send 无 reply」才是一轮真正的失败 —— 客户端**绝不**发
+   * chat_reply（它算不出来），服务端也**绝不**发 chat_send（那会让分母翻倍）。
+   *
+   * 归属：页 1–2 的事件挂 visit（会话要到进第 3 页才创建），页 3–4 挂会话。
+   * 这不是随手分的 —— metrics.js 的页 1–2 停留**只读** visit.events，
+   * 挂错了那两格就是永久 0，而且不会报错。
+   */
+  var VISIT = '';
+  var QIDS = [];
+  var UNLOCKED = false;
+  /** 当前已经发出 page_enter、还没发 page_exit 的页号（null = 没有打开的段） */
+  var PAGEVIEW = { open: null };
+  /**
+   * 发一句话之前，最多为"把 chat_send 落库"等这么久（毫秒）。
+   * 等不到就照常发请求：一轮的配对值得保，但学生的消息更值得保。
+   */
+  var CHAT_SEND_GATE_MS = 1200;
+
+  var T = {
+    q: [],
+    timer: 0,
+    of: function (scope) {
+      var owner = {};
+      if (scope === 'session' && S.sessionId) owner.sessionId = S.sessionId;
+      if (VISIT) owner.visitId = VISIT;
+      return owner;
+    },
+    /**
+     * 入队并返回"这一批发完了没有"的 Promise（没带 now 时返回 null）。
+     *
+     * 为什么要把 Promise 交出去：`chat_send` 要等它落地才许发 /api/chat，
+     * 否则服务端可能先落 `chat_reply`，那一轮就永远配不上（见 send() 里的说明）。
+     */
+    push: function (type, payload, owner, now) {
+      var ev = { type: type, payload: payload || {} };
+      var who = owner || T.of('visit');
+      if (who.sessionId) ev.sessionId = who.sessionId;
+      if (who.visitId) ev.visitId = who.visitId;
+      /** 没有归属的事件落库也查不出来（只有 login 允许全空，见 T3）—— 宁可不发 */
+      if (!ev.sessionId && !ev.visitId && type !== 'login') return null;
+      T.q.push(ev);
+      if (now) return T.flush();
+      if (!T.timer) T.timer = setTimeout(function () { T.timer = 0; T.flush(); }, 0);
+      return null;
+    },
+    /** 把队列发空；返回一个永远 resolve 的 Promise（埋点失败静默） */
+    flush: function () {
+      if (T.timer) { clearTimeout(T.timer); T.timer = 0; }
+      if (!T.q.length) return Promise.resolve();
+      var jobs = [];
+      while (T.q.length) {
+        var batch = T.q.splice(0, 20);
+        try {
+          /**
+           * keepalive：这一批很可能是在"页面正在被关掉"的时候发出去的。
+           * 走 API.req 而不是自己 fetch，是因为令牌只许在那一处注入。
+           */
+          jobs.push(API.req('/api/events', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ events: batch }),
+            keepalive: true
+          }).catch(function () {}));   // 埋点失败静默：不许打扰学生，也不许抛出
+        } catch (e) {}
+      }
+      if (T.q.length && !T.timer) T.timer = setTimeout(function () { T.timer = 0; T.flush(); }, 0);
+      return Promise.all(jobs).then(function () {}, function () {});
+    }
+  };
+
+  var track = {
+    visit: function (type, payload, now) { T.push(type, payload, T.of('visit'), now); },
+    session: function (type, payload, now) { T.push(type, payload, T.of('session'), now); }
+  };
+
+  function pageEv(type, page, extra) {
+    var payload = { page: page };
+    if (extra) { for (var k in extra) payload[k] = extra[k]; }
+    T.push(type, payload, T.of(page <= 2 ? 'visit' : 'session'));
+  }
+  function pageEnter(page) {
+    PAGEVIEW.open = page;
+    pageEv('page_enter', page);
+  }
+  function pageExit(via) {
+    if (PAGEVIEW.open === null) return;
+    var page = PAGEVIEW.open;
+    PAGEVIEW.open = null;
+    pageEv('page_exit', page, { via: via });
+  }
 
   var work = $('#work'), splitter = $('#splitter');
 
@@ -2131,6 +2367,12 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
   function setPage(n) {
     if (n === 5) n = 4; // 兼容旧链接；练习不再占一页。
     if (n < 1 || n > 4) return;
+    /**
+     * 页没变就不是一次进出：点同一个步骤条、或者"再练一道"从第 3 页再进第 3 页，
+     * 都不该多记一对 enter/exit —— 多记的那次会让第 3 页的停留凭空断成两段。
+     */
+    var changed = n !== S.page;
+    if (changed) pageExit(n > S.page ? 'next' : 'back');
     // 五页随时可以切：没有数据就进空态，而不是把人弹回第 1 页
     if (n > S.max) S.max = n;
     S.page = n;
@@ -2158,6 +2400,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       else { S.report = null; S.reportErr = '还没有开始做题。先在第 1 页选题，到第 3 页对话，报告会自动生成。'; renderReport(); }
     }
     $('#reportReturnBtn').hidden = n !== 3 || !REPORT_ORIGIN;
+    if (changed) pageEnter(n);
   }
 
   document.addEventListener('click', function (e) {
@@ -2313,10 +2556,20 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     input.readOnly = true;
     input.placeholder = '正在读取图片…';
 
+    /**
+     * 拍照这条链路记两个点：`ocr_call`（点了、图多大）与 `ocr_result`（多久、成没成）。
+     * `quota` 目前没有来源 —— 阿里云那条链路查不到余量，日额度是我们自己的计数器
+     * （T11 用 `ocr:daily:<UTC 日期>`），所以这里如实发 null，不编一个数。
+     */
+    var ocrStartedAt = Date.now();
+    var ocrBytes = Math.floor(String(dataUrl || '').length * 0.75);
+    track.visit('ocr_call', { bytes: ocrBytes });
+
     return API.ocr(dataUrl).then(function (d) {
       var t = String(d.rawText || '').trim();
       input.readOnly = false;
       input.placeholder = '粘贴题目，或说说你卡在哪一步…';
+      track.visit('ocr_result', { ok: true, ms: Date.now() - ocrStartedAt, quota: null });
       if (t) {
         input.value = t;
         S.picked = null;
@@ -2332,6 +2585,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     }).catch(function (err) {
       input.readOnly = false;
       input.placeholder = '粘贴题目，或说说你卡在哪一步…';
+      track.visit('ocr_result', { ok: false, ms: Date.now() - ocrStartedAt, quota: null });
       // 计费状态决定下一步该做什么：没扣钱就可以放心重试，扣了就别连点
       var billed = !(err.data && err.data.charged === false);
       hint.textContent = err.message + (billed ? '（这次可能已计费，别连着点）' : '（未计费，可以直接重试）');
@@ -2351,6 +2605,8 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
   onFilePicked($('#file1'), function (dataUrl) {
     ocrShot = dataUrl;
     setShot(dataUrl);
+    /** 真的选到图了才算"选了拍照这条路"（点开又取消不算） */
+    track.visit('intake_choose', { path: 'photo' });
     runOcr(dataUrl).catch(function () {});
   });
 
@@ -2440,6 +2696,13 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     beginReading();
     if (S.readCtrl) { try { S.readCtrl.abort(); } catch (e) { } }
     S.readCtrl = (typeof AbortController === 'function') ? new AbortController() : null;
+    /**
+     * 入场方式（J7）：走到这里、又没有题库题可复用，就是"自己粘贴/打字"这条入口。
+     * 它挂在 visit 上 —— 此刻会话还没建，页 1 的事件本来就该归这次打开。
+     */
+    var importing = !S.pickedBank && !S.picked;
+    if (importing) track.visit('intake_choose', { path: 'paste' });
+    var readStartedAt = Date.now();
     var task = S.pickedBank ? API.problem('qbank-' + S.pickedBank) : S.picked ? API.problem(S.picked.id)
       : API.importProblem(typed, S.readCtrl ? { signal: S.readCtrl.signal } : null);
 
@@ -2447,10 +2710,18 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       S.problem = res.problem;
       hydrateBankDetail();
       if (!S.picked) S.picked = { id: res.problem.id, topics: res.problem.topics, source: 'imported' };
+      if (importing) {
+        track.visit('import_result', {
+          ok: true,
+          ms: Date.now() - readStartedAt,
+          warningCount: (res.intake && res.intake.warningCount) || 0
+        });
+      }
       $('#p2text').textContent = S.problem.stem;
       setNote('');
       setPage(2);
     }).catch(function (err) {
+      if (importing) track.visit('import_result', { ok: false, ms: Date.now() - readStartedAt, warningCount: 0 });
       setNote(err.message, true);
     }).then(function () {
       endReading();
@@ -2619,6 +2890,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     S.turns = [];
     S.done = false;
     S.busy = false;
+    S.resumed = false;
     S.report = null;
     S.reportTurns = [];
     S.reportErr = null;
@@ -2805,7 +3077,8 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     var html = '';
     if (!S.turns.length) {
       html = '<div class="chat-empty"><p>从你的思路开始：这道题你打算先处理哪一部分？</p>' +
-        '<p class="sub">AI 不会替你做，只会接着你的想法往下问。</p></div>';
+        '<p class="sub">AI 不会替你做，只会接着你的想法往下问。</p>' +
+        (S.resumed ? '<p class="sub">上次的对话还在，接着往下说就行。</p>' : '') + '</div>';
     } else {
       html = S.turns.map(msgHtml).join('');
     }
@@ -2845,6 +3118,51 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     if (el) jumpTo(Number(el.dataset.jump));
   });
 
+  /**
+   * 认真度粗筛（J8）：把消息与题干都去掉空白、标点与公式占位符 `〔式〕` 之后比较。
+   *
+   * `〔式〕` 必须先去：题库题的纯文本题干里到处是它，学生复制过去的一整段
+   * 如果原样带着这些占位符，反而会和别处的题干对不上。
+   * **只发布尔，不发布内容** —— 埋点里出现题目或对话就是数据最小化失守。
+   */
+  function stemNorm(s) {
+    return String(s == null ? '' : s)
+      .replace(/〔式〕/g, '')
+      .replace(/[\s\u3000]+/g, '')
+      .replace(/[。，、；：？！“”‘’（）《》〈〉【】「」『』…—～·!@#$%^&*()_+=\[\]{}\\|;:'",.<>\/?`~^-]/g, '');
+  }
+
+  /** 二元组 Dice 相似度：足够做"这一句是不是题干的一部分"的粗筛，且不引依赖 */
+  function bigrams(s) {
+    var out = {}, i;
+    for (i = 0; i < s.length - 1; i++) {
+      var g = s.slice(i, i + 2);
+      out[g] = (out[g] || 0) + 1;
+    }
+    return out;
+  }
+  function similarity(a, b) {
+    if (!a || !b) return 0;
+    if (a === b) return 1;
+    var ga = bigrams(a), gb = bigrams(b), hit = 0, total = 0, k;
+    for (k in ga) { total += ga[k]; if (gb[k]) hit += Math.min(ga[k], gb[k]); }
+    for (k in gb) total += gb[k];
+    return total ? (2 * hit) / total : 0;
+  }
+
+  /**
+   * 首条消息像不像"把题干复制过来了"：长度门槛 8，题干包含它，或相似度 > 0.8。
+   *
+   * 门槛 8 是防误判："不会"、"不知道"这种短句谁都会说，不能算复制题干。
+   */
+  function copiedStem(utterance) {
+    var msg = stemNorm(utterance);
+    var stem = stemNorm(S.problem && S.problem.stem);
+    if (msg.length < 8 || !stem) return false;
+    if (stem.indexOf(msg) >= 0) return true;
+    return similarity(msg, stem) > 0.8;
+  }
+
   function send(text, asksHelp) {
     // 只有"点了快捷问句"这种明确的求助动作才置 true；
     // 自己敲的话交给服务端按语句判断，否则自主训练等于每句都在求助
@@ -2858,13 +3176,35 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     S.busy = true;
     renderChat();
 
-    API.chat({
-      sessionId: S.sessionId,
-      problemId: S.problem.id,
-      utterance: text,
-      mode: S.mode === 'self' ? 'self_training' : 'ai_companion',
-      explicitHelpSeeking: helpFlag,
-      persona: S.mentor
+    /**
+     * `chat_send` **必须先落库，再发 /api/chat**（J7 + 设计稿 §5.3 的硬要求）。
+     *
+     * 为什么是"等它落地"而不是"先发出去"：一轮的配对是按事件的 `seq` 顺序来的
+     * （`metrics.countTurns`：先 send 后 reply 才算同一轮）。两个请求并发发出时，
+     * 服务端完全可能先处理 /api/chat —— 实测抓到过一次：同一屏里
+     * `seq 77 = chat_reply`、`seq 78 = chat_send`，那一轮就永远配不上，
+     * 失败率凭空 +1。所以这里等埋点回来再发请求。
+     *
+     * 但埋点**不许拦路**：最多等 `CHAT_SEND_GATE_MS`，超时/失败就照常发请求 ——
+     * 丢掉一条证据 < 让学生卡在那儿。
+     */
+    var logged = track.session('chat_send', { len: text.length, copiedStem: copiedStem(text) }, true);
+    var settled = logged && typeof logged.then === 'function' ? logged.catch(function () {}) : Promise.resolve();
+    var gate = Promise.race([
+      settled,
+      new Promise(function (resolve) { setTimeout(resolve, CHAT_SEND_GATE_MS); })
+    ]);
+
+    gate.then(function () {
+      return API.chat({
+        sessionId: S.sessionId,
+        problemId: S.problem.id,
+        utterance: text,
+        mode: S.mode === 'self' ? 'self_training' : 'ai_companion',
+        explicitHelpSeeking: helpFlag,
+        persona: S.mentor,
+        visitId: VISIT
+      });
     }).then(function (r) {
       var p = r.progress || {};
       S.progress = {
@@ -3535,6 +3875,11 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       return API.problem('qbank-' + q.bankId).then(function (res) {
         if (state && (REL_PREVIEW !== state || !$('#relPreview').open)) return;
         if (!res.problem || res.problem.id !== 'qbank-' + q.bankId) throw new Error('题目读取失败，请重新选择');
+        /**
+         * 「再练一道」选中了（设计稿 §5.3 的第 14 种事件）：这是"他还愿不愿意继续做"
+         * 唯一能被观察到的信号，导出件的「再练次数」读它。
+         */
+        track.session('practice_pick', { problemId: res.problem.id });
         var opts = (det.options || []).map(function (o) { return o.l + ' ' + o.text; }).join('\n');
         rememberReport();
         $('#input1').value = (det.stemText || q.sub || '') + (opts ? '\n' + opts : '');
@@ -3566,6 +3911,412 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
   }
 
 
+  /* ---------------- 内测准入：登录 → 开场说明 → 第 1 页 ----------------
+   *
+   * 三屏的次序是产品决定的：令牌 → （第一次看）说明 → 第 1 页。
+   * 说明屏不算第 1 页：它自己的停留记 `page_enter{page:0}` / `page_exit{page:0}`，
+   * 点「开始」才记 `page_enter{page:1}` —— 否则第 1 页的平均停留会被说明屏拉长。
+   */
+  function setLocked(on) {
+    if (on) document.body.setAttribute('data-locked', '1');
+    else document.body.removeAttribute('data-locked');
+  }
+
+  function showLogin(message) {
+    setLocked(true);
+    UNLOCKED = false;
+    /** 设置面板要是正开着，先收起来：一层浮层压在新出现的登录屏上会让人不知道点哪儿 */
+    if (setShown()) setOpen(false);
+    var wrap = $('#lockWrap'), login = $('#loginWrap'), intro = $('#introWrap');
+    if (wrap) wrap.hidden = false;
+    if (login) login.hidden = false;
+    if (intro) intro.hidden = true;
+    var err = $('#loginErr');
+    if (err) {
+      err.textContent = message || '';
+      err.hidden = !message;
+    }
+    var code = $('#loginCode');
+    if (code) {
+      code.value = '';
+      setTimeout(function () { try { code.focus(); } catch (e) {} }, 60);
+    }
+  }
+
+  function showIntro() {
+    setLocked(true);
+    var wrap = $('#lockWrap'), login = $('#loginWrap'), intro = $('#introWrap');
+    if (wrap) wrap.hidden = false;
+    if (login) login.hidden = true;
+    if (intro) intro.hidden = false;
+    var count = $('#introCount');
+    /** 拿不到题单就写「几」：编一个数会让学生以为题数是准的 */
+    if (count) count.textContent = String(QIDS.length || '几');
+    pageEnter(0);
+    var go = $('#introGo');
+    if (go) setTimeout(function () { try { go.focus(); } catch (e) {} }, 60);
+  }
+
+  /** 说明屏看过就记一次：键按代号 + 批次分，换个人登录还会再看一次 */
+  function introSeen() { return readKey(acctKey('intro')) === '1'; }
+
+  function unlock() {
+    setLocked(false);
+    var wrap = $('#lockWrap'), login = $('#loginWrap'), intro = $('#introWrap');
+    if (wrap) wrap.hidden = true;
+    /** 两张卡都收起来：门关上了，里面还亮着一屏的话，下次开门就会闪一下上一个人的画面 */
+    if (login) login.hidden = true;
+    if (intro) intro.hidden = true;
+    UNLOCKED = true;
+    pageEnter(1);
+    maybeReviewJump();   // 逐页评审的深链：等解锁之后再落页
+  }
+
+  /**
+   * 落地：开一次 visit（J6.1）。
+   *
+   * 同一个标签页里刷新时**复用**上次那次 visit（sessionStorage 就是干这个的）：
+   * p1 是"打开次数"，刷新一次就多一次打开会让漏斗第一根柱子虚高。
+   * 失败**不阻塞**：没有 visitId 也要能做题，只是页 1–2 的事件这一轮没有归属
+   * （服务端会拒掉它们，不会写脏数据）。
+   */
+  function land() {
+    var cached = '';
+    try { cached = sessionStorage.getItem('bsj-visit') || ''; } catch (e) { cached = ''; }
+    if (cached) {
+      VISIT = cached;
+      try { QIDS = (JSON.parse(sessionStorage.getItem('bsj-qids') || '[]') || []).map(String); } catch (e) { QIDS = []; }
+      return Promise.resolve(null);
+    }
+    return API.post('/api/visit', {}).then(function (d) {
+      VISIT = String((d && d.visitId) || '');
+      QIDS = Array.isArray(d && d.questionIds) ? d.questionIds.map(String) : [];
+      try {
+        sessionStorage.setItem('bsj-visit', VISIT);
+        sessionStorage.setItem('bsj-qids', JSON.stringify(QIDS));
+      } catch (e) {}
+      track.visit('visit_open', { questionCount: QIDS.length });
+      return null;
+    }).catch(function (err) {
+      if (err && err.status === 401) throw err;   // 令牌不认了：authLost 已经接管
+      VISIT = '';
+      QIDS = [];
+      /** 题单没读到 ≠ 老师没配题单：两种空态说的不是同一句话，别让学生猜 */
+      QLIST.failed = true;
+      return null;
+    });
+  }
+
+  function afterLanding() {
+    if (AUTH_LOST) return;
+    QLIST.index = loadProgressIndex();
+    paintQuestionList();
+    var nameEl = $('#acctName');
+    if (nameEl) nameEl.textContent = AUTH.name || '—';
+    if (introSeen()) unlock();
+    else showIntro();
+  }
+
+  function boot() {
+    if (!AUTH.token) { showLogin(''); return; }
+    /**
+     * 续做条的那次请求顺带验一下令牌：同一个标签页刷新时我们复用了上次的 visitId，
+     * 那条链路上没有别的请求能证明令牌还有效。两个都回来才决定落哪一屏，
+     * 免得"先闪一下主干、再被 401 弹回登录屏"。
+     */
+    Promise.all([land(), loadResume()]).then(afterLanding, function () {
+      if (AUTH_LOST) return;
+      QIDS = [];
+      afterLanding();
+    });
+  }
+
+  function submitLogin() {
+    var codeEl = $('#loginCode'), errEl = $('#loginErr'), go = $('#loginGo');
+    var code = String(codeEl ? codeEl.value : '').replace(/[^0-9]/g, '');
+    if (code.length !== 6) {
+      if (errEl) { errEl.textContent = '老师给的是 6 位数字，请把 6 个数字都输进来'; errEl.hidden = false; }
+      if (codeEl) codeEl.focus();
+      return;
+    }
+    if (errEl) { errEl.textContent = ''; errEl.hidden = true; }
+    if (go) { go.disabled = true; go.textContent = '正在登录…'; }
+    API.post('/api/auth/login', { code: code }).then(function (d) {
+      saveAuth(d);
+      AUTH_LOST = false;
+      /** login 是唯一允许没有归属的事件（设计稿 §5.3 那一栏写的就是「—」） */
+      T.push('login', { displayName: AUTH.name }, {}, false);
+      if (go) { go.disabled = false; go.textContent = '进入'; }
+      boot();
+    }).catch(function (err) {
+      if (go) { go.disabled = false; go.textContent = '进入'; }
+      /**
+       * 这里只写两句人话：429 是"等一会儿"，其余（含 401 口令不对）是"核对纸条"。
+       * 不把服务端的原始 body 摊给学生看 —— 那里面没有一个字是他能用的。
+       */
+      var msg = err && err.status === 429
+        ? '试错太多次了，等一会儿（约 15 分钟）再试'
+        : '口令不对，请核对老师发给你的 6 位数字';
+      if (errEl) { errEl.textContent = msg; errEl.hidden = false; }
+      if (codeEl) { codeEl.value = ''; codeEl.focus(); }
+    });
+  }
+
+  /**
+   * 登录失效的唯一收尾（J1）。只清"账号态"：
+   * 主题 / 字号 / 老师是这台设备的偏好，学生只是登录过期，不该连深色模式一起丢；
+   * 但带代号的键（开场说明、题单进度）必须一起清 —— 否则换个人登录就会看到上一个人的进度。
+   */
+  function clearAccount() {
+    var name = AUTH.name || readKey(AUTH_KEYS.name);
+    try {
+      var doomed = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k || k.indexOf('bsj-') !== 0 || DEVICE_KEYS[k]) continue;
+        if (!name || k.indexOf(name) >= 0) doomed.push(k);
+      }
+      doomed.forEach(function (k) { dropKey(k); });
+    } catch (e) {}
+    dropKey(AUTH_KEYS.token);
+    dropKey(AUTH_KEYS.name);
+    dropKey(AUTH_KEYS.batch);
+    AUTH = { token: '', name: '', batch: '' };
+    VISIT = '';
+    QIDS = [];
+    QLIST.index = 0;
+    /**
+     * 题单的"这次打开了没有"要一起复位：换个人登录是**另一次**打开，
+     * 它的 batch_open 得重新记一条，不能因为是同一个页面就省掉。
+     */
+    QLIST.opened = false;
+    try {
+      sessionStorage.removeItem('bsj-visit');
+      sessionStorage.removeItem('bsj-qids');
+    } catch (e) {}
+  }
+
+  var AUTH_LOST = false;
+  function authLost() {
+    if (AUTH_LOST) return;   // 一屏上几个请求一起 401 时只收尾一次，也不自动重试
+    AUTH_LOST = true;
+    clearAccount();
+    showLogin('登录过期了，请重新输入口令');
+  }
+
+  /* ---------------- 题单条（J4） ---------------- */
+  var QLIST = { index: 0, opened: false, failed: false };
+
+  function clampIndex(i, n) {
+    if (!n) return 0;
+    var v = Number(i);
+    if (!isFinite(v) || v < 0) return 0;
+    return Math.min(n - 1, Math.floor(v));
+  }
+
+  function progressStoreKey() { return acctKey('progress'); }
+
+  function loadProgressIndex() {
+    var raw = 0;
+    try { raw = Number(localStorage.getItem(progressStoreKey()) || 0); } catch (e) { raw = 0; }
+    return clampIndex(raw, QIDS.length);
+  }
+
+  function saveProgressIndex(i) {
+    try { localStorage.setItem(progressStoreKey(), String(i)); } catch (e) {}
+  }
+
+  function paintQuestionList() {
+    var pos = $('#qlistPos'), next = $('#qlistNext');
+    if (!pos || !next) return;
+    /** 第一次画题单条 = 「打开题单」（设计稿 §5.3 的 batch_open） */
+    if (!QLIST.opened) {
+      QLIST.opened = true;
+      track.visit('batch_open', { questionIds: QIDS.slice() });
+    }
+    var n = QIDS.length;
+    if (!n) {
+      /**
+       * 两种空态说的是两件事，不许混成一句：
+       *   · 读不到（网络 / 服务抖动）→ 别让学生以为老师没配；
+       *   · 真的没配 → 说清现在能做什么，并把「下一道」置灰。**不许报错**。
+       */
+      pos.textContent = QLIST.failed
+        ? '题单这次没读到，先在下面自己粘贴题目'
+        : '老师还没配题单，先随便挑一道';
+      next.disabled = true;
+      return;
+    }
+    QLIST.index = clampIndex(QLIST.index, n);
+    pos.textContent = '第 ' + (QLIST.index + 1) + ' 道 / 共 ' + n + ' 道';
+    next.disabled = QLIST.index >= n - 1;
+  }
+
+  /**
+   * 题单里的第 N 道：能取到就落进第 1 页的输入区（和第 1 页的其它入口同一条路），
+   * 取不到就说清"可以自己粘贴" —— 题单是老师的配置，配置坏了不该把学生堵死。
+   */
+  function openListItem(index) {
+    var id = QIDS[index];
+    if (!id) return;
+    var pid = String(id);
+    var bankId = /^qbank-/.test(pid) ? Number(pid.slice(6)) : null;
+    API.problem(pid).then(function (res) {
+      S.problem = res.problem;
+      S.picked = { id: res.problem.id, topics: res.problem.topics, source: 'list' };
+      S.pickedBank = isFinite(bankId) ? bankId : null;
+      S.problem.qbId = isFinite(bankId) ? bankId : null;
+      var box = $('#input1');
+      if (box) box.value = res.problem.stem || '';
+      clearPickedView();
+      hydrateBankDetail();
+      syncP1();
+      setNote('这是题单里的第 ' + (index + 1) + ' 道。');
+      track.visit('intake_choose', { path: 'qbank' });
+    }).catch(function (err) {
+      setNote('这一道暂时打不开（' + err.message + '），可以自己粘贴题目。', true);
+    });
+  }
+
+  /* ---------------- 续做条（J5） ---------------- */
+  var RESUME = null;
+
+  /** idleMinutes → 人话：一小时以内说分钟，一天以内说小时，再往上说天 */
+  function idleText(minutes) {
+    var m = Number(minutes);
+    if (!isFinite(m) || m < 0) m = 0;
+    if (m < 1) return '刚刚';
+    if (m < 60) return Math.round(m) + ' 分钟前';
+    if (m < 24 * 60) return Math.round(m / 60) + ' 小时前';
+    return Math.round(m / (24 * 60)) + ' 天前';
+  }
+
+  function paintResume() {
+    var bar = $('#resumeBar'), text = $('#resumeText');
+    if (!bar || !text) return;
+    if (!RESUME) { bar.hidden = true; return; }   // 没有可续做的会话：整条不显示
+    var page = Math.min(4, Math.max(1, Number(RESUME.page) || 1));
+    text.textContent = '继续刚才那道题 · ' + idleText(RESUME.idleMinutes) + ' · 停在页 ' + page;
+    bar.hidden = false;
+  }
+
+  function loadResume() {
+    return API.req('/api/session/resume').then(function (d) {
+      RESUME = d && d.session ? d.session : null;
+      paintResume();
+    }).catch(function () {
+      RESUME = null;
+      paintResume();
+    });
+  }
+
+  /**
+   * 接着上次那条会话做：题目、章节、会话 id 都换成它的。
+   * `hintLevel` 不归前端管 —— 服务端按 sessionId 回载，层级不会归零（C4）。
+   * 会话历史不在这一屏重放：唯一能读历史的接口是 /api/report，而它会给会话
+   * 打上 finishedAt，那等于把"没做完"改成"做完了"，续做条从此不再出现。
+   */
+  function openResume(rec) {
+    var pid = String((rec && rec.problemId) || '');
+    if (!pid) return;
+    var bankId = /^qbank-/.test(pid) ? Number(pid.slice(6)) : null;
+    API.problem(pid).then(function (res) {
+      S.problem = res.problem;
+      S.picked = isFinite(bankId) ? { id: res.problem.id, topics: res.problem.topics, source: 'list' } : null;
+      S.pickedBank = isFinite(bankId) ? bankId : null;
+      S.sessionId = rec.id;      // 接着原来那条会话说：服务端的提示层级不会归零
+      S.turns = [];
+      S.resumed = true;
+      S.done = false;
+      S.busy = false;
+      S.report = null;
+      S.reportTurns = [];
+      S.reportErr = null;
+      S.progress = { index: null, count: res.problem.stepCount || 0, done: [], labels: {} };
+      S.sessionStart = Date.now();
+      S.ledger.push({ problemId: res.problem.id, done: false, at: Date.now() });
+      S.max = Math.max(S.max, 3);
+      var p2 = $('#p2text');
+      if (p2) p2.textContent = res.problem.stem;
+      paintMode();
+      renderLeft();
+      renderXP();
+      renderChat();
+      setPage(Math.min(4, Math.max(3, Number(rec.page) || 3)));
+    }).catch(function (err) {
+      setNote('这道题暂时打不开（' + err.message + '），可以重新选一道。', true);
+    });
+  }
+
+  /* ---------------- 准入与两条横条的接线 ---------------- */
+  if ($('#loginGo')) $('#loginGo').addEventListener('click', submitLogin);
+  if ($('#loginCode')) {
+    $('#loginCode').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); submitLogin(); }
+    });
+    /** 只留数字：输了字母照样能登会让人怀疑"是不是我少打了一位" */
+    $('#loginCode').addEventListener('input', function () {
+      var clean = this.value.replace(/[^0-9]/g, '').slice(0, 6);
+      if (clean !== this.value) this.value = clean;
+    });
+  }
+  if ($('#introGo')) {
+    $('#introGo').addEventListener('click', function () {
+      writeKey(acctKey('intro'), '1');   // 见过一次就不再显示（按代号 + 批次记）
+      pageExit('next');                  // 说明屏那一段到此为止（p0）
+      unlock();                          // 这里才记 page_enter{page:1}
+    });
+  }
+  if ($('#qlistNext')) {
+    $('#qlistNext').addEventListener('click', function () {
+      if (!QIDS.length) return;
+      if (QLIST.index >= QIDS.length - 1) return;
+      QLIST.index += 1;
+      saveProgressIndex(QLIST.index);
+      paintQuestionList();
+      openListItem(QLIST.index);
+    });
+  }
+  if ($('#resumeGo')) {
+    $('#resumeGo').addEventListener('click', function () {
+      if (!RESUME) return;
+      /**
+       * 这里**故意不发 `resume_click`**，虽然设计稿 §5.5 要求"恢复要记 resume_click"。
+       *
+       * 理由：`src/server/events.js` 的字典里只有 14 种事件（13 + practice_pick），
+       * 没有 `resume_click`，所以发出去会被 `validateEvent` 以 `unknown_type` 拒掉 ——
+       * 页面看起来发了、服务端一条也留不下，这种"看起来接好了"的埋点比不发更坏。
+       * 事件字典是 Task 3/7 的契约（`test/events.test.js` 把 14 种和顺序逐条钉死），
+       * 不是本任务能改的地方。补法只有一行：`EVENT_TYPES` 末尾加 `'resume_click'`，
+       * 并同一次提交里改 events.test.js 的两条断言（长度 14→15、整表字符串）。
+       */
+      openResume(RESUME);
+    });
+  }
+  if ($('#acctOut')) {
+    $('#acctOut').addEventListener('click', function () {
+      /** 一台电脑轮流用：换人 = 把账号态清干净再回登录屏（设备偏好保留） */
+      if (setShown()) setOpen(false);
+      clearAccount();
+      showLogin('');
+    });
+  }
+
+  /**
+   * 切到后台 / 正在被关掉：把队列里的事件用 keepalive 发出去，并给当前这一页
+   * 收个尾（via: 'idle'）。回到前台再记一次 page_enter —— 停留按段相加，
+   * 而不是"第一次进入算到关掉为止"（那样一夜的挂机都会被算成第 3 页的停留）。
+   */
+  document.addEventListener('visibilitychange', function () {
+    if (!UNLOCKED) return;
+    if (document.visibilityState === 'hidden') {
+      pageExit('idle');
+      T.flush();
+    } else if (document.visibilityState === 'visible' && PAGEVIEW.open === null) {
+      pageEnter(S.page);
+    }
+  });
+
   /* ---------------- 初始化 ---------------- */
   renderStepper();
   syncP1();
@@ -3574,6 +4325,9 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
   paintMode();
   /* 老师选择器要在 /api/health 回来之前就画好：它不依赖服务端（见 MENTORS 的注释） */
   paintMentor();
+  /* 准入最后做：它可能要打两次接口（visit + 续做），不该挡住首屏的样式与选择器 */
+  loadAuth();
+  boot();
 
   API.health().then(function (h) {
     S.health = h;
@@ -3732,6 +4486,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       input.dispatchEvent(new Event('input', { bubbles: true }));
       /* 输入事件会清掉选中态，这里再落一次题库题号（只影响显示层） */
       S.pickedBank = q.i || null;
+      track.visit('intake_choose', { path: 'qbank' });
       closeMap();
       setTimeout(function () { input.focus(); }, 260);
       input.setSelectionRange(0, 0);
@@ -3826,6 +4581,8 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     var n = Number(new URLSearchParams(location.search).get('p'));
     if (!n || n < 2 || n > 5) return;
     if (n === 5) n = 4;
+    /** 还没登录、还在说明屏：等解锁之后再落页（解锁那次会再调一遍） */
+    if (!UNLOCKED) return;
     if (!S.bank.length) return;
     S.picked = S.bank[0];
     API.problem(S.picked.id).then(function (res) {

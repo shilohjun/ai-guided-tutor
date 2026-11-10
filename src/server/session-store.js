@@ -495,3 +495,76 @@ export function createVisit({ userId, batchId = null, now = Date.now() }) {
     sessionIds: [],
   };
 }
+
+/**
+ * 把一条会话挂回它发生在的那次打开（J6 —— 本任务补的那一格）。
+ *
+ * ============================================================================
+ * 为什么非要回填
+ * ============================================================================
+ * `session.visitId` 从 Task 4 起就存在，但**从来没有任何写入方**：
+ *   · `metrics.js` 的 `identityOf` 有一档就是 visitId，那一档在真实数据上永远是空的；
+ *   · 页 1–2 的事件挂在 visit 上（会话要到进第 3 页才造），
+ *     而"这个会话属于哪次打开"只能靠这一格，不然 p1 的对账只能靠 userId 猜。
+ * 这种缺口不会报错：看板上页 1、页 2 的停留会安静地偏低，而"偏低"看起来像
+ * "学生没停"。
+ *
+ * ============================================================================
+ * 三条规矩
+ * ============================================================================
+ * ① **先认这次打开**：`visitId` 指向的记录不存在时什么都不做。凭空相信一个
+ *    id（比如被还原的标签页里存着的旧 visitId）只会写出一条指向虚空的会话。
+ * ② **会话侧只认领，不改嫁**：`visitId` 已经有值就不覆盖 —— 一条会话只属于
+ *    它被创建的那次打开，覆盖等于把这段作答记到另一次打开上。
+ * ③ **不覆盖别人的记录**：库里的会话已有主人且不是这次请求的人时，不写。
+ *    与 `persistSession` 的纵深防御同一条规则。
+ *
+ * 传了 `session`（内存里那条活会话）就只改内存、由调用方随后的写穿落库；
+ * 没传就读库、只补这一个字段再写回去 —— `/api/events` 那条路没有写穿时机，
+ * 而它恰恰是"学生一句话都没说就离开"时唯一的回填机会。
+ *
+ * @param {object} store
+ * @param {{ visitId?: string, sessionId?: string, session?: object|null, owner?: object|null }} link
+ * @returns {Promise<object|null>} 认出来的那次打开（没认出来是 null）
+ */
+export async function linkSessionToVisit(store, { visitId, sessionId, session = null, owner = null } = {}) {
+  if (!store) return null;
+  const vid = typeof visitId === 'string' ? visitId.trim() : '';
+  const sid = typeof sessionId === 'string' ? sessionId.trim() : '';
+  if (!vid || !sid) return null;
+
+  let visit;
+  try {
+    visit = await store.getVisit(vid);
+  } catch (err) {
+    console.warn(`[visit] 读不出这次打开（${vid}），这一轮不回填：${err?.message ?? err}`);
+    return null;
+  }
+  if (!visit) return null;
+
+  const ids = Array.isArray(visit.sessionIds) ? visit.sessionIds : [];
+  if (!ids.includes(sid)) {
+    try {
+      await store.putVisit({ ...visit, sessionIds: [...ids, sid] });
+    } catch (err) {
+      console.warn(`[visit] 追加 sessionIds 失败（${vid}）：${err?.message ?? err}`);
+    }
+  }
+
+  if (session) {
+    if (!session.visitId) session.visitId = vid;
+    return visit;
+  }
+
+  try {
+    const stored = await store.getSession(sid);
+    if (!stored || stored.visitId) return visit;
+    const storedOwner = typeof stored.userId === 'string' && stored.userId !== '' ? stored.userId : null;
+    const mine = owner?.user?.id ?? null;
+    if (storedOwner && mine && storedOwner !== mine) return visit;
+    await store.putSession({ ...stored, visitId: vid });
+  } catch (err) {
+    console.warn(`[visit] 回填 session.visitId 失败（${sid}）：${err?.message ?? err}`);
+  }
+  return visit;
+}

@@ -60,6 +60,7 @@ import {
   createLiveSession,
   createVisit,
   hydrateSession,
+  linkSessionToVisit,
   persistReset,
   persistSession,
   pickResumable,
@@ -844,6 +845,39 @@ async function acceptEvents(req, body) {
     }
   }
 
+  /**
+   * 会话 → 这次打开的回填（J6）的另一条路。
+   *
+   * 为什么 `/api/chat` 有回填点，这里还要再来一次：**学生可能一句话都没说**
+   * 就翻到第 4 页、或者点了"再练一道" —— 那些事件都带 sessionId + visitId，
+   * 但一次 `/api/chat` 都没发生。只做 chat 那一处的话，这些会话在库里
+   * `visitId` 仍然是 null，页 1–2 的事件就和它对不上账，而且看不出来。
+   *
+   * 一批事件里同一对 (session, visit) 只处理一次：埋点会连发好几条，
+   * 逐条去读库再写回是白花的钱。失败只 warn —— 埋点这条路永远不许 5xx。
+   */
+  const links = new Map();
+  for (const item of items) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const sessionId = textOrNull(item.sessionId);
+    const visitId = textOrNull(item.visitId);
+    if (sessionId && visitId && !links.has(sessionId)) links.set(sessionId, visitId);
+  }
+  for (const [sessionId, visitId] of links) {
+    try {
+      /**
+       * 这里**不传活会话**：这条路没有写穿时机，回填必须当场落库
+       * （`linkSessionToVisit` 的活会话分支是"只改内存、由调用方随后的写穿落库"）。
+       */
+      await linkSessionToVisit(store, { visitId, sessionId, owner: identity });
+      /** 内存里那条也要认领，否则它下一次写穿会把 visitId 覆盖回 null */
+      const live = sessions.get(sessionId);
+      if (live && !live.visitId) live.visitId = visitId;
+    } catch (err) {
+      console.warn(`[visit] 埋点回填失败（${sessionId}）：${err?.message ?? err}`);
+    }
+  }
+
   return { accepted, rejected };
 }
 
@@ -1326,6 +1360,53 @@ export async function handleApi(req, res, url) {
     appendTurn(session.record, { utterance, response, problem });
 
     /**
+     * 会话 → 这次打开的回填（J6）。
+     *
+     * `session.visitId` 以前恒为 null，`metrics.js` 的 visitId 档因此是死代码。
+     * 这里**在写穿之前**认领：`persistSession` 拍的就是下面这一份快照。
+     * 传活会话进去，所以只改内存；这个函数自己会去 append `visit.sessionIds`。
+     * 失败只 warn —— 认不出这次打开不该让学生的这一轮变成 500。
+     */
+    const visitId = typeof body?.visitId === 'string' ? body.visitId.trim() : '';
+    if (visitId) {
+      try {
+        await linkSessionToVisit(store, { visitId, sessionId: session.id, session, owner: req.__user });
+      } catch (err) {
+        console.warn(`[visit] 回填失败（${session.id}）：${err?.message ?? err}`);
+      }
+    }
+
+    /**
+     * `chat_reply`（J7）：**只有服务端**算得出这五个值。
+     *
+     * 客户端负责 `chat_send`（它才知道消息多长、有没有复制题干），服务端负责这一条：
+     * 两边各发一半，「有 send 无 reply」才是一轮真正的失败。**服务端绝不再发 chat_send**
+     * —— 那会让一轮失败率的分母翻倍，而那个数是要拿去做告警的。
+     *
+     * `batchId` 必须带上：事件的批次查询（看板与整批导出）按事件自带的 batchId 过滤，
+     * 少了它，这条事件写进去了但没人读得到 —— 与 J6 那类"看不出坏"的缺口同源。
+     * 写失败只 warn：埋点是旁路，学生这一轮的答复比埋点重要。
+     */
+    try {
+      await recordEvent(store, {
+        type: 'chat_reply',
+        sessionId: session.id,
+        visitId: session.visitId || visitId || null,
+        userId: req.__user?.user?.id ?? session.userId ?? null,
+        batchId: req.__user?.batchId ?? session.batchId ?? null,
+        payload: {
+          ms: Number.isFinite(response.meta?.latencyMs) ? response.meta.latencyMs : null,
+          level: typeof response.hint?.level === 'number' ? response.hint.level : null,
+          stuckKind: response.diagnosis?.stuckKind ?? null,
+          suppressed: Boolean(response.suppressed),
+          engine: response.meta?.engine ?? null,
+        },
+      });
+    } catch (err) {
+      console.warn(`[events] chat_reply 没写进去（这一轮照常返回）：${err?.message ?? err}`);
+    }
+
+    /**
      * 写穿（C6）：历史与提示记录都在这一份里，写失败只 warn。
      * 归属（userId / batchId）在这里补：会话可能是匿名建的，登录之后才第一次落库。
      */
@@ -1533,7 +1614,24 @@ export async function handleApi(req, res, url) {
       sendJson(res, 503, { error: '记录本次打开失败，请刷新页面重试。', retryable: true });
       return true;
     }
-    sendJson(res, 200, { visitId: visit.id });
+    /**
+     * 题单随这次打开一起带下去（J4）。
+     *
+     * 为什么挂在 `/api/visit` 而不是新开一个接口：落地第一件事就是开一次打开，
+     * 题单条又要立刻画出来 —— 多一次往返只会多一个"先闪一下空题单"的瞬间。
+     * 批次没配题单（或读不出来）时给空数组：前端据此写「老师还没配题单」，
+     * 那是**事实**，不是错误，所以这里也不 4xx。
+     */
+    let questionIds = [];
+    if (me.batchId) {
+      try {
+        const batch = await store.getBatch(me.batchId);
+        if (Array.isArray(batch?.questionIds)) questionIds = batch.questionIds.map((id) => String(id));
+      } catch (err) {
+        console.warn(`[visit] 读批次题单失败（${me.batchId}）：${err?.message ?? err}`);
+      }
+    }
+    sendJson(res, 200, { visitId: visit.id, questionIds });
     return true;
   }
 
