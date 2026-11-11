@@ -16,7 +16,12 @@
  */
 
 import { describe, it, assertEquals, assert, assertIncludes } from './runner.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { handleCloudbaseEvent } from '../src/server/cloudbase-handler.js';
+import { getStore, requestEnv, __resetStoreForTests } from '../src/server/router.js';
 
 /** 发一次"云函数调用" */
 async function call(event, source = {}) {
@@ -169,5 +174,109 @@ describe('CloudBase 适配层 · 页面也由函数出', () => {
   it('既不是页面也不是接口 → 404', async () => {
     const res = await call(get('/not-a-real-file.txt'));
     assertEquals(res.statusCode, 404, '不存在的路径应 404');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 二进制响应：zip 导出（B1，终审阻塞项）
+// ---------------------------------------------------------------------------
+
+/**
+ * 为什么这一组非有不可：
+ *
+ * 本地导出一直是好的，因为真的 `node:http` response 直接吃 Buffer。
+ * 而 CloudBase 的 HTTP 访问服务把函数返回值当**文本**收：`body` 是字符串、
+ * `isBase64Encoded` 由我们硬写 `false`。于是 ≥0x80 的每一个字节都被换成 U+FFFD，
+ * content-length 也跟着对不上 —— 老师下载到的是一个打不开的 zip，
+ * 而这条链路上**没有任何一处会报错**。试点唯一的交付物就是这个文件。
+ *
+ * 判据取"收集到的 chunk 是不是二进制"，不取 content-type：按类型写死的话，
+ * 下一个二进制响应（字体、图片、PDF）会以完全相同的方式悄悄坏掉。
+ */
+const ADMIN_CODE = 'cb-admin';
+
+/** 一个装着一条会话的文件库；用完连目录一起删（file 驱动每次读盘，所以换目录就是换库） */
+async function withSeededStore(fn) {
+  const dir = mkdtempSync(join(tmpdir(), 'bsj-cb-bin-'));
+  const env = { ...process.env, STORE: 'file', STORE_DIR: dir, ADMIN_CODE };
+  /** 开发者本机的 .env 可能带着真口令 / 真额度 / 真守卫：一律删掉，让这一组自己说了算 */
+  for (const key of ['LLM_API_KEY', 'OPENAI_API_KEY', 'ALIYUN_OCR_APPCODE', 'OCR_DAILY_CAP', 'PILOT_REQUIRE_LOGIN']) {
+    delete env[key];
+  }
+
+  __resetStoreForTests();
+  const store = await requestEnv.run(env, () => getStore());
+  await store.putBatch({ id: 'b1', label: '第二版', abandonHours: 24, ocrCap: 10 });
+  await store.putUser({ id: 'u1', displayName: 'S01', batches: ['b1'] });
+  await store.putSession({
+    id: 's1',
+    userId: 'u1',
+    batchId: 'b1',
+    problemId: 'qbank-1',
+    startedAt: '2026-11-09T10:00:00.000Z',
+    lastAt: '2026-11-09T10:20:00.000Z',
+    finishedAt: null,
+    progress: { maxPage: 2, reached: { p2: '2026-11-09T10:00:00.000Z' } },
+    counters: {},
+    turns: [{ i: 0, at: '2026-11-09T10:01:00.000Z', role: 'student', text: '我先把力分解' }],
+    reportSnapshot: null,
+  });
+
+  try {
+    return await fn({ store, env });
+  } finally {
+    __resetStoreForTests();
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** 带管理员口令的一次 GET（口令只进请求头，不进查询串） */
+const adminGet = (path) => ({ httpMethod: 'GET', path, headers: { 'x-admin-code': ADMIN_CODE } });
+
+describe('CloudBase 适配层 · 二进制响应（zip 导出）', () => {
+  it('导出按 base64 回传：isBase64Encoded 为 true，解回来仍是 zip', async () => {
+    await withSeededStore(async ({ env }) => {
+      const res = await handleCloudbaseEvent(adminGet('/api/admin/export?sessionId=s1'), env);
+
+      assertEquals(res.statusCode, 200, '导出应当成功');
+      assertEquals(res.headers['content-type'], 'application/zip');
+      assertEquals(
+        res.isBase64Encoded,
+        true,
+        '二进制响应必须声明 base64：硬写 false 时 ≥0x80 的字节会被网关换成 U+FFFD，zip 当场坏掉',
+      );
+
+      /** base64 只允许出现这些字符；被当文本收过的 body 会带 U+FFFD，那不在这个字符集里 */
+      assert(/^[A-Za-z0-9+/]*={0,2}$/.test(res.body), `body 应当是纯 base64，实际开头：${String(res.body).slice(0, 40)}`);
+
+      const zip = Buffer.from(res.body, 'base64');
+      assertEquals(zip.subarray(0, 4).toString('latin1'), 'PK\x03\x04', '解回来的前 4 个字节必须是 zip 的本地文件头');
+      assertEquals(zip.length, Number(res.headers['content-length']), 'content-length 必须与解回来的字节数对得上');
+      assert(zip.includes('session.md'), '解回来的内容里应当有这一条的名字（顺手确认真的解出了内容）');
+    });
+  });
+
+  it('普通 JSON 响应保持原文：isBase64Encoded 仍是 false，body 不是一串 base64', async () => {
+    await withSeededStore(async ({ env }) => {
+      const res = await handleCloudbaseEvent(adminGet('/api/admin/overview?batchId=b1'), env);
+
+      assertEquals(res.statusCode, 200);
+      assertEquals(res.isBase64Encoded, false, '文本响应不许跟着一起改成 base64');
+      assertEquals(res.body.trimStart().startsWith('{'), true, 'body 应当是原文 JSON，而不是它的 base64');
+      const json = JSON.parse(res.body);
+      assertEquals(json.batch.id, 'b1');
+    });
+  });
+
+  /**
+   * 同一类缺陷的另一处：函数包里的图片 / 字体也会被 `toString('utf8')` 弄坏。
+   * 放在这里是因为它和导出走的是**同一条判据**（能不能当文本）。
+   */
+  it('静态二进制文件（png）同样按 base64 回传：解回来还是 PNG', async () => {
+    const res = await call(get('/brand.png'));
+    assertEquals(res.statusCode, 200, '函数包里应当有 brand.png');
+    assertEquals(res.isBase64Encoded, true, 'png 不许被当文本发出去（≥0x80 的字节会被换成 U+FFFD）');
+    const png = Buffer.from(res.body, 'base64');
+    assertEquals(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', '解回来应当是 PNG 的魔数');
   });
 });

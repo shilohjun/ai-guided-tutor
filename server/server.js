@@ -25,6 +25,28 @@ const PUBLIC_DIR = join(ROOT, 'public');
 const PORT = Number(process.env.PORT || 5173);
 const HOST = process.env.HOST || '127.0.0.1';
 
+/**
+ * 可选的第二个端口：**只给"试点入口单独一个端口"用**。
+ *
+ * 为什么需要它：试点期间同一台机器上常常既有"给学生做测试的入口"（/pilot.html），
+ * 又有"平时大家看的 Demo"（/）。分成两个端口之后，前端、投屏、内网转发的配置
+ * 可以各管各的，不用在一个端口上分辨"这次是测试还是演示"。
+ *
+ * 什么时候不生效（都按"没配"处理，不是报错）：
+ *   · 空值 / 非数字 / 越界（1–65535）；
+ *   · 与 PORT 相同 —— 那是同一条监听，写出来等于没写。
+ *
+ * 注意 CloudBase 上**不适用**：云函数只有一个入口，试点入口走同域的 `/pilot.html`。
+ * 所以这个开关只影响本地开发与自托管。
+ */
+function parsePilotPort(raw, mainPort) {
+  const value = Number(String(raw ?? '').trim());
+  if (!Number.isInteger(value) || value <= 0 || value > 65535) return 0;
+  return value === mainPort ? 0 : value;
+}
+
+const PILOT_PORT = parsePilotPort(process.env.PILOT_PORT, PORT);
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -37,7 +59,14 @@ const MIME = {
   '.woff2': 'font/woff2',
 };
 
-const server = createServer(async (req, res) => {
+/**
+ * 一个请求的处理过程。
+ *
+ * 抽成函数是因为它要被两个端口共用（见文件末尾的 PILOT_PORT）：第二端口是
+ * **同一个进程、同一份路由、同一个库**，不是第二个应用 —— 分成两份代码，
+ * 就会出现"测试入口能用、Demo 入口不能用"这种只在一边复现的问题。
+ */
+async function handleRequest(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const path = url.pathname;
 
@@ -61,7 +90,9 @@ const server = createServer(async (req, res) => {
     }
     res.end(JSON.stringify({ error: '内部错误', detail: String(err?.message ?? err) }));
   }
-});
+}
+
+const server = createServer(handleRequest);
 
 async function serveStatic(res, path) {
   const rel = path === '/' ? '/index.html' : path;
@@ -115,4 +146,27 @@ server.listen(PORT, HOST, () => {
   console.log('  ▸ 核心承诺：只给提示，不给答案（出口由 guard 强制校验）');
   console.log('  ▸ 学生视图：白名单投影 —— 拿不到解题路径 / 答案指纹 / 错因标签');
   console.log('');
+
+  /**
+   * 第二端口（可选）：同一个 handler、同一个库，只是多一条监听。
+   *
+   * 为什么要明说"哪个端口是试点入口"：两个端口跑的是同一个应用，光看地址栏
+   * 分不出该用哪个。日志里点一句，比写在 .env.example 里更可能被看到。
+   */
+  if (PILOT_PORT) {
+    const pilotServer = createServer(handleRequest);
+    /**
+     * 先挂 error 再 listen：端口被占用时 `EADDRINUSE` 可能在 listen 的同一个 tick 里
+     * 就抛出来，晚一步挂就变成未捕获的 error 事件 —— 那会把整个进程带走，
+     * 连主端口的 Demo 也一起没了。
+     */
+    pilotServer.on('error', (err) => {
+      // 端口被占用不该让主服务跟着退：Demo 入口仍然能用，试点入口换个端口再来
+      console.error(`  ✗ 试点端口 ${PILOT_PORT} 不能监听：${err?.message ?? err}`);
+    });
+    pilotServer.listen(PILOT_PORT, HOST, () => {
+      console.log(`  ▸ 试点入口：http://${HOST}:${PILOT_PORT}/pilot.html（PILOT_PORT，同一个进程同一个库）`);
+      console.log('');
+    });
+  }
 });

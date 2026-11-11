@@ -1,7 +1,22 @@
 {
-  "questions": 152,
-  "sourceSha256": "dcd1262c487ee4fc35d14f2f7875499d814d19644b7e7ab2beb43c6e34b3cace",
-  "knowledgeLeaves": 75,
-  "methodLeaves": 28,
-  "formulaHandling": "Original formula images preserved; no claim of OCR transcription."
+  "questions": 835,
+  "sourceFile": "高中物理高考真题题库 (4).html",
+  "sourceBytes": 33897249,
+  "sourceSha256": "44d33c560a2a232b653c378396a239977c9de68a05ff04378afed56476bab1e9",
+  "sourceQuestions": 861,
+  "excluded": 26,
+  "papers": 64,
+  "knowledgeLeaves": 94,
+  "knowledgeChapters": 22,
+  "methodLeaves": 29,
+  "formulaImages": 3077,
+  "figureImages": 1067,
+  "legacyQuestionsKeptVerbatim": 152,
+  "notes": {
+    "idPolicy": "已有 152 道题沿用原 id（qbank-1…qbank-152），新题接在后面编号；旧题的题面、选项、答案与解析沿用上一版，不拿新导出覆盖。",
+    "excluded": "26 道题的选项是图片，但导出没有内联图片，选项位置只剩 figs/*.png 文件名，界面上无法作答，暂不入库；清单见 qbank-import-excluded.json。",
+    "sourceGaps": "新导出里 4 道题只标到章节、6 道题只标到方法大类：前者落到本章「综合应用」叶子，后者保留方法大类、细分留空。",
+    "restoredNodes": "2 道题引用已被导出方删掉的 c-实验-热学实验 / k78 气体等温变化，按上一版名字把节点补回树上，不丢标签。",
+    "formulaHandling": "公式与图形保留为原始图片（data URL）；无 OCR 转写。新导出把行内上下标与分式压成了纯文本，本次不拿它覆盖旧题。"
+  }
 }

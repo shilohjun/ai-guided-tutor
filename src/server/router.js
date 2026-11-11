@@ -25,6 +25,12 @@
  *   因此这里加了 TTL 清理，并且前端对"会话不存在"做了友好降级。
  *   PoC 阶段刻意不引持久化存储 —— 换来的是零依赖，代价是长间隔的对话可能丢上下文。
  *   导入的题目也一样（见 registry.js：用内容哈希做 id，丢了就重新生成同一个 id）。
+ *
+ *   试点之后存储端口（src/server/store/）已经就位，账号与令牌走它；
+ *   现在会话本身也写穿了：/api/chat、/api/formula、/api/report、/api/reset
+ *   每一处成功之后都把会话快照写进库，冷启动再从库里回载（见 session-store.js）。
+ *   内存 Map 仍然保留 —— 它是热路径的缓存，不是唯一副本。
+ *   serverless 下的"间隔较久"问题因此只剩导入题目（内存注册表，TTL 6 小时）。
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -45,6 +51,23 @@ import { runEvaluation, formatEvaluation } from '../core/eval.js';
 import { STUDENT_LEVEL_NOTE, inspectVoice } from '../core/prompt.js';
 import { PROBLEMS } from '../core/problems.data.js';
 import { DEFAULT_PERSONA, PERSONA_IDS, PERSONAS, normalizePersona, personaById, stylePersonaReply } from '../core/personas.js';
+import { openStore } from './store/index.js';
+import { handleAdminApi } from './admin.js';
+import { checkLoginRate, login, noteLoginFailure, noteLoginSuccess } from './auth.js';
+import { ownerOf, recordEvent, validateEvent } from './events.js';
+import { resolveUser, tokenFromHeaders } from './demo-gate.js';
+import {
+  createLiveSession,
+  createVisit,
+  hydrateSession,
+  linkSessionToVisit,
+  persistReset,
+  persistSession,
+  pickResumable,
+  readSessionRecord,
+  SessionReadError,
+  snapshotSession,
+} from './session-store.js';
 
 loadEnvFile();
 
@@ -82,6 +105,17 @@ const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
 /** 会话数量上限（防内存被打满） */
 const MAX_SESSIONS = 500;
 
+/**
+ * 一轮 `/api/chat` 的时间预算（默认值）。
+ *
+ * 为什么是 22 秒而不是 30 秒：部署方的硬超时是 30 秒（云函数），而网关到点会
+ * **把整个函数掐掉** —— 那时函数里的代码一行都不跑，`chat_error` 写不进去、
+ * 503 也发不出去。留出 8 秒，是为了让"写事件 + 回响应"这两件事在被掐之前做完。
+ *
+ * 可以用 `TURN_DEADLINE_MS` 覆盖（测试把它设成 1 就能走到超时那条路径）。
+ */
+const TURN_DEADLINE_MS = 22000;
+
 const sessions = new Map();
 /**
  * adapter 缓存按「形态」分键，而不是单例。
@@ -111,6 +145,42 @@ function rememberShape(shape) {
   if (shape?.url && shape?.imageField) ocrShape = shape;
 }
 
+/**
+ * 存储的进程级单例。
+ *
+ * 缓存的为什么是 Promise 而不是 Store 实例：`openStore` 是异步的，
+ * 两个请求同时到达时各开一次，memory 驱动就会变成两个互不相干的库
+ * （file 驱动也会白开一次目录）。缓存 Promise 让并发请求等同一个打开动作。
+ *
+ * 打开失败要清掉缓存：否则一次瞬时故障（目录没权限、云 SDK 还没装）
+ * 会把这个进程永久钉在一个 rejected promise 上 —— 之后每个请求都 500，
+ * 直到实例重启，而重启之后故障可能已经消失了。
+ *
+ * `STORE` 没配时是 memory，所以本地与现有测试的行为一个字节都不变。
+ */
+let storePromise = null;
+
+export function getStore() {
+  if (!storePromise) {
+    storePromise = openStore(envFor());
+    storePromise.catch(() => {
+      storePromise = null;
+    });
+  }
+  return storePromise;
+}
+
+/**
+ * 测试钩子：把单例丢掉，下一次 `getStore()` 按当时的 env 重新打开。
+ *
+ * 为什么必须有它：单例是进程级的，而"冷启动还在不在"这件事只能靠
+ * "换一个 STORE_DIR 再看一次"来验（file 驱动每次读盘，所以换目录就是换库）。
+ * 名字带下划线是明示：生产代码不该调它 —— 调了之后同一个进程里会出现两个库。
+ */
+export function __resetStoreForTests() {
+  storePromise = null;
+}
+
 function adapterTagFor(env) {
   const apiKey = String(env.LLM_API_KEY ?? '').trim() || String(env.OPENAI_API_KEY ?? '').trim();
   if (!apiKey) return 'offline';
@@ -137,7 +207,12 @@ function getAdapter() {
   return adapters.get(tag);
 }
 
-/** 取会话；顺带做过期清理 */
+/**
+ * 取会话；顺带做过期清理。
+ *
+ * 它是**内存**的访问器（与存储端口的 `store.getSession` 同名但不是一回事）：
+ * 命中就返回同一个对象，没命中才现造一个。落库与回载不在这里，见 restoreSession。
+ */
 function getSession(sessionId, problemId) {
   const now = Date.now();
   if (sessions.size > MAX_SESSIONS || (sessions.size > 0 && sessions.size % 50 === 0)) {
@@ -148,16 +223,14 @@ function getSession(sessionId, problemId) {
   let s = sessions.get(sessionId);
   const adapterTag = adapterTagFor(envFor());
   if (!s || s.problemId !== problemId) {
-    s = {
+    /** 默认形状（含 progress / counters / 时间戳）只在 session-store.js 里定义一份 */
+    s = createLiveSession({
       id: sessionId,
       problemId,
       engine: createEngine({ adapter: getAdapter(), problem: problemId ? getProblemById(problemId) : null }),
       adapterTag,
-      history: [],
-      record: createSessionRecord(problemId),
-      createdAt: new Date().toISOString(),
-      touchedAt: now,
-    };
+      now,
+    });
     sessions.set(sessionId, s);
   } else if (s.adapterTag !== adapterTag) {
     /**
@@ -178,15 +251,128 @@ function getSession(sessionId, problemId) {
   return s;
 }
 
+/**
+ * 会话是别人的（C10）—— 归属规则的唯一说明在 `notMine` 上方那段注释里。
+ *
+ * 为什么用异常而不是再塞一个 `null`：`null` 已经是"这条会话不存在"，
+ * 两者混用就一定会出现"别人的 → 当成没有 → 现造一条新的"（评审 Important 1 的洞）。
+ * 翻转成 403 的地方是 `restoreForRoute`，四条受保护的路由都走它。
+ */
+class NotOwnerError extends Error {
+  constructor(owner) {
+    super('这不是你的学习记录');
+    this.name = 'NotOwnerError';
+    this.code = 'NOT_OWNER';
+    this.owner = owner ?? null;
+  }
+}
+
+/**
+ * 回载：内存命中就直接用，否则从库里读回来、重建引擎、放回内存。
+ *
+ * 顺序是刻意的 —— **先看内存再看库**：
+ *   · 热路径上不能每轮都读一次盘；
+ *   · 内存里那份带着这一轮刚推进的状态，比库里上一次写穿的更"新"。
+ *
+ * 返回 null 的含义是"这条会话没法复活"，调用方各有各的答法：
+ *   · 库里没有这条（含 problemId 对不上）→ /api/chat 现造一条，/api/report 走 404；
+ *   · 题目已经不在注册表（照片/粘贴题过了 TTL）→ 只有报告还能说有快照的那份。
+ *
+ * 另外两种失败**不伪装成 null**（伪装过一次，代价是静默覆盖别人的记录）：
+ *   · 库读不出来 → 抛 `SessionReadError`（调用方回 503，且不许写穿）；
+ *   · 会话是别人的 → 抛 `NotOwnerError`（调用方回 403）。
+ *
+ * 注意 `problemId` 传 null 表示"不限定题目"（/api/formula、/api/report 只知道
+ * sessionId）。这时以库里的 problemId 为准，不会拿一个空 id 去查题目表。
+ *
+ * @param {object} store
+ * @param {string} sessionId
+ * @param {string|null} problemId
+ * @param {{user: object, batchId: string|null}|null} me 调用者身份（没登录就是 null）
+ */
+export async function restoreSession(store, sessionId, problemId, me = null) {
+  const hot = sessions.get(sessionId);
+  if (hot && (!problemId || hot.problemId === problemId)) {
+    /** 走 getSession 而不是直接返回：TTL 清理与"形态变了要换引擎"都在那里 */
+    return getSession(sessionId, hot.problemId);
+  }
+  if (!store || !sessionId) return null;
+
+  const record = await readSessionRecord(store, sessionId);
+  if (!record) return null;
+
+  /**
+   * 归属必须在**任何替换之前**判（评审 Important 1）。
+   *
+   * 放到 `problemId` 比对之后就晚了：对不上会先返回 null，调用方于是
+   * `getSession(...)` 现造一条 `userId: null` 的新会话 —— "这是别人的"被洗成
+   * "这是一条新会话"，`notMine` 对空归属放行，随后的写穿把原主人的记录整条盖掉。
+   * 归属只从**库里的记录**读（`record.userId`），不看请求参数。
+   */
+  if (notMine(record, me)) throw new NotOwnerError(record.userId);
+
+  if (problemId && record.problemId !== problemId) return null;
+
+  const liveProblem = getProblemById(record.problemId);
+  const live = hydrateSession(record, {
+    /**
+     * 题目没了就**没有引擎**：这个对象只用于读（报告快照、公式卡判断）。
+     * 绝不放进内存表 —— 放进去了 /api/chat 会拿到一个没有引擎的会话并当场崩。
+     */
+    engine: liveProblem ? createEngine({ adapter: getAdapter(), problem: liveProblem }) : null,
+    adapterTag: adapterTagFor(envFor()),
+  });
+  if (!live.engine) return live;
+
+  sessions.set(sessionId, live);
+  /** 再走一遍 getSession：TTL 清理、形态判定都不必在这里重复一遍 */
+  return getSession(sessionId, live.problemId);
+}
+
+/** 库读不出来：**可重试**，措辞要让人知道刷新一下就好，而不是去重开一道题 */
+function sendStoreUnreadable(res) {
+  sendJson(res, 503, { error: '读取学习记录失败，请刷新页面重试。', retryable: true });
+}
+
+/**
+ * 回载 + 两种失败的统一答法 —— **四条受保护的路由都走它**（chat / formula / report / reset）。
+ *
+ * 返回 `{ replied: true }` 表示已经答复过（调用方直接 `return true`）；
+ * 否则返回 `{ session }`，其中 null 仍是"库里确实没有这条"——新建还是 404
+ * 由各路由自己决定（chat 是"开始一道新题"，report 是 404）。
+ *
+ * 这两种失败都不许落到"现造一条新会话"上：读失败时那条新会话会盖掉真记录，
+ * 归属失败时等于让别人接着写你的历史。
+ */
+async function restoreForRoute(res, store, sessionId, problemId, me) {
+  try {
+    return { session: await restoreSession(store, sessionId, problemId, me) };
+  } catch (err) {
+    if (err instanceof NotOwnerError) {
+      sendNotOwner(res);
+      return { replied: true };
+    }
+    if (err instanceof SessionReadError) {
+      sendStoreUnreadable(res);
+      return { replied: true };
+    }
+    throw err;
+  }
+}
+
+/** 落库快照 —— 从 router 导出是为了让测试与后续任务按计划的那一处取 */
+export { snapshotSession };
+
 // ---------------------------------------------------------------------------
 // 响应工具（统一封装，本地与 serverless 共用）
 // ---------------------------------------------------------------------------
 
-function sendJson(res, status, payload) {
+function sendJson(res, status, payload, headers = {}) {
   const body = JSON.stringify(payload);
   res.statusCode = status;
   res.setHeader('content-type', 'application/json; charset=utf-8');
   res.setHeader('cache-control', 'no-store');
+  for (const [name, value] of Object.entries(headers)) res.setHeader(name, value);
   res.end(body);
 }
 
@@ -264,6 +450,26 @@ function readJson(req) {
     });
     req.on('error', reject);
   });
+}
+
+/**
+ * 这次请求算谁。
+ *
+ * `x-forwarded-for` 取**第一段**：代理会把自己一层层追加在后面，
+ * 第一段才是客户端地址；整串拿来当键，等于每个 IP 都算成新的一个。
+ * 没有这个头（本地直连）时退回 socket 地址 —— 拿不到就统一记 'unknown'。
+ * `'unknown'` 这一桶**不参与 IP 维度的锁**（锁它等于锁所有人），
+ * 原因与代价写在 auth.js 的 `checkLoginRate` 上。
+ *
+ * 前提（按 IP 限速的通用前提，不是这一段能解决的）：部署层必须**自己写**这个头。
+ * 若它把客户端带来的 XFF 原样透传，那么每发一个请求换一个伪造的 XFF 就能绕过限速 ——
+ * 遇到这种部署形态，限速要改成按"口令+IP"或加一层 TTL 缓存来兜底。
+ */
+function clientIp(req) {
+  const forwarded = req.headers?.['x-forwarded-for'];
+  const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  const first = String(raw ?? '').split(',')[0].trim();
+  return first || req.socket?.remoteAddress || 'unknown';
 }
 
 // ---------------------------------------------------------------------------
@@ -432,6 +638,474 @@ export function buildStudentTurn(response, mode, problem, personaValue = DEFAULT
 }
 
 // ---------------------------------------------------------------------------
+// 请求身份（C1）
+// ---------------------------------------------------------------------------
+
+/**
+ * 这一次请求算谁 —— **每个请求只解一次**，下游一律读 `req.__user`。
+ *
+ * 为什么放在 router 而不是入口（api/index.js、api/worker.js）：
+ *   store 的配置来自**这次请求的 env**（Workers 的库配置就在 env 绑定里），
+ *   而入口调 `buildRequestContext` 的时候 `requestEnv` 还没被 `run` 起来。
+ *   在入口解析会拿到一个用进程环境打开的库；在 router 里解析才拿得到正确的那份。
+ *
+ * 为什么要判"有没有带令牌"才读库：
+ *   没带令牌的请求连 store 都不碰，于是**不配登录守卫时行为一个字节都不变**
+ *   （现有 400+ 用例里绝大多数请求都不带令牌）。
+ *
+ * 解析失败（令牌过期、库读不出来）一律按未登录处理，不抛 500：
+ *   一个坏库不该让所有请求变成"内部错误"，那样连"请先登录"都发不出去。
+ *
+ * @param {object} req
+ * @returns {Promise<{user: object, batchId: string|null}|null>}
+ */
+async function resolveRequestUser(req) {
+  /** 入口或测试可以预置（预置了就照用，不再读库） */
+  if (req.__user !== undefined) return req.__user;
+  if (!tokenFromHeaders(req.headers)) return null;
+
+  const store = await getStore().catch(() => null);
+  if (!store) return null;
+  return resolveUser({ headers: req.headers, store });
+}
+
+/**
+ * 登录守卫（C1）：`PILOT_REQUIRE_LOGIN=1` 时，除健康检查与登录之外一律 401。
+ *
+ * 两个例外各有理由：
+ *   · `/api/health` —— 监控与部署校验要能问"你还活着吗"，把它挡在登录后面
+ *     等于一个配错的环境连"哪里配错了"都看不到；
+ *   · `/api/auth/login` —— 挡住它就没有任何人能登录了。
+ *
+ * **不配这个变量时完全不存在这条分支**：本地开发、现有测试、公网离线 Demo
+ * 都照旧可用（设计稿要求的是"试点环境必须登录"，不是一个全局的强制开关）。
+ */
+const LOGIN_EXEMPT_PATHS = new Set(['/api/health', '/api/auth/login']);
+
+function loginGuardBlocks(path, user) {
+  if (envFor().PILOT_REQUIRE_LOGIN !== '1') return false;
+  if (LOGIN_EXEMPT_PATHS.has(path)) return false;
+  return !user;
+}
+
+/**
+ * 归属规则（C10）—— **唯一的一份，四条受保护的路由全部走它**：
+ *
+ *   · POST /api/chat     别人的 sessionId 不能拿来续聊（续聊会写穿，等于改别人的记录）
+ *   · POST /api/formula  公式卡读的是 `record.hintLog` —— 别人做到了哪一步
+ *   · GET  /api/report   报告是整段对话的结论（也含 `turns`）
+ *   · POST /api/reset    重置会清空对话，比读更狠，必须同样拦
+ *
+ * 归属**只从存储里的那条记录读**（库记录的 `userId` / 活会话的 `session.userId`），
+ * 不由请求参数决定：sessionId 是前端生成的可猜字符串（`'ui-' + Date.now().toString(36)`），
+ * "拿得出 sessionId 就说明是你的"这条推断是错的。判定点三处，缺一不可：
+ *   ① `restoreSession`：库记录 → 活会话之前。**必须在 problemId 比对之前**，
+ *      否则对不上时调用方会现造一条 `userId: null` 的新会话，把"这是别人的"
+ *      洗成"这是新的"，随后的写穿覆盖原主人的记录（评审 Important 1）；
+ *   ② 各路由拿到会话之后：内存里命中的那条不经过库，① 看不到它；
+ *   ③ `persistSession` 写之前：纵深防御 —— 任何新路径都不许覆盖别人名下的记录。
+ *
+ * 判的是"有归属且不是你"，而不是 `session.userId !== 我`：
+ * 会话的 `userId` 起初是 null —— sessionId 由前端生成，第一次说话时才由
+ * persistSession 从令牌补上归属。若把 null 也判成"不是你的"，登录之后
+ * **第一句话就会被自己的接口拒掉**：那不是收紧权限，是把门焊死。
+ *
+ * 没有登录态（`req.__user` 为空）时一律放行：没配守卫的环境里不存在"归属"这回事，
+ * 行为必须与加这条校验之前一模一样（C10 第三条：不放宽也不收紧）。
+ *
+ * 为什么判在这里而不是每路由各写一次：它是**身份规则**，不是业务规则。
+ * 四条各写一份，就一定会出现"报告拦了、重置没拦"这种后门。
+ */
+function notMine(session, me) {
+  const owner = session?.userId;
+  if (!me?.user || typeof owner !== 'string' || owner === '') return false;
+  return owner !== me.user.id;
+}
+
+/** 403 只回一句人话：不确认"这条会话存在"以外的任何事（报告内容、题目、对话都不带） */
+function sendNotOwner(res) {
+  sendJson(res, 403, { error: '这不是你的学习记录', code: 'NOT_OWNER' });
+}
+
+/**
+ * 这一轮给多少毫秒（`TURN_DEADLINE_MS`，默认 22 秒）。
+ *
+ * 非法值（非数字 / 0 / 负数）一律退回默认，而不是"用 0 秒"：
+ * 一个配错的环境变量不应该让**所有**对话都变成 TURN_SLOW —— 那会让人以为服务坏了。
+ */
+function turnDeadlineMs(env = envFor()) {
+  const raw = Number(env?.TURN_DEADLINE_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : TURN_DEADLINE_MS;
+}
+
+/**
+ * 一轮失败事件（L3 的后半句）—— **只由服务端发**（L4）。
+ *
+ * payload 形状钉死为 `{ code, status }`：
+ *   `code`  `TURN_SLOW`（我们没时间了）| `UPSTREAM`（对方坏了）—— 两者的下一步不一样；
+ *   `status` 这一轮回给客户端的 HTTP 状态码。
+ * 不放消息正文、不放耗时：事件表是按"每轮"增长的，往里塞自由文本的代价是成千上万倍。
+ *
+ * 写失败只 warn：这一轮该回的 503 比埋点重要，而且调用方是失败路径，
+ * 不能因为记不上而再抛一次。
+ */
+async function recordChatError(store, { session, req, visitId, code, status }) {
+  try {
+    await recordEvent(store, {
+      type: 'chat_error',
+      sessionId: session?.id ?? null,
+      visitId: visitId || session?.visitId || null,
+      userId: req?.__user?.user?.id ?? session?.userId ?? null,
+      batchId: req?.__user?.batchId ?? session?.batchId ?? null,
+      payload: { code, status },
+    });
+  } catch (err) {
+    console.warn(`[events] chat_error 没写进去（这一轮照常回 503）：${err?.message ?? err}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 埋点上报（POST /api/events）
+// ---------------------------------------------------------------------------
+
+/** 空串、空白、非字符串一律收敛成 null —— 库里不想出现 `userId: ''` 这种"有值但没意义" */
+function textOrNull(value) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  return text === '' ? null : text;
+}
+
+/**
+ * 一批埋点的全部处理。**永远不抛**，永远返回两个计数（B4）。
+ *
+ * ============================================================================
+ * 为什么这个接口"永远返回 200"
+ * ============================================================================
+ * 埋点是**旁路**：它坏了不能影响学生做题。而它又几乎一定在最糟的时刻坏
+ * （弱网、页面被杀、后台标签页被节流）—— 这时候回 4xx/5xx，前端的常见反应是
+ * 重试，于是坏请求被放大成一串坏请求，还可能顶掉真正的主流程请求。
+ * 所以这里把"丢掉"当成正常结果：逐条判断，能收几条收几条，剩下的计数返回。
+ *
+ * 下面这几种情况都不许 5xx：
+ *   ① 请求体解析失败（半截 JSON / 超过 1MB / 空 body）→ `{ accepted: 0, rejected: 0 }`
+ *   ② 单条不合法（未知 type / payload 超 2KB / 没有归属）→ 跳过并计入 rejected
+ *   ③ 存储写失败（磁盘满、驱动不可用）→ 同样计入 rejected，不往上报错
+ *   ④ 令牌解析失败 → 当作"没有身份"，回落到 body 里的 userId（Task 4 会把它收紧成必须登录）
+ *   ⑤ **读不出来**的（既没有归属、也没有 batchId，见下一节）→ 同样计入 rejected、不写
+ *
+ * `rejected` 存在的意义不是给前端看，而是**让埋点坏掉这件事有数字**：
+ * 没有它，"这周为什么少了三分之一的事件"只能靠猜。
+ *
+ * ============================================================================
+ * "收下"的定义：至少能被一条查询路径读出来
+ * ============================================================================
+ * 事件表只有两个读入口 —— `listEventsBySession(归属键)` 与 `listEventsByBatch(batchId)`。
+ * 一条**既没有归属、也没有 batchId** 的事件落库之后，两个都读不到它：
+ * 前者按归属键分文件/过滤，后者对空 batchId 直接返回 `[]`。
+ * 于是它被写进磁盘、计入 `accepted`，然后对漏斗 / 看板 / 导出**永久不可见** ——
+ * 那三个功能只读事件表，而且不会报错。`accepted` 在这里就成了谎话。
+ *
+ * 所以可读性是**收下的前提**，判在归属键与 batchId 都解析完之后：
+ * 读不出来的一条，计入 `rejected`、不写。这不是校验规则 —— `validateEvent`
+ * 不认识 `batchId`，它照旧放行无归属的 `login`（B7-1 的纯函数契约）。
+ *
+ * 现实路径不受影响：登录之后客户端就握着令牌，下面会把用户和当前批次解出来，
+ * `login` 于是既可查、也被收下。真正会被拒的只有"匿名 + 没带 batchId"那种埋点 ——
+ * 它本来就没有任何分析价值。
+ *
+ * ============================================================================
+ * 身份与时间都不信客户端
+ * ============================================================================
+ * - `userId` / `batchId`：带了令牌就用令牌里的（`batchId` 是令牌解析出的**当前批次**）。
+ *   令牌缺席时才回落到 body —— 没配登录守卫的本地/演示环境需要这条路；
+ *   配了守卫（`PILOT_REQUIRE_LOGIN=1`）时请求根本走不到这里，回落自然失效。
+ * - `at`：**先盖服务端时间、再逐条校验**（B7-2），所以客户端漏发 `at` 不会丢事件；
+ *   值最终仍由 `recordEvent` 换成服务端时间。`missing_at` 作为纯函数契约保留，
+ *   但这条 HTTP 路径上不可达 —— 半截埋点会以别的理由（未知 type / 缺归属）被拒。
+ *
+ * @param {object} req
+ * @param {object|null} body 已解析好的请求体；解析失败传 null
+ * @returns {Promise<{ accepted: number, rejected: number }>}
+ */
+async function acceptEvents(req, body) {
+  const items = Array.isArray(body?.events) ? body.events : [];
+  if (!items.length) return { accepted: 0, rejected: 0 };
+
+  /** 存储打不开（例如 STORE=cloudbase 还没实现）时，这一批全部记成 rejected，而不是 500 */
+  const store = await getStore().catch(() => null);
+  if (!store) return { accepted: 0, rejected: items.length };
+
+  /**
+   * 身份已经从请求头解过一次了（`handleApi` 开头的 `req.__user`），这里直接用 ——
+   * 一套取令牌的写法只能有一处，否则"某个接口认这个头、另一个不认"是必然的。
+   */
+  const identity = req.__user ?? null;
+
+  let accepted = 0;
+  let rejected = 0;
+  for (const item of items) {
+    /**
+     * 非对象一条条看起来很像"数组里混了 null/字符串"（前端拼接出错时就是这样），
+     * 它们连 validateEvent 的入参都不该是 —— 直接计数跳过。
+     */
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      rejected += 1;
+      continue;
+    }
+
+    /**
+     * 先盖时间戳、再校验（B7-2）：客户端漏发 `at` 不会因此丢掉事件。
+     * 因为这里已经盖过章，`validateEvent` 的 `missing_at` 分支从 HTTP 不可达 ——
+     * 那条分支作为纯函数的契约保留（测试仍会直接命中）。
+     */
+    const stamped = { ...item, at: new Date().toISOString() };
+
+    if (!validateEvent(stamped).ok) {
+      rejected += 1;
+      continue;
+    }
+
+    const event = {
+      ...stamped,
+      /** 令牌优先；body 只在没有身份时兜底（见上面的说明） */
+      userId: identity ? identity.user.id : (textOrNull(item.userId) ?? textOrNull(body?.userId)),
+      batchId: identity ? (identity.batchId ?? null) : (textOrNull(item.batchId) ?? textOrNull(body?.batchId)),
+    };
+
+    /**
+     * **读不出来就不算收下**（见上面"收下的定义"）：归属键与 batchId 都为空的事件，
+     * 两条查询路径都取不到它 —— 写进去只会让 `accepted` 变成谎话。
+     *
+     * 判在校验**之后**是刻意的：`validateEvent` 放行无归属的 `login` 是纯函数契约（B7-1），
+     * 而且它不认识 `batchId`；"这条以后查不查得出来"是这里才知道的事。
+     * 也判在 `recordEvent` **之前**：被拒的事件不该占掉一个 seq。
+     */
+    if (!ownerOf(event) && !event.batchId) {
+      rejected += 1;
+      continue;
+    }
+
+    try {
+      await recordEvent(store, event);
+      accepted += 1;
+    } catch {
+      /** 单条写失败不牵连整批，也不把异常放到路由外 */
+      rejected += 1;
+    }
+  }
+
+  /**
+   * 会话 → 这次打开的回填（J6）的另一条路。
+   *
+   * 为什么 `/api/chat` 有回填点，这里还要再来一次：**学生可能一句话都没说**
+   * 就翻到第 4 页、或者点了"再练一道" —— 那些事件都带 sessionId + visitId，
+   * 但一次 `/api/chat` 都没发生。只做 chat 那一处的话，这些会话在库里
+   * `visitId` 仍然是 null，页 1–2 的事件就和它对不上账，而且看不出来。
+   *
+   * 一批事件里同一对 (session, visit) 只处理一次：埋点会连发好几条，
+   * 逐条去读库再写回是白花的钱。失败只 warn —— 埋点这条路永远不许 5xx。
+   */
+  const links = new Map();
+  for (const item of items) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const sessionId = textOrNull(item.sessionId);
+    const visitId = textOrNull(item.visitId);
+    if (sessionId && visitId && !links.has(sessionId)) links.set(sessionId, visitId);
+  }
+  for (const [sessionId, visitId] of links) {
+    try {
+      /**
+       * 这里**不传活会话**：这条路没有写穿时机，回填必须当场落库
+       * （`linkSessionToVisit` 的活会话分支是"只改内存、由调用方随后的写穿落库"）。
+       */
+      await linkSessionToVisit(store, { visitId, sessionId, owner: identity });
+      /** 内存里那条也要认领，否则它下一次写穿会把 visitId 覆盖回 null */
+      const live = sessions.get(sessionId);
+      if (live && !live.visitId) live.visitId = visitId;
+    } catch (err) {
+      console.warn(`[visit] 埋点回填失败（${sessionId}）：${err?.message ?? err}`);
+    }
+  }
+
+  return { accepted, rejected };
+}
+
+// ---------------------------------------------------------------------------
+// 拍照识题 · 两道额度闸
+// ---------------------------------------------------------------------------
+
+/**
+ * ============================================================================
+ * 键名是**契约**：写错一个字符，看板那一格永远是 0，而且没人会发现
+ * ============================================================================
+ * 看板（`admin.js` 的 `usageOf`）读的是同一对键：
+ *   `ocr:batch:<batchId>`    整批累计（按成功调用计）
+ *   `ocr:daily:<YYYY-MM-DD>` 当日累计（**UTC**，与全项目所有时间戳同一口径）
+ *
+ * 为什么把拼键收成两个函数而不是在调用点各写一遍：这里有三个使用点
+ * （闸门读、成功后写、健康检查读），三处各拼一遍就一定会有一处漂移 ——
+ * 而漂移的症状是"看板是 0"，不是报错，比挂掉难查得多。
+ */
+function ocrBatchCounterKey(batchId) {
+  return `ocr:batch:${batchId}`;
+}
+
+function ocrDailyCounterKey(now = new Date()) {
+  /** UTC 日：`toISOString()` 的前 10 位就是 YYYY-MM-DD，与看板同一个表达式 */
+  return `ocr:daily:${now.toISOString().slice(0, 10)}`;
+}
+
+/** 计数与上限的归一化：非数字、负数、NaN 一律 0；0 表示"没配 = 不限" */
+function countOf(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+/**
+ * 两道闸的判定 —— 纯函数，不碰存储、不读环境，所以路由与测试用的是同一个判据。
+ *
+ * 两道闸是**且**的关系：批内额度管"这一班能用多少"，当日额度管"这个部署一天能烧多少"，
+ * 任一触顶即拒。上限为 0 或未配视为不限（本地开发不受影响）。
+ *
+ * @param {{ batchUsed?: number, batch?: object|null, dailyUsed?: number, dailyCap?: number }} input
+ * @returns {{ blocked: boolean, remaining: number|null, reason: 'batch'|'daily'|null }}
+ *   `remaining` 是两道闸里**更紧**的那一个剩余量；都没配上限时是 `null`（不限，不是 0 次）
+ */
+export function ocrQuotaState({ batchUsed = 0, batch = null, dailyUsed = 0, dailyCap = 0 } = {}) {
+  const batchCap = countOf(batch?.ocrCap);
+  const dayCap = countOf(dailyCap);
+
+  const lefts = [];
+  if (batchCap > 0) lefts.push(Math.max(0, batchCap - countOf(batchUsed)));
+  if (dayCap > 0) lefts.push(Math.max(0, dayCap - countOf(dailyUsed)));
+
+  const blockedByBatch = batchCap > 0 && countOf(batchUsed) >= batchCap;
+  const blockedByDaily = dayCap > 0 && countOf(dailyUsed) >= dayCap;
+
+  return {
+    blocked: blockedByBatch || blockedByDaily,
+    remaining: lefts.length ? Math.min(...lefts) : null,
+    reason: blockedByBatch ? 'batch' : blockedByDaily ? 'daily' : null,
+  };
+}
+
+/**
+ * 读两道闸的当前状态。
+ *
+ * ============================================================================
+ * 读不出来 = 已达上限（fail closed），不是"按 0 算"
+ * ============================================================================
+ * 这一环是**花钱的闸门**：OCR 按成功调用计费（约 0.083 元/次），是这套系统里
+ * 唯一"学生自己点一下就会花钱"的入口。
+ *
+ * 原来的写法是三次读共用一个 try、失败就把用量当 0 —— 也就是"库坏了就当没用量"。
+ * 那等于在**最需要闸门的时候**把它静默解除，而日志里只留一句 warn，没人会看到
+ * 额度在涨。所以改成：
+ *
+ *   ① 三次读各自 try/catch，一次失败不牵连另外两维；
+ *   ② 任一维读不出来 → 该维记成"未知"；
+ *   ③ 有未知维 → **整道闸按已达上限处理**，由调用方回 503。
+ *
+ * 代价是学生这一次要自己粘贴文字（那条链路一直是可用的），换来的是
+ * "库故障期间不会无限烧额度"。这个方向不能反过来：少放行一次是体验问题，
+ * 多花钱是账问题。
+ *
+ * 两种拒绝要分开报（见 /api/ocr 的调用点）：
+ *   · `reason` 非空 → 真的到顶（OCR_QUOTA，"今日额度用完了"，学生知道该等明天）；
+ *   · `reason` 为空但有未知维 → 查不到（OCR_QUOTA_UNKNOWN，"稍后再试"）。
+ * 不分开的话，库故障会被说成"今天的额度用完了" —— 那是假话，而且会让人去查账单
+ * 而不是查库，把真正的故障藏起来。
+ */
+async function readOcrQuota({ store, batchId, env, now = new Date() }) {
+  const dailyCap = countOf(env?.OCR_DAILY_CAP);
+
+  let batch = null;
+  let batchUsed = 0;
+  let dailyUsed = 0;
+  /** 读不出来的维度；非空即"证明不了还有额度" */
+  const unknown = [];
+
+  /**
+   * 读一次，失败只标记自己那一维。
+   *
+   * 返回值是 `{ ok, value }` 而不是"失败时给的默认值"：默认值 0 与"真的读到 0"
+   * 在下游分不开，而这两件事的处置正好相反（一个是"还没用过，放行"，
+   * 一个是"不知道，拒绝"）。
+   */
+  const readOne = async (dimension, fn, fallback) => {
+    try {
+      return { ok: true, value: await fn() };
+    } catch (err) {
+      console.warn(`[ocr] 额度读不出来（${dimension}），这一道闸按已达上限处理：${err?.message ?? err}`);
+      return { ok: false, value: fallback };
+    }
+  };
+
+  if (store) {
+    /**
+     * 批次这一维只在"有批次"时存在：未登录不是读失败，是一个事实（没有批次）。
+     * 读回来是 null（批次记录被删了）也不算读失败 —— 那也是事实，不是故障；
+     * 那种情况下日额度那道闸照常守着，不必让整批学生都改用粘贴。
+     */
+    if (batchId) {
+      const batchRead = await readOne('batch', () => store.getBatch(batchId), null);
+      if (!batchRead.ok) unknown.push('batch');
+      batch = batchRead.value;
+
+      const batchUsedRead = await readOne('ocr:batch', () => store.getCounter(ocrBatchCounterKey(batchId)), 0);
+      if (!batchUsedRead.ok) unknown.push('batchUsed');
+      batchUsed = countOf(batchUsedRead.value);
+    }
+
+    const dailyRead = await readOne('ocr:daily', () => store.getCounter(ocrDailyCounterKey(now)), 0);
+    if (!dailyRead.ok) unknown.push('dailyUsed');
+    dailyUsed = countOf(dailyRead.value);
+  } else {
+    /**
+     * 库压根没打开（`getStore()` 失败）：这不是"用量是 0"，是"不知道"。
+     * 与读失败同一档 —— 否则"库打不开"就成了花钱最自由的那种状态。
+     */
+    unknown.push('store');
+  }
+
+  const state = ocrQuotaState({ batchUsed, batch, dailyUsed, dailyCap });
+  return {
+    ...state,
+    /** 未知维也算 blocked：以后别处只判 `.blocked` 一个字段时，默认仍然是拒绝的 */
+    blocked: state.blocked || unknown.length > 0,
+    unknown: unknown.length > 0,
+  };
+}
+
+/**
+ * 成功之后记账：**两个计数器各加 1**。
+ *
+ * 失败不加 —— 供应商按**成功调用**计费，我们按同一个口径计，
+ * 否则"额度用完了"会比真实账单先到，学生会莫名其妙被拦。
+ *
+ * 写失败只 warn：额度计数是旁路，学生这一张图已经识别出来了，不能因为记账失败就回 500。
+ */
+async function recordOcrUsage({ store, batchId, now = new Date() }) {
+  if (!store) return;
+  try {
+    await store.incrCounter(ocrDailyCounterKey(now), 1);
+    /** 没有批次（未登录 / 开发档）时不写批次那一格：它不是一个真实批次 */
+    if (batchId) await store.incrCounter(ocrBatchCounterKey(batchId), 1);
+  } catch (err) {
+    console.warn(`[ocr] 用量没记上（这一轮照常返回）：${err?.message ?? err}`);
+  }
+}
+
+/** 健康检查用：今日用量。读不出来时是 `null`（不知道），不是 0（一个事实） */
+async function readOcrUsedToday(store, now = new Date()) {
+  if (!store) return null;
+  try {
+    return countOf(await store.getCounter(ocrDailyCounterKey(now)));
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // API 处理
 // ---------------------------------------------------------------------------
 
@@ -442,13 +1116,40 @@ export function buildStudentTurn(response, mode, problem, personaValue = DEFAULT
 export async function handleApi(req, res, url) {
   const path = url.pathname;
 
+  // 管理接口：挂在最前面、早于登录守卫（管理员口令与学生令牌是两件事，见 admin.js）
+  if (path.startsWith('/api/admin/')) {
+    return handleAdminApi(req, res, url, { store: await getStore().catch(() => null), env: envFor() });
+  }
 
+  /**
+   * ① 先解身份，② 再判守卫 —— 顺序不能反过来。
+   *
+   * 反过来的话令牌还没解出来守卫就先拒了：带对令牌的人也会吃 401。
+   *
+   * 关于"库读不出来"：**这里不区分**，也区分不了。`resolveRequestUser` 把
+   * "没带令牌"、"令牌过期"、"读库失败"一律收敛成"没有身份"（它不抛、也不回 500）。
+   * 于是配了守卫时这三种都是 `401 请先登录` —— 这是 C1 要求的：未登录一律 401，
+   * 而且 401 这个响应不该告诉外面"我们的库坏了"。
+   * 真正的"库坏了"只在**拿到身份之后**的读写路径上暴露：那里回 503 并记 warn
+   * （见 `restoreForRoute` 与 session-store 的 `readSessionRecord`）。
+   * 记法：**401 是"请去登录"，503 才是"我们这边坏了"**。
+   *
+   * 解析结果挂在 `req.__user` 上：下游（埋点、续做、访问记录）一律读它，
+   * 不允许各自再解一遍 —— 一处解析、一处分叉机会。
+   */
+  req.__user = await resolveRequestUser(req);
+  if (loginGuardBlocks(path, req.__user)) {
+    sendJson(res, 401, { error: '请先登录', code: 'AUTH_REQUIRED' });
+    return true;
+  }
 
   // ---- GET /api/health ----
   if (path === '/api/health' && req.method === 'GET') {
     const env = envFor();
     const config = readLLMConfig(env);
     const adapter = getAdapter();
+    /** 用量要读库；读不出来就是 `null`（"不知道"），绝不编一个 0 充数 */
+    const store = await getStore().catch(() => null);
     sendJson(res, 200, {
       ok: true,
       /**
@@ -467,7 +1168,18 @@ export async function handleApi(req, res, url) {
        * 拍照识题状态：只报"配没配 / 走哪个通道"，**绝不回传 AppCode**。
        * 与 llmConfigured 同一口径 —— 健康检查是用来判断可用性的，不是用来泄密的。
        */
-      ocr: ocrStatus(env),
+      ocr: {
+        ...ocrStatus(env),
+        /**
+         * 今日用量与日上限（L2）：试点的调试条读这两个数。
+         *
+         * `usedToday` 拿不到时是 `null` 而不是 0：0 是一个**事实**（今天还没用过），
+         * null 是"不知道" —— 调试条上把后者写成前者，等于让人拿一个假的用量去做判断。
+         * 键名与看板/闸门同源（见 ocrDailyCounterKey），三处不许各拼一遍。
+         */
+        usedToday: await readOcrUsedToday(store),
+        dailyCap: countOf(env.OCR_DAILY_CAP),
+      },
       capabilities: {
         /**
          * 本部署支持的学习方式。
@@ -506,6 +1218,130 @@ export async function handleApi(req, res, url) {
           'solution_insight',
         ],
       },
+    });
+    return true;
+  }
+
+  // ---- POST /api/events（埋点批量上报：永不因埋点失败返回 4xx/5xx） ----
+  /**
+   * 读体失败**只在本路由内消化**：
+   * 半截 JSON、超过 1MB、空 body 都走同一条路 —— 回 `200 { accepted: 0, rejected: 0 }`。
+   * 埋点坏了不能影响主流程，也不能给学生端一个"内部错误"。
+   *
+   * 外面再包一层 catch：`acceptEvents` 里已经逐段兜过，但"永远不 5xx"是承诺，
+   * 承诺要由最后一道兜底来兑现，而不是靠"我记得里面都兜住了"。
+   */
+  if (path === '/api/events' && req.method === 'POST') {
+    const body = await readJson(req).catch(() => null);
+    let summary;
+    try {
+      summary = await acceptEvents(req, body);
+    } catch {
+      summary = { accepted: 0, rejected: 0 };
+    }
+    sendJson(res, 200, summary);
+    return true;
+  }
+
+  // ---- POST /api/auth/login（6 位口令 → 令牌） ----
+  /**
+   * 顺序是有讲究的：**先限速，再哈希**。
+   * 反过来写的话，被拒绝的那一次其实已经做完了哈希 —— 一次 sha256 不贵，
+   * 但乘以"每秒几百次"就是另一回事；限速只挡住了响应，没挡住成本。
+   * 所以 `checkLoginRate` 在读体之后、`login()`（它才是哈希与查库）之前。
+   *
+   * 两个维度（见 auth.js 的注释，这是本路由必须照做的那一半）：
+   *   `code_locked` —— 这一对 (IP, 口令) 试错太多。换一个口令照样能登。
+   *   `ip_locked`   —— 这个来源 IP 的失败总量到顶。任何口令都不放行。
+   * 两个都回同一句"稍后再试"是不行的：前者的正确下一步是**核对纸条**，
+   * 后者才是**等**。文案分开写，学生才知道该做什么。
+   *
+   * 401 只有一句话（`口令不对`）：不区分"没有这个人"与"口令错了"，
+   * 否则枚举脚本能靠错误文案二分出有效账号。
+   *
+   * 只有"真的验过一次且没通过"才记账。**被 429 拒绝的那次不记账**：
+   * 它不是一次验证，记了会让锁自己续期（每次被拒都把窗口往后推），永远解不开。
+   * 坏请求体（半截 JSON、断网）同理，单独回 400 且不消耗任何次数。
+   */
+  if (path === '/api/auth/login' && req.method === 'POST') {
+    /**
+     * 读体失败用一个**本地哨兵变量**记，而不是往 body 里塞 `__readError` 字段：
+     * serverless 平台上 `req.body` 可能是平台已经解析好的对象（也就是学生可控的
+     * JSON），往那个对象里认字段，等于让客户端自己声明"我这次是坏请求"。
+     */
+    let readFailed = null;
+    const body = await readJson(req).catch((err) => {
+      readFailed = err;
+      return null;
+    });
+    if (readFailed) {
+      const tooLarge = String(readFailed.message ?? '').includes('过大');
+      sendJson(res, tooLarge ? 413 : 400, {
+        error: tooLarge ? '请求体过大' : '请求体不是合法 JSON，请重新提交',
+      });
+      return true;
+    }
+
+    const ip = clientIp(req);
+    const code = typeof body?.code === 'string' ? body.code.trim() : '';
+
+    const verdict = checkLoginRate(ip, code);
+    if (verdict !== 'ok') {
+      /**
+       * `retry-after` 是**提示**不是承诺：两个维度都取 900（15 分钟），
+       * 比 IP 维度最长 60 分钟的窗口短 —— 到点重试可能仍是 429，
+       * 但让学生"先等一会儿再看一眼"比让它消失一小时好。
+       */
+      const locked = verdict === 'ip_locked'
+        ? '这个网络试错的次数太多了，请稍后再试'
+        : '这个口令试错太多次了，请核对老师发给你的 6 位数字，或稍后再试';
+      sendJson(res, 429, { error: locked }, { 'retry-after': '900' });
+      return true;
+    }
+
+    /**
+     * 配置按**请求**取（`envFor()`）：试点只跑 CloudBase，那边配置是平台逐请求
+     * 交进来的，不是进程环境。开发钥匙与看板钥匙都从这同一份里读，
+     * 与 `admin.js` 的 `x-admin-code` 闸门用的是同一个来源 —— 两处各读一份，
+     * 迟早会出现"登录口认、看板不认"这种谁也复现不了的分叉。
+     */
+    const result = await login(await getStore(), code, ip, Date.now(), envFor());
+    if (!result) {
+      /** 真的验过一次、没通过：这才叫一次失败 */
+      noteLoginFailure(ip, code);
+      sendJson(res, 401, { error: '口令不对' });
+      return true;
+    }
+
+    /**
+     * 成功只清**这一对 (IP, 口令)**。
+     * 不清 IP 总量：那是枚举防线，清了就等于"错几次 → 用自己的号登一次 → 重来"。
+     */
+    noteLoginSuccess(ip, code);
+
+    /**
+     * 管理员那把钥匙只回一个角色名 —— **不发令牌**。
+     *
+     * 若这里顺手也发一张学生令牌，"看数据的人"立刻变成"能替学生做题的人"：
+     * 那张令牌调得动 `/api/chat`，写进去的会话挂的是管理员的 userId。
+     * 看板自己用 `x-admin-code` 进门，不需要令牌。
+     */
+    if (result.role === 'admin') {
+      sendJson(res, 200, { role: 'admin' });
+      return true;
+    }
+
+    /**
+     * 学生档与开发档的响应形状**刻意一样**（多一个 `role`）：
+     * 前端只需按 `role` 决定"加载产品页"还是"加载产品页 + 调试条"，
+     * 而两档拿到的都是同一张令牌、同一套接口。
+     */
+    sendJson(res, 200, {
+      role: result.role,
+      token: result.token,
+      displayName: result.user.displayName,
+      batchId: result.batchId,
+      expiresAt: result.expiresAt,
     });
     return true;
   }
@@ -592,6 +1428,37 @@ export async function handleApi(req, res, url) {
     }
 
     /**
+     * ---- 两道额度闸（L1）：**拦在调用之前** ----
+     *
+     * 位置很关键：在 `recognizeProblemImage` 之前。拦在调用之后（先花钱再回 503）
+     * 等于没拦 —— 而 OCR 按成功调用计费，是这套系统里唯一"学生点一下就会花钱"的入口。
+     * 被拦下的那一次**不发起调用、也不计数**。
+     *
+     * 两种拒绝分开说（见 readOcrQuota 的文件头）：
+     *   · `reason` 非空 → 真的到顶，学生该等明天；
+     *   · 只有未知维 → 查不到额度，值得过一会儿再试。
+     * 两句都给出"粘贴文字"这条仍然可用的路 —— 拒绝必须带一个下一步，
+     * 否则学生只会以为这个功能坏了。
+     */
+    const store = await getStore().catch(() => null);
+    const batchId = req.__user?.batchId ?? null;
+    const quota = await readOcrQuota({ store, batchId, env: ocrEnv });
+    if (quota.blocked) {
+      if (quota.reason) {
+        sendJson(res, 503, {
+          error: '今日的拍照识题额度用完了，可以直接粘贴题目文字。',
+          code: 'OCR_QUOTA',
+        });
+      } else {
+        sendJson(res, 503, {
+          error: '暂时查不到额度，请稍后再试，或直接粘贴题目文字。',
+          code: 'OCR_QUOTA_UNKNOWN',
+        });
+      }
+      return true;
+    }
+
+    /**
      * 命中过的调用形状缓存在进程里。
      *
      * 为什么要缓存：候选形状（地址 + 传图字段名）在首次调用前是未知的，
@@ -605,6 +1472,8 @@ export async function handleApi(req, res, url) {
     });
 
     if (result.ok && result.shape) rememberShape(result.shape);
+    /** 成功才记账（与供应商同一个口径：按成功调用计费） */
+    if (result.ok) await recordOcrUsage({ store, batchId });
 
     if (!result.ok) {
       /**
@@ -730,8 +1599,39 @@ export async function handleApi(req, res, url) {
       return true;
     }
 
-    const session = getSession(sessionId || 'demo', problemId);
+    /**
+     * 会话：先回载（冷启动/换实例之后会话只在库里），库里没有才现造一条。
+     *
+     * `??` 而不是"回载失败就报错"：新学生第一次说话时库里本来就没有记录 ——
+     * 那不是错误，是开始。回载返回 null 只有两种情形（库里没有 / 题目对不上），
+     * 两种都该走"新建"，与加写穿之前的冷启动行为完全一致。
+     *
+     * 真正的失败不在这里，也不许落到"新建"上：读不出来 → 503、是别人的 → 403
+     * （见 restoreForRoute）。旧版本把两者都当成 null，于是"新建"盖掉了真记录。
+     */
+    const sid = sessionId || 'demo';
+    const store = await getStore().catch(() => null);
+    const restored = await restoreForRoute(res, store, sid, problemId, req.__user);
+    if (restored.replied) return true;
+    const session = restored.session ?? getSession(sid, problemId);
+    /** 归属校验（C10）：内存命中的那条不经过库，这里再判一次（新会话 userId 为空，照常放行） */
+    if (notMine(session, req.__user)) {
+      sendNotOwner(res);
+      return true;
+    }
     const normalizedMode = 'self_training';
+
+    /**
+     * 这一轮的截止时间（L3）—— **按轮算，不按次算**。
+     *
+     * 一次 `/api/chat` 最多串三次模型调用（observe + 两次 draft），而部署方的硬超时
+     * 是 30 秒。若把预算写成"每次调用 25 秒"，最坏是 75 秒：网关在第 30 秒把函数掐掉，
+     * 于是 503 发不出去、`chat_error` 也写不进去 —— 而"有 send 无 reply 的一轮"
+     * 正是换平台的触发条件。把同一个截止时间交给引擎，三次调用分它一个，总时长才有上界。
+     */
+    const deadlineAt = Date.now() + turnDeadlineMs(envFor());
+    /** 提前取出来：失败路径也要能用它给事件挂归属（本来它只在下游被读一次） */
+    const visitId = typeof body?.visitId === 'string' ? body.visitId.trim() : '';
 
     let response;
     try {
@@ -745,9 +1645,25 @@ export async function handleApi(req, res, url) {
         explicitHelpSeeking: Boolean(explicitHelpSeeking) || looksLikeHelpRequest(utterance),
         sessionId: session.id,
         persona,
+        deadlineAt,
       });
     } catch (error) {
+      /**
+       * 超时：**由我们自己回** 503，并且先留一条 `chat_error`。
+       *
+       * 为什么这一步非做不可：网关把函数掐掉时，函数里的代码一行都不跑 ——
+       * 那一轮在事件表里就只剩一条客户端发的 `chat_send`，看起来像"学生没等到就关了页面"。
+       * 由我们主动判定超时，失败率才有分子（brief L3 的那一段）。
+       */
+      if (error?.code === 'TURN_SLOW') {
+        console.warn(`[chat] 这一轮超出预算（${session.id}）：${error.detail ?? error.message}`);
+        await recordChatError(store, { session, req, visitId, code: 'TURN_SLOW', status: 503 });
+        sendJson(res, 503, { error: error.message, code: 'TURN_SLOW', retryable: true });
+        return true;
+      }
       if (!['OBSERVATION_UNAVAILABLE', 'REPLY_UNAVAILABLE'].includes(error.code)) throw error;
+      /** 其余上游故障单独一个码：它要的动作是"等一会儿"，与超时的"再发一次"不同 */
+      await recordChatError(store, { session, req, visitId, code: 'UPSTREAM', status: 503 });
       sendJson(res, 503, { error: error.message, retryable: true });
       return true; // 系统故障不写入学生学习记录。
     }
@@ -766,6 +1682,62 @@ export async function handleApi(req, res, url) {
     });
     appendTurn(session.record, { utterance, response, problem });
 
+    /**
+     * 会话 → 这次打开的回填（J6）。
+     *
+     * `session.visitId` 以前恒为 null，`metrics.js` 的 visitId 档因此是死代码。
+     * 这里**在写穿之前**认领：`persistSession` 拍的就是下面这一份快照。
+     * 传活会话进去，所以只改内存；这个函数自己会去 append `visit.sessionIds`。
+     * 失败只 warn —— 认不出这次打开不该让学生的这一轮变成 500。
+     */
+    if (visitId) {
+      try {
+        await linkSessionToVisit(store, { visitId, sessionId: session.id, session, owner: req.__user });
+      } catch (err) {
+        console.warn(`[visit] 回填失败（${session.id}）：${err?.message ?? err}`);
+      }
+    }
+
+    /**
+     * `chat_reply`（J7）：**只有服务端**算得出这五个值。
+     *
+     * 客户端负责 `chat_send`（它才知道消息多长、有没有复制题干），服务端负责这一条：
+     * 两边各发一半，「有 send 无 reply」才是一轮真正的失败。**服务端绝不再发 chat_send**
+     * —— 那会让一轮失败率的分母翻倍，而那个数是要拿去做告警的。
+     *
+     * `batchId` 必须带上：事件的批次查询（看板与整批导出）按事件自带的 batchId 过滤，
+     * 少了它，这条事件写进去了但没人读得到 —— 与 J6 那类"看不出坏"的缺口同源。
+     * 写失败只 warn：埋点是旁路，学生这一轮的答复比埋点重要。
+     */
+    try {
+      await recordEvent(store, {
+        type: 'chat_reply',
+        sessionId: session.id,
+        visitId: session.visitId || visitId || null,
+        userId: req.__user?.user?.id ?? session.userId ?? null,
+        batchId: req.__user?.batchId ?? session.batchId ?? null,
+        payload: {
+          ms: Number.isFinite(response.meta?.latencyMs) ? response.meta.latencyMs : null,
+          level: typeof response.hint?.level === 'number' ? response.hint.level : null,
+          stuckKind: response.diagnosis?.stuckKind ?? null,
+          suppressed: Boolean(response.suppressed),
+          engine: response.meta?.engine ?? null,
+        },
+      });
+    } catch (err) {
+      console.warn(`[events] chat_reply 没写进去（这一轮照常返回）：${err?.message ?? err}`);
+    }
+
+    /**
+     * 写穿（C6）：历史与提示记录都在这一份里，写失败只 warn。
+     * 归属（userId / batchId）在这里补：会话可能是匿名建的，登录之后才第一次落库。
+     */
+    await persistSession(store, session, {
+      chatTurn: true,
+      hintLevel: response.hint.level,
+      owner: req.__user,
+    });
+
     // 学生载荷 —— 只走白名单投影
     const turnIndex = session.history.filter((t) => t.role === 'ai').length;
     sendJson(res, 200, buildStudentTurn({ ...response, stepCount: totalSteps(problem, response.diagnosis.position.graphId) }, normalizedMode, problem, persona, turnIndex));
@@ -782,9 +1754,21 @@ export async function handleApi(req, res, url) {
   if (path === '/api/formula' && req.method === 'POST') {
     const body = await readJson(req);
     const sessionId = String(body?.sessionId ?? '');
-    const session = sessions.get(sessionId);
+    const store = await getStore().catch(() => null);
+    /**
+     * 回载：公式卡的开放条件是"同一步给过 L3"，而那条记录在 `record.hintLog` 里 ——
+     * 只读内存的话，冷启动之后同一张卡会被判成"还没给过 L3"，学生拿不到。
+     */
+    const restored = await restoreForRoute(res, store, sessionId, null, req.__user);
+    if (restored.replied) return true;
+    const session = restored.session;
     if (!session) {
       sendJson(res, 404, { error: '这个学习会话不存在或已过期，请重新开始一道题。' });
+      return true;
+    }
+    /** 归属校验（C10）：公式卡读的是 hintLog，也就是别人做到了哪一步 */
+    if (notMine(session, req.__user)) {
+      sendNotOwner(res);
       return true;
     }
     const problem = getProblemById(session.problemId);
@@ -804,6 +1788,8 @@ export async function handleApi(req, res, url) {
     }
     session.record.formulaCards = session.record.formulaCards ?? [];
     session.record.formulaCards.push({ at: new Date().toISOString(), topic: card.topic, stepIndex: l3.stepIndex ?? null });
+    /** 写穿（C6）：用过哪张卡要落库，否则重启之后"他用过工具"这件事消失 */
+    await persistSession(store, session, { formulaOpen: true, owner: req.__user });
     sendJson(res, 200, { card });
     return true;
   }
@@ -811,7 +1797,10 @@ export async function handleApi(req, res, url) {
   // ---- GET /api/report?sessionId=xxx（学生自己的学习报告） ----
   if (path === '/api/report' && req.method === 'GET') {
     const sessionId = url.searchParams.get('sessionId') || 'demo';
-    const session = sessions.get(sessionId);
+    const store = await getStore().catch(() => null);
+    const restored = await restoreForRoute(res, store, sessionId, null, req.__user);
+    if (restored.replied) return true;
+    const session = restored.session;
     if (!session) {
       const bankId = url.searchParams.get('problemId');
       const bank = bankId && bankId.startsWith('qbank-') ? getProblemById(bankId) : null;
@@ -821,33 +1810,69 @@ export async function handleApi(req, res, url) {
         sendJson(res, 200, { report, turns: [] });
         return true;
       }
-    }
 
-    if (!session) {
-      // serverless 冷启动会丢会话 —— 给出可操作的提示，而不是一个空白错误
+      // 没有会话可回载 —— 给出可操作的提示，而不是一个空白错误
       sendJson(res, 404, {
         error: '该会话不存在或已过期',
         detail:
-          '公开演示部署在 serverless 环境，会话只保留在单个实例内存里，间隔较久或实例切换后会丢失。本地运行不受影响。',
+          '会话已经写进存储，但这个 id 在库里没有记录：可能是在别的环境开始的，也可能是链接里的 id 不对。请回到题单重新开始一道题。',
       });
       return true;
     }
-    const problem = getProblemById(session.problemId);
-    if (!problem) {
-      sendJson(res, 404, { error: '该会话的题目已不在注册表里（导入题目有存活时间）' });
+
+    /**
+     * 归属校验（C10）：sessionId 是前端生成的可猜字符串，写穿之后
+     * "猜中一个 id 就能读走别人的报告"是真漏洞，不是理论风险。
+     */
+    if (notMine(session, req.__user)) {
+      sendNotOwner(res);
       return true;
     }
-    const report = buildReport(problem, session.record, {
-      engine: session.engine.adapter.kind,
-      model: session.engine.adapter.model,
-    });
-    sendJson(res, 200, { report, turns: session.record.turns });
+
+    const problem = getProblemById(session.problemId);
+    /**
+     * 快照优先（C5）：已经冻结过的那一份**哪怕题目被回收了也照发** ——
+     * 报告是学生当时看到的结论，注册表清理不该让它变成 404。
+     * 只有"没有快照 + 题目也没了"才说实话（照片/粘贴题就是这个形状）。
+     */
+    if (!session.reportSnapshot) {
+      if (!problem) {
+        sendJson(res, 404, { error: '该会话的题目已不在注册表里（导入题目有存活时间）' });
+        return true;
+      }
+      session.reportSnapshot = buildReport(problem, session.record, {
+        engine: session.engine?.adapter?.kind ?? 'unknown',
+        model: session.engine?.adapter?.model,
+      });
+      session.reportBuiltAt = new Date().toISOString();
+      /** 到报告页就是"走完了"：写进 finishedAt，续做条才不会一直劝他回来 */
+      session.finishedAt = session.reportBuiltAt;
+      session.endState = 'finished';
+      /** 写穿（C6）：快照与完成状态一起落库（导出件读的是库里那份） */
+      await persistSession(store, session, { page: 4, owner: req.__user });
+    }
+    sendJson(res, 200, { report: session.reportSnapshot, turns: session.record.turns });
     return true;
   }
 
   // ---- POST /api/eval ----
   // 默认走离线规则桩：公开演示绝不能因为配了 Key 就发几十轮真实请求。
   if (path === '/api/eval' && req.method === 'POST') {
+    /**
+     * 配了登录守卫的部署里，这个接口**不存在**（F3）。
+     *
+     * 为什么不靠守卫挡住：守卫只挡"没登录"的人，而每个学生手里都有令牌。
+     * `/api/eval` 一次能跑几十轮模型调用（`scenarioIds` 由请求体指定），
+     * 留着它等于给每个学生一个烧钱按钮 —— 而它跟课堂上要做的任何一件事都没有关系。
+     *
+     * 回 404 而不是 403：403 等于承认"这里有东西，只是你不能用"。
+     * 在这个部署里它本来就该像不存在一样（与看板未配置时同一句话）。
+     */
+    if (envFor().PILOT_REQUIRE_LOGIN === '1') {
+      sendJson(res, 404, { error: '没有这个接口' });
+      return true;
+    }
+
     const body = await readJson(req).catch(() => ({}));
     const { createOfflineAdapter } = await import('../core/llm.js');
     const useLlm = Boolean(body?.useLlm);
@@ -864,10 +1889,114 @@ export async function handleApi(req, res, url) {
     return true;
   }
 
+  // ---- GET /api/session/resume（续做：「继续刚才那道题」条） ----
+  /**
+   * 身份**只能来自令牌**（C2）。计划里原本写的是 `?userId=`，那是可伪造的：
+   * 换一个 id 就能看到别人做到哪道题、停在第几页。所以查询参数一律忽略，
+   * 连读都不读 —— 读了就迟早有人顺手用上。
+   *
+   * 没有登录态时回 401，**不退化成"返回所有人的最近一条"**：
+   * 那种"降级"在演示里看起来很友好，在试点里就是把全班进度发给第一个人。
+   */
+  if (path === '/api/session/resume' && req.method === 'GET') {
+    const me = req.__user;
+    if (!me?.user) {
+      sendJson(res, 401, { error: '请先登录', code: 'AUTH_REQUIRED' });
+      return true;
+    }
+    const store = await getStore().catch(() => null);
+    if (!store) {
+      sendStoreUnreadable(res);
+      return true;
+    }
+    try {
+      const records = await store.listSessionsByUser(me.user.id);
+      sendJson(res, 200, { session: pickResumable(records) });
+    } catch (err) {
+      /**
+       * 读库失败**不冒充"没有未完成的题"**：那会让学生以为自己什么都没做过，
+       * 而真正的问题是库坏了。宁可说"读不出来"。
+       */
+      console.warn(`[session] 续做查询失败：${err?.message ?? err}`);
+      sendStoreUnreadable(res);
+    }
+    return true;
+  }
+
+  // ---- POST /api/visit（一次打开 = 一次 visit） ----
+  /**
+   * 为什么需要它：会话 id 是前端在**第 3 页**才生成的，而拍照、粘贴、选题
+   * 全都发生在第 1 页 —— 没有 visit 这一层，漏斗第一级的分母（"打开了但一道题都没选"）
+   * 根本记不下来（设计稿 §5.2）。
+   *
+   * 同一个人当天重复打开就是**新的**一次 visit，不去重："一次打开"就是一次 visit，
+   * 去重等于把"他又回来了一次"这件事抹掉。
+   */
+  if (path === '/api/visit' && req.method === 'POST') {
+    const me = req.__user;
+    if (!me?.user) {
+      sendJson(res, 401, { error: '请先登录', code: 'AUTH_REQUIRED' });
+      return true;
+    }
+    const store = await getStore().catch(() => null);
+    if (!store) {
+      sendJson(res, 503, { error: '记录本次打开失败，请刷新页面重试。', retryable: true });
+      return true;
+    }
+    const visit = createVisit({ userId: me.user.id, batchId: me.batchId ?? null });
+    try {
+      await store.putVisit(visit);
+    } catch (err) {
+      console.warn(`[visit] 写入失败：${err?.message ?? err}`);
+      sendJson(res, 503, { error: '记录本次打开失败，请刷新页面重试。', retryable: true });
+      return true;
+    }
+    /**
+     * 题单随这次打开一起带下去（J4）。
+     *
+     * 为什么挂在 `/api/visit` 而不是新开一个接口：落地第一件事就是开一次打开，
+     * 题单条又要立刻画出来 —— 多一次往返只会多一个"先闪一下空题单"的瞬间。
+     * 批次没配题单（或读不出来）时给空数组：前端据此写「老师还没配题单」，
+     * 那是**事实**，不是错误，所以这里也不 4xx。
+     */
+    let questionIds = [];
+    if (me.batchId) {
+      try {
+        const batch = await store.getBatch(me.batchId);
+        if (Array.isArray(batch?.questionIds)) questionIds = batch.questionIds.map((id) => String(id));
+      } catch (err) {
+        console.warn(`[visit] 读批次题单失败（${me.batchId}）：${err?.message ?? err}`);
+      }
+    }
+    sendJson(res, 200, { visitId: visit.id, questionIds });
+    return true;
+  }
+
   // ---- POST /api/reset ----
+  /**
+   * 重置 = 内存里丢掉这条会话（老行为），库里**清空对话但保留会话本身**：
+   * `counters.resetCount` 是"重来"这个指标的分子，把记录删掉就永远算不出来了。
+   * 详见 session-store.js 的 persistReset。
+   */
   if (path === '/api/reset' && req.method === 'POST') {
     const body = await readJson(req).catch(() => ({}));
-    sessions.delete(body?.sessionId || 'demo');
+    const sessionId = body?.sessionId || 'demo';
+    const store = await getStore().catch(() => null);
+    /** 冷启动之后内存里没有它，但库里可能有 —— 先回载再按"重置"写回去 */
+    const restored = await restoreForRoute(res, store, sessionId, null, req.__user);
+    if (restored.replied) return true;
+    const session = restored.session;
+    /**
+     * 归属校验（C10）：sessionId 是猜得出来的，而重置**会毁掉数据**（清空对话、把快照
+     * 压进 reportHistory、resetCount +1）。读错别人的记录只是泄露，重置错是永久损失，
+     * 所以判在 `sessions.delete` **之前** —— 判晚了内存里那条已经没了。
+     */
+    if (notMine(session, req.__user)) {
+      sendNotOwner(res);
+      return true;
+    }
+    sessions.delete(sessionId);
+    if (session) await persistReset(store, session);
     sendJson(res, 200, { ok: true });
     return true;
   }
