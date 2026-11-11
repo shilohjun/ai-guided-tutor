@@ -448,3 +448,76 @@ describe('引擎 · 诊断可解释性', () => {
     assert(res.diagnosis.misconceptions[0].evidence.length > 0, '应给出证据引用');
   });
 });
+
+// ---------------------------------------------------------------------------
+// 成文提示词：关键点的"判断"和"依据"必须传进去
+//
+// 之前提示词里只有 step.kind 和 concepts，模型拿到的是"这一步是推导"，
+// 说出来的自然只能是"想想这一步用什么规律"。真题的关键点链带来了
+// judge / why，这两样才是能让 L2 真正补上课的东西。
+// ---------------------------------------------------------------------------
+
+import { buildDraftUserPrompt } from '../src/core/llm.js';
+
+const KEYPOINT_PROBLEM = {
+  stem: '电子垂直射入磁场，从 S 点进、P 点出，已知两点位置，求磁感应强度。',
+  solutionGraphs: [
+    {
+      id: 'g-main',
+      steps: [
+        {
+          index: 2,
+          title: '由两点定圆心',
+          kind: 'derive',
+          concepts: ['圆周运动'],
+          cues: ['圆心在速度垂线上', '找中垂线交点'],
+          intent: '能否由入射点、出射点和入射速度方向唯一确定圆心',
+          why: '圆心既在过入射点且垂直于速度的直线上，又到两点等距',
+        },
+      ],
+    },
+  ],
+};
+
+const KEYPOINT_DIAGNOSIS = {
+  position: { graphId: 'g-main', stepIndex: 2, confidence: 0.8 },
+  stuckKind: 'concept',
+  misconceptions: [],
+  evidenceQuotes: [],
+};
+
+describe('成文提示词带上关键点', () => {
+  it('这一步有 judge/why 时，提示词里要能读到判断与依据', () => {
+    const prompt = buildDraftUserPrompt({
+      problem: KEYPOINT_PROBLEM,
+      diagnosis: KEYPOINT_DIAGNOSIS,
+      level: 2,
+      allowedConcepts: ['圆周运动'],
+      forbidden: [],
+      strategy: '补齐这一步缺的几何关系',
+      history: [],
+      utterance: '不知道从哪下手',
+    });
+    assert(prompt.includes('能否由入射点、出射点和入射速度方向唯一确定圆心'), '要带这一步的判断');
+    assert(prompt.includes('圆心既在过入射点且垂直于速度的直线上'), '要带判断依据');
+  });
+
+  it('没有 judge/why 的通用骨架步骤，不硬塞空字段', () => {
+    const bare = {
+      stem: '通用题',
+      solutionGraphs: [{ id: 'g-general', steps: [{ index: 2, title: '判断该用哪个规律', kind: 'identify', concepts: ['规律选择'], cues: ['规律'] }] }],
+    };
+    const prompt = buildDraftUserPrompt({
+      problem: bare,
+      diagnosis: { position: { graphId: 'g-general', stepIndex: 2, confidence: 0.6 }, stuckKind: 'concept', misconceptions: [], evidenceQuotes: [] },
+      level: 1,
+      allowedConcepts: ['规律选择'],
+      forbidden: [],
+      strategy: '给方向',
+      history: [],
+      utterance: '不会',
+    });
+    assert(!prompt.includes('这一步要作出的判断：undefined'));
+    assert(!prompt.includes('判断依据：'), '没有依据就别留空壳，模型会编');
+  });
+});

@@ -189,3 +189,48 @@ test('closing during confirmation prevents a late request from starting another 
   assert.equal(S.problem.id,'original');assert.equal(S.sessionId,'original-session');
   assert.equal(calls.starts,0);assert.equal(calls.remembered,0);
 });
+
+// ---------------------------------------------------------------------------
+// 推荐同类型题：不再只靠标签相同，要按"关键点重合"排序并能说出共在哪一步
+// ---------------------------------------------------------------------------
+
+import {keypointOverlap} from '../src/core/similarity.js';
+import {QBANK_KEYSTEPS} from '../src/core/qbank-keysteps.data.js';
+
+test('keypointOverlap 认同一类判断里的同一个概念',()=>{
+  const a=[{title:'由两点定圆心',type:'几何关系',concepts:['圆周运动','圆心']}];
+  const b=[{title:'作中垂线找圆心',type:'几何关系',concepts:['圆心','半径']}];
+  const r=keypointOverlap(a,b);
+  assert.equal(r.score,1);
+  assert.deepEqual(r.shared,['由两点定圆心']);
+  assert.equal(keypointOverlap(a,[{title:'定圆心',type:'模型选择',concepts:['圆心']}]).score,0,'类型不同不算同一个判断');
+  assert.equal(keypointOverlap(a,[]).score,0);
+});
+
+test('相似题按关键点重合度排序，并把共用的那个判断写进推荐理由',()=>{
+  let found=false;
+  for(const source of QBANK_SOURCE){
+    const cur=QBANK_KEYSTEPS[source.i];
+    if(!cur||cur.length<3) continue;
+    const p=getProblemById(`qbank-${source.i}`),review=buildReportReview(p);
+    const r=buildReportPractice(p,{feedback:[]},review);
+    for(const entry of r.knowledge){
+      if(entry.items.length<2) continue;
+      const scores=entry.items.map(it=>keypointOverlap(cur,QBANK_KEYSTEPS[it.bankId]||[]).score);
+      for(let i=1;i<scores.length;i++) assert.ok(scores[i-1]>=scores[i],`${p.id} 的候选没有按重合度排序`);
+      const top=entry.items[0];
+      if(scores[0]>0){
+        found=true;
+        assert.ok(top.reason.includes('同样要作出'),`${p.id} 的首选没有说明共用哪个判断：${top.reason}`);
+      }
+    }
+    // 方法桶只排序、不改理由：把"共用哪个判断"塞进"练这一招"里会把两件事混在一起
+    for(const entry of r.methods){
+      if(entry.items.length<2) continue;
+      const scores=entry.items.map(it=>keypointOverlap(cur,QBANK_KEYSTEPS[it.bankId]||[]).score);
+      for(let i=1;i<scores.length;i++) assert.ok(scores[i-1]>=scores[i],`${p.id} 的方法候选没有按重合度排序`);
+      for(const it of entry.items) assert.ok(!it.reason.includes('同样要作出'),`${p.id} 的方法桶混进了判断理由：${it.reason}`);
+    }
+  }
+  assert.ok(found,'全库都找不到一道和其它题共用关键点的题，排序等于没接上');
+});

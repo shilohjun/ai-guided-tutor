@@ -1,4 +1,6 @@
 /** Report-only study cards. No model call and no access to reference solutions. */
+import { leafCard, methodCard } from './taxonomy.js';
+
 const K = {
   cutting: { title: '导体棒切割磁感线', formula: 'E = BLv', meaning: 'L 是有效切割长度，v 是棒相对磁场的速度。', condition: '匀强磁场、直棒有效长度方向与速度、磁场两两垂直。存在夹角时需重新核对几何关系。' },
   circuit: { title: '闭合电路欧姆定律', formula: 'I = E / (R + r)', meaning: '电流由电动势与全回路总电阻共同决定，应计入棒的电阻。', condition: '仅适用于这里的闭合串联电阻回路；有并联支路、电容充电时需重新分析电路。' },
@@ -90,7 +92,49 @@ export function buildReportReview(problem) {
       { title: '反证法', principle: '暂时假设命题的反面成立，检查它是否导致矛盾。', use: '明确假设与前提，再逐步检验推理是否与已知条件相容。', when: '直接证明困难，反面假设却能形成可用关系时。', boundary: '必须指出矛盾的具体依据；不能把待证结论当作前提。' },
     ], note: '知识和方法用于复盘，不替代完整证明。' };
   }
+  // 陌生题：按题目结构自动归类到既有知识树，只给"位置卡"，不编讲解。
+  if (problem.source !== 'qbank' && problem.leafId) return locationCards(problem);
+
   // Do not prescribe a physics formula from a broad subject label or untrusted title.
   return { source: 'topic-cards', status: 'pending', knowledge: [], methods: [],
     note: '这道题暂未配置配套知识与方法卡，先保留本次对话小结；不自动套用其他题的公式。' };
+}
+
+/**
+ * 位置卡：告诉学生"这题落在知识树的哪一格"，不冒充讲解。
+ *
+ * 为什么不做成讲解卡：题库里只有电磁感应那 14 张卡是教研手写的，
+ * 其余 94 个叶节点没有文案。硬拿模型现编一段"本节讲解"，就等于在复盘页
+ * 编造教材 —— 那是比留空更坏的事。这里只给位置、题量、方法名与方向。
+ */
+function locationCards(problem) {
+  const leaf = leafCard(problem.leafId);
+  const methods = (problem.methodIds ?? []).map((id) => methodCard(id)).filter(Boolean);
+
+  const knowledge = leaf
+    ? [{
+      // id 要留着：报告页的"巩固这一知识点"靠它去题库里捞题（见 report-practice.js）
+      id: leaf.id,
+      title: leaf.title,
+      formula: '',
+      meaning: `属于「${leaf.path}」，题库里同一位置有 ${leaf.count} 道题。`,
+      condition: '这一步的判断依据要回题干条件里自己找 —— 这里只标位置，不代推。',
+    }]
+    : [];
+
+  return {
+    source: 'topic-cards',
+    status: 'available',
+    knowledge,
+    methods: methods.map((m) => ({
+      id: m.id,
+      title: m.title,
+      family: m.family ?? '',
+      principle: m.principle ?? '',
+      use: `题库里同一方法下还有 ${m.count} 道题，本题也要作出这一步判断。`,
+      when: '回到对话里看你在这一步说了什么、漏了哪个条件。',
+      boundary: '这里只给位置与方法方向，不是本题的解法；具体式子仍要在对话里自己推。',
+    })),
+    note: '按题目结构自动归类，只给位置、不含讲解；不代表已经掌握。',
+  };
 }
