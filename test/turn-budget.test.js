@@ -137,12 +137,22 @@ describe('一轮预算 · 引擎只发一个截止时间', () => {
 
     await engine.handleTurn({ ...TURN, deadlineAt: Date.now() + 6000 });
 
-    assertEquals(adapter.calls[0].timeoutMs, 6000, '第一次拿到全部剩余');
+    /**
+     * 这里只能断言「接近全部剩余」，不能要求分毫不差：
+     * deadlineAt 是 Date.now()+6000，而引擎真正取预算时已经过去几毫秒（实测 5999）。
+     * 原来写的精确相等在 CI 上偶发挂（2026-11-12 run#22 就是这么红的）。
+     * 留 200ms 容差仍然能区分「第一次拿到 6 秒」和「被封顶成 12 秒 / 退化成配置里的 45 秒」。
+     */
+    const first = adapter.calls[0];
+    assert(
+      first.timeoutMs <= 6000 && first.timeoutMs > 5800,
+      `第一次拿到接近全部的剩余（期望 5800–6000，实际 ${first.timeoutMs}）`,
+    );
     const draft = adapter.calls[1];
     assertEquals(draft.phase, 'draft');
     assert(
-      draft.timeoutMs < adapter.calls[0].timeoutMs,
-      `第二次必须拿到更少的预算（实际 ${draft.timeoutMs}，第一次 ${adapter.calls[0].timeoutMs}）`,
+      draft.timeoutMs < first.timeoutMs,
+      `第二次必须拿到更少的预算（实际 ${draft.timeoutMs}，第一次 ${first.timeoutMs}）`,
     );
     assert(draft.timeoutMs > 0, '还没花光的时候不许传 0');
   });
