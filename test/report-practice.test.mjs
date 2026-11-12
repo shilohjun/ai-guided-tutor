@@ -42,7 +42,7 @@ test('all bank cards match exact full source labels, exclude the current questio
     const r=buildReportPractice(p,{feedback:[]},review);
     for(const [kind,keys] of [['knowledge','knowledgeIds'],['methods','methodIds']]) {
       r[kind].forEach((entry,i)=>{
-        assert.ok(entry.items.length<=152);
+        assert.ok(entry.items.length<=QBANK_SOURCE.length);
         for(const item of entry.items) {
           const q=QBANK_SOURCE.find(q=>q.i===item.bankId);
           assert.ok(q[keys].includes(review[kind][i].id));
