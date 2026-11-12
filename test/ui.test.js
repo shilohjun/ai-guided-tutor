@@ -387,3 +387,63 @@ describe('前端 · 超长题目在框内滚动，而不是把整页拉长', () 
     assert(!/max-height:\s*calc\(100vh/.test(style), '不该再用 100vh 的 max-height 硬顶高度');
   });
 });
+
+describe('前端 · 首屏摊开的题库题干里，$…$ 也要画出来', () => {
+  /**
+   * 现场：从地图里选 2025 浙江第 17 题（bankId 168），首屏输入区展开题干，
+   * 看到的是 `$T_{1} = 300 \,\mathrm{K}$` 这种 LaTeX 原文。
+   *
+   * 根因不是数据坏了，是新旧两批题库的公式放了两种形态：
+   *   · 旧题（265/835）：公式是 <img class="qf"> 图片，塞进 DOM 就是图
+   *   · 新题（570/835）：公式是 $…$ 原文，塞进 DOM 还是字
+   * 所以凡是把 stemHtml 塞进 DOM 的地方，后面都必须补一次 KaTeX。
+   * 第 3 页左栏、完整题预览都补了，首屏的 renderPicked 漏了。
+   */
+  const from = appJs.indexOf('function renderPicked');
+  const to = appJs.indexOf('function landPickedQuestion');
+  const pickedSrc = from >= 0 && to > from ? appJs.slice(from, to) : '';
+
+  it('renderPicked 在塞完 stemHtml 之后要过一遍 BsjMath.renderMathIn', () => {
+    assert(pickedSrc.length > 0, '在 index.html 里找不到 renderPicked');
+    assertIncludes(pickedSrc, 'renderMathIn', '首屏摊开题干后要调用 BsjMath.renderMathIn，否则新题库的 $…$ 会原样显示');
+  });
+
+  it('题干详情拿不到时的兜底文本也一样要画', () => {
+    // catch 里写的是 esc(q.stem)，索引里的 stem 同样带 $…$（570/835 道如此）
+    const catchAt = pickedSrc.indexOf('.catch(');
+    assert(catchAt > 0, 'renderPicked 里应当有详情读取失败的兜底');
+    assertIncludes(pickedSrc.slice(catchAt), 'paint()', '兜底分支也要走同一个画公式的收尾，否则断网时又是一屏 LaTeX');
+  });
+});
+
+describe('前端 · 公式自动渲染：不用每个显示点都手写一遍', () => {
+  /**
+   * 反复事故的收口：每次新增一个「把题干塞进页面」的地方，都得记得补一次
+   * renderMathIn；漏一次就是一屏 $T_{1} = 300 \,\mathrm{K}$。
+   *
+   * 现在把这件事收进 public/math.js —— 一个 MutationObserver 兜底。
+   * 首页、题库地图、题库工坊三个文档都引了这个文件，所以改这一处就全覆盖；
+   * 以后新加的页面、新加的显示点，都不用再想起来这件事。
+   */
+  const mathJs = readFileSync(join(ROOT, 'public/math.js'), 'utf8');
+
+  it('math.js 里装了 MutationObserver 兜底', () => {
+    assertIncludes(mathJs, 'MutationObserver', 'math.js 要用 MutationObserver 自动发现新内容');
+    assertIncludes(mathJs, 'characterData', '文字节点被原地改写也要能看见');
+    assertIncludes(mathJs, 'requestAnimationFrame', '一帧内的多次变更要合并成一次渲染');
+  });
+
+  it('可以一键关掉，观察器句柄也拿得到（出问题时能排查）', () => {
+    assertIncludes(mathJs, 'autoRender', '要有 BsjMath.autoRender 这样的开关');
+    assertIncludes(mathJs, 'BsjMath.observer', '观察器要挂在 BsjMath 上');
+  });
+
+  it('全局扫描不许闯进输入框', () => {
+    // textarea 的默认值本身就是一个文本子节点，被替换成 span 之后 value 就废了
+    const skipLine = (mathJs.match(/var skipAlways = .*/) || [''])[0];
+    assert(skipLine.length > 0, 'renderMathIn 的 skip 名单要写成 var skipAlways = ... 一行，便于核对');
+    for (const sel of ['textarea', 'input', 'select', 'option']) {
+      assertIncludes(skipLine, sel, 'skip 名单要含 ' + sel);
+    }
+  });
+});
