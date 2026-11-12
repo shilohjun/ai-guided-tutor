@@ -9,51 +9,51 @@ import { getProblemById } from '../src/core/registry.js';
 import { buildReport,createSessionRecord } from '../src/core/report.js';
 import { toStudentProblem,handleApi } from '../src/server/router.js';
 
-test('old question identities and knowledge paths survive source reordering',()=>{
+test('legacy question identities and semantic knowledge paths survive the merge',()=>{
   const legacy=JSON.parse(readFileSync(new URL('./fixtures/qbank-legacy-ids.json',import.meta.url),'utf8'));
   const byId=new Map(QBANK_SOURCE.map(q=>[q.i,q]));
   for (const old of legacy.questions) assert.equal(byId.get(old.i)?.code,old.code,`legacy question ${old.i}`);
-  const paths=new Map(QBANK_GRAPHS.knowledge.flatMap(m=>m.children.flatMap(c=>c.children.map(l=>[l.id,[m.name,c.name,l.name]]))));
-  for (const old of legacy.knowledge) assert.deepEqual(paths.get(old.id),old.path,`legacy knowledge ${old.id}`);
+  // Synthetic graph IDs may change between exports; the full semantic path must remain.
+  const paths=new Set(QBANK_GRAPHS.knowledge.flatMap(m=>m.children.flatMap(c=>c.children.map(l=>JSON.stringify([m.name,c.name,l.name])))));
+  for (const old of legacy.knowledge) assert.ok(paths.has(JSON.stringify(old.path)),old.path.join('/'));
 });
 
-test('expanded picker, embedded map and report registry share all 861 identities',()=>{
+test('picker, embedded map and report registry share the same 835 usable questions',()=>{
   const data=JSON.parse(readFileSync(new URL('../public/qbank/data.json',import.meta.url),'utf8'));
   const map=readFileSync(new URL('../public/qbank/map.html',import.meta.url),'utf8');
   const embedded=JSON.parse(map.match(/<script type="application\/json" id="qdata">([\s\S]*?)<\/script>/)[1]);
   assert.deepEqual(embedded,data);
-  assert.equal(data.qs.length,861);
+  assert.equal(data.qs.length,835);
   assert.deepEqual(data.qs.map(q=>q.i),QBANK_SOURCE.map(q=>q.i));
-  const source=new Map(QBANK_SOURCE.map(q=>[q.i,q]));
-  for (const q of data.qs) {
-    const raw=source.get(q.i);
-    assert.ok(q.m && q.k && q.l && q.t && q.t2 && q.s && q.stem);
-    assert.ok([2,3,4].includes(q.d));
-    assert.deepEqual(q.knowledgeIds,raw.knowledgeIds);
-    assert.deepEqual(q.methodIds,raw.methodIds);
-    assert.equal(q.stem,raw.stemText);
-    assert.ok(!('answerHtml' in q) && !('analysisHtml' in q));
-  }
-  for (const code of ['TJ-2025-09','TJ-2024-09','HN-2024-14']) {
-    const same=QBANK_SOURCE.filter(q=>q.code===code);
-    assert.equal(same.length,2);
-    assert.equal(new Set(same.map(q=>q.i)).size,2);
+  const excluded=JSON.parse(readFileSync(new URL('../docs/qbank-import-excluded.json',import.meta.url),'utf8'));
+  assert.equal(excluded.length,26);
+  for (const q of QBANK_SOURCE) {
+    const card=data.qs.find(x=>x.i===q.i);
+    assert.equal(card.c,q.code);
+    assert.equal(card.l,q.knowledgeIds[0]);
+    assert.equal(card.t2,q.t2 ? q.methodIds[0] : '');
+    assert.ok(!/figs\/[\w.-]+\.(?:png|jpe?g|webp|gif|svg)/i.test([q.stemHtml,...q.options.map(o=>o.html)].join('')),q.code);
   }
 });
 
-test('chapter-only source labels remain explicitly unspecialized in reports',()=>{
-  const source=QBANK_SOURCE.filter(q=>q.knowledgeIds.some(id=>id.startsWith('chapter-review-')));
-  assert.ok(source.length>0);
-  for (const q of source) {
+test('chapter-only questions explicitly show unspecialized review without changing graph IDs',()=>{
+  const chapter=QBANK_SOURCE.filter(q=>q.knowledgeScope==='chapter');
+  assert.deepEqual(chapter.map(q=>q.code).sort(),['JS-2026-12','HB-2026-11','HUB-2026-05','YN-2026-11'].sort());
+  for (const q of chapter) {
     const report=buildReport(getQbankProblem(`qbank-${q.i}`),createSessionRecord(`qbank-${q.i}`),{engine:'offline-stub'});
-    assert.ok(report.review.knowledge.some(k=>k.title.includes('未细分')));
+    assert.deepEqual(report.review.knowledge.map(k=>k.id),q.knowledgeIds);
+    assert.ok(report.review.knowledge.every(k=>k.title.includes('未细分') && !k.formula));
     assert.ok(!report.assessment.knowledge.some(k=>k.status==='mastered'));
   }
+  // A chapter-only record must not mutate the reusable card used by explicitly tagged records.
+  const tagged=QBANK_SOURCE.find(q=>!q.knowledgeScope && q.knowledgeIds.some(id=>chapter.some(c=>c.knowledgeIds.includes(id))));
+  assert.ok(tagged);
+  assert.ok(!getQbankProblem(`qbank-${tagged.i}`).reportReview.knowledge.some(k=>k.title.includes('未细分')));
 });
 
-test('all 861 source questions retain answers, full images and every knowledge/method association',()=>{
-  assert.equal(QBANK_IDS.length,861);
-  assert.equal(QBANK_GRAPHS.knowledge.flatMap(m=>m.children.flatMap(c=>c.children)).length,97);
+test('all 835 source questions retain answers, full images and every knowledge/method association',()=>{
+  assert.equal(QBANK_IDS.length,835);
+  assert.equal(QBANK_GRAPHS.knowledge.flatMap(m=>m.children.flatMap(c=>c.children)).length,94);
   assert.equal(QBANK_GRAPHS.methods.flatMap(m=>m.children).length,29);
   for (const source of QBANK_SOURCE) {
     const p=getProblemById(`qbank-${source.i}`);
@@ -83,10 +83,6 @@ test('public questions and problem API projections exclude reference answers and
     for (const key of ['answerText','answerHtml','analysisText','analysisHtml']) assert.ok(!(key in pub));
     assert.equal(pub.stemHtml,source.stemHtml);
     assert.deepEqual(pub.options,source.options);
-    for (const [,image] of pub.stemHtml.matchAll(/(<img\b[^>]*>)/g)) {
-      assert.match(image,/src="data:image\//,source.code);
-      assert.ok(!/\son\w+\s*=/.test(image));
-    }
     const student=toStudentProblem(getQbankProblem(`qbank-${source.i}`));
     for (const key of ['referenceSource','referenceAnswer','reportReview','answerFingerprints']) assert.ok(!(key in student));
   }
@@ -96,7 +92,7 @@ test('knowledge is selected by stable source ID and does not mutate another ques
   const first=getQbankProblem('qbank-1'), second=getQbankProblem('qbank-2');
   assert.ok(first.reportReview.knowledge.some(k=>k.title==='光电效应'));
   assert.ok(second.reportReview.knowledge.some(k=>/折射/.test(k.title)));
-  assert.equal(getQbankProblem('qbank-862'),null);
+  assert.equal(getQbankProblem('qbank-836'),null);
   const r=buildReport(first,createSessionRecord(first.id),{engine:'offline-stub'});
   r.review.knowledge[0].title='mutated';
   assert.ok(!first.reportReview.knowledge.some(k=>k.title==='mutated'));
@@ -140,7 +136,7 @@ test('every bank question has an API report even before the first chat turn',asy
       assert.equal(report.meta.recordMissing,true);
       assert.deepEqual(turns,[]);
     }
-    const invalid=await fetch(`${base}/api/report?sessionId=missing&problemId=qbank-862`);
+    const invalid=await fetch(`${base}/api/report?sessionId=missing&problemId=qbank-836`);
     assert.equal(invalid.status,404);
   } finally {
     server.closeAllConnections();

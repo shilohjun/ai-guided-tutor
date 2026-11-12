@@ -879,6 +879,92 @@ body.is-qb{overflow:hidden}
 .p2-foot .note{font-size:var(--fs-body);color:var(--ink-3);font-weight:400}
 
 /* =====================================================================
+   5.1 陪学老师：跟模式卡同层的一个大选择框
+   ---------------------------------------------------------------------
+   四位老师是"同一道题的不同讲法"，所以它和两张模式卡是同一层上的选择：
+   默认派蒙，选过就记住（bsj-mentor），不选就一直是派蒙。
+   点开的是浮层而不是第五屏 —— 步骤条只有四步，不该多出一个不在条上的页。
+   ===================================================================== */
+
+/* —— 头像取景 ——
+   四张素材各自是独立裁的去底头像。做头像时素材本身就得是"脸在正中"的方图：
+   靠 CSS 平移只在 s=1 时管用，而一平移，另一侧就没有像素补上（会长出一条空白），
+   单纯放大又会把头顶切掉。所以取景问题在**素材层**解决，这里只负责圆形裁切与留白。
+   建华的素材曾偏左 60px，已按 characters/body 的原图重裁（脸居中、且裁掉了左侧的板子）；
+   其余三位目前的构图可以直接用。 */
+.av-frame{
+  position:relative;overflow:hidden;flex:none;
+  border-radius:var(--r-circle);
+}
+.av-frame img{
+  position:absolute;inset:0;
+  width:100%;height:100%;
+  object-fit:cover;
+  /* 留给"确实需要微调"的极端情况；正常情况下不设 --fx/--fy，等于不位移 */
+  transform:translate(var(--fx,0),var(--fy,0));
+}
+
+/* —— 页面二：与两张模式卡同宽同高，排在同一列里 —— */
+.teacher-bar .av-frame{width:48px;height:48px}
+
+/* —— 选老师层：居中浮层，点谁就是谁，点完即关 —— */
+.mentor-mask{position:fixed;inset:0;z-index:60;background:rgba(17,17,22,.40)}
+.mentor{
+  position:fixed;z-index:61;left:50%;top:50%;
+  transform:translate(-50%,-50%);
+  width:min(720px,calc(100vw - 32px));
+  max-height:calc(100% - 32px);
+  display:flex;flex-direction:column;gap:16px;
+  padding:24px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--r-card);
+  box-shadow:var(--shadow-2);
+}
+.mentor-head{display:flex;align-items:flex-start;gap:16px}
+.mentor-head h2{font-size:var(--fs-sub);font-weight:700;line-height:var(--lh-sub)}
+.mentor-head p{margin-top:4px;font-size:var(--fs-body);color:var(--ink-3)}
+.mentor-head .icon-btn{margin-left:auto}
+.mentor-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;overflow:auto}
+.pick{
+  display:flex;align-items:center;gap:8px;
+  padding:8px;
+  background:var(--surface-2);
+  border:1px solid var(--line);
+  border-radius:var(--r-sub);
+  color:var(--ink-2);
+  font-size:var(--fs-body);font-weight:600;
+  text-align:left;
+  transition:.16s;
+}
+.pick:hover{border-color:var(--line-strong);background:var(--surface)}
+.pick[aria-checked="true"]{border-color:var(--brand);background:var(--brand-tint);color:var(--brand-ink)}
+.pick .av-frame{width:48px;height:48px}
+.pick-copy{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pick-copy b{font-weight:700}
+.pick-copy em{font-style:normal;font-size:var(--fs-meta);font-weight:400;color:var(--ink-3)}
+
+/* —— 对话里的老师标识：谁在说话，点一下就能换 —— */
+.chat-mentor{
+  display:inline-flex;align-items:center;gap:4px;flex:none;
+  padding:2px 8px 2px 2px;
+  background:var(--surface-2);
+  border:1px solid var(--line);
+  border-radius:var(--r-pill);
+  color:var(--ink-2);
+  font-size:var(--fs-meta);font-weight:600;
+  transition:.16s;
+}
+.chat-mentor:hover{border-color:var(--line-strong);color:var(--ink)}
+.chat-mentor .av-frame{width:var(--ico-sm);height:var(--ico-sm)}
+.chat-mentor[aria-expanded="true"]{border-color:var(--brand);color:var(--brand-ink)}
+/* 气泡旁的头像跟着老师走，尺寸沿用原有的 26px 槽位 */
+.msg .av .av-frame{width:var(--av-img);height:var(--av-img)}
+@container (max-width:380px){
+  .chat-mentor .cm-name{display:none}
+}
+
+/* =====================================================================
    6. 页面三：左右分栏工作台
    ===================================================================== */
 .work{
@@ -1559,7 +1645,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       <div class="p2-col">
         <div class="p2-head">
           <h2>选一种做题方式</h2>
-          <p>同一道题，两种陪法</p>
+          <p>同一道题，两种陪法 · 再挑一位合拍的老师</p>
         </div>
         <div class="p2-quote" id="p2quote">
           <span>当前题目</span>
@@ -1597,6 +1683,20 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
             </span>
           </button>
         </div>
+        <div class="p2-teacher">
+          <button class="mode-bar teacher-bar" id="teacherPick" type="button" aria-pressed="true" aria-haspopup="dialog" aria-controls="mentorDlg" aria-expanded="false" title="换一位陪学老师">
+            <span class="av-frame" id="tpAvFrame" data-mentor="paimon" aria-hidden="true">
+              <img id="tpAv" src="/characters/profile/paimon.png" alt="" width="48" height="48">
+            </span>
+            <span class="mode-copy">
+              <span class="mode-title">陪学老师 · <span id="tpName">派蒙</span> <span class="tag brand" id="mentorTag">默认</span></span>
+              <span class="mode-desc" id="tpDesc">软萌亲切，温柔陪学</span>
+            </span>
+            <span class="mode-arrow" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+            </span>
+          </button>
+        </div>
       </div>
       <div class="p2-foot">
         <button class="btn-ghost" id="back1" type="button">返回</button>
@@ -1622,6 +1722,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       <section class="pane">
         <div class="pane-head">
           <strong>对话</strong>
+          <button class="chat-mentor" id="chatMentor" type="button" aria-haspopup="dialog" aria-expanded="false" title="换一位陪学老师"></button>
           <span class="tag" id="qIndexTag">0 个提问</span>
           <span class="tag" id="stepTag">第 1 / 5 步</span><button class="btn-ghost chat-next" id="skipToPractice" type="button">继续练习</button>
         </div>
@@ -1780,6 +1881,21 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       </button>
     </div>
 
+    <!-- 选老师：第 2 页的大框与第 3 页栏头共用这一层 -->
+    <div class="mentor-mask" id="mentorMask" hidden></div>
+    <div class="mentor" id="mentorDlg" role="dialog" aria-modal="true" aria-labelledby="mentorTitle" hidden>
+      <div class="mentor-head">
+        <div>
+          <h2 id="mentorTitle">选一位陪学老师</h2>
+          <p>同一道题，四种讲法。点谁就用谁的讲法，之后还能换。</p>
+        </div>
+        <button class="icon-btn" id="mentorClose" type="button" aria-label="关闭">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="mentor-grid" id="mentorGrid" role="radiogroup" aria-label="选择陪学老师"></div>
+    </div>
+
 <script src="/vendor/katex/katex.min.js"></script>
 <script src="/math.js"></script>
 <script>
@@ -1788,7 +1904,42 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var SVG_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l4.5 4.5L20 7"/></svg>';
-  var AVATAR = '<img src="/brand.png" alt="" width="26" height="26">';
+
+  /**
+   * 四位陪学老师的前端投影。
+   *
+   * 与 src/core/personas.js 的 PERSONAS 一一对应（名字、简介、图片路径），
+   * test/personas.test.js 会核对两份，避免服务端和页面各改各的。
+   * 在前端留一份的理由只有一个：第 2 页要在 /api/health 回来之前就画得出来。
+   */
+  var MENTORS = {
+    paimon: { id: 'paimon', name: '派蒙', tagline: '软萌亲切，温柔陪学', avatar: '/characters/profile/paimon.png' },
+    hermione: { id: 'hermione', name: '赫敏', tagline: '毒舌学姐，精准点拨', avatar: '/characters/profile/hermione.png' },
+    zhuge: { id: 'zhuge', name: '诸葛亮', tagline: '运筹帷幄，纵观全局', avatar: '/characters/profile/zhuge.png' },
+    jianhua: { id: 'jianhua', name: '建华教授', tagline: '严谨治学，一丝不苟', avatar: '/characters/profile/jianhua.png' }
+  };
+  var MENTOR_ORDER = ['paimon', 'hermione', 'zhuge', 'jianhua'];
+  var MENTOR_KEY = 'bsj-mentor';
+
+  function mentorOf(id) { return MENTORS[id] || MENTORS.paimon; }
+
+  function readMentor() {
+    try {
+      var v = localStorage.getItem(MENTOR_KEY);
+      return MENTORS[v] ? v : 'paimon';
+    } catch (e) { return 'paimon'; }
+  }
+
+  /**
+   * 每条 AI 消息都记下"当时是谁在说"。
+   * 换老师只该影响之后的话，不该把已经说过的话改写成另一个人的口吻。
+   * 头像统一走 .av-frame：圆形裁切 + 每个老师自己的取景（见 CSS 那段注释）。
+   */
+  function avatarHtml(id) {
+    var m = mentorOf(id);
+    return '<span class="av-frame" data-mentor="' + m.id + '">' +
+      '<img src="' + m.avatar + '" alt="" width="26" height="26"></span>';
+  }
 
   var PAGES = ['题目', '方式', '解题', '报告'];
 
@@ -1813,9 +1964,21 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
   };
 
   /* ---------------- 接口层 ---------------- */
+  /**
+   * 接口基址。
+   *
+   * 腾讯云静态托管域（*.tcloudbaseapp.com）只发静态文件，不会把 /api 转给云函数；
+   * 同一环境的 HTTP 访问服务在 *.service.tcloudbase.com 上，所以那一侧要跨域取。
+   * 本地、Vercel、Workers 都是同源，返回空串即可。
+   */
+  var API_BASE = (function () {
+    var m = /^([a-z0-9-]+?)-[0-9]+\.tcloudbaseapp\.com$/.exec(location.hostname);
+    return m ? 'https://' + m[1] + '.service.tcloudbase.com' : '';
+  })();
+
   var API = {
     req: function (path, opt) {
-      return fetch(path, opt).then(function (res) {
+      return fetch(API_BASE + path, opt).then(function (res) {
         return res.text().then(function (raw) {
           var data = null;
           try { data = raw ? JSON.parse(raw) : null; } catch (e) { data = null; }
@@ -1858,6 +2021,8 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     bank: [], bankErr: null,
     picked: null, problem: null,
     mode: 'self', sessionId: null,
+    /** 当前陪学老师：默认派蒙，选过就记住（bsj-mentor） */
+    mentor: readMentor(),
     turns: [], progress: { index: null, count: 0, done: [], labels: {} },
     done: false, busy: false,
     report: null, reportTurns: [], reportErr: null,
@@ -2335,6 +2500,104 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
   });
   $('#back1').addEventListener('click', function () { setPage(1); });
 
+  /* ---------------- 陪学老师 ----------------
+     页面二是跟模式卡并排的一个大选择框：它只负责"点开"，不改变
+     "点模式卡即进入"的流程；不选就一直是派蒙。
+     页面三的栏头再放一个老师标识，点开是同一层 —— 不必退回第二页。
+     换人只影响之后的话，历史消息保留各自的老师（见 avatarHtml 的注释）。 */
+  function pickHtml(id, current) {
+    var m = mentorOf(id);
+    return '<button class="pick" type="button" role="radio" aria-checked="' + (id === current) + '" data-mentor="' + m.id + '">' +
+      '<span class="av-frame" data-mentor="' + m.id + '" aria-hidden="true">' +
+      '<img src="' + m.avatar + '" alt="" width="48" height="48"></span>' +
+      '<span class="pick-copy"><b>' + esc(m.name) + '</b><em>' + esc(m.tagline) + '</em></span>' +
+      '</button>';
+  }
+
+  function mentorOpen() {
+    var dlg = $('#mentorDlg');
+    return !!dlg && !dlg.hidden;
+  }
+
+  function paintMentor() {
+    var m = mentorOf(S.mentor);
+    if ($('#mentorDlg')) {
+      $('#mentorGrid').innerHTML = MENTOR_ORDER.map(function (id) { return pickHtml(id, S.mentor); }).join('');
+    }
+    if ($('#teacherPick')) {
+      $('#tpName').textContent = m.name;
+      $('#tpDesc').textContent = m.tagline;
+      $('#tpAv').src = m.avatar;
+      $('#tpAvFrame').setAttribute('data-mentor', m.id);
+      /* 默认派蒙时标"默认"，换过之后标"已选" —— 一眼能看出是不是自己挑的 */
+      $('#mentorTag').textContent = S.mentor === 'paimon' ? '默认' : '已选';
+      $('#teacherPick').title = '换一位陪学老师（现在是' + m.name + '）';
+    }
+    if ($('#chatMentor')) {
+      $('#chatMentor').innerHTML = '<span class="av-frame" data-mentor="' + m.id + '" aria-hidden="true">' +
+        '<img src="' + m.avatar + '" alt="" width="24" height="24"></span>' +
+        '<span class="cm-name">' + esc(m.name) + '</span>';
+    }
+  }
+
+  /** 打开选老师层的那个按钮：关掉时焦点要回到它身上，而不是跳去另一个页面 */
+  var mentorTrigger = null;
+
+  function openMentor(trigger) {
+    var dlg = $('#mentorDlg');
+    if (!dlg) return;
+    mentorTrigger = trigger || null;
+    paintMentor();
+    $('#mentorMask').hidden = false;
+    dlg.hidden = false;
+    if (trigger && trigger.setAttribute) trigger.setAttribute('aria-expanded', 'true');
+    var checked = $('#mentorGrid .pick[aria-checked="true"]');
+    setTimeout(function () { (checked || $('#mentorClose')).focus(); }, 0);
+  }
+
+  function closeMentor() {
+    var dlg = $('#mentorDlg');
+    if (!dlg || dlg.hidden) return;
+    dlg.hidden = true;
+    $('#mentorMask').hidden = true;
+    ['#teacherPick', '#chatMentor'].forEach(function (sel) {
+      if ($(sel)) $(sel).setAttribute('aria-expanded', 'false');
+    });
+    if (mentorTrigger && mentorTrigger.focus) mentorTrigger.focus();
+    mentorTrigger = null;
+  }
+
+  /** 选完之后：记住、重画、把对话里的头像一并换成新老师 */
+  function setMentor(id) {
+    var m = mentorOf(id);
+    if (m.id === S.mentor) return;
+    S.mentor = m.id;
+    try { localStorage.setItem(MENTOR_KEY, m.id); } catch (e) {}
+    paintMentor();
+    renderChat();
+  }
+
+  if ($('#teacherPick')) {
+    $('#teacherPick').addEventListener('click', function () { openMentor(this); });
+  }
+  if ($('#chatMentor')) {
+    $('#chatMentor').addEventListener('click', function () { openMentor(this); });
+  }
+  if ($('#mentorGrid')) {
+    $('#mentorGrid').addEventListener('click', function (e) {
+      var el = e.target.closest('[data-mentor]');
+      if (!el) return;
+      setMentor(el.getAttribute('data-mentor'));
+      closeMentor();
+    });
+  }
+  if ($('#mentorMask')) $('#mentorMask').addEventListener('click', closeMentor);
+  if ($('#mentorClose')) $('#mentorClose').addEventListener('click', closeMentor);
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || !mentorOpen()) return;
+    closeMentor();
+  });
+
   /** 进对话页：没有题就先回第一页选题（空态不假装能开始） */
   function enterSolving() {
     if (!S.problem) { setPage(1); return; }
@@ -2402,16 +2665,31 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     if (q.figure) {
       html += '<div class="fig"><div class="fig-note"><b>图示</b><p>' + esc(q.figure) + '</p></div></div>';
     }
-    if (q.givens && q.givens.length) {
-      html += '<div class="left-block known"><h3>已知</h3><ul>' + q.givens.map(function (g) {
+    /* 模型偶尔会把整段题干当成「已知 / 求」回吐（题库题尤其容易，因为公式在纯文本里
+       是〔式〕占位）。这里收一道：去掉占位符、压掉空白、丢掉过长条目、最多 6 条。 */
+    function tidyItems(list) {
+      var out = [];
+      (list || []).forEach(function (raw) {
+        var t = String(raw == null ? '' : raw).replace(/〔式〕/g, '').replace(/\s+/g, ' ').trim();
+        if (!t || t.length > 40) return;
+        out.push(t);
+      });
+      return out.slice(0, 6);
+    }
+    var givens = tidyItems(q.givens);
+    if (givens.length) {
+      html += '<div class="left-block known"><h3>已知</h3><ul>' + givens.map(function (g) {
         return '<li><code>' + esc(g) + '</code></li>';
       }).join('') + '</ul></div>';
     }
-    var asked = Array.isArray(q.asked) ? q.asked : (q.asked ? [q.asked] : []);
+    var askedRaw = Array.isArray(q.asked) ? q.asked : (q.asked ? [q.asked] : []);
+    var asked = tidyItems(askedRaw);
     if (asked.length) {
       html += '<div class="left-block ask"><h3>求</h3><p>' + asked.map(function (a) {
         return '<code>' + esc(a) + '</code>';
       }).join('　') + '</p></div>';
+    } else if (askedRaw.length) {
+      html += '<div class="left-block ask"><h3>求</h3><p><code>见题干各小问</code></p></div>';
     }
     body.innerHTML = html;
     /* 左栏的题干 / 已知 / 求里也可能带 $...$，就地画出来（引擎读到的仍是原文） */
@@ -2508,7 +2786,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       return '<div class="msg err" data-i="' + i + '"><div class="bubble">' +
         '<p>' + esc(m.text) + '</p></div></div>';
     }
-    var av = m.role === 'ai' ? '<span class="av">' + AVATAR + '</span>' : '';
+    var av = m.role === 'ai' ? '<span class="av">' + avatarHtml(m.mentor) + '</span>' : '';
     var next = m.next ? '<div class="next-ask">' + esc(m.next) + '</div>' : '';
     return '<div class="msg ' + (m.role === 'ai' ? 'ai' : 'me') + '" data-i="' + i + '">' + av +
       '<div class="bubble">' + paraHtml(m.text) + next + '</div></div>';
@@ -2532,7 +2810,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       html = S.turns.map(msgHtml).join('');
     }
     if (S.busy) {
-      html += '<div class="msg ai"><span class="av">' + AVATAR + '</span>' +
+      html += '<div class="msg ai"><span class="av">' + avatarHtml(S.mentor) + '</span>' +
         '<div class="bubble dots"><i></i><i></i><i></i>' +
         '<span class="dots-label">正在思考…</span></div></div>';
     }
@@ -2585,7 +2863,8 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       problemId: S.problem.id,
       utterance: text,
       mode: S.mode === 'self' ? 'self_training' : 'ai_companion',
-      explicitHelpSeeking: helpFlag
+      explicitHelpSeeking: helpFlag,
+      persona: S.mentor
     }).then(function (r) {
       var p = r.progress || {};
       S.progress = {
@@ -2600,6 +2879,8 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
         text: hint.text || r.message || '（本轮没有返回内容）',
         next: hint.nextAsk || null,
         concepts: hint.concepts || [],
+        /** 这一句是谁说的：以服务端回的为准，历史消息不会因为换老师而被改写 */
+        mentor: (r.persona && r.persona.id) || S.mentor,
         stepIndex: typeof p.stepIndex === 'number' ? p.stepIndex : null,
         at: Date.now()
       });
@@ -3210,6 +3491,8 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       $('#relPreviewTitle').textContent = det.code + ' · 完整题目';
       $('#relPreviewMeta').textContent = [det.src,det.ty,'难度：' + det.d].filter(Boolean).join(' ｜ ');
       $('#relPreviewQuestion').innerHTML = fullBankQuestionHtml(det);
+      /* 新题库的行内公式是 $…$ 原文（旧题是图片），预览里也画出来 */
+      if (typeof window !== 'undefined' && window.BsjMath && window.BsjMath.renderMathIn) window.BsjMath.renderMathIn($('#relPreviewQuestion'));
       $('#relPreviewStart').disabled = false;
     }).catch(function (err) {
       if (REL_PREVIEW !== state || !preview.open) return;
@@ -3291,6 +3574,8 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
   renderXP();
   renderChat();
   paintMode();
+  /* 老师选择器要在 /api/health 回来之前就画好：它不依赖服务端（见 MENTORS 的注释） */
+  paintMentor();
 
   API.health().then(function (h) {
     S.health = h;
@@ -3520,6 +3805,14 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       });
       S.bankErr = null;
       if (REL.open) renderRelated();
+      /**
+       * 题库到货之后再决定落哪一页。
+       *
+       * `?p=N` 是逐页评审/截图用的深链：它要真实跑一遍读题与会话，
+       * 所以必须等题库能取到第一道题 —— 早于这里调用只会被 S.bank.length 挡回去，
+       * 表现就是"带了 ?p=3 却停在首页"。这个函数以前只定义没人调用，等于深链失效。
+       */
+      maybeReviewJump();
     }).catch(function (err) { S.bankErr = err.message; });
   }
   loadQBankList();

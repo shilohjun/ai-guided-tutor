@@ -130,6 +130,99 @@ export function classifyRequest(utterance) {
 }
 
 // ---------------------------------------------------------------------------
+// 一轮的时间预算（真正要修的那个 bug）
+// ---------------------------------------------------------------------------
+
+/**
+ * 单次模型调用最多等多久。
+ *
+ * 12 秒是"够一次正常观察/起草、又不至于吃掉半轮预算"的量级：
+ * 一次 `/api/chat` 最多串三次调用，若每次都等到 12 秒，总时长仍然会超过云函数
+ * 的硬超时 —— 所以单次上限只是第一道，真正管住总时长的是下面的"剩余量"。
+ */
+const MAX_CALL_TIMEOUT_MS = 12000;
+
+/**
+ * 剩余时间低于这个数就当作"一次调用都装不下"。
+ *
+ * 为什么要有这一档而不是让调用自己带一个 300ms 的超时：那种调用必然失败，
+ * 而失败长得和"上游坏了"一模一样 —— 排查会去查供应商，实际是我们自己没时间了。
+ * 所以它返回 0，语义是**明确**的：不再发起调用（也不再重试）。
+ */
+const MIN_RETRY_BUDGET_MS = 4000;
+
+/** 超时时给学生的话术：只有这一句，前端只负责显示（不让原始错误串出网） */
+const TURN_SLOW_MESSAGE = '这一轮没等到回复，再发一次就好。';
+
+/**
+ * 这一刻还剩多少预算可以给**一次**模型调用。
+ *
+ * 返回值三种，语义必须分清（这是本函数存在的全部理由）：
+ *   `null`  没有截止时间 ⇒ 沿用各适配器自己的超时配置（旧调用点不受影响）
+ *   `0`     有截止时间，但剩余不足一次调用 ⇒ **不再发起任何调用/重试**
+ *   `> 0`   一次调用最多等这么多毫秒（同时不超过单次上限与剩余量）
+ *
+ * 为什么 `null` 与 `0` 不能合并成 `0`：`timeoutMs: 0` 交给 `setTimeout` 就是
+ * "立刻超时一次"，那会把"没配预算"变成"必然失败"；而把"没时间了"当成"没配预算"
+ * 则会发出一次注定超时的请求 —— 两个方向的错都会让这一轮变成看不懂的失败。
+ *
+ * @param {{ deadlineAt?: number|null, now?: number }} [options]
+ * @returns {number|null}
+ */
+export function turnBudget({ deadlineAt, now = Date.now() } = {}) {
+  if (deadlineAt === null || deadlineAt === undefined) return null;
+  const deadline = Number(deadlineAt);
+  const at = Number(now);
+  if (!Number.isFinite(deadline) || !Number.isFinite(at)) return null;
+
+  const remaining = deadline - at;
+  /**
+   * 先判下界再取 min：已经过去的截止时间要返回 **0** 而不是负数。
+   * 负数交给 `setTimeout` 会退化成 0（立刻超时），看起来"发了请求"，
+   * 而 `budget === 0` 这条分支就永远走不到 —— 那正是"不再重试"失效的形状。
+   */
+  if (remaining < MIN_RETRY_BUDGET_MS) return 0;
+  return Math.min(MAX_CALL_TIMEOUT_MS, remaining);
+}
+
+/**
+ * 超时错误：由**我们**抛、由**我们**回。
+ *
+ * 为什么不能只在适配器里 abort：云函数被网关砍掉时，函数里的代码一行都不跑，
+ * 于是 `chat_error` 写不进去，"一轮失败率"永远是 0 —— 而那个数正是换平台的触发条件。
+ * 所以超时必须是一枚**我们自己认识的错误**，让路由能在被砍之前写事件、回 503。
+ */
+function turnSlowError(detail) {
+  const err = new Error(TURN_SLOW_MESSAGE);
+  err.code = 'TURN_SLOW';
+  err.statusCode = 503;
+  err.retryable = true;
+  /** 给日志看的，不出网：学生只需要那句"再发一次就好" */
+  err.detail = detail;
+  return err;
+}
+
+/**
+ * 这次失败是不是"没时间了"。
+ *
+ * 三种形状都要认：fetch 被 AbortController 掐断（AbortError）、
+ * llm.js 把 abort 包成的 LLM_TIMEOUT，以及已经转成 TURN_SLOW 的（防御性）。
+ */
+function isTimeoutError(err) {
+  return err?.name === 'AbortError' || err?.code === 'LLM_TIMEOUT' || err?.code === 'TURN_SLOW';
+}
+
+/**
+ * 把 `timeoutMs` 挂进调用参数 —— **只在有值的时候挂**。
+ *
+ * 没配截止时间时必须一个字段都不多传：适配器的契约是 `input.timeoutMs ?? 配置值`，
+ * 传一个 `undefined` 键在 JS 里等价，但"看起来传了"会让下一个人以为预算已经接上了。
+ */
+function withTimeout(input, timeoutMs) {
+  return timeoutMs == null ? input : { ...input, timeoutMs };
+}
+
+// ---------------------------------------------------------------------------
 // 引擎工厂
 // ---------------------------------------------------------------------------
 
@@ -150,6 +243,24 @@ export function createEngine({ adapter, problem, logger } = {}) {
     const trace = [];
     const sessionKey = request.sessionId ?? 'default';
     const history = request.history ?? [];
+    /**
+     * 这一轮的截止时间（毫秒时间戳），由调用方（router 的 /api/chat）给。
+     *
+     * 为什么它是**一轮**的一个数、由外面给：总时长必须小于部署方的硬超时
+     * （云函数 30 秒），而那个数属于部署，不属于引擎。引擎只负责把同一个截止时间
+     * 摊给这一轮里的每一次模型调用 —— 这样"串行三次调用"的总时长才有上界。
+     *
+     * 不传 ⇒ 沿用各适配器自己的超时（测试与脚本的旧调用点一个字节都不变）。
+     */
+    const deadlineAt = Number.isFinite(request.deadlineAt) ? request.deadlineAt : null;
+    /** 每次取值都重算：剩余量是随时间减少的，缓存一次就等于把预算写成了"每次调用各自算" */
+    const budgetNow = () => turnBudget({ deadlineAt, now: Date.now() });
+    /**
+     * 本轮由哪位老师说话。
+     * 它只影响"怎么说"—— 不参与定位、层级、守卫任何一个判断，
+     * 所以这里不做校验，交给 personas.js 的 normalizePersona 兜底。
+     */
+    const persona = request.persona;
     /**
      * 这道题是不是"现场读出来的"（intake 导入）。
      * 用途只有一个：学生版判断链路里要不要加一句"读题"。
@@ -231,15 +342,27 @@ export function createEngine({ adapter, problem, logger } = {}) {
     const isConfirmation = verdict.matched.length > 0 || verdict.complete;
 
     // ---------------- 1. observe ----------------
+    /**
+     * 预算检查放在**第一次模型调用之前**，而不是 turn 的最开头：
+     * 前面的确定性拒绝路径（"直接告诉我答案"）一次模型都不需要，
+     * 在开头拦会把"本来答得出"的一轮也变成 503。
+     */
+    const observeTimeout = budgetNow();
+    if (observeTimeout === 0) throw turnSlowError('剩余预算不足以发起一次观察调用');
+
     let observation;
     try {
-      observation = await llm.observeStudent({
-        problem,
-        utterance: request.utterance,
-        history,
-      });
+      observation = await llm.observeStudent(
+        withTimeout({ problem, utterance: request.utterance, history }, observeTimeout),
+      );
     } catch (err) {
       logger?.(`observe 失败：${err.message}`);
+      /**
+       * 超时走 TURN_SLOW，不裹成 OBSERVATION_UNAVAILABLE：
+       * 后者回给学生的是一句"暂时未能读取你的思路"，而这一轮真正发生的事是
+       * **我们没等到** —— 两句话指向的下一步不一样（前者重说一遍，后者再发一次）。
+       */
+      if (isTimeoutError(err)) throw turnSlowError(`观察调用超时：${err.message}`);
       const failure = new Error('暂时未能读取你的思路，请重试；已完成的步骤会保留。');
       failure.code = 'OBSERVATION_UNAVAILABLE';
       failure.statusCode = 503;
@@ -340,20 +463,39 @@ export function createEngine({ adapter, problem, logger } = {}) {
     let usedFallback = false;
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
+      /**
+       * 每一次起草都重新问一次"还剩多少"。
+       *
+       * 这是把总时长压到部署硬超时之内的那一环：第二次起草拿到的是**剩下的**预算，
+       * 不是又一个 12 秒。剩余不足一次调用时预算为 0 ⇒ 不再发起（也就是不再重试），
+       * 直接落到下面的兜底模板 —— 兜底不花钱、也不占时间。
+       */
+      const draftTimeout = budgetNow();
+      if (draftTimeout === 0) {
+        trace.push({
+          stage: 'generate',
+          message: attempt === 0
+            ? '本轮的预算已经用尽，未发起起草 ⇒ 直接用安全兜底模板'
+            : '本轮的预算已经用尽，不再重试起草 ⇒ 直接用安全兜底模板',
+        });
+        break;
+      }
       const forbidden = attempt === 0 ? routing.forbidden : accumulateForbidden(routing.forbidden, guardHistory);
       try {
-        const drafted = await draftWithMeta(llm, {
+        const drafted = await draftWithMeta(llm, withTimeout({
           problem,
           diagnosis,
           level: routing.level,
           allowedConcepts: routing.allowedConcepts,
           forbidden,
           strategy: routing.strategyInstruction,
+          /** 老师人格只改措辞：真模型据此拼接规范与语言风格，离线桩不使用 */
+          persona,
           /** 传层级统计给适配器：离线桩用它轮换话术，真模型也可用作 few-shot 选择依据 */
           l3Count: routing.l3Count ?? 0,
           history,
           utterance: request.utterance,
-        });
+        }, draftTimeout));
         draftMeta = drafted.meta;
         const candidate = drafted.text;
 
@@ -386,6 +528,11 @@ export function createEngine({ adapter, problem, logger } = {}) {
       } catch (err) {
         trace.push({ stage: 'generate', message: `第 ${attempt + 1} 次起草失败：${err.message}` });
         logger?.(`draft 失败：${err.message}`);
+        /**
+         * 起草超时不再"吞掉 + 换兜底"：吞掉的后果是学生看到一句通用话术，
+         * 而指标上这一轮算成功 —— 恰恰是这次要修掉的那个"测不出来"。
+         */
+        if (isTimeoutError(err)) throw turnSlowError(`起草调用超时：${err.message}`);
       }
     }
 

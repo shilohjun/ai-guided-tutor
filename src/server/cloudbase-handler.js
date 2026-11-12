@@ -68,6 +68,23 @@ const MIME = {
 };
 
 /**
+ * 必须按字节原样发出去的类型（B1）。
+ *
+ * 为什么要有这一份：云函数的返回值**是文本**。凡是我们先 `toString('utf8')`
+ * 再交出去的响应，≥0x80 的每个字节都会被网关换成 U+FFFD —— 而且是静默的：
+ * HTTP 200、content-type 对、长度不对，下载下来打不开。
+ *
+ * 判据取"这些字节能不能当文本"（也就是 MIME），不取"是不是 zip"：
+ * 导出件是 `application/zip`，而函数包里还有人物图和字体（`public/` 整目录被
+ * 铺进包，见 scripts/build-cloudbase.mjs）。把规则写死成一个类型，
+ * 下一个二进制文件就会以完全相同的方式坏掉，而且同样不报错。
+ *
+ * `application/octet-stream` 也在里面：认不出扩展名时按二进制处理更安全 ——
+ * base64 出去总还能被客户端解码，按文本出去则一定会坏。
+ */
+const BINARY_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/x-icon', 'font/woff2', 'application/octet-stream']);
+
+/**
  * CloudBase HTTP 访问服务 → 一次完整的请求处理。
  *
  * @param {object} event 云函数事件（HTTP 触发时是 API 网关形状）
@@ -75,6 +92,10 @@ const MIME = {
  *   留这个参数是为了让测试能直接喂一份配置进来，而不必去改 process.env ——
  *   云函数实例是长驻的，测试里改全局变量会污染同文件后续用例。
  * @returns {Promise<{statusCode:number, headers:Record<string,string>, body:string, isBase64Encoded:boolean}>}
+ *   `isBase64Encoded` 是**逐响应**判的：二进制响应（zip 导出、图片、字体）的 `body`
+ *   是 base64 串且这个标志为 `true`，文本响应仍为原文 + `false`。理由见
+ *   `BINARY_TYPES` 与 `createNodeLikeExchange` 里的说明 —— 写死 `false` 会把
+ *   每一个 ≥0x80 的字节换成 U+FFFD，而那条链路上没有任何一处会报错。
  */
 export async function handleCloudbaseEvent(event, source = process.env) {
   const raw = event ?? {};
@@ -138,7 +159,7 @@ async function handleApiRequest({ raw, method, headers, pathname, search, source
   }
 
   const out = readResponse();
-  return { statusCode: out.statusCode, headers: out.headers, body: out.body, isBase64Encoded: false };
+  return { statusCode: out.statusCode, headers: out.headers, body: out.body, isBase64Encoded: out.isBase64Encoded };
 }
 
 /**
@@ -158,14 +179,22 @@ async function readStatic(pathname) {
   if (!existsSync(candidate)) return null;
 
   const buf = await readFile(candidate);
+  /**
+   * 文本就按原文发，二进制按 base64 发（`isBase64Encoded: true`）。
+   * 这一处和路由那一路是同一个判据的两面：**只要字节必须原样到浏览器，
+   * 就不能让它经过一次字符串解码**。png / woff2 一旦被当文本，
+   * 同样会在网关那边变成一串 U+FFFD。
+   */
+  const type = MIME[extname(candidate).toLowerCase()] ?? 'application/octet-stream';
+  const binary = BINARY_TYPES.has(type);
   return {
     statusCode: 200,
     headers: {
-      'content-type': MIME[extname(candidate).toLowerCase()] ?? 'application/octet-stream',
+      'content-type': type,
       'cache-control': 'no-store',
     },
-    body: buf.toString('utf8'),
-    isBase64Encoded: false,
+    body: binary ? buf.toString('base64') : buf.toString('utf8'),
+    isBase64Encoded: binary,
   };
 }
 
@@ -254,7 +283,7 @@ function createNodeLikeExchange({ method, headers, pathWithQuery, body, gateStat
     },
   };
 
-  const collected = { statusCode: 200, headers: {}, chunks: [] };
+  const collected = { statusCode: 200, headers: {}, chunks: [], binary: false };
 
   const res = {
     get statusCode() {
@@ -267,19 +296,47 @@ function createNodeLikeExchange({ method, headers, pathWithQuery, body, gateStat
     setHeader(name, value) {
       collected.headers[String(name).toLowerCase()] = String(value);
     },
+    /**
+     * 收响应体。**二进制在这里分道**（B1）。
+     *
+     * 云函数不认识 Buffer：它只认识 `body`（字符串）+ `isBase64Encoded`。
+     * 上一版把任何 chunk 都 `String(...)` 收下、然后硬写 `isBase64Encoded: false`，
+     * 于是导出件里每一个 ≥0x80 的字节到网关那边都成了 U+FFFD ——
+     * 老师下载到的 zip 打不开，而这一层连一个警告都不会打（本地开发用的是
+     * 真的 `node:http` response，它吃 Buffer，所以本地永远是好的）。
+     *
+     * 判据只看"这个 chunk 是不是二进制"，不看 content-type：
+     * 按类型写死成 `application/zip` 的话，下一个二进制响应就会以同样的方式坏掉。
+     */
     end(chunk) {
       if (chunk !== undefined && chunk !== null) {
-        collected.chunks.push(typeof chunk === 'string' ? chunk : String(chunk));
+        if (Buffer.isBuffer(chunk) || chunk instanceof Uint8Array) {
+          collected.binary = true;
+          collected.chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        } else {
+          collected.chunks.push(String(chunk));
+        }
       }
       res.headersSent = true;
     },
   };
 
+  /**
+   * 拼出云函数认识的那一份。
+   *
+   * 文本路径原样不动（`false` + 原文）：把所有响应都改成 base64 会让健康检查、
+   * 页面、JSON 全变样，而它们本来就是好的 —— 那是拿一个新故障换一个旧故障。
+   * 混合 chunk（理论上不该出现）按 UTF-8 补成 Buffer 再 base64：宁可多一层编码，
+   * 也不要让一半字节在网关那边被换掉。
+   */
   function readResponse() {
     return {
       statusCode: collected.statusCode,
       headers: collected.headers,
-      body: collected.chunks.join(''),
+      body: collected.binary
+        ? Buffer.concat(collected.chunks.map((chunk) => (Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), 'utf8')))).toString('base64')
+        : collected.chunks.join(''),
+      isBase64Encoded: collected.binary,
     };
   }
 
