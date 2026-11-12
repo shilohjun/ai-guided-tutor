@@ -447,3 +447,21 @@ describe('前端 · 公式自动渲染：不用每个显示点都手写一遍', 
     }
   });
 });
+
+describe('前端 · 题库地图的卡片不会把公式卡在 ⟨式⟩ 上', () => {
+  /**
+   * 现场：题库地图的卡片是两段式渲染 —— 先用 data.json 的纯文本铺（老题那里
+   * 只能写成 ⟨式⟩），再异步取回 rich HTML 把公式图填进去。
+   *
+   * 问题在第二步只补 `list.slice(0, 80)`：835 张卡里只有前 80 张会被补。
+   * 实测 103 道题的纯文本带 ⟨式⟩，前 80 张命中 22 道，剩下 81 道永远停在占位符。
+   * 现在改成按可见性懒补，并用这条测试钉住。
+   */
+  const mapHtml = readFileSync(join(ROOT, 'public/qbank/map.html'), 'utf8');
+
+  it('补公式不再有「只补前 N 张」的截断', () => {
+    assert(!/slice\(0,\s*80\)/.test(mapHtml), '曾经 list.slice(0,80)：超出 80 张的卡片永远显示 ⟨式⟩');
+    assertIncludes(mapHtml, 'IntersectionObserver', '要按卡片是否进入视口来补，而不是按序号');
+    assertIncludes(mapHtml, '__hydrateJob', '观察器命中后要能取回这张卡的详情任务');
+  });
+});
