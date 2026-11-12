@@ -143,7 +143,13 @@ for (const family of QBANK_GRAPHS.methods) {
 }
 
 export function buildQbankReview(record) {
-  const ks=record.knowledgeIds.map(id => knowledge.get(id));
+  const ks=record.knowledgeIds.map(id => {
+    const card=knowledge.get(id);
+    if (!card || record.knowledgeScope !== 'chapter') return card;
+    return {...card,title:`${card.graphPath[1]}章节复习（未细分）`,formula:'',
+      meaning:`原题库仅标注${card.graphPath[1]}；本卡供章节复习，不推断具体考点。`,
+      condition:'尚无可靠的细分知识点标签；请结合题干核对规律与适用条件，不据此判断学生已掌握。'};
+  });
   const ms=record.methodIds.map(id => methods.get(id));
   if (ks.some(x=>!x) || ms.some(x=>!x)) throw new Error(`Incomplete graph mapping for qbank-${record.i}`);
   const focus=ks.slice(0,2).map(k=>k.title).join('、');

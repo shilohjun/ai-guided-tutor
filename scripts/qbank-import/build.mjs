@@ -553,6 +553,8 @@ const base = (q) => ({
 const publicRecord = (q) => base(q);
 const sourceRecord = (q) => ({
   ...base(q),
+  // Report-only provenance: a chapter fallback is not an explicit concept tag.
+  ...(!q.kgIds.some((id) => id.startsWith('k')) ? { knowledgeScope: 'chapter' } : {}),
   answerHtml: q.answerHtml, answerText: q.answerText,
   analysisHtml: q.analysisHtml, analysisText: q.analysisText,
 });

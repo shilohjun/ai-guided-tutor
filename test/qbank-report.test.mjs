@@ -9,6 +9,48 @@ import { getProblemById } from '../src/core/registry.js';
 import { buildReport,createSessionRecord } from '../src/core/report.js';
 import { toStudentProblem,handleApi } from '../src/server/router.js';
 
+test('legacy question identities and semantic knowledge paths survive the merge',()=>{
+  const legacy=JSON.parse(readFileSync(new URL('./fixtures/qbank-legacy-ids.json',import.meta.url),'utf8'));
+  const byId=new Map(QBANK_SOURCE.map(q=>[q.i,q]));
+  for (const old of legacy.questions) assert.equal(byId.get(old.i)?.code,old.code,`legacy question ${old.i}`);
+  // Synthetic graph IDs may change between exports; the full semantic path must remain.
+  const paths=new Set(QBANK_GRAPHS.knowledge.flatMap(m=>m.children.flatMap(c=>c.children.map(l=>JSON.stringify([m.name,c.name,l.name])))));
+  for (const old of legacy.knowledge) assert.ok(paths.has(JSON.stringify(old.path)),old.path.join('/'));
+});
+
+test('picker, embedded map and report registry share the same 835 usable questions',()=>{
+  const data=JSON.parse(readFileSync(new URL('../public/qbank/data.json',import.meta.url),'utf8'));
+  const map=readFileSync(new URL('../public/qbank/map.html',import.meta.url),'utf8');
+  const embedded=JSON.parse(map.match(/<script type="application\/json" id="qdata">([\s\S]*?)<\/script>/)[1]);
+  assert.deepEqual(embedded,data);
+  assert.equal(data.qs.length,835);
+  assert.deepEqual(data.qs.map(q=>q.i),QBANK_SOURCE.map(q=>q.i));
+  const excluded=JSON.parse(readFileSync(new URL('../docs/qbank-import-excluded.json',import.meta.url),'utf8'));
+  assert.equal(excluded.length,26);
+  for (const q of QBANK_SOURCE) {
+    const card=data.qs.find(x=>x.i===q.i);
+    assert.equal(card.c,q.code);
+    assert.equal(card.l,q.knowledgeIds[0]);
+    assert.equal(card.t2,q.t2 ? q.methodIds[0] : '');
+    assert.ok(!/figs\/[\w.-]+\.(?:png|jpe?g|webp|gif|svg)/i.test([q.stemHtml,...q.options.map(o=>o.html)].join('')),q.code);
+  }
+});
+
+test('chapter-only questions explicitly show unspecialized review without changing graph IDs',()=>{
+  const chapter=QBANK_SOURCE.filter(q=>q.knowledgeScope==='chapter');
+  assert.deepEqual(chapter.map(q=>q.code).sort(),['JS-2026-12','HB-2026-11','HUB-2026-05','YN-2026-11'].sort());
+  for (const q of chapter) {
+    const report=buildReport(getQbankProblem(`qbank-${q.i}`),createSessionRecord(`qbank-${q.i}`),{engine:'offline-stub'});
+    assert.deepEqual(report.review.knowledge.map(k=>k.id),q.knowledgeIds);
+    assert.ok(report.review.knowledge.every(k=>k.title.includes('未细分') && !k.formula));
+    assert.ok(!report.assessment.knowledge.some(k=>k.status==='mastered'));
+  }
+  // A chapter-only record must not mutate the reusable card used by explicitly tagged records.
+  const tagged=QBANK_SOURCE.find(q=>!q.knowledgeScope && q.knowledgeIds.some(id=>chapter.some(c=>c.knowledgeIds.includes(id))));
+  assert.ok(tagged);
+  assert.ok(!getQbankProblem(`qbank-${tagged.i}`).reportReview.knowledge.some(k=>k.title.includes('未细分')));
+});
+
 test('all 835 source questions retain answers, full images and every knowledge/method association',()=>{
   assert.equal(QBANK_IDS.length,835);
   assert.equal(QBANK_GRAPHS.knowledge.flatMap(m=>m.children.flatMap(c=>c.children)).length,94);
