@@ -31,7 +31,7 @@
  * 只有 src/core/qbank-source.data.js 被换掉。源仓库一个字节都不改。
  */
 
-import { cpSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -69,6 +69,23 @@ function renderSlimModule(questions) {
   ].join('\n');
 }
 
+/**
+ * 递归复制目录。
+ *
+ * 为什么不用 `fs.cpSync`：在本机 Windows + Node 24 上，它对目录调用会直接
+ * 把进程打崩（退出码 127、无任何报错输出），而单文件 `copyFileSync` 正常。
+ * 这个脚本要在开发机上跑，所以自己走一遍目录树，只用最稳的那几个 API。
+ */
+function copyTree(from, to) {
+  mkdirSync(to, { recursive: true });
+  for (const entry of readdirSync(from)) {
+    const src = join(from, entry);
+    const dest = join(to, entry);
+    if (statSync(src).isDirectory()) copyTree(src, dest);
+    else copyFileSync(src, dest);
+  }
+}
+
 async function main() {
   const srcFile = join(ROOT, 'src/core/qbank-source.data.js');
   const before = sizeOf(srcFile);
@@ -84,7 +101,10 @@ async function main() {
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
   for (const entry of ENTRIES) {
-    cpSync(join(ROOT, entry), join(OUT, entry), { recursive: true });
+    const from = join(ROOT, entry);
+    const dest = join(OUT, entry);
+    if (statSync(from).isDirectory()) copyTree(from, dest);
+    else copyFileSync(from, dest);
   }
   writeFileSync(join(OUT, 'src/core/qbank-source.data.js'), slimText);
 
