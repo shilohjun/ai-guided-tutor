@@ -3725,6 +3725,13 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       body.innerHTML = '<p class="picked-loading">正在展开题目…</p>';
       var i = q && q.i;
       if (!i) { body.innerHTML = ''; return; }
+      /* 题库里的公式有新旧两种形态：旧题是 <img class="qf"> 图片，新题（570/835 道）
+         是 $…$ 原文。所以凡是把 stemHtml 塞进 DOM 之后都得再走一遍 KaTeX ——
+         第 3 页左栏、完整题预览都这么做了，这里当初漏了，
+         表现就是题干原样显示 $T_{1} = 300 \,\mathrm{K}$。 */
+      function paint() {
+        if (window.BsjMath && window.BsjMath.renderMathIn) window.BsjMath.renderMathIn(body);
+      }
       fetch('/qbank/q/' + i + '.json').then(function (r) {
         return r.ok ? r.json() : null;
       }).then(function (det) {
@@ -3738,8 +3745,10 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
           html += '</ol>';
         }
         body.innerHTML = html;
+        paint();
       }).catch(function () {
         body.innerHTML = '<p>' + esc((q && q.stem) || '') + '</p>';
+        paint();
       });
     }
 

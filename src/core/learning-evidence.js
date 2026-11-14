@@ -105,4 +105,3 @@ export function numericAttempts(problem, logs, {formulaCards=[],historyIncomplet
         priority:fixed ? 2 : 1};
     })};
 }
-

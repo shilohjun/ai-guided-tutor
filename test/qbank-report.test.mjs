@@ -119,6 +119,11 @@ test('both selection paths use registered IDs; report renderer preserves all car
 });
 
 test('every bank question has an API report even before the first chat turn',async()=>{
+  // 这条测的是"题库题有没有离线报告"，不是登录闸门。工作区 .env 一旦打开
+  // PILOT_REQUIRE_LOGIN=1（试点环境需要登录），这里就会整片被 401 拦住 ——
+  // 临时关掉、测完还原，别让本地配置冒充成功能回归。
+  const prevLogin=process.env.PILOT_REQUIRE_LOGIN;
+  process.env.PILOT_REQUIRE_LOGIN='0';
   const {createServer}=await import('node:http');
   const server=createServer((req,res)=>handleApi(req,res,new URL(req.url,'http://localhost')).catch(e=>{
     res.statusCode=500;res.end(String(e));
@@ -139,6 +144,7 @@ test('every bank question has an API report even before the first chat turn',asy
     const invalid=await fetch(`${base}/api/report?sessionId=missing&problemId=qbank-836`);
     assert.equal(invalid.status,404);
   } finally {
+    if (prevLogin===undefined) delete process.env.PILOT_REQUIRE_LOGIN; else process.env.PILOT_REQUIRE_LOGIN=prevLogin;
     server.closeAllConnections();
     await new Promise(resolve=>server.close(resolve));
   }

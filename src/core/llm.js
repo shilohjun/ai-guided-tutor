@@ -176,7 +176,7 @@ export function buildDraftUserPrompt({ problem, diagnosis, level, allowedConcept
 【本轮策略】${strategy}
 【可以引用的概念白名单】${allowedConcepts.join('、') || '（无，请只做澄清）'}
 【必须回避的内容】${forbidden.join('；') || '（无）'}
-【该步的知识位置提示】这一步的"动作类型"是 ${step?.kind ?? 'unknown'}，涉及概念：${step?.concepts.join('、') ?? '无'}
+【该步的知识位置提示】这一步的"动作类型"是 ${step?.kind ?? 'unknown'}，涉及概念：${step?.concepts.join('、') ?? '无'}${step?.intent ? `\n- 这一步要作出的判断：${step.intent}` : ''}${step?.why ? `\n- 判断依据：${step.why}\n- 依据只用来决定"该点出哪一个理由"，不要把依据里的完整算式或结论抄给学生` : ''}
 
 【此前已给出的提示与学生反馈，必须避免重复并增加实质信息】
 ${recent || '（无）'}
@@ -277,6 +277,8 @@ export const INTAKE_SYSTEM_PROMPT = `你是中学理科教研员，任务是**�
 {
   "subject": "physics | math | chemistry",
   "topics": ["知识点，3~6 个，用中学教材里的标准名称"],
+  "leafId": "从【候选知识位置】里挑一个知识点 id；候选都不合适就写 null",
+  "methodIds": ["从【候选知识位置】里挑 1~2 个方法 id；没有就给空数组"],
   "difficulty": 1到5的整数,
   "summary": "这道题在问什么（一句话，教师可见）",
   "givens": ["已知量，如 'm = 2 kg'，用题干原话"],
@@ -351,16 +353,45 @@ export const INTAKE_SYSTEM_PROMPT = `你是中学理科教研员，任务是**�
 - answerFingerprints 里有没有混进题干已知量？有就删掉。
 - solutionInsights 里有没有把答案本身写进去？那里只放"结论性说法"，不放数值。`;
 
-export function buildIntakeUserPrompt({ rawText, subjectHint }) {
-  return `【题目原文】（学生粘贴的，可能有换行错乱、缺少图片信息）
-${rawText}
+export function buildIntakeUserPrompt({ rawText, subjectHint, candidates }) {
+  const lines = [
+    `【题目原文】（学生粘贴的，可能有换行错乱、缺少图片信息）`,
+    rawText,
+    '',
+    `【学科提示】${subjectHint ? `出题人认为是 ${subjectHint}` : '未指定，请自行判断'}`,
+    '',
+  ];
 
-【学科提示】${subjectHint ? `出题人认为是 ${subjectHint}` : '未指定，请自行判断'}
+  /**
+   * 候选块：把"自由发明知识点"改成"在闭集里选"。
+   *
+   * 这条限制很关键 —— 没有它，模型会给出一道题库里根本不存在的知识点名，
+   * 报告页与推荐就挂不上任何配套题（等于归类失效）。
+   */
+  const leaves = candidates?.leaves ?? [];
+  const methods = candidates?.methods ?? [];
+  if (leaves.length || methods.length) {
+    lines.push(`【候选知识位置】（从题库里检索出来的，只能从这里挑）`);
+    for (const l of leaves) {
+      lines.push(`- 知识点 ${l.id}：${l.name}（路径：${l.path}·题量 ${l.count}）`);
+    }
+    for (const m of methods) {
+      lines.push(`- 方法 ${m.id}：${m.name}${m.family ? `（${m.family}）` : ''}`);
+    }
+    lines.push('');
+    lines.push(`请把 leafId 填成上面某一个知识点 id、methodIds 填成上面某一个或多个方法 id。`);
+    lines.push(`如果这些候选都不对，leafId 写 null、methodIds 写 [] —— 不要自己编树上没有的节点。`);
+    lines.push('');
+  }
 
-请按系统提示输出 JSON 建档结果。再次强调三件事：
-① cues 必须是学生会说出口的口语词；
-② answerFingerprints 里不要放题干已知量；
-③ 题干原文不要改写。`;
+  lines.push(
+    `请按系统提示输出 JSON 建档结果。再次强调三件事：`,
+    `① cues 必须是学生会说出口的口语词；`,
+    `② answerFingerprints 里不要放题干已知量；`,
+    `③ 题干原文不要改写。`,
+  );
+
+  return lines.join('\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -552,10 +583,10 @@ export function createOpenAIAdapter(config = readLLMConfig()) {
      * 错因 + 三组指纹）本身就长；截断了模型会给出半截 JSON，
      * 那样反而比"读不懂"更糟 —— 会静默产出一个缺指纹的题目。
      */
-    async understandProblem({ rawText, subjectHint }) {
+    async understandProblem({ rawText, subjectHint, candidates }) {
       const { content: raw, finishReason } = await chat(
         INTAKE_SYSTEM_PROMPT,
-        buildIntakeUserPrompt({ rawText, subjectHint }),
+        buildIntakeUserPrompt({ rawText, subjectHint, candidates }),
         {
           temperature: 0.2,
           /**

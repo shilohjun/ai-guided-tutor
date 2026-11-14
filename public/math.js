@@ -52,7 +52,11 @@
   /* 就地渲染已经排进 DOM 的文字节点（对话气泡、题面等） */
   function renderMathIn(root, opts) {
     if (!root) return;
-    var skip = (opts && opts.includeCode) ? 'pre, script, style, .katex' : 'code, pre, script, style, .katex';
+    /* 必须躲开的：脚本与样式本身，以及所有表单控件 ——
+       textarea 的默认值就是一个文本子节点，被替换成 span 之后 value 就废了。
+       自动渲染会扫整页，所以这条不再是理论风险。 */
+    var skipAlways = 'script, style, textarea, input, select, option, .katex';
+    var skip = (opts && opts.includeCode) ? skipAlways + ', pre' : skipAlways + ', code, pre';
     var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: function (node) {
         if (!node.nodeValue || !hasMath(node.nodeValue)) return NodeFilter.FILTER_REJECT;
@@ -92,6 +96,85 @@
     hasMath: hasMath,
     renderToHtml: renderToHtml,
     renderMathIn: renderMathIn,
-    renderBlock: renderBlock
+    renderBlock: renderBlock,
+    /* 关掉自动渲染的开关：万一哪个页面想完全手动控制，把它置 false 就行 */
+    autoRender: true,
+    /* 装好之后指向那个 MutationObserver —— 排查「公式为什么没画」时先看它 */
+    observer: null
   };
+
+  /* ==========================================================================
+     自动渲染：新内容进页面就自己过一遍 KaTeX
+     ==========================================================================
+     为什么要有这一层：显示点是一个只会变长的清单。首屏预览、第 3 页题干、
+     聊天气泡、推荐区预览、地图详情、工坊列表……每加一个，都要记得补一次
+     renderMathIn。2026-11 就漏过一次：首屏摊开题库题干时，570 道新题
+     （公式是 $…$ 原文，不是旧那种 <img class="qf"> 图片）整屏显示 LaTeX 源码。
+
+     所以把「渲染」从每个调用点挪到这里：观察 body，谁被塞进来、谁的文字被改写，
+     就画谁。显式调用点保留 —— 它们让首帧就画好，不会有一闪而过的源码；
+     这一层只兜底，幂等，重复跑不产生二次渲染。
+
+     不会死循环：KaTeX 插进去的节点都包在 .katex 里，主循环直接跳过，
+     第二轮扫不到东西，自然收敛。
+     ========================================================================== */
+  function installAutoRender() {
+    var pending = [];
+    var scheduled = false;
+
+    function skipSubtree(el) {
+      return !!(el.closest && el.closest('script, style, textarea, input, select, option, .katex'));
+    }
+
+    function collect(node) {
+      if (!node) return;
+      var el = node.nodeType === 1 ? node : (node.nodeType === 3 ? node.parentElement : null);
+      if (!el) return;
+      pending.push(el);
+      schedule();
+    }
+
+    /* 一帧内的多次变更合成一次；嵌套的只留最外层，同一棵树不走两遍 */
+    function flush() {
+      scheduled = false;
+      var list = pending;
+      pending = [];
+      if (!window.BsjMath.autoRender) return;
+      if (list.length > 60) list = [document.body];
+      var targets = list.filter(function (el) {
+        if (!el.isConnected) return false;
+        return !list.some(function (other) { return other !== el && other.contains(el); });
+      });
+      targets.forEach(function (el) {
+        if (skipSubtree(el)) return;
+        renderMathIn(el);
+      });
+    }
+
+    function schedule() {
+      if (scheduled) return;
+      scheduled = true;
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(flush);
+      else setTimeout(flush, 16);
+    }
+
+    /* math.js 是在 body 里执行的，这时文档可能只解析了一半：
+       先扫一遍已经存在的，剩下的交给观察器 —— 后面插入的每个节点都会被看见。 */
+    renderMathIn(document.body);
+
+    var mo = new MutationObserver(function (records) {
+      if (!window.BsjMath.autoRender) return;
+      for (var i = 0; i < records.length; i++) {
+        var r = records[i];
+        if (r.type === 'characterData') { collect(r.target); continue; }
+        for (var j = 0; j < r.addedNodes.length; j++) collect(r.addedNodes[j]);
+      }
+    });
+    mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+    window.BsjMath.observer = mo;
+    return mo;
+  }
+
+  if (document.body) installAutoRender();
+  else document.addEventListener('DOMContentLoaded', installAutoRender);
 })();

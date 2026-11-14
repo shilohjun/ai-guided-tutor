@@ -1479,19 +1479,37 @@ body[data-page="bank"] .home-only{opacity:0;pointer-events:none}
     return String(html || '').replace(/<img[^>]*class="qfig"[^>]*>/g, '<span class="fig-ph">〔图〕</span>');
   }
 
-  /* 卡片先用纯文本占位（$…$ 立刻由 KaTeX 画出来），再逐题取回 rich HTML 把公式图补上 */
+  /* 卡片先用纯文本占位（$…$ 立刻由 KaTeX 画出来），再由观察器补上公式图。
+   *
+   * 早先这里截了前 80 张：只补这些。835 道题、纯文本用 ⟨式⟩ 占位的
+   * 有 103 道，前 80 张里正好命中 22 道，剩下的 81 道永远停在占位符上 —— 表现就是
+   * 「还有很多题目在用 ⟨式⟩ 替代」。
+   *
+   * 现在改成滚到哪补哪：IntersectionObserver 盯着卡片，进入视口（含 300px 预取边）
+   * 才排进队列，并发仍限 6。而且只补真的需要补的卡 —— 纯文本里已经是 $…$ 的
+   * 新题第一帧就画好了，不用再发一次请求。全量 103 次请求，不是 835 次。
+   */
   var hydrateToken = 0;
+  var hydrateObserver = null;
+  var PLACEHOLDER = '⟨式⟩';
+
   function hydrate(root, list) {
     if (!root || !list || !list.length) return;
     var token = ++hydrateToken;
-    var queue = list.slice(0, 80);
-    var idx = 0, active = 0;
+    if (hydrateObserver) { hydrateObserver.disconnect(); hydrateObserver = null; }
+
+    var byId = {};
+    list.forEach(function (q) { byId[q.i] = q; });
+
+    var queue = [];
+    var active = 0;
     function pump() {
-      while (active < 6 && idx < queue.length) {
-        var q = queue[idx++];
+      while (active < 6 && queue.length) {
+        var job = queue.shift();
         active += 1;
-        (function (item) {
-          var cell = root.querySelector('.qcard[data-i="' + item.i + '"] .qcard-stem');
+        (function (job) {
+          var cell = job.cell;
+          var item = job.item;
           var ready = qCache[item.i] ? Promise.resolve(qCache[item.i]) : fetch('/qbank/q/' + item.i + '.json').then(function (r) {
             if (!r.ok) throw new Error('no');
             return r.json();
@@ -1502,10 +1520,44 @@ body[data-page="bank"] .home-only{opacity:0;pointer-events:none}
             if (det && det.stemHtml) cell.innerHTML = previewHtml(det.stemHtml);
             mathIn(cell);
           }).catch(function () { }).then(function () { active -= 1; pump(); });
-        })(q);
+        })(job);
       }
     }
-    pump();
+
+    /* 只挑占位卡；正文里已有 $…$ 的不用管 */
+    var cards = root.querySelectorAll('.qcard');
+    var targets = [];
+    for (var k = 0; k < cards.length; k++) {
+      var stem = cards[k].querySelector('.qcard-stem');
+      if (!stem || stem.textContent.indexOf(PLACEHOLDER) < 0) continue;
+      var q = byId[cards[k].getAttribute('data-i')];
+      if (!q) continue;
+      targets.push({ card: cards[k], cell: stem, item: q });
+    }
+    if (!targets.length) return;
+
+    if (typeof IntersectionObserver !== 'function') {
+      /* 老浏览器：退回一次性全补，宁可多请求也不能留占位 */
+      queue = targets;
+      pump();
+      return;
+    }
+
+    hydrateObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        hydrateObserver.unobserve(en.target);
+        var job = en.target.__hydrateJob;
+        if (!job) return;
+        queue.push(job);
+        pump();
+      });
+    }, { root: null, rootMargin: '300px 0px' });
+
+    targets.forEach(function (t) {
+      t.card.__hydrateJob = t;
+      hydrateObserver.observe(t.card);
+    });
   }
 
   /* ---------- 导图 / 题库：拖动分隔条改宽度（双击复位，键盘 ←/→ 微调） ---------- */
