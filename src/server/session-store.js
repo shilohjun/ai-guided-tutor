@@ -21,9 +21,9 @@
  *    听到的是"你想从哪一步开始"（提示层级归零）。`record.hintLog` 是报告与
  *    "这一步给过 L3 没有"的唯一依据，少它等于把公式卡也一起锁上。
  *
- * ③ **报告快照只冻结一次。** 导出件不能随代码变化而变化（设计稿 §5.2）——
+ * ③ **每个对话版本的报告快照只冻结一次。** 导出件不能随代码变化而变化（设计稿 §5.2）——
  *    冻结之后 `buildReport` 再怎么改，学生当时看到的那份就是那份。
- *    冻结由调用方判（`if (!session.reportSnapshot)`），这里只保证它跟着落库。
+ *    有新对话时旧快照留入 reportHistory，再生成新版本；重复读取同一版本不重算。
  *
  * ============================================================================
  * 写失败与读失败的策略是**不对称**的，这是刻意的
@@ -56,6 +56,8 @@ export const SNAPSHOT_FIELDS = [
   'batchId',
   'visitId',
   'problemId',
+  'problemSnapshot',
+  'inputLog',
   'questionIndex',
   'startedAt',
   'lastAt',
@@ -86,6 +88,8 @@ export function createLiveSession({ id, problemId, engine = null, adapterTag = '
   return {
     id,
     problemId,
+    problemSnapshot: null,
+    inputLog: [],
     engine,
     adapterTag,
     /** 归属：登录之后第一次写穿时由 /api/chat 从令牌补上（见 persistSession 的 owner） */
@@ -158,6 +162,8 @@ export function snapshotSession(session) {
    * 快照的正确性不能建立在"驱动会克隆"这个假设上。
    */
   if (Array.isArray(snap.history)) snap.history = snap.history.slice();
+  if (snap.problemSnapshot) snap.problemSnapshot=structuredClone(snap.problemSnapshot);
+  if (Array.isArray(snap.inputLog)) snap.inputLog=snap.inputLog.map(x=>({...x}));
   if (snap.progress && typeof snap.progress === 'object') {
     snap.progress = { ...snap.progress, reached: { ...(snap.progress.reached ?? {}) } };
   }
@@ -193,6 +199,8 @@ export function hydrateSession(record, { engine = null, adapterTag = 'offline', 
     'batchId',
     'visitId',
     'questionIndex',
+    'problemSnapshot',
+    'inputLog',
     'startedAt',
     'lastAt',
     'finishedAt',
@@ -411,6 +419,7 @@ export async function persistReset(store, session, nowIso = new Date().toISOStri
   }
   cleared.history = [];
   cleared.record = createSessionRecord(session.problemId);
+  cleared.inputLog=[];
   cleared.turns = [];
   cleared.lastAt = nowIso;
   cleared.reportSnapshot = null;

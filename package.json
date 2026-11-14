@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node server/server.js",
     "dev": "node --watch server/server.js",
-    "test": "node test/run.js && node --test test/report-practice.test.mjs test/report-review.test.mjs test/report-assessment.test.mjs test/qbank-report.test.mjs && node scripts/audit-ui-style.js",
+    "test": "node test/run.js && node --test test/report-practice.test.mjs test/report-review.test.mjs test/report-assessment.test.mjs test/qbank-report.test.mjs test/session-report-evidence.test.mjs && node scripts/audit-ui-style.js",
     "eval": "node scripts/eval.js",
     "eval:llm": "node scripts/eval.js --adapter llm",
     "ocr:path": "node scripts/ocr-path-probe.js",

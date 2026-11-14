@@ -12,12 +12,13 @@
  * 这更贴合产品主张（关注"怎么走到这一步"而不是"答对没有"）。
  */
 
-import { findStepByPosition, findGraph, totalSteps } from './locate.js';
+import { findStepByPosition } from './locate.js';
 import { inspectVoice } from './prompt.js';
 import { safeStepRef } from './guard.js';
 import { buildReportReview } from './report-review.js';
 import { assessLearning } from './report-assessment.js';
 import { buildReportPractice } from './report-practice.js';
+export const REPORT_SCHEMA_VERSION='session-evidence-v3';
 
 /**
  * 从引擎响应累积一条会话记录（服务端维护）。
@@ -34,6 +35,7 @@ export function appendTurn(record, { utterance, response, problem }) {
   const position = response.diagnosis.position;
   const step = problem ? findStepByPosition(problem, position) : null;
 
+  const studentMessageIndex=record.turns.length;
   record.turns.push({ role: 'student', text: utterance, at: now });
   record.turns.push({
     role: 'ai',
@@ -47,6 +49,7 @@ export function appendTurn(record, { utterance, response, problem }) {
   record.hintLog.push({
     at: now,
     utterance,
+    studentMessageIndex,
     suppressed: Boolean(response.suppressed),
     requestedLevel: response.hint.level,
     deliveredLevel: response.hint.level,
@@ -100,8 +103,17 @@ export function createSessionRecord(problemId) {
  * @returns {import('./types.js').Report}
  */
 export function buildReport(problem, record, meta) {
-  const graph = findGraph(problem, record.hintLog[0]?.graphId ?? problem.solutionGraphs[0]?.id);
-  const stepTotal = totalSteps(problem, graph?.id);
+  problem={topics:[],asked:[],givens:[],solutionGraphs:[],misconceptions:[],...problem};
+  record={turns:[],hintLog:[],formulaCards:[],...record};
+  for (const key of ['topics','asked','givens','solutionGraphs','misconceptions']) if (!Array.isArray(problem[key])) problem[key]=[];
+  for (const key of ['turns','hintLog','formulaCards']) if (!Array.isArray(record[key])) record[key]=[];
+  // Older persisted records sometimes contain only the transcript. Preserve its process evidence.
+  if (!record.hintLog.length && record.turns.length) {
+    record={...record,historyIncomplete:true,hintLog:record.turns.flatMap((t,i)=>t.role==='student'
+      ? [{utterance:t.text,at:t.at,studentMessageIndex:i,form:'unverified',suppressed:true,
+          deliveredLevel:0,misconceptionIds:[],graphId:null,stepIndex:null}] : [])};
+  }
+  record={...record,hintLog:record.hintLog.map(l=>({misconceptionIds:[],deliveredLevel:0,...l}))};
 
   /**
    * 后面所有"教学统计"都只看**引导轮**，把确认轮排除掉。
@@ -111,12 +123,12 @@ export function buildReport(problem, record, meta) {
    * 学生会看到"第 8 步 · 引导 1 轮 · 已接近完成"这种莫名其妙的条目。
    * 确认轮的学生可见语义是"你答对了"，它不该出现在任何"卡在哪"的统计里。
    */
-  const guidedLogs = record.hintLog.filter((l) => l.form !== 'confirm');
+  const guidedLogs = record.hintLog.filter((l) => !l.suppressed && !['confirm','silent','refusal','unverified'].includes(l.form));
 
   // ---- 1. 卡点聚合：按 (步骤, 卡点性质) 归并 ----
   const stuckMap = new Map();
   for (const log of guidedLogs) {
-    const key = `${log.stepIndex ?? 'na'}::${log.stuckKind}`;
+    const key = `${log.graphId ?? 'na'}::${log.stepIndex ?? 'na'}::${log.stuckKind}`;
     if (!stuckMap.has(key)) {
       stuckMap.set(key, {
         stepIndex: log.stepIndex,
@@ -161,7 +173,8 @@ export function buildReport(problem, record, meta) {
   };
 
   // ---- 3. 独立完成度 ----
-  const independence = computeIndependence(record, stepTotal);
+  const assessment = assessLearning(problem, record);
+  const independence = computeIndependence(assessment);
 
   // ---- 4. 深层问题：把零散错因归纳成认知缺口 ----
   const deeperIssues = inferDeeperIssues(problem, record);
@@ -172,15 +185,18 @@ export function buildReport(problem, record, meta) {
   // ---- 6. 下一步行动 ----
   const nextActions = buildNextActions(stuckPoints, independence, deeperIssues);
 
-  const assessment = assessLearning(problem, record);
-  const review = buildReportReview(problem);
+  const partialSections=[];
+  const optional=(section,fn,fallback)=>{try{return fn();}catch{partialSections.push(section);return fallback;}};
+  const review = optional('知识与方法',()=>buildReportReview(problem),{
+    source:'unavailable',status:'pending',knowledge:[],methods:[],note:'配套标签暂不可用，学习过程与作答证据已保留。'});
+  const practice=optional('推荐题',()=>buildReportPractice(problem,assessment,review),{knowledge:[],methods:[],gaps:[]});
   return {
     problemId: problem.id,
     problemTitle: `${problem.subject === 'physics' ? '物理' : ''} · ${problem.topics.slice(0, 2).join('/')}（难度 ${problem.difficulty}/5）`,
     stuckPoints,
     assessment,
     review,
-    practice: buildReportPractice(problem, assessment, review),
+    practice,
     hintStats,
     formulaCards: record.formulaCards?.length ?? 0,
     independence,
@@ -191,6 +207,9 @@ export function buildReport(problem, record, meta) {
       engine: meta.engine,
       model: meta.model,
       generatedAt: new Date().toISOString(),
+      schemaVersion: REPORT_SCHEMA_VERSION,
+      partialSections,
+      referenceUnverified:problem.source==='imported' && problem.referenceVerified!==true,
     },
   };
 }
@@ -214,43 +233,18 @@ function stepTitle(problem, graphId, stepIndex) {
   return ref ? ref.replace(/^「|」$/g, '') : `第 ${stepIndex} 步`;
 }
 
-/**
- * 独立完成度算法（可解释版）：
- *   基础分 = 学生自己走过的步骤数 / 总步骤数
- *   扣分项 = 每获得一次 L3 降级示范，扣 0.1（最多扣 0.4）
- *   加分项 = 被守卫拦下的次数体现"护栏在工作"，不计入学生表现
- *
- * 注意：这里衡量的是"帮助强度"，不是"学生水平"。
- * 报告文案必须避免把它表述成分数评价。
- */
-function computeIndependence(record, stepTotal) {
-  const touchedSteps = new Set(
-    record.hintLog.map((l) => l.stepIndex).filter((i) => typeof i === 'number'),
-  );
-  const completedSteps = touchedSteps.size;
-  const total = Math.max(stepTotal, completedSteps, 1);
-
-  const l3Count = record.hintLog.filter((l) => l.deliveredLevel === 3).length;
-  const l2Count = record.hintLog.filter((l) => l.deliveredLevel === 2).length;
-  const formulaCount = record.formulaCards?.length ?? 0;
-  const penalty = Math.min(0.4, l3Count * 0.1 + l2Count * 0.04 + formulaCount * 0.1);
-
-  let raw = completedSteps / total - penalty;
-  raw = Math.max(0, Math.min(1, raw));
-
-  const noteParts = [`你独立走过了 ${completedSteps} / ${total} 个关键步骤`];
-  if (l3Count > 0) noteParts.push(`其中 ${l3Count} 次用到了"示范一步"`);
-  if (l2Count > 0) noteParts.push(`${l2Count} 次用到了方向提示`);
-  if (formulaCount > 0) noteParts.push(`${formulaCount} 次查看了公式卡`);
-  if (l3Count === 0 && l2Count === 0 && formulaCount === 0 && record.hintLog.length > 0) {
-    noteParts.push('全程只用到条件追问，说明你自己完成得很扎实');
-  }
-
+/** 独立完成度只计入已核验的独立作答；定位、提问与提示次数不充当完成证据。 */
+function computeIndependence(assessment) {
+  const qs=assessment.subquestions ?? [];
+  const independent=qs.filter(q=>q.state==='independently_completed').length;
+  const total=qs.length;
   return {
-    score: Math.round(raw * 100) / 100,
-    completedSteps,
+    score:total && qs.every(q=>q.verifiable) ? Math.round(independent/total*100)/100 : null,
+    completedSteps:independent,
     totalSteps: total,
-    note: noteParts.join('，') + '。',
+    basis:'verified-subquestions',
+    note:total ? `本题有证据的独立完成为 ${independent} / ${total} 个待求量；提示后完成单独记录，不等同于独立掌握。`
+      : '待求量或核验依据不足，暂不计算独立完成度；提问次数和定位步骤不算完成证据。',
   };
 }
 
@@ -310,7 +304,7 @@ function inferDeeperIssues(problem, record) {
     }
   }
 
-  if (issues.length === 0 && record.hintLog.length > 0) {
+  if (false) {
     issues.push({
       id: 'no-systemic',
       text: '本轮没有暴露出系统性缺口，卡点更像是"单点没想起"，属于正常波动。',
@@ -348,8 +342,8 @@ function buildRecommendations(problem, stuckPoints, deeperIssues) {
   if (recs.length === 0) {
     recs.push({
       topic: problem.topics[0] ?? '本题知识点',
-      reason: '本轮进展顺利，未出现明显卡点。',
-      drill: '尝试把本题改一个条件（例如把匀速改成匀加速），看方法是否还成立。',
+      reason: '暂无足够证据确认具体卡点，先保留本次学习过程。',
+      drill: '独立重述当前列式与依据，检查已知条件、单位和适用前提。',
     });
   }
 

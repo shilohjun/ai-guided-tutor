@@ -20,6 +20,8 @@ export function getQbankProblem(id) {
     difficulty:{'易':2,'中':3,'难':4}[q.d] || 3,stem,
     topics:[...new Set([q.chap,...review.knowledge.map(k=>k.title)])],
     referenceAnswer:answerText,answerFingerprints,reportReview:review,
+    // Keep the original question's figures/formula images with the session, not just text placeholders.
+    questionAssets:{stemHtml:q.stemHtml,options:structuredClone(q.options)},
     // Lossless answer/analysis/formula image assets remain server-only.
     referenceSource:{code:q.code,answerHtml:q.answerHtml,analysisHtml:q.analysisHtml,
       knowledgeIds:[...q.knowledgeIds],methodIds:[...q.methodIds]},
