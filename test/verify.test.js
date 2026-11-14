@@ -167,7 +167,7 @@ describe('答案判定 · 与引擎的联调', () => {
     assertEquals(res.completion.complete, true);
     assertEquals(res.completion.expectedCount, 4);
     assert(
-      res.diagnosis.strengths.some((s) => s.includes('自己算出了')),
+      res.diagnosis.strengths.some((s) => s.includes('结果已核验')),
       `strengths 应记录结果性肯定，实际：${JSON.stringify(res.diagnosis.strengths)}`,
     );
     assertEquals(res.diagnosis.stuckKind, 'finished');
