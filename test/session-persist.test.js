@@ -329,8 +329,9 @@ describe('会话 · 冷启动回载', () => {
       await store.putSession(recordFor({ id: sessionId, problemId: goneId }));
 
       const noSnap = await call(base, `/api/report?sessionId=${sessionId}`);
-      assertEquals(noSnap.status, 404, '题目没了、也没有快照 → 不能编一份报告出来');
-      assertIncludes(String(noSnap.json?.error ?? ''), '题目', '话要落到"题目没了"这件事上');
+      assertEquals(noSnap.status, 200, '旧会话即使缺题目快照，也保留有边界的过程报告');
+      assertEquals(noSnap.json.report.meta.problemContextMissing, true);
+      assertEquals(noSnap.json.report.assessment.accuracy.percent, null);
 
       /** 换一个入口问同一件事：聊天必须说清"重新导入"，而不是 500 或者凭空开始 */
       const chatAfterSweep = await call(base, '/api/chat', {
@@ -338,7 +339,7 @@ describe('会话 · 冷启动回载', () => {
         body: { sessionId, problemId: goneId, utterance: '还是不会', mode: 'self_training', explicitHelpSeeking: true },
       });
       assertEquals(chatAfterSweep.status, 404, '题目不在注册表时聊天应 404，而不是崩在回载里');
-      assertIncludes(String(chatAfterSweep.json?.error ?? ''), '重新导入', '要给出可操作的下一步');
+      assertIncludes(String(chatAfterSweep.json?.error ?? ''), '重试题目读取', '要给出可操作的下一步且不要求重做');
 
       /** 已经冻结过快照的：照发那一份（导出件不能因为注册表回收就变样） */
       await store.putSession(
@@ -656,7 +657,7 @@ describe('会话 · 续做接口', () => {
 // ===========================================================================
 
 describe('会话 · 报告快照', () => {
-  it('同一会话连取两次报告，第二次与第一次逐字段相同（中间还追加了一轮）', async () => {
+  it('同一对话版本报告保持不变；追加新轮次后更新报告并保留旧版本', async () => {
     await withRouterServer({}, async ({ base, store }) => {
       const sessionId = uid('freeze');
       await chat(base, { sessionId });
@@ -665,16 +666,19 @@ describe('会话 · 报告快照', () => {
       assertEquals(first.status, 200);
       const firstText = JSON.stringify(first.json.report);
       assert(firstText.length > 50, '前提：报告不该是空的');
+      const same=await call(base, `/api/report?sessionId=${sessionId}`);
+      assertEquals(JSON.stringify(same.json.report),firstText,'没有新证据时不重算');
 
       /** 中间再聊一轮：如果快照被重算，这里就会带上新的一轮 */
       await chat(base, { sessionId, utterance: '然后呢' });
 
       const second = await call(base, `/api/report?sessionId=${sessionId}`);
       assertEquals(second.status, 200);
-      assertEquals(JSON.stringify(second.json.report), firstText, '报告快照只冻结一次，不得被重算覆盖');
+      assert(JSON.stringify(second.json.report)!==firstText, '新学习轮次不能被旧报告遮住');
 
       const stored = await store.getSession(sessionId);
-      assertEquals(JSON.stringify(stored.reportSnapshot), firstText, '冻结的那一份必须落库（导出件读它）');
+      assertEquals(JSON.stringify(stored.reportSnapshot), JSON.stringify(second.json.report));
+      assertEquals(JSON.stringify(stored.reportHistory[0].reportSnapshot),firstText,'旧报告原样留档');
       assert(stored.reportBuiltAt, 'reportBuiltAt 要记下来，否则没人知道这份快照是哪一刻的');
     });
   });

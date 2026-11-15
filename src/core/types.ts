@@ -320,6 +320,8 @@ export interface Turn {
 }
 
 export interface HintRequest {
+  /** Internal server-computed evidence only; /api/chat never accepts this field from a client. */
+  learningVerdict?: { complete: boolean; expectedCount: number; remainingCount: number; correctQuotes: string[] } | null;
   problemId: string;
   /** 本轮学生输入 */
   utterance: string;
@@ -729,7 +731,17 @@ export interface DraftInput {
 // 学习报告
 // ---------------------------------------------------------------------------
 
+export type LearningState = 'independently_completed' | 'completed_with_hint' |
+  'completed_after_demonstration' | 'still_incorrect' | 'insufficient_evidence';
+
 export interface Report {
+  assessment?: {
+    knowledge: {id:string; title:string; status:'mastered'|'consolidate'|'weak'|'unknown'; state?:LearningState; evidence:unknown[]}[];
+    subquestions: {id:string;title:string;state:LearningState;verifiable:boolean;completed:boolean;everIncorrect:boolean;corrected:boolean;evidence:unknown[]}[];
+    completion: {completed:number;total:number;percent:number|null;complete:boolean;verifiable:number};
+    accuracy: {correct:number;total:number;percent:number|null};
+    feedback: unknown[];
+  };
   problemId: string;
   problemTitle: string;
   /** 卡点清单 */
@@ -749,7 +761,7 @@ export interface Report {
     guardBlocked: number;
   };
   /** 独立完成度 */
-  independence: { score: number; completedSteps: number; totalSteps: number; note: string };
+  independence: { score: number|null; completedSteps: number; totalSteps: number; note: string; basis?:string };
   /** 深层问题（跨卡点归纳的认知缺口） */
   deeperIssues: string[];
   /** 举一反三建议（只给定点，不代做） */

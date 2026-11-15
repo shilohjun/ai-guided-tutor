@@ -45,6 +45,9 @@ import { understandProblem } from '../core/intake.js';
 import { getProblemById, listProblems, getImportMeta, getProblemAnalysis, registerImportedProblem, registryStats } from '../core/registry.js';
 import { toStudentAnalysis } from '../core/analysis.js';
 import { createSessionRecord, appendTurn, buildReport } from '../core/report.js';
+import { assessLearning } from '../core/report-assessment.js';
+import { numericAttempts } from '../core/learning-evidence.js';
+import { captureProblem, sessionProblem, missingProblem } from './problem-snapshot.js';
 import { formulaCardFor } from '../core/formula-cards.js';
 import { looksLikeHelpRequest } from '../core/route.js';
 import { runEvaluation, formatEvaluation } from '../core/eval.js';
@@ -227,10 +230,12 @@ function getSession(sessionId, problemId) {
     s = createLiveSession({
       id: sessionId,
       problemId,
+      // Capture before the first model call, not when the report happens to open.
       engine: createEngine({ adapter: getAdapter(), problem: problemId ? getProblemById(problemId) : null }),
       adapterTag,
       now,
     });
+    s.problemSnapshot=captureProblem(problemId ? getProblemById(problemId) : null);
     sessions.set(sessionId, s);
   } else if (s.adapterTag !== adapterTag) {
     /**
@@ -244,7 +249,7 @@ function getSession(sessionId, problemId) {
      * 所以这里以"这一次请求的形态"为准重建引擎，历史对话保留
      * （history 是引擎的输入而不是引擎的一部分，换引擎不会丢上下文）。
      */
-    s.engine = createEngine({ adapter: getAdapter(), problem: problemId ? getProblemById(problemId) : null });
+    s.engine = createEngine({ adapter: getAdapter(), problem: sessionProblem(s,getProblemById(problemId)) });
     s.adapterTag = adapterTag;
   }
   s.touchedAt = now;
@@ -313,7 +318,7 @@ export async function restoreSession(store, sessionId, problemId, me = null) {
 
   if (problemId && record.problemId !== problemId) return null;
 
-  const liveProblem = getProblemById(record.problemId);
+  const liveProblem = sessionProblem(record,getProblemById(record.problemId));
   const live = hydrateSession(record, {
     /**
      * 题目没了就**没有引擎**：这个对象只用于读（报告快照、公式卡判断）。
@@ -417,7 +422,7 @@ function readJson(req) {
        * 覆盖"前端压缩到长边 1600px"的正常产出，同时离 Vercel serverless
        * 请求体上限（约 4.5MB）还有安全距离。
        */
-      const limit = String(req.url ?? '').startsWith('/api/ocr') ? 2_600_000 : 1_000_000;
+      const limit = /^\/api\/(?:ocr|session\/start)(?:\?|$)/.test(String(req.url ?? '')) ? 2_600_000 : 1_000_000;
       if (size > limit) {
         aborted = true;
         /**
@@ -1573,6 +1578,32 @@ export async function handleApi(req, res, url) {
     return true;
   }
 
+  // Confirming a question persists server-owned context even before any chat.
+  if (path === '/api/session/start' && req.method === 'POST') {
+    const body=await readJson(req);
+    const sid=body?.sessionId, pid=body?.problemId;
+    if (typeof sid!=='string' || !sid.trim() || sid.length>160 || typeof pid!=='string') {
+      sendJson(res,400,{error:'需要有效的会话编号与题目编号'}); return true;
+    }
+    const store=await getStore().catch(()=>null);
+    const restored=await restoreForRoute(res,store,sid,null,req.__user);
+    if (restored.replied) return true;
+    let session=restored.session;
+    if (notMine(session,req.__user)) { sendNotOwner(res); return true; }
+    if (session && session.problemId!==pid) {
+      sendJson(res,409,{error:'该会话已关联另一道题，请开启新的学习会话'});return true;
+    }
+    const problem=sessionProblem(session,getProblemById(pid));
+    if (!problem) { sendJson(res,404,{error:'题目读取未完成，请重试确认题目；已保存的聊天不会被清除'});return true; }
+    const isNew=!session;
+    session ??= getSession(sid,pid);
+    if (isNew || !session.problemSnapshot) session.problemSnapshot=captureProblem(problem,{originalStem:body.originalStem,image:body.image});
+    if (isNew) session.progress={maxPage:2,reached:{p2:session.startedAt},backtracks:0};
+    const saved=await persistSession(store,session,{page:2,owner:req.__user});
+    sendJson(res,200,{sessionId:sid,saved:Boolean(saved),snapshotReady:true,
+      durable:Boolean(saved) && ['file','cloudbase'].includes(store?.kind)});return true;
+  }
+
   // ---- POST /api/chat ----
   if (path === '/api/chat' && req.method === 'POST') {
     const body = await readJson(req);
@@ -1586,12 +1617,6 @@ export async function handleApi(req, res, url) {
       sendJson(res, 400, { error: '需要 problemId 与 utterance' });
       return true;
     }
-    const problem = getProblemById(problemId);
-    if (!problem) {
-      sendJson(res, 404, { error: `未找到题目 ${problemId}。如果是导入的题目，服务重启后需要重新导入。` });
-      return true;
-    }
-
     if (mode === 'ai_companion') {
       // 只上线了自主训练：能力位（/api/health 的 capabilities.modes）里没有的模式，
       // 前端点不到、服务端也不接 —— 免得改漏一处就悄悄跑出一个没验收过的模式。
@@ -1613,12 +1638,20 @@ export async function handleApi(req, res, url) {
     const store = await getStore().catch(() => null);
     const restored = await restoreForRoute(res, store, sid, problemId, req.__user);
     if (restored.replied) return true;
+    const problem=sessionProblem(restored.session,getProblemById(problemId));
+    if (!problem) {
+      sendJson(res,404,{error:'题目上下文暂不可用，已保存的聊天仍可生成过程报告；请重试题目读取。',retryable:true});return true;
+    }
     const session = restored.session ?? getSession(sid, problemId);
     /** 归属校验（C10）：内存命中的那条不经过库，这里再判一次（新会话 userId 为空，照常放行） */
     if (notMine(session, req.__user)) {
       sendNotOwner(res);
       return true;
     }
+    session.problemSnapshot ??= captureProblem(problem);
+    const input={at:new Date().toISOString(),utterance,status:'processing'};
+    (session.inputLog ??= []).push(input);
+    await persistSession(store,session,{page:3,owner:req.__user});
     const normalizedMode = 'self_training';
 
     /**
@@ -1635,6 +1668,9 @@ export async function handleApi(req, res, url) {
 
     let response;
     try {
+      const preview=numericAttempts(problem,[...session.record.hintLog,{utterance,form:'unverified',
+        suppressed:true,deliveredLevel:0,at:input.at}],{formulaCards:session.record.formulaCards});
+      const quotes=preview.subquestions.flatMap(q=>q.evidence.filter(e=>e.turn===session.record.hintLog.length && e.result==='correct').map(e=>e.quote));
       response = await session.engine.handleTurn({
         problemId,
         utterance,
@@ -1646,8 +1682,13 @@ export async function handleApi(req, res, url) {
         sessionId: session.id,
         persona,
         deadlineAt,
+        // Server-generated only: a request body cannot supply grading decisions.
+        learningVerdict:preview.completion.total ? {complete:preview.completion.complete,
+          expectedCount:preview.completion.total,remainingCount:preview.completion.total-preview.completion.completed,correctQuotes:quotes} : null,
       });
     } catch (error) {
+      input.status='failed';
+      await persistSession(store,session,{owner:req.__user});
       /**
        * 超时：**由我们自己回** 503，并且先留一条 `chat_error`。
        *
@@ -1681,6 +1722,16 @@ export async function handleApi(req, res, url) {
       metaGraphId: response.diagnosis.position.graphId,
     });
     appendTurn(session.record, { utterance, response, problem });
+    input.status='succeeded';
+    // A report freezes one revision, not every future turn of this session.
+    if (session.reportSnapshot) {
+      (session.reportHistory ??= []).push({reportSnapshot:session.reportSnapshot,
+        reportBuiltAt:session.reportBuiltAt,archivedAt:now,reason:'continued-learning'});
+      session.reportSnapshot=null; session.reportBuiltAt=null;
+    }
+    const evidence=assessLearning(problem,session.record);
+    session.record.learning=evidence;
+    const verified=evidence.completion;
 
     /**
      * 会话 → 这次打开的回填（J6）。
@@ -1740,7 +1791,14 @@ export async function handleApi(req, res, url) {
 
     // 学生载荷 —— 只走白名单投影
     const turnIndex = session.history.filter((t) => t.role === 'ai').length;
-    sendJson(res, 200, buildStudentTurn({ ...response, stepCount: totalSteps(problem, response.diagnosis.position.graphId) }, normalizedMode, problem, persona, turnIndex));
+    const payload=buildStudentTurn({ ...response, stepCount: totalSteps(problem, response.diagnosis.position.graphId) }, normalizedMode, problem, persona, turnIndex);
+    // The same per-question records drive live completion and the report; values are never unioned in the client.
+    payload.completion={complete:verified.complete,expectedCount:verified.total,answeredCount:verified.completed,
+      remainingCount:Math.max(0,verified.total-verified.completed),matched:response.completion?.matched ?? []};
+    payload.progress.completed=evidence.verifiedSteps.filter(ref=>ref.startsWith(response.diagnosis.position.graphId+':'))
+      .map(ref=>Number(ref.split(':').at(-1))).filter(Number.isFinite);
+    payload.progress.stepLabels=stepLabelsFor(problem,response.diagnosis.position.graphId,payload.progress.completed);
+    sendJson(res, 200,payload);
     return true;
   }
 
@@ -1771,7 +1829,7 @@ export async function handleApi(req, res, url) {
       sendNotOwner(res);
       return true;
     }
-    const problem = getProblemById(session.problemId);
+    const problem=sessionProblem(session,getProblemById(session.problemId));
     if (!problem) {
       sendJson(res, 404, { error: '这道题已不在题库里。' });
       return true;
@@ -1814,8 +1872,8 @@ export async function handleApi(req, res, url) {
       // 没有会话可回载 —— 给出可操作的提示，而不是一个空白错误
       sendJson(res, 404, {
         error: '该会话不存在或已过期',
-        detail:
-          '会话已经写进存储，但这个 id 在库里没有记录：可能是在别的环境开始的，也可能是链接里的 id 不对。请回到题单重新开始一道题。',
+        detail:'未能找到这份学习记录，请保留当前页面并重试；如仍失败，请提供会话编号排查，不必重新做题。',
+        retryable:true,
       });
       return true;
     }
@@ -1829,21 +1887,26 @@ export async function handleApi(req, res, url) {
       return true;
     }
 
-    const problem = getProblemById(session.problemId);
+    const knownProblem=sessionProblem(session,getProblemById(session.problemId));
+    const problem=knownProblem ?? missingProblem(session.problemId);
+    // Upgrade the known previous algorithm once, keeping exactly what the student saw in history.
+    if (knownProblem && session.reportSnapshot?.meta?.schemaVersion==='session-evidence-v2') {
+      (session.reportHistory ??= []).push({reportSnapshot:session.reportSnapshot,
+        reportBuiltAt:session.reportBuiltAt,archivedAt:new Date().toISOString(),reason:'report-algorithm-upgrade'});
+      session.reportSnapshot=null;session.reportBuiltAt=null;
+    }
     /**
      * 快照优先（C5）：已经冻结过的那一份**哪怕题目被回收了也照发** ——
      * 报告是学生当时看到的结论，注册表清理不该让它变成 404。
      * 只有"没有快照 + 题目也没了"才说实话（照片/粘贴题就是这个形状）。
      */
     if (!session.reportSnapshot) {
-      if (!problem) {
-        sendJson(res, 404, { error: '该会话的题目已不在注册表里（导入题目有存活时间）' });
-        return true;
-      }
       session.reportSnapshot = buildReport(problem, session.record, {
         engine: session.engine?.adapter?.kind ?? 'unknown',
         model: session.engine?.adapter?.model,
       });
+      session.reportSnapshot.meta.problemContextMissing=!knownProblem;
+      session.reportSnapshot.meta.unprocessedInputs=(session.inputLog ?? []).filter(x=>x.status!=='succeeded').length;
       session.reportBuiltAt = new Date().toISOString();
       /** 到报告页就是"走完了"：写进 finishedAt，续做条才不会一直劝他回来 */
       session.finishedAt = session.reportBuiltAt;
@@ -1851,7 +1914,11 @@ export async function handleApi(req, res, url) {
       /** 写穿（C6）：快照与完成状态一起落库（导出件读的是库里那份） */
       await persistSession(store, session, { page: 4, owner: req.__user });
     }
-    sendJson(res, 200, { report: session.reportSnapshot, turns: session.record.turns });
+    const pendingInputs=(session.inputLog ?? []).filter(x=>x.status!=='succeeded')
+      .map(x=>({text:x.utterance,at:x.at,status:x.status}));
+    const studentReport=pendingInputs.length ? {...session.reportSnapshot,
+      meta:{...session.reportSnapshot.meta,unprocessedInputs:pendingInputs.length}} : session.reportSnapshot;
+    sendJson(res, 200, { report: studentReport, turns: session.record.turns, pendingInputs });
     return true;
   }
 

@@ -205,15 +205,15 @@ export function composeStudentMessage(diagnosis, hint) {
  * @param {{ verdict: import('./types.js').AnswerVerdict, problem: object }} input
  */
 export function composeConfirmation({ verdict, problem }) {
-  const left = verdict.remaining.length;
+  const left = verdict.remainingCount ?? verdict.remaining.length;
 
   const candidates = verdict.complete
     ? [
-        '完全正确。这道题从头到尾是你自己推出来的 —— 每一步的判断都由你完成，我只在你停顿时问了一个前提。',
-        '答案正确。回顾一下：这道题的关键关节都是你自己走通的，我只是把该想的地方指给了你。',
+        '各待求量的结果已有正确作答证据。是否能独立复现解题过程，还需要结合提示记录和你的解释确认。',
+        '结果已核验正确。接下来可以合上提示，试着说明关键依据，检验是否能独立复现。',
       ]
     : [
-        `这一问的结果是对的。你已经独立解决了一部分 —— 还有 ${left} 个待求量没有着落，接着往下走。`,
+        `这一问的结果已核验正确。还有 ${left} 个待求量待完成，先选一个继续说明依据。`,
         `对，这个结果是正确的。剩下的 ${left} 个量你继续推进，从你认为最有把握的那一个入手。`,
         `这一步结论正确。${left} 个待求量还没处理完，我们把它走完整。`,
       ];
@@ -223,7 +223,7 @@ export function composeConfirmation({ verdict, problem }) {
     if (findUnstatedAnswers(text, problem, verdict).length === 0) return text;
   }
   return verdict.complete
-    ? '完全正确。这道题是你自己推出来的。'
+    ? '结果已核验正确，独立复现情况还需验证。'
     : '这一问的结果是对的，剩下的部分继续推进。';
 }
 
@@ -249,7 +249,7 @@ export function confirmationNextAsk(verdict) {
 export function confirmationStrengths(verdict) {
   const out = [];
   if (verdict.matched.length) {
-    out.push(`自己算出了 ${verdict.matched.length} 个待求量：${verdict.matched.map((m) => m.raw).join('、')}`);
+    out.push(`本轮提交的 ${verdict.matched.length} 个结果已核验：${verdict.matched.map((m) => m.raw).join('、')}`);
   }
   if (verdict.complete) out.push('把这道题的每一问都推进到了结果');
   return out;

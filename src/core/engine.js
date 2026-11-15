@@ -27,7 +27,7 @@ import {
   confirmationStrengths,
 } from './prompt.js';
 import { verifyAnswer, findUnstatedAnswers } from './verify.js';
-import { isFollowUpUtterance } from './text.js';
+import { isFollowUpUtterance,canonicalize } from './text.js';
 
 /**
  * 从历史里取出最近一次 AI 轮次所依据的位置。
@@ -338,8 +338,16 @@ export function createEngine({ adapter, problem, logger } = {}) {
      * 代价是确认轮也会调一次 observe（一次 LLM 调用）。这个代价换来的，
      * 是教师视图里"学生答对了那一轮他在第几步、有没有错因"仍然看得到。
      */
-    const verdict = verifyAnswer(problem, request.utterance ?? '');
-    const isConfirmation = verdict.matched.length > 0 || verdict.complete;
+    let verdict = verifyAnswer(problem, request.utterance ?? '');
+    if (request.learningVerdict) {
+      const learning=request.learningVerdict;
+      const compact=s=>canonicalize(String(s)).replace(/\s+/g,'');
+      const matched=verdict.matched.filter(m=>learning.correctQuotes.some(q=>compact(q).includes(compact(m.raw))));
+      verdict={...verdict,matched,complete:learning.complete && learning.correctQuotes.length>0,
+        expectedCount:learning.expectedCount,remainingCount:learning.remainingCount};
+    }
+    const isConfirmation = request.learningVerdict ? request.learningVerdict.correctQuotes.length>0
+      : verdict.matched.length > 0 || verdict.complete;
 
     // ---------------- 1. observe ----------------
     /**

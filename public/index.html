@@ -2009,6 +2009,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     problems: function () { return API.req('/api/problems'); },
     problem: function (id) { return API.req('/api/problem?id=' + encodeURIComponent(id)); },
     importProblem: function (text, opt) { return API.post('/api/problem/import', { rawText: text }, opt); },
+    startSession: function (body) { return API.post('/api/session/start', body); },
     chat: function (body) { return API.post('/api/chat', body); },
     report: function (sid, pid) { return API.req('/api/report?sessionId=' + encodeURIComponent(sid) + '&problemId=' + encodeURIComponent(pid || '')); },
     ocr: function (image) { return API.post('/api/ocr', { image: image }); }
@@ -2431,7 +2432,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
 
   function goPage2() {
     if (S.reading) return;
-    if (S.problem && S.picked) { setPage(2); return; }
+    if (S.problem && S.picked) { prepareLearningSession(); setPage(2); return; }
     var typed = $('#input1').value.trim();
     if (!S.picked && !typed) return;
 
@@ -2445,6 +2446,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
 
     task.then(function (res) {
       S.problem = res.problem;
+      prepareLearningSession(typed);
       hydrateBankDetail();
       if (!S.picked) S.picked = { id: res.problem.id, topics: res.problem.topics, source: 'imported' };
       $('#p2text').textContent = S.problem.stem;
@@ -2613,15 +2615,38 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
   });
 
   /* ---------------- 会话 ---------------- */
+  function prepareLearningSession(original) {
+    var pid=S.problem && S.problem.id;
+    if (!pid) return;
+    if (S.preparedProblemId===pid && S.preparedSessionId) return;
+    S.preparedProblemId=pid;
+    S.preparedSessionId='ui-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,7);
+    S.preparedMaterial={sessionId:S.preparedSessionId,problemId:pid,originalStem:original || S.problem.stem,
+      image:typeof ocrShot==='string' ? ocrShot : null};
+    // Keep rejection handled while the student is still choosing a mode; retry before chat/report.
+    S.sessionReady=API.startSession(S.preparedMaterial).then(function(){return true;},function(){return false;});
+  }
+  function ensureLearningSession() {
+    var material=S.activeSessionMaterial;
+    if (!material) return Promise.resolve();
+    return Promise.resolve(S.sessionReady).then(function(ok){
+      if (ok) return;
+      return API.startSession(material).then(function(d){S.sessionReady=Promise.resolve(true);return d;});
+    });
+  }
   function startSession(preserveReport) {
     if (!preserveReport) REPORT_ORIGIN = null;
-    S.sessionId = 'ui-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+    if (!S.preparedSessionId || S.preparedProblemId!==S.problem.id) prepareLearningSession();
+    S.sessionId = S.preparedSessionId;
+    S.activeSessionMaterial=S.preparedMaterial;
+    S.preparedSessionId=null; S.preparedProblemId=null;
     S.turns = [];
     S.done = false;
     S.busy = false;
     S.report = null;
     S.reportTurns = [];
     S.reportErr = null;
+    S.turnReady = Promise.resolve();
     S.progress = { index: null, count: S.problem.stepCount || 0, done: [], labels: {} };
     S.sessionStart = Date.now();
     S.ledger.push({ problemId: S.problem.id, done: false, at: Date.now() });
@@ -2858,14 +2883,14 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     S.busy = true;
     renderChat();
 
-    API.chat({
+    S.turnReady=ensureLearningSession().then(function(){ return API.chat({
       sessionId: S.sessionId,
       problemId: S.problem.id,
       utterance: text,
       mode: S.mode === 'self' ? 'self_training' : 'ai_companion',
       explicitHelpSeeking: helpFlag,
       persona: S.mentor
-    }).then(function (r) {
+    }); }).then(function (r) {
       var p = r.progress || {};
       S.progress = {
         index: typeof p.stepIndex === 'number' ? p.stepIndex : S.progress.index,
@@ -2892,18 +2917,11 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       if (r.completion) {
         var entry = S.ledger[S.ledger.length - 1];
         if (entry && entry.problemId === S.problem.id) {
-          entry.seen = entry.seen || {};
-          (r.completion.matched || []).forEach(function (m) {
-            entry.seen[m.value + '|' + m.unit] = 1;
-          });
-          entry.expected = r.completion.expectedCount || entry.expected || 0;
-          entry.matched = Math.min(Object.keys(entry.seen).length, entry.expected || 99);
-          if (entry.expected && entry.matched >= entry.expected) {
-            entry.done = true;
-            S.done = true;
-          }
+          entry.expected = r.completion.expectedCount || 0;
+          entry.matched = r.completion.answeredCount || 0;
+          entry.done = Boolean(r.completion.complete);
         }
-        if (r.completion.complete) S.done = true;
+        S.done = Boolean(r.completion.complete);
       }
       // 有过真实对话之后，报告页就该可达（报告是实时的，不必等做完）
       if (S.max < 4) {
@@ -3030,7 +3048,9 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     S.reportLoading = true;
     renderReport();
     var reportSession = S.sessionId;
-    API.report(reportSession, S.problem && S.problem.id).then(function (d) {
+    var pendingTurn=S.turnReady || Promise.resolve();
+    var reportProblemId=S.problem && S.problem.id;
+    Promise.resolve(pendingTurn).catch(function(){}).then(ensureLearningSession).then(function(){return API.report(reportSession,reportProblemId);}).then(function (d) {
       if (S.sessionId !== reportSession) return;
       S.reportLoading = false;
       S.report = d.report;
@@ -3051,7 +3071,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     var list = rep && rep.assessment ? rep.assessment.knowledge || [] : [];
     return {
       ok: list.filter(function (x) { return x.status === 'mastered'; }).map(function (x) { return x.title; }),
-      warn: list.filter(function (x) { return x.status === 'consolidate'; }).map(function (x) { return x.title; }),
+      warn: list.filter(function (x) { return x.status === 'consolidate' || x.status === 'unknown'; }).map(function (x) { return x.title + (x.status === 'unknown' && !/待核验|证据不足|尚未作答/.test(x.title) ? '（证据不足，待核验）' : ''); }),
       bad: list.filter(function (x) { return x.status === 'weak'; }).map(function (x) { return x.title; })
     };
   }
@@ -3179,6 +3199,18 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       $('#reportAlert').hidden = false;
       $('#reportAlert').textContent = '尚无本题对话记录，以下展示题库配套知识与方法；暂不判断个人掌握情况。';
     }
+    if (rep.meta && rep.meta.problemContextMissing) {
+      $('#reportAlert').hidden=false;
+      $('#reportAlert').textContent='原题上下文暂缺，已保留学习过程与对话；正确率和掌握情况等待核验，不需要重做。';
+    }
+    if (rep.meta && rep.meta.referenceUnverified) {
+      $('#reportAlert').hidden=false;
+      $('#reportAlert').textContent='本题参考答案尚未可靠核验，先展示学习过程与待核验项，不生成推测的正确率或掌握结论。';
+    }
+    if (rep.meta && rep.meta.unprocessedInputs) {
+      $('#reportAlert').hidden=false;
+      $('#reportAlert').textContent='部分输入尚未完成AI处理，已保留原文；报告仅统计已有核验证据，可返回解题页重试。';
+    }
     var buckets = levelBuckets(rep);
     $('#mWeak').textContent = buckets.bad[0] || '证据不足，暂未确认';
     $('#mWeak').parentNode.classList.toggle('warn', buckets.bad.length > 0);
@@ -3186,7 +3218,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     $('#lvWarn').innerHTML = chips(buckets.warn, '暂无充分证据');
     $('#lvBad').innerHTML = chips(buckets.bad, '暂无充分证据');
     $('#lvOk').title = '仅指本题：无具体提示，独立作答正确且说明依据；不代表长期掌握。';
-    $('#lvWarn').title = '本题出现明确错误、提示后完成或尚缺独立解释；纠正后仍需巩固。';
+    $('#lvWarn').title = '包括提示后完成、明确错误和证据不足的待核验项；证据不足不等于不会，纠正后也不等于长期掌握。';
     $('#lvBad').title = '获得具体提示后，同一概念仍至少出现两次明确错误。';
 
     var items = assessment ? (assessment.feedback || []).slice(0, 3) : [];
@@ -3232,7 +3264,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
   }
 
   var REPORT_ORIGIN = null;
-  var REPORT_FIELDS = ['problem','picked','pickedBank','sessionId','turns','done','progress','report','reportTurns','reportErr','sessionStart'];
+  var REPORT_FIELDS = ['problem','picked','pickedBank','sessionId','turns','done','progress','report','reportTurns','reportErr','sessionStart','activeSessionMaterial','sessionReady'];
   function rememberReport() {
     if (S.page !== 4 || !S.problem || !S.report || S.reportLoading) return;
     REPORT_ORIGIN = {};

@@ -28,6 +28,8 @@ export function getQbankProblem(id) {
     summary:keysteps ? `${q.chap}·${q.leaf}：${q.stemText.replace(/\s+/g,' ').slice(0,50)}` : skeleton.summary,
     topics:[...new Set([q.chap,...review.knowledge.map(k=>k.title)])],
     referenceAnswer:answerText,answerFingerprints,reportReview:review,
+    // Keep the original question's figures/formula images with the session, not just text placeholders.
+    questionAssets:{stemHtml:q.stemHtml,options:structuredClone(q.options)},
     // Lossless answer/analysis/formula image assets remain server-only.
     referenceSource:{code:q.code,answerHtml:q.answerHtml,analysisHtml:q.analysisHtml,
       knowledgeIds:[...q.knowledgeIds],methodIds:[...q.methodIds]},
