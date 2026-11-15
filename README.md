@@ -14,7 +14,7 @@
 
 [![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](package.json)
 [![依赖](https://img.shields.io/badge/dependencies-0-brightgreen)](package.json)
-[![测试](https://img.shields.io/badge/tests-783%2F783-brightgreen)](test/run.js)
+[![测试](https://img.shields.io/badge/tests-818%2F818-brightgreen)](test/run.js)
 [![许可](https://img.shields.io/badge/license-UNLICENSED-lightgrey)](LICENSE)
 
 仓库地址：<https://github.com/shilohjun/ai-guided-tutor>
@@ -305,7 +305,7 @@ npm run preview:verify    # file:// 打开验收
 npm test
 ```
 
-当前注册 **783 个用例，全部通过**。`npm test` 跑完测试后会接着跑
+当前注册 **818 个用例，全部通过**。`npm test` 跑完测试后会接着跑
 `scripts/audit-ui-style.js`：它把设计令牌（间距 2/4/6/8/12/16/24/32、字号三档、
 嵌套圆角、语义色）做成可执行规则，样式一跑偏就报出来 —— 只靠人眼看不住。
 字号与控件尺寸参考 LeetCode 做题页后，再按中文密度收一档（中档题干 13/18.9、标签 11、按钮高 32、顶栏 52）。
@@ -351,7 +351,9 @@ public/
   app.js / styles.css   旧版页面代码，当前不引用，正在清理
   shell.js              旧壳入口脚本（只被 classic.html 加载）
   shell.css / shell-overrides.css / youth.css   旧壳样式
-  mathinput.js          旧壳的符号插入
+  mathinput.js          自动替换规则（`^2`→`²`、`mu`→`μ`），浏览器与 Node 共用
+  symbolpanel.js        符号面板：清单 + 插入落点 + 摆放（纯函数）+ 浮层渲染
+  voice.js              语音输入：浏览器 Web Speech API + 拼接/错误文案（纯函数）
 src/core/
   engine.js             主流程编排
   locate.js             卡点定位

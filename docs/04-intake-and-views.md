@@ -1040,6 +1040,16 @@ node scripts/audit-ui-style.js
 规则放在 `public/mathinput.js`（**纯函数，浏览器与 Node 共用**），
 所以 `test/mathinput.test.js` 能直接拿奇怪输入去砸它，规则不会漂移成两份。
 
+> **这一版里两层机制分别落在两处，别记混**：
+> 符号面板的清单与插入落点在 `public/symbolpanel.js`，挂在主界面
+> （`public/index.html`）的题干框与对话框上；自动替换的规则仍在
+> `public/mathinput.js`，目前只有旧壳（`classic.html`）在调用。
+>
+> 面板曾经**消失过一个月**：2026-10-28 主界面整页重写把它带走了，commit 一字未提，
+> 而当时全仓没有一条断言问过"界面上还有符号入口吗" —— 清单在、规则在、用例全绿。
+> 现在 `test/ui.test.js` 钉了一条 DOM 契约（两个输入框都必须有 `data-sym-trigger`
+> 且指向同一个 `#symPanel`），下一次整页重写会先在那里红。
+
 **只认显式约定，不猜**：`^` `_` `>=` 这类是声明式的，见到就换；
 而 `v0` → `v₀` 这种"猜意图"的一律不做 —— 它会顺手把 `sin53` 变成 `sin₅₃`。
 

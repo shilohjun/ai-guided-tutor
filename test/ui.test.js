@@ -77,6 +77,47 @@ describe('前端 · DOM 契约（防止"点了没反应"）', () => {
     assert(missing.length === 0, '以下 id 在 index.html 里不存在，运行时会静默失效：\n  ' + missing.join('\n  '));
   });
 
+  /**
+   * 符号面板的入口必须真的存在。
+   *
+   * 这条是补一个真实事故：面板 2026-10-28 随着 index.html 整页重写消失了，
+   * commit message 一个字没提，而当时全仓**没有一条断言问过"界面上还有符号入口吗"** ——
+   * 清单还在、替换规则还在、用例还在跑，CI 全绿，谁都没发现。
+   *
+   * 所以这里钉三件事：题干框和对话框各有一个入口、两个入口指向同一个面板容器、
+   * 渲染模块真的被加载。下一回整页重写会在这里先红。
+   */
+  it('两个输入框都有符号入口，且指向同一个面板容器', () => {
+    const triggers = [...html.matchAll(/<button[^>]*data-sym-trigger="(input[13])"[^>]*>/g)];
+    const bound = triggers.filter((m) => m[0].includes('aria-controls="symPanel"'));
+    assertEquals(
+      bound.length,
+      2,
+      '题干输入框（#input1）与对话输入框（#input3）各要有一个符号入口，且都指向 #symPanel；' +
+        `实际找到 ${triggers.length} 个入口、其中 ${bound.length} 个指向 #symPanel`,
+    );
+    assertIncludes(html, 'id="symPanel"', '面板容器 #symPanel 不存在');
+    assertIncludes(html, 'data-sym-grid', '面板缺少格子容器 data-sym-grid');
+    assertIncludes(html, 'src="/symbolpanel.js"', '面板渲染模块 public/symbolpanel.js 没有被加载');
+  });
+
+  /**
+   * 语音入口同样要两处都有，理由同上一条 —— 而且它已经翻过一次车：
+   * 第 3 页从一开始就有麦克风，第 1 页（题干）从来没有；第 3 页那个还是个桩，
+   * 点一下只改 placeholder，连 SpeechRecognition 都没碰过。两条都没人测。
+   */
+  it('两个输入框都有语音入口，且都绑到了自己的文本框', () => {
+    const triggers = [...html.matchAll(/<button[^>]*data-mic-for="(input[13])"[^>]*>/g)];
+    const targets = new Set(triggers.map((m) => m[1]));
+    assertEquals(
+      targets.size,
+      2,
+      '题干输入框（#input1）与对话输入框（#input3）各要有一个语音入口；' +
+        `实际绑到的目标：${[...targets].join(',') || '（无）'}`,
+    );
+    assertIncludes(html, 'src="/voice.js"', '语音模块 public/voice.js 没有被加载');
+  });
+
   it('学生解题页不含任何"防泄题 / 教研"面板（那些内容不该出现在学生面前）', () => {
     const start = htmlVisible.indexOf('data-page="3"');
     const end = htmlVisible.indexOf('data-page="4"');

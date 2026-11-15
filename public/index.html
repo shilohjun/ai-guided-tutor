@@ -600,6 +600,53 @@ body[data-page="1"] .tb-center,body[data-page="2"] .tb-center{opacity:0;pointer-
 .send-btn:hover{background:var(--brand-strong)}
 .send-btn[disabled]{background:var(--surface-3);color:var(--ink-3);cursor:not-allowed}
 
+/* =====================================================================
+   符号面板
+   ---------------------------------------------------------------------
+   物理公式里的 ² μ Ω √ 在普通键盘上打不出来 —— 写不出来，学生就只能用文字绕，
+   思路的表达精度直接下降。面板是给"不会打"的人兜底的，不是唯一入口。
+
+   两点和旧版不同，都是被现在的布局逼出来的：
+   1) 浮层挂在 <body> 上、fixed 定位。第 3 页的输入框长在 .pane{overflow:hidden}
+      里，第 1 页长在 .p1{overflow-y:auto} 里 —— 绝对定位的浮层在这两处都会被裁掉，
+      表现就是"点开了只看到一条边"。
+   2) 两页共用同一个面板，靠 data-sym-trigger 指向各自的输入框。
+   ===================================================================== */
+.sym-trigger{font-family:var(--font-sans);font-size:var(--fs-body);font-weight:700;line-height:1}
+/* 题库的题已经灌进输入框时，文本框被只读卡片顶掉，符号与语音都没有落点 —— 入口跟着一起收起来 */
+.composer.is-picked .sym-trigger,
+.composer.is-picked .mic-btn{display:none}
+
+.sympanel{
+  position:fixed;left:0;top:0;z-index:45;
+  width:min(480px,calc(100vw - 32px));
+  display:flex;flex-direction:column;gap:6px;padding:8px;
+  background:var(--surface);border:1px solid var(--line-strong);
+  border-radius:var(--r-sub);box-shadow:var(--shadow-2);
+  /* 高度由 public/symbolpanel.js 钳到"输入框上方还剩多少"，超出的部分格子自己滚 */
+  overflow:hidden;
+}
+.sympanel[hidden]{display:none}
+.symgrid{display:flex;flex-direction:column;gap:6px;min-height:0;overflow-y:auto}
+.symgroup{display:flex;align-items:center;gap:8px}
+.symgroup-label{flex:none;width:32px;text-align:right;font-size:var(--fs-meta);font-weight:400;color:var(--ink-3)}
+.symrow{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
+.symcell{
+  min-width:32px;height:32px;padding:0 6px;
+  display:grid;place-items:center;
+  font-family:var(--font-sans);font-size:var(--fs-body);font-weight:600;line-height:1;color:var(--ink);
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-inner);
+  cursor:pointer;transition:background .12s,border-color .12s,color .12s;
+}
+.symcell:hover{background:var(--brand-tint);border-color:var(--brand-line);color:var(--brand-ink)}
+.symcell:active{background:var(--brand-tint)}
+/* 手机：格子放大到能稳妥点中的尺寸（44px），分组标签收窄一点省宽度 */
+@media (max-width:640px){
+  .sympanel{width:min(100%,calc(100vw - 24px));gap:8px}
+  .symgroup-label{width:24px}
+  .symcell{min-width:44px;height:44px;padding:0 8px}
+}
+
 /* 识别成功：图挂在输入框右侧、文字直接落进输入框本体 */
 .composer-main{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
 .composer-main textarea{flex:1;min-width:0}
@@ -1595,11 +1642,17 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 12h16M12 4v16"/></svg>
                 物理 · 高中
               </span>
-              <span class="c-hint" id="pickHint">支持文字、拍照识别</span>
+              <span class="c-hint" id="pickHint">支持文字、语音、拍照识别</span>
               <button class="picked-clear" id="pickedClear" type="button" hidden>重新输入</button>
               <button class="ocr-retry" id="ocrRetry" type="button" hidden>重新识别</button>
             </div>
             <div class="c-right">
+              <button class="icon-btn mic-btn" id="mic1" type="button" aria-label="语音输入" aria-pressed="false" data-mic-for="input1">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="3" width="6" height="10.5" rx="3"></rect>
+                  <path d="M5.5 11a6.5 6.5 0 0 0 13 0"></path><path d="M12 17.5V21"></path>
+                </svg>
+              </button>
               <button class="icon-btn" id="cam1" type="button" aria-label="拍照上传题目">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M4 8h2.6l1.4-2h8l1.4 2H20a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"></path>
@@ -1607,6 +1660,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
                 </svg>
               </button>
               <input type="file" id="file1" accept="image/*" hidden>
+              <button class="icon-btn sym-trigger" id="symBtn1" type="button" aria-label="符号面板" aria-expanded="false" aria-controls="symPanel" data-sym-trigger="input1">Ω</button>
               <button class="send-btn" id="send1" type="button" aria-label="确认题目" disabled>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M12 19V5"></path><path d="M6 11l6-6 6 6"></path>
@@ -1737,7 +1791,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
             <textarea id="input3" placeholder="说说你的下一步…" aria-label="对话输入"></textarea>
             <div class="composer-bar">
               <div class="c-left">
-                <button class="icon-btn sm mic-btn" id="micBtn" type="button" aria-label="语音输入">
+                <button class="icon-btn sm mic-btn" id="micBtn" type="button" aria-label="语音输入" aria-pressed="false" data-mic-for="input3">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="9" y="3" width="6" height="10.5" rx="3"></rect>
                     <path d="M5.5 11a6.5 6.5 0 0 0 13 0"></path><path d="M12 17.5V21"></path>
@@ -1749,6 +1803,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
                     <circle cx="12" cy="13.2" r="3.2"></circle>
                   </svg>
                 </button>
+                <button class="icon-btn sm sym-trigger" id="symBtn3" type="button" aria-label="符号面板" aria-expanded="false" aria-controls="symPanel" data-sym-trigger="input3">Ω</button>
                 <input type="file" id="file3" accept="image/*" hidden>
               </div>
               <div class="c-right">
@@ -1896,8 +1951,17 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       <div class="mentor-grid" id="mentorGrid" role="radiogroup" aria-label="选择陪学老师"></div>
     </div>
 
+    <!-- 符号面板：两个输入框共用这一个。挂在 body 上、fixed 定位，
+         因为它要逃出 .pane{overflow:hidden} 与 .p1{overflow-y:auto} 的裁剪。
+         格子由 public/symbolpanel.js 按清单渲染，清单只有一份。 -->
+    <div class="sympanel" id="symPanel" role="group" aria-label="符号" hidden>
+      <div class="symgrid" data-sym-grid></div>
+    </div>
+
 <script src="/vendor/katex/katex.min.js"></script>
 <script src="/math.js"></script>
+<script type="module" src="/symbolpanel.js"></script>
+<script type="module" src="/voice.js"></script>
 <script>
 (function () {
   'use strict';
@@ -2965,13 +3029,8 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     send(el.textContent, true);
   });
 
-  /* 语音：后端没有识别服务，不伪造转写结果 */
-  $('#micBtn').addEventListener('click', function () {
-    var input = $('#input3');
-    input.focus();
-    input.placeholder = '语音识别未接入，请直接输入文字';
-    setTimeout(function () { input.placeholder = '说说你的下一步…'; }, 2600);
-  });
+  /* 语音：真正的识别在 public/voice.js（浏览器自带的 Web Speech API）。
+     这里原来是个桩 —— 点一下只改 placeholder，连 SpeechRecognition 都没碰过。 */
 
   /* 拍照：识别成文字后填进输入框，由学生确认再发送 */
   $('#cam3').addEventListener('click', function () {
