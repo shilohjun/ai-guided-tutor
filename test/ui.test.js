@@ -474,9 +474,75 @@ describe('前端 · 公式自动渲染：不用每个显示点都手写一遍', 
     assertIncludes(mathJs, 'requestAnimationFrame', '一帧内的多次变更要合并成一次渲染');
   });
 
+  describe('前端 · 题库工作台使用完整索引', () => {
+    const qbankData = JSON.parse(readFileSync(join(ROOT, 'public/qbank/data.json'), 'utf8'));
+    const workbench = readFileSync(join(ROOT, 'public/qbank/workbench.html'), 'utf8');
+
+    it('工作台从完整前端索引加载，而不是依赖旧的固定题数', () => {
+      assert(qbankData.qs.some((q) => q.i === 836), '前端索引应包含新增题 836');
+      assertIncludes(workbench, "fetchQbankAsset('data.json')", '工作台应读取正式题库索引');
+      assertIncludes(workbench, "var urls = ['/qbank/' + path, path]", '工作台应兼容子路径部署');
+      assert(!workbench.includes('835 道'), '工作台不应保留旧的固定题数');
+    });
+
+    it('新增题目的知识点和章节 ID 必须存在于知识树', () => {
+      const chapters = new Set(qbankData.kg.flatMap((m) => (m.children || []).map((c) => c.id)));
+      const leaves = new Set(qbankData.kg.flatMap((m) => (m.children || []).flatMap((c) => (c.children || []).map((l) => l.id))));
+      for (const id of [836, 837, 838, 839, 840]) {
+        const q = qbankData.qs.find((item) => item.i === id);
+        assert(q, '题目 ' + id + ' 应存在');
+        assert(chapters.has(q.k), '题目 ' + id + ' 的章节 ID 无效');
+        assert(leaves.has(q.l), '题目 ' + id + ' 的知识点 ID 无效');
+      }
+    });
+  });
+
+  describe('前端 · 公式图片随文字字号缩放', () => {
+    const indexHtml = readFileSync(join(ROOT, 'public/index.html'), 'utf8');
+    const workbenchHtml = readFileSync(join(ROOT, 'public/qbank/workbench.html'), 'utf8');
+    const mapHtml = readFileSync(join(ROOT, 'public/qbank/map.html'), 'utf8');
+
+    it('qf 图片使用 em 高度，题图 qfig 不受影响', () => {
+      for (const html of [indexHtml, workbenchHtml, mapHtml]) {
+        assertIncludes(html, 'height:1.15em', '公式图片应按当前字体高度缩放');
+        assertIncludes(html, 'object-fit:contain', '公式图片应保持比例');
+      }
+    });
+  });
+
+  describe('前端 · 题库页面使用独立 CSS 文件', () => {
+    const pages = [
+      ['public/index.html', 'index.css'],
+      ['public/qbank/map.html', 'map.css'],
+      ['public/qbank/workbench.html', 'workbench.css'],
+    ];
+
+    it('页面引用外部 CSS，且提取后的样式文件存在', () => {
+      for (const [page, css] of pages) {
+        const html = readFileSync(join(ROOT, page), 'utf8');
+        assertIncludes(html, `rel="stylesheet" href="/${page.includes('qbank/') ? 'qbank/' : ''}${css}"`, page + ' 应引用独立 CSS');
+        assert(!/<style(?:\s|>)/.test(html), page + ' 不应继续保留内联 CSS');
+        const extracted = readFileSync(join(ROOT, 'public', page.includes('qbank/') ? 'qbank' : '', css), 'utf8');
+        assert(extracted.length > 0, css + ' 不应为空');
+      }
+    });
+  });
+
   it('可以一键关掉，观察器句柄也拿得到（出问题时能排查）', () => {
     assertIncludes(mathJs, 'autoRender', '要有 BsjMath.autoRender 这样的开关');
     assertIncludes(mathJs, 'BsjMath.observer', '观察器要挂在 BsjMath 上');
+  });
+
+  it('数学片段中的 Unicode 兼容字符不会交给 KaTeX 字体渲染', () => {
+    assertIncludes(mathJs, 'normalizeMathText', '数学文本需要先做 KaTeX 字符兼容处理');
+    assertIncludes(mathJs, "'NFKC'", '罗马数字和带圈数字应归一化为 KaTeX 支持的 ASCII 字符');
+    assertIncludes(mathJs, '\\u2460-\\u24FF', '应覆盖带圈数字和带圈字母');
+  });
+
+  it('自动公式渲染不占用动画帧并会合并重复根节点', () => {
+    assertIncludes(mathJs, 'requestIdleCallback', '批量公式渲染应安排在空闲时间');
+    assertIncludes(mathJs, 'pending.some', '重复的观察节点应合并');
+    assertIncludes(mathJs, 'pending.filter', '子树节点应从待处理列表中去重');
   });
 
   it('全局扫描不许闯进输入框', () => {
