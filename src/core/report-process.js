@@ -18,9 +18,9 @@ const HELP=/[?？]|吗|怎么|如何|为什么|哪条|哪个|能否|请.*(?:提�
 const OFFTOPIC=/人生|游戏|电影|天气|笑话|旅游|吃什么|股票/;
 const QUOTED=/举例|比如|老师说|老师问|AI说|参考答案/;
 
-export function processFeedback(logs,{knownFeedback=[],resolved=[]}={}) {
+export function processFeedback(logs,{knownFeedback=[],resolved=[],checkpoints=[]}={}) {
   const groups=new Map();
-  let previous=null;
+  let previous=null,previousTurn=null;
   for (let turn=0;turn<logs.length;turn++) {
     const log=logs[turn],text=String(log.utterance ?? '').trim();
     if (!text || OFFTOPIC.test(text) || QUOTED.test(text)) continue;
@@ -29,22 +29,29 @@ export function processFeedback(logs,{knownFeedback=[],resolved=[]}={}) {
     // A short follow-up may inherit a request's focus, never an arbitrary AI diagnosis.
     const group=direct || (CONFUSED.test(text) && text.length<=24 ? previous : null);
     if (!group) continue;
-    previous=group;
+    previous=group;if(direct)previousTurn=turn;
     if (knownFeedback.some(f=>f.evidence?.some(e=>e.quote===text))) continue;
     let item=groups.get(group.id);
     if (!item) {item={group,events:[]};groups.set(group.id,item);}
-    item.events.push({result:'help_requested',quote:text.slice(0,160),turn,
+    item.events.push({result:'help_requested',quote:text.slice(0,160),turn,focusTurn:previousTurn,
       messageIndex:log.studentMessageIndex ?? turn*2,graphId:log.graphId,stepIndex:log.stepIndex});
   }
   return [...groups.values()].map(({group,events})=>{
-    const last=events.at(-1),ref=`${last.graphId}:${last.stepIndex}`;
-    const fixed=resolved.some(r=>r.refs.includes(ref) && r.turn>last.turn &&
-      (group.id==='direction' ? /direction/.test(r.id) : group.id==='condition' ? /circuit|cutting|equilibrium|flux/.test(r.id) : false));
+    const matches=(r,e)=>r.turn>e.turn && (r.requestTurns?.includes(e.turn)||r.requestTurns?.includes(e.focusTurn)||r.helpTurns?.includes(e.turn)||r.helpTurns?.includes(e.focusTurn)||
+      (r.refs.includes(`${e.graphId}:${e.stepIndex}`) && (group.id==='direction' ? /direction/.test(r.id) : group.id==='condition' ? /circuit|cutting|equilibrium|flux/.test(r.id) : false)));
+    const resolutions=events.map(e=>{
+      const targets=checkpoints.filter(k=>k.requestTurns?.includes(e.turn)||k.requestTurns?.includes(e.focusTurn)||k.helpTurns?.includes(e.turn));
+      if(targets.length){const proofs=targets.map(k=>resolved.find(r=>r.id===k.id&&matches(r,e)));return proofs.every(Boolean)?proofs:null;}
+      const proof=resolved.find(r=>matches(r,e));return proof?[proof]:null;
+    });
+    const fixed=resolutions.every(Boolean);
+    const proofs=[...new Set(resolutions.flatMap(r=>r||[]))];
     const rounds=events.map(e=>e.turn+1).join('、');
-    return {id:`process-${group.id}`,kind:'process',title:group.title,status:fixed?'corrected':'pending',
+    return {id:`process-${group.id}`,kind:'process',title:fixed?group.title.replace(/待.*$/,'')+'求助已得到回应':group.title,status:fixed?'corrected':'pending',
       finding:`第${rounds}轮围绕${group.title.replace(/待.*$/,'')}求助，共${events.length}次。`+
         (fixed?'之后已有对应步骤的正确作答证据，独立迁移仍待验证。':'这些记录说明需要支持，尚不足以认定已经答错或已掌握。'),
-      action:group.action,evidence:events,helpRounds:events.length,
+      action:fixed?(proofs.find(r=>r.transferTask)?.transferTask||'不看提示，再独立解释这一步的依据。'):group.action,
+      evidence:[...events,...proofs.filter(r=>r.quote).map(r=>({result:'correct',quote:r.quote,turn:r.turn,messageIndex:r.messageIndex}))],helpRounds:events.length,
       priority:group.id==='goal'?2:1};
   }).sort((a,b)=>a.priority-b.priority || b.helpRounds-a.helpRounds || a.evidence[0].turn-b.evidence[0].turn);
 }

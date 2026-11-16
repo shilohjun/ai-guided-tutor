@@ -503,9 +503,13 @@ export function createEngine({ adapter, problem, logger } = {}) {
           l3Count: routing.l3Count ?? 0,
           history,
           utterance: request.utterance,
+          learningProgress:request.learningProgress,
         }, draftTimeout));
         draftMeta = drafted.meta;
-        const candidate = drafted.text;
+        // A model's fluent endorsement cannot overturn the shared answer ledger.
+        const candidate = request.learningVerdict?.incorrectQuotes?.length && !request.learningVerdict.correctQuotes.length
+          ? '这次提交的结果与本题核验结果不一致。\n先保留你的列式或选择依据，逐项核对题目条件、物理量对应关系和单位；从第一处不符合条件的判断开始修正，不需要把整道题推倒重来。'
+          : drafted.text;
 
         const visible = composeStudentMessage(diagnosis, { text: candidate, nextAsk: drafted.meta.nextAsk });
         const g = guard(visible, problem, routing.level, {
