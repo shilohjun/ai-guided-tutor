@@ -61,13 +61,39 @@ sudo systemctl restart bubujie
 
 ## 5. 怎么更新代码
 
+### 一条命令（推荐）
+
+```powershell
+# 在仓库根目录：先快进到 origin/main，再发（服务器已是同一版本就什么都不做）
+.\scripts\deploy-server.ps1 -Pull
+```
+
+会：`git fetch` → 落后就 `pull --ff-only` → 比对服务器上的 `/opt/bubujie/.deployed-rev`
+→ 不同才打包上传（40 MB）→ 解包 → 重启 → 本机健康检查 → 公网健康检查 → 打印地址。
+
+常用开关：
+
+| 开关 | 作用 |
+|---|---|
+| `-Pull` | 先快进到 `origin/main`（分叉就报错停下，不硬来） |
+| `-Force` | 服务器已是这个版本也重发 |
+| `-DryRun` | 只打包并打印命令，不连服务器 |
+| `-SshKey <path>` | 指定私钥；不指定就用 `.deploy-key/bubujie_deploy` |
+
+**部署密钥**：`.deploy-key/bubujie_deploy`（已授权到服务器，`gitignore` 里，绝不入库）。
+换一台电脑要部署的话，把这两个文件拷过去；或者重新 `ssh-keygen` 一把，把 `.pub`
+追加到服务器的 `~/.ssh/authorized_keys`。没有密钥时脚本会退回**交互式输密码**
+（scp 一次、ssh 一次），一样能用。
+
+### 手工步骤（脚本出问题时照这个来）
+
 本地（Windows）打包 → 上传 → 解包 → 重启。**`.data` 不在包里**，解压不会碰数据。
 
 ```bash
-# ① 本地：只打运行时需要的三样（别把 .git / test / docs / 题库原始 HTML 带上）
+# ① 本地：只打运行时需要的东西（别把 .git / test / docs / 题库原始 HTML 带上）
 tar -czf bubujie-app.tar.gz package.json server src public scripts/smoke-usage.mjs
 
-# ② 上传（任选其一）
+# ② 上传
 scp bubujie-app.tar.gz ubuntu@101.33.230.189:/tmp/
 
 # ③ 服务器：解包 + 重启（.env 不动）
