@@ -106,6 +106,8 @@
   --av:32px;
   --av-img:26px;
   --pane-head:44px;
+  /* 使用引导打开时首屏要给底部那张卡让出来的高度（卡片约 148 + 呼吸 32） */
+  --guide-lift:180px;
 }
 
 /* —— 档位：小。整组覆盖而不是乘一个系数，每个值都能逐行核对 —— */
@@ -375,10 +377,10 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
 .p1-ready .hero-mark{animation:softIn .5s cubic-bezier(.22,.61,.36,1) both}
 .p1-ready .hero-text{animation:softIn .58s .06s cubic-bezier(.22,.61,.36,1) both}
 .p1-ready .composer{animation:softIn .62s .14s cubic-bezier(.22,.61,.36,1) both}
-.p1-ready .goodbar{animation:softFade .5s .3s ease both}  /* 底条靠 translateX(-50%) 居中，不能动 transform */
+.p1-ready .p1-down{animation:softFade .5s .3s ease both}  /* 底条靠 translateX(-50%) 居中，只能淡入不能动 transform */
 @media (prefers-reduced-motion:reduce){
   .page.is-active,.page.is-leaving{animation:none}
-  .p1-ready .hero-mark,.p1-ready .hero-text,.p1-ready .composer,.p1-ready .goodbar{animation:none}
+  .p1-ready .hero-mark,.p1-ready .hero-text,.p1-ready .composer,.p1-ready .p1-down{animation:none}
 }
 
 .btn-primary{
@@ -458,26 +460,18 @@ html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;colo
 }
 .p1-chips button:hover{color:var(--ink);border-color:var(--line-strong)}
 
-.goodbar{
+/* 首页底部不再有「好题精练」按钮：留一行不可点的静态暗示，往下滑就进题库。
+   入口由先看一次的使用引导讲清楚（见第 11 节），这一行只负责"下面还有东西"。 */
+.p1-down{
   position:absolute;left:50%;bottom:22px;transform:translateX(-50%);
-  width:min(748px,calc(100% - 48px));display:flex;align-items:center;gap:12px;
-  padding:12px 16px;text-align:left;cursor:pointer;
-  background:var(--surface);border:1px solid var(--brand-line);border-radius:var(--r-pill);
-  transition:border-color .2s ease,transform .2s ease;
+  display:flex;align-items:center;gap:6px;
+  color:var(--ink-3);font-size:var(--fs-meta);white-space:nowrap;
+  pointer-events:none;
 }
-.goodbar:hover{border-color:var(--brand);transform:translate(-50%,-1px)}
-.goodbar:active{transform:translate(-50%,0);background:var(--brand-tint)}
-.gb-ico{
-  flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
-  background:var(--brand-tint);color:var(--brand-ink);font-size:12px;
-}
-.gb-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
-.gb-txt b{font-size:var(--fs-lead);font-weight:600;color:var(--ink)}
-.gb-txt em{font-style:normal;font-size:var(--fs-meta);color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.gb-go{margin-left:auto;flex:none;font-size:var(--fs-meta);color:var(--ink-3)}
-.goodbar + .bank{margin-top:16px}
+.p1-down i{font-style:normal;display:inline-block;animation:downNudge 2s ease-in-out infinite}
+@keyframes downNudge{0%,100%{transform:translateY(0)}50%{transform:translateY(2px)}}
 .bank-head .bank-map{display:none}
-@media (prefers-reduced-motion:reduce){.goodbar{transition:none}.p1-hero{transition:none}}
+@media (prefers-reduced-motion:reduce){.p1-down i{animation:none}.p1-hero{transition:none}}
 /* ===== 首屏极简：宋体标题，去掉示例与提示语 ===== */
 /* ===== 首屏标题字体：思源宋体子集（仅标题用到的 12 个字，3.4KB）===== */
 @font-face{
@@ -926,11 +920,12 @@ body.is-qb{overflow:hidden}
 .p2-foot .note{font-size:var(--fs-body);color:var(--ink-3);font-weight:400}
 
 /* =====================================================================
-   5.1 陪学老师：跟模式卡同层的一个大选择框
+   5.1 陪学老师：两张模式卡下面的一行「讲法的人」
    ---------------------------------------------------------------------
-   四位老师是"同一道题的不同讲法"，所以它和两张模式卡是同一层上的选择：
-   默认派蒙，选过就记住（bsj-mentor），不选就一直是派蒙。
-   点开的是浮层而不是第五屏 —— 步骤条只有四步，不该多出一个不在条上的页。
+   四位老师是"同一道题的不同讲法"，不是第三种做题方式 —— 所以它不该长成
+   第三张等大的卡。这一行只有头像和名字，四人同屏、点谁就是谁，不开浮层；
+   浮层只留给第 3 页栏头那个位置（那里排不开四个人）。
+   默认派蒙，选过就记住（bsj-mentor）。
    ===================================================================== */
 
 /* —— 头像取景 ——
@@ -951,8 +946,25 @@ body.is-qb{overflow:hidden}
   transform:translate(var(--fx,0),var(--fy,0));
 }
 
-/* —— 页面二：与两张模式卡同宽同高，排在同一列里 —— */
-.teacher-bar .av-frame{width:48px;height:48px}
+/* —— 页面二：一行头像，不占卡片的位置 ——
+   没有外框、没有背景：它要看起来像一句注解，不像第三张卡。
+   hover 才给一块浅底，让"能点"这件事在指针下显形。 */
+.mentor-row{display:flex;align-items:center;gap:12px;min-height:48px;flex-wrap:wrap}
+.mr-label{flex:none;font-size:var(--fs-body);color:var(--ink-3);font-weight:400}
+.mr-pick{
+  display:inline-flex;align-items:center;gap:6px;flex:none;
+  padding:4px 8px 4px 4px;border-radius:var(--r-pill);
+  border:1px solid transparent;background:transparent;
+  color:var(--ink-3);font-size:var(--fs-meta);font-weight:400;
+  transition:.16s;
+}
+.mr-pick:hover{background:var(--surface-2);color:var(--ink-2)}
+.mr-pick[aria-checked="true"]{
+  border-color:var(--brand-line);background:var(--brand-tint);
+  color:var(--brand-ink);font-weight:600;
+}
+.mr-pick .av-frame{width:var(--av);height:var(--av)}
+.mr-pick:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 
 /* —— 选老师层：居中浮层，点谁就是谁，点完即关 —— */
 .mentor-mask{position:fixed;inset:0;z-index:60;background:rgba(17,17,22,.40)}
@@ -1543,6 +1555,120 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
 .rel-preview-head .rel-x{font-size:var(--fs-title);line-height:1}
 @media(max-width:600px){.rel-preview{width:calc(100vw - 16px);height:92vh;max-height:92vh}.rel-preview-head{padding:12px 16px}.rel-preview-body{padding:12px 16px}.rel-preview-footer{padding:12px 16px}.rel-preview .q-opts-r li{padding:8px 12px;gap:8px}.rel-preview-footer .btn-primary{white-space:nowrap}}
 html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var(--r-inner)}
+
+/* =====================================================================
+   11. 使用引导：一张卡 + 一圈高亮，没有遮罩
+   ---------------------------------------------------------------------
+   1) 三步共用一个进度值（localStorage bsj-guide：空 → 1 → 2 → done）。
+      由 syncGuide() 按「当前页 + 进度」决定装哪一步，切页先卸上一步 ——
+      所以不会出现两张卡同屏。
+   2) 卡片/高亮/提示条都挂 body 上：放进 .page 会在切页时被 display:none 掉。
+   3) z-index 39：在页面内容(2)与顶栏(30)之上，在所有**用户主动打开**的
+      浮层之下（40 设置 / 45 符号 / 55 同类题 / 60 老师 / 70 查看器 / 80 题库）。
+      因此不需要写"打开浮层就收起卡片"那种会抖的逻辑。
+   4) 卡片靠 translateX(-50%) 居中，入场只能淡入、不能动 transform。
+   ===================================================================== */
+.guide-ring{
+  position:fixed;z-index:39;pointer-events:none;
+  border-radius:var(--r-card);
+  box-shadow:0 0 0 3px var(--brand);
+}
+.guide-ring[hidden]{display:none}
+
+.guide{
+  position:fixed;z-index:39;left:50%;bottom:24px;transform:translateX(-50%);
+  width:min(560px,calc(100vw - 32px));
+  display:flex;flex-direction:column;gap:12px;
+  padding:16px;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);
+  box-shadow:var(--shadow-2);
+  animation:guideFade .2s ease both;
+}
+.guide[hidden]{display:none}
+@keyframes guideFade{from{opacity:0}to{opacity:1}}
+
+.guide-head{display:flex;align-items:flex-start;gap:8px}
+.guide-head b{flex:1;min-width:0;font-size:var(--fs-sub);font-weight:700;line-height:var(--lh-sub)}
+.guide-x{
+  flex:none;width:24px;height:24px;border-radius:var(--r-circle);
+  display:grid;place-items:center;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--ink-3);
+  font-size:var(--fs-meta);line-height:1;
+}
+.guide-x:hover{color:var(--ink);border-color:var(--line-strong)}
+.guide-txt{margin:0;font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink-2);font-weight:400}
+
+.guide-opts{display:flex;flex-direction:column;gap:8px}
+.guide-opt{
+  display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  padding:12px;border-radius:var(--r-inner);
+  background:var(--surface-2);border:1px solid var(--line);
+  transition:.16s;
+}
+.guide-opt:hover{border-color:var(--line-strong);background:var(--surface)}
+.guide-opt.is-main{background:var(--brand-tint);border-color:var(--brand-line)}
+.guide-opt.is-main:hover{border-color:var(--brand)}
+.guide-ico{
+  flex:none;width:24px;height:24px;border-radius:var(--r-circle);
+  display:grid;place-items:center;
+  background:var(--surface);border:1px solid var(--line);color:var(--ink-3);
+  font-size:var(--fs-meta);line-height:1;
+}
+.guide-opt.is-main .guide-ico{background:var(--brand);border-color:var(--brand);color:#fff}
+.guide-copy{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.guide-copy b{display:flex;align-items:center;gap:6px;font-size:var(--fs-body);font-weight:700;line-height:var(--lh-body);color:var(--ink)}
+.guide-copy em{font-style:normal;font-size:var(--fs-meta);color:var(--ink-3);font-weight:400}
+
+.guide-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.guide-dots{display:flex;align-items:center;gap:6px}
+.guide-dots i{width:6px;height:6px;border-radius:var(--r-circle);background:var(--surface-3)}
+.guide-dots i.is-on{background:var(--brand)}
+.guide-skip{
+  flex:none;min-height:28px;padding:4px 8px;border:0;border-radius:var(--r-inner);
+  background:transparent;color:var(--ink-3);font-size:var(--fs-meta);
+}
+.guide-skip:hover{color:var(--ink);background:var(--surface-2)}
+.guide-next{
+  flex:none;min-height:28px;padding:4px 16px;border-radius:var(--r-inner);
+  background:var(--brand);color:#fff;font-size:var(--fs-body);font-weight:500;
+}
+.guide-next:hover{background:var(--brand-strong)}
+
+/* —— 第 3 步：六秒自己退的一条提示，不拦操作 —— */
+.guide-toast{
+  position:fixed;z-index:39;left:50%;bottom:24px;transform:translateX(-50%);
+  width:min(560px,calc(100vw - 32px));
+  display:flex;align-items:center;gap:12px;
+  padding:12px 16px;
+  background:var(--surface);border:1px solid var(--line);border-left:2px solid var(--brand);
+  border-radius:var(--r-sub);
+  box-shadow:var(--shadow-2);
+  font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink-2);
+  animation:guideFade .2s ease both;
+}
+.guide-toast[hidden]{display:none}
+.guide-toast b{color:var(--brand-ink);font-weight:600}
+/* 叉掉键：整条本来点哪都能关，但"能点"看不见 —— 给一个看得见的出口 */
+.guide-toast-x{
+  flex:none;margin-left:auto;width:24px;height:24px;border-radius:var(--r-circle);
+  display:grid;place-items:center;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--ink-3);
+  font-size:var(--fs-meta);line-height:1;
+}
+.guide-toast-x:hover{color:var(--ink);border-color:var(--line-strong)}
+
+/* 引导打开时首屏让位：卡片贴底，内容整体上推，别压住输入框与发送键 */
+body[data-guide="1"] #p1Home{padding-bottom:var(--guide-lift)}
+/* 用 display 而不是 opacity：.p1-down 身上还挂着一个 fill:both 的入场动画，
+   动画值会盖过普通声明 —— 只写 opacity:0 的时候，引导刚打开的那半秒它还看得见 */
+body[data-guide="1"] .p1-down{display:none}
+
+@media (max-width:760px){
+  .guide,.guide-toast{bottom:16px}
+}
+@media (prefers-reduced-motion:reduce){
+  .guide,.guide-toast{animation:none}
+}
 </style>
 <link rel="stylesheet" href="/vendor/katex/katex.min.css">
 </head>
@@ -1568,8 +1694,8 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     <div class="bank-tools" id="bankTools">
       <button class="bt" id="bankBack" type="button" aria-label="返回首页"><span aria-hidden="true">←</span><span class="lbl-full"> 返回</span></button>
       <div class="seg bt-seg" id="bankSeg" role="group" aria-label="分类视角">
-        <button type="button" data-view="th" aria-pressed="true">思路</button>
-        <button type="button" data-view="kg" aria-pressed="false">知识点</button>
+        <button type="button" data-view="kg" aria-pressed="true">知识点</button>
+        <button type="button" data-view="th" aria-pressed="false">思路</button>
       </div>
       <button class="bt" id="bankCollapse" type="button"><span class="lbl-full">收起分支</span><span class="lbl-mini">收起</span></button>
       <button class="bt" id="bankReset" type="button">复位</button>
@@ -1597,6 +1723,10 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     <div class="set-label">字号</div>
     <input class="set-range" id="uxRange" type="range" min="0" max="2" step="1" value="1" aria-label="字号" aria-valuetext="中">
     <div class="set-ticks" id="uxTicks" aria-hidden="true"><span>小</span><span class="is-on">中</span><span>大</span></div>
+  </div>
+  <div class="set-grp">
+    <div class="set-label">使用引导</div>
+    <button class="btn-ghost" id="guideReplay" type="button">重看一遍</button>
   </div>
 </div>
 
@@ -1678,11 +1808,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
         <button class="btn-primary" id="go2" type="button" disabled>确认</button>
       </div>
 
-      <button class="goodbar" id="goodBar" type="button">
-        <span class="gb-ico" aria-hidden="true">✦</span>
-        <span class="gb-txt"><b>好题精练</b><em>按知识点与思路，挑一道真正吃透</em></span>
-        <span class="gb-go">进入题库 →</span>
-      </button>
+      <p class="p1-down"><i aria-hidden="true">↓</i><span>835 道精选题在下面</span></p>
     </div>
 
     <div class="p1-screen p1-map" id="p1Map">
@@ -1737,20 +1863,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
             </span>
           </button>
         </div>
-        <div class="p2-teacher">
-          <button class="mode-bar teacher-bar" id="teacherPick" type="button" aria-pressed="true" aria-haspopup="dialog" aria-controls="mentorDlg" aria-expanded="false" title="换一位陪学老师">
-            <span class="av-frame" id="tpAvFrame" data-mentor="paimon" aria-hidden="true">
-              <img id="tpAv" src="/characters/profile/paimon.png" alt="" width="48" height="48">
-            </span>
-            <span class="mode-copy">
-              <span class="mode-title">陪学老师 · <span id="tpName">派蒙</span> <span class="tag brand" id="mentorTag">默认</span></span>
-              <span class="mode-desc" id="tpDesc">软萌亲切，温柔陪学</span>
-            </span>
-            <span class="mode-arrow" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
-            </span>
-          </button>
-        </div>
+        <div class="mentor-row" id="mentorRow" role="radiogroup" aria-label="讲法的人"></div>
       </div>
       <div class="p2-foot">
         <button class="btn-ghost" id="back1" type="button">返回</button>
@@ -1950,6 +2063,12 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       </div>
       <div class="mentor-grid" id="mentorGrid" role="radiogroup" aria-label="选择陪学老师"></div>
     </div>
+
+    <!-- 使用引导：三步共用一张卡，挂 body 上跨页（放进 .page 会在切页时被 display:none）。
+         内容由 guideCardHtml() 按步渲染；卡里没有遮罩，也不抢焦点。 -->
+    <div class="guide-ring" id="guideRing" aria-hidden="true" hidden></div>
+    <div class="guide" id="guide" role="region" aria-label="使用引导" hidden></div>
+    <div class="guide-toast" id="guideToast" role="status" hidden></div>
 
     <!-- 符号面板：两个输入框共用这一个。挂在 body 上、fixed 定位，
          因为它要逃出 .pane{overflow:hidden} 与 .p1{overflow-y:auto} 的裁剪。
@@ -2223,6 +2342,8 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       else { S.report = null; S.reportErr = '还没有开始做题。先在第 1 页选题，到第 3 页对话，报告会自动生成。'; renderReport(); }
     }
     $('#reportReturnBtn').hidden = n !== 3 || !REPORT_ORIGIN;
+    /* 引导跟着页走：切页先卸上一步，再按「当前页 + 进度」决定装哪一步 */
+    syncGuide();
   }
 
   document.addEventListener('click', function (e) {
@@ -2585,19 +2706,30 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     return !!dlg && !dlg.hidden;
   }
 
+  /**
+   * 第 2 页那一行「讲法的人」。
+   *
+   * 和浮层里的 pickHtml 不同：这里只留头像 + 名字，没有容器、没有第二行简介 ——
+   * 一行排得下四个人，才谈得上"直接点就换，不用开浮层"。
+   * 简介退到 title 里，指针停一下仍看得到。
+   */
+  function mrHtml(id, current) {
+    var m = mentorOf(id);
+    return '<button class="mr-pick" type="button" role="radio" aria-checked="' + (id === current) + '"' +
+      ' data-mentor="' + m.id + '" title="' + esc(m.tagline) + '">' +
+      '<span class="av-frame" data-mentor="' + m.id + '" aria-hidden="true">' +
+      '<img src="' + m.avatar + '" alt="" width="32" height="32"></span>' +
+      '<span class="mr-name">' + esc(m.name) + '</span></button>';
+  }
+
   function paintMentor() {
     var m = mentorOf(S.mentor);
     if ($('#mentorDlg')) {
       $('#mentorGrid').innerHTML = MENTOR_ORDER.map(function (id) { return pickHtml(id, S.mentor); }).join('');
     }
-    if ($('#teacherPick')) {
-      $('#tpName').textContent = m.name;
-      $('#tpDesc').textContent = m.tagline;
-      $('#tpAv').src = m.avatar;
-      $('#tpAvFrame').setAttribute('data-mentor', m.id);
-      /* 默认派蒙时标"默认"，换过之后标"已选" —— 一眼能看出是不是自己挑的 */
-      $('#mentorTag').textContent = S.mentor === 'paimon' ? '默认' : '已选';
-      $('#teacherPick').title = '换一位陪学老师（现在是' + m.name + '）';
+    if ($('#mentorRow')) {
+      $('#mentorRow').innerHTML = '<span class="mr-label">讲法的人</span>' +
+        MENTOR_ORDER.map(function (id) { return mrHtml(id, S.mentor); }).join('');
     }
     if ($('#chatMentor')) {
       $('#chatMentor').innerHTML = '<span class="av-frame" data-mentor="' + m.id + '" aria-hidden="true">' +
@@ -2626,9 +2758,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     if (!dlg || dlg.hidden) return;
     dlg.hidden = true;
     $('#mentorMask').hidden = true;
-    ['#teacherPick', '#chatMentor'].forEach(function (sel) {
-      if ($(sel)) $(sel).setAttribute('aria-expanded', 'false');
-    });
+    if ($('#chatMentor')) $('#chatMentor').setAttribute('aria-expanded', 'false');
     if (mentorTrigger && mentorTrigger.focus) mentorTrigger.focus();
     mentorTrigger = null;
   }
@@ -2643,8 +2773,13 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     renderChat();
   }
 
-  if ($('#teacherPick')) {
-    $('#teacherPick').addEventListener('click', function () { openMentor(this); });
+  /* 第 2 页那一行：点谁就是谁，直接换，不开浮层 */
+  if ($('#mentorRow')) {
+    $('#mentorRow').addEventListener('click', function (e) {
+      var el = e.target.closest('[data-mentor]');
+      if (!el) return;
+      setMentor(el.getAttribute('data-mentor'));
+    });
   }
   if ($('#chatMentor')) {
     $('#chatMentor').addEventListener('click', function () { openMentor(this); });
@@ -2663,6 +2798,182 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     if (e.key !== 'Escape' || !mentorOpen()) return;
     closeMentor();
   });
+
+  /* =====================================================================
+     使用引导
+     ---------------------------------------------------------------------
+     三步共用一个**进度值**：空 → '1' → '2' → 'done'。
+     为什么不是"看过没有"这个布尔：三步之间有先后，而走到一半关页面太正常了 ——
+     进度值天然回答了"他停在哪"，下次从那一步接着来。
+     syncGuide() 是唯一的调度者：切页、首次加载、重看，都走它。
+     ===================================================================== */
+  var GUIDE_KEY = 'bsj-guide';
+  var GUIDE_Q = new URLSearchParams(location.search);
+  var GUIDE_FORCE = GUIDE_Q.get('guide');   // '1' 重放 / '0' 关掉 / null 正常
+  var GUIDE_STEP = 0;                       // 当前展示到第几步，0 = 不展示
+  var GUIDE_TIMER = 0;
+
+  /* ?guide=1：先把进度清掉，之后一切照常 —— 这样"重放"不会变成每次都从第 1 步开始 */
+  if (GUIDE_FORCE === '1') { try { localStorage.removeItem(GUIDE_KEY); } catch (e) {} }
+
+  function guideProgress() {
+    try { return localStorage.getItem(GUIDE_KEY) || ''; } catch (e) { return ''; }
+  }
+  /** 全站唯一写 bsj-guide 的地方 */
+  function setGuideProgress(v) {
+    try { localStorage.setItem(GUIDE_KEY, v); } catch (e) {}
+  }
+  /** ?p=N 是逐页评审/截图深链：那种地址要的是干净页面，一条引导都不出 */
+  function guideAllowed() {
+    if (GUIDE_FORCE === '0') return false;
+    if (GUIDE_FORCE === '1') return true;
+    return !(Number(GUIDE_Q.get('p')) >= 2);
+  }
+
+  function guideDot(n, on) { return '<i class="' + (on === n ? 'is-on' : '') + '"></i>'; }
+
+  function guideCardHtml(n) {
+    var dots = '<span class="guide-dots" aria-hidden="true">' +
+      guideDot(1, n) + guideDot(2, n) + guideDot(3, n) + '</span>';
+    if (n === 1) {
+      return '<div class="guide-head"><b>先定从哪出道题</b>' +
+        '<button class="guide-x" type="button" data-guide-act="skip" aria-label="跳过引导">✕</button></div>' +
+        '<div class="guide-opts">' +
+          '<button class="guide-opt" type="button" data-guide-act="own">' +
+            '<span class="guide-ico" aria-hidden="true">✎</span>' +
+            '<span class="guide-copy"><b>我有题，直接发给你</b><em>拍照或粘贴，按你的题讲</em></span>' +
+          '</button>' +
+          '<button class="guide-opt is-main" type="button" data-guide-act="qbank" data-guide-path="qbank">' +
+            '<span class="guide-ico" aria-hidden="true">✦</span>' +
+            '<span class="guide-copy"><b>从精选题库挑一道 <span class="tag brand">推荐</span></b><em>835 道高考真题，默认按知识点挑</em></span>' +
+          '</button>' +
+        '</div>' +
+        '<div class="guide-foot">' + dots +
+          '<button class="guide-skip" type="button" data-guide-act="skip">跳过引导</button></div>';
+    }
+    return '<div class="guide-head"><b>再定怎么讲</b>' +
+        '<button class="guide-x" type="button" data-guide-act="skip" aria-label="跳过引导">✕</button></div>' +
+      '<p class="guide-txt">AI 伴学还在做，先选「自主训练」：先自己写，卡住再要提示。想换个人讲，点下面那四个头像。</p>' +
+      '<div class="guide-foot">' + dots +
+        '<button class="guide-next" type="button" data-guide-act="next">接着走</button></div>';
+  }
+
+  function guideClear() {
+    clearTimeout(GUIDE_TIMER);
+    GUIDE_STEP = 0;
+    if ($('#guide')) $('#guide').hidden = true;
+    if ($('#guideToast')) $('#guideToast').hidden = true;
+    if ($('#guideRing')) $('#guideRing').hidden = true;
+    document.body.removeAttribute('data-guide');
+  }
+
+  /** 把高亮环贴到目标元素上。位置每次现算 —— 三档字号会改高度。 */
+  function guideRingTo(sel) {
+    var ring = $('#guideRing'), box = sel ? $(sel) : null;
+    if (!ring) return;
+    if (!box) { ring.hidden = true; return; }
+    var r = box.getBoundingClientRect();
+    if (!r.width && !r.height) { ring.hidden = true; return; }
+    ring.style.left = r.left + 'px';
+    ring.style.top = r.top + 'px';
+    ring.style.width = r.width + 'px';
+    ring.style.height = r.height + 'px';
+    ring.hidden = false;
+  }
+
+  function guideShow(n) {
+    var card = $('#guide');
+    if (!card) return;
+    GUIDE_STEP = n;
+    card.innerHTML = guideCardHtml(n);
+    card.hidden = false;
+    document.body.setAttribute('data-guide', '1');
+    if ($('#guideRing')) $('#guideRing').hidden = true;
+    clearTimeout(GUIDE_TIMER);
+    /* 页面切换动画 320ms 会把内容推 6px：环等它停下来再量，否则差几个像素 */
+    GUIDE_TIMER = setTimeout(function () {
+      guideRingTo(n === 1 ? '#composer1' : '#modeList .mode-bar');
+    }, 340);
+  }
+
+  function guideToast() {
+    var t = $('#guideToast');
+    if (!t) return;
+    GUIDE_STEP = 3;
+    t.innerHTML = '<span>卡在哪就说哪，<b>我只给提示，不给答案</b>。</span>' +
+      '<button class="guide-toast-x" type="button" aria-label="关闭提示">✕</button>';
+    t.hidden = false;
+    document.body.removeAttribute('data-guide');
+    clearTimeout(GUIDE_TIMER);
+    /* 六秒后自己退，退掉就算整轮走完 */
+    GUIDE_TIMER = setTimeout(function () {
+      setGuideProgress('done');
+      guideClear();
+    }, 6000);
+  }
+
+  function syncGuide() {
+    guideClear();
+    if (!guideAllowed()) return;
+    var prog = guideProgress();
+    if (prog === 'done') return;
+    if (S.page === 1 && prog === '') guideShow(1);
+    else if (S.page === 2 && (prog === '' || prog === '1')) guideShow(2);
+    else if (S.page === 3 && (prog === '1' || prog === '2')) guideToast();
+  }
+
+  if ($('#guide')) {
+    $('#guide').addEventListener('click', function (e) {
+      var el = e.target.closest('[data-guide-act]');
+      if (!el) return;
+      var act = el.getAttribute('data-guide-act');
+      if (act === 'skip') { setGuideProgress('done'); guideClear(); return; }
+      if (act === 'own') {
+        setGuideProgress('1');
+        guideClear();
+        var box = $('#input1');
+        if (box) box.focus();
+        return;
+      }
+      if (act === 'qbank') {
+        setGuideProgress('1');
+        guideClear();
+        if (window.__openBankAt) window.__openBankAt('kg');
+        return;
+      }
+      if (act === 'next') { setGuideProgress('2'); guideClear(); }
+    });
+  }
+  if ($('#guideToast')) {
+    $('#guideToast').addEventListener('click', function () {
+      setGuideProgress('done');
+      guideClear();
+    });
+  }
+  /* Esc 关引导：capture 先跑，并把默认行为标掉 —— 后面那些 Esc 处理器认这个标记 */
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || !GUIDE_STEP || e.defaultPrevented) return;
+    e.preventDefault();
+    setGuideProgress('done');
+    guideClear();
+  }, true);
+  window.addEventListener('resize', function () {
+    if (GUIDE_STEP === 1) guideRingTo('#composer1');
+    else if (GUIDE_STEP === 2) guideRingTo('#modeList .mode-bar');
+  });
+  if ($('#p1')) {
+    $('#p1').addEventListener('scroll', function () {
+      if (GUIDE_STEP === 1) guideRingTo('#composer1');
+    }, { passive: true });
+  }
+  if ($('#guideReplay')) {
+    $('#guideReplay').addEventListener('click', function () {
+      try { localStorage.removeItem(GUIDE_KEY); } catch (e) {}
+      setOpen(false);
+      setPage(1);
+      syncGuide();
+    });
+  }
 
   /** 进对话页：没有题就先回第一页选题（空态不假装能开始） */
   function enterSolving() {
@@ -3668,6 +3979,9 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
   /* 老师选择器要在 /api/health 回来之前就画好：它不依赖服务端（见 MENTORS 的注释） */
   paintMentor();
 
+  /* 使用引导：等首屏分层淡入落定（0.62s + 0.14s 延迟）再出现，别和入场动画抢 */
+  setTimeout(syncGuide, 600);
+
   API.health().then(function (h) {
     S.health = h;
     applyModes(h.capabilities && h.capabilities.modes);
@@ -3690,6 +4004,13 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
     var root = document.documentElement;
     var p1 = $('#p1'), home = $('#p1Home'), mapSec = $('#p1Map'), frame = $('#qbFrame');
     var mapLoaded = false;
+    /**
+     * 默认视角：知识点。
+     *
+     * 显式写进 src，不靠地图自己的默认值 —— 否则哪天地图那边改回思路，
+     * 就会出现"顶栏说知识点、图里是思路"的分裂，而且没有任何地方会报错。
+     */
+    var DEFAULT_VIEW = 'kg';
     function loadMap() {
       if (mapLoaded) return;
       mapLoaded = true;
@@ -3698,7 +4019,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
         frame.removeEventListener('load', once);
         if (mapSec) mapSec.classList.add('is-ready');
       });
-      frame.src = '/qbank/map.html?embedded=1&theme=' + theme;
+      frame.src = '/qbank/map.html?embedded=1&theme=' + theme + '&view=' + DEFAULT_VIEW;
     }
     function openMap() {
       loadMap();
@@ -3736,25 +4057,31 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       if (viewerEl && !viewerEl.hidden) { e.stopPropagation(); closeViewer(); return; }
       if (p1 && p1.scrollTop > 40) { e.stopPropagation(); closeMap(); }
     });
-    var goodBar = $('#goodBar');
-    if (goodBar) goodBar.addEventListener('click', openMap);
-
     /* 题库控件：宿主顶栏发指令，地图在 iframe 里照做 */
     function toMap(msg) {
       if (!frame || !frame.contentWindow) return;
       try { frame.contentWindow.postMessage(msg, location.origin); } catch (err) { }
     }
+    /**
+     * 切视角：顶栏的分段控件与地图内部必须一起动。
+     * 只改一边就会出现"顶栏说知识点、图里还是思路" —— 这种分裂不会报错，只会让人不信。
+     */
+    function bankView(view) {
+      var seg = $('#bankSeg');
+      if (seg) Array.prototype.forEach.call(seg.children, function (o) {
+        o.setAttribute('aria-pressed', String(o.getAttribute('data-view') === view));
+      });
+      toMap({ type: 'qbank:view', view: view });
+    }
+    /* 引导里那条「从精选题库挑一道」：先切到知识点，再滚下去 */
+    window.__openBankAt = function (view) { if (view) bankView(view); openMap(); };
+
     var bankTools = $('#bankTools');
     if (bankTools) {
       $('#bankBack').addEventListener('click', closeMap);
       var bankSeg = $('#bankSeg');
       Array.prototype.forEach.call(bankSeg.children, function (b) {
-        b.addEventListener('click', function () {
-          Array.prototype.forEach.call(bankSeg.children, function (o) {
-            o.setAttribute('aria-pressed', String(o === b));
-          });
-          toMap({ type: 'qbank:view', view: b.getAttribute('data-view') });
-        });
+        b.addEventListener('click', function () { bankView(b.getAttribute('data-view')); });
       });
       $('#bankCollapse').addEventListener('click', function () { toMap({ type: 'qbank:collapse' }); });
       $('#bankReset').addEventListener('click', function () { toMap({ type: 'qbank:reset' }); });
@@ -3772,7 +4099,7 @@ html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var
       })(fillBtn[fi]);
     }
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && p1 && p1.scrollTop > 40) { e.stopPropagation(); closeMap(); }
+      if (e.key === 'Escape' && !e.defaultPrevented && p1 && p1.scrollTop > 40) { e.stopPropagation(); closeMap(); }
     });
     /* 题库题：输入框位置直接摊开带公式图的题干；引擎仍读 textarea 里的纯文本 */
     function renderPicked(q) {

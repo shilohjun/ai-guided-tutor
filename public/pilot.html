@@ -715,8 +715,14 @@ body{
   /**
    * 入场方式：题库 / 粘贴 / 拍照。
    *
-   * 命中成品页现有的入口（好题精练 #goodBar、相机 #cam1、输入框 #input1）——
-   * 这三个 id 是成品页的公开结构，改它们等于改产品页，所以只读不写。
+   * 命中成品页现有的入口（引导里那条「从精选题库挑一道」= [data-guide-path="qbank"]、
+   * 相机 #cam1、输入框 #input1）—— 这几个选择器是成品页的公开结构，改它们等于改产品页，
+   * 所以只读不写。
+   *
+   * 历史：这条埋点原先认的是首页底部那条「好题精练」按钮（#goodBar）。
+   * 那个按钮已经取消，题库入口改成一次性使用引导里的选项，于是判据换到
+   * data-guide-path 上 —— 引导只出现一次，所以这个漏斗现在记的是
+   * "第一次从题库进来的人"，而不是"点过按钮的次数"。
    *
    * 一次打开只记**第一次**选的方式：之后再换入口改变不了"他是怎么进来的"，
    * 多发只会把漏斗的入口分布算重。
@@ -731,7 +737,7 @@ body{
     doc.addEventListener('click', function (ev) {
       var target = ev.target;
       if (!target || typeof target.closest !== 'function') return;
-      if (target.closest('#goodBar')) intake('qbank');
+      if (target.closest('[data-guide-path="qbank"]')) intake('qbank');
       else if (target.closest('#cam1')) intake('photo');
     }, true);
     doc.addEventListener('paste', function (ev) {

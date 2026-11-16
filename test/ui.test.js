@@ -220,6 +220,42 @@ describe('前端 · 四步流程契约（新版单文件）', () => {
     assertIncludes(appJs, "mode: 'self'", '初始模式必须是自主训练');
   });
 
+  it('使用引导：三步各有落点、进度只写一处、题库默认按知识点', () => {
+    /**
+     * 首页底部那条「好题精练」按钮已经取消，换成一次性的三步引导。
+     * 这条测试守三件容易悄悄坏掉的事：
+     *
+     * ① **三步都真的存在**：卡片、高亮环、提示条少一个，引导就退化成一句空话；
+     * ② **进度只有一个写入点**：多写一处，就会出现"这步算走完、那步不算"的分叉；
+     * ③ **题库默认按知识点**：顶栏分段控件、iframe 的 src、地图自己的默认值
+     *    说的必须是同一件事 —— 只改一处不会报错，只会让人不信。
+     */
+    for (const id of ['guide', 'guideRing', 'guideToast', 'guideReplay', 'mentorRow']) {
+      assertIncludes(html, 'id="' + id + '"', '缺少使用引导/选老师相关的 #' + id);
+    }
+    assertIncludes(appJs, 'data-guide-path="qbank"', '引导里要留着「从精选题库挑一道」这条路');
+
+    assertEquals(
+      (appJs.match(/localStorage\.setItem\(GUIDE_KEY/g) ?? []).length,
+      1,
+      '引导进度（bsj-guide）必须只有一个写入点，否则"哪一步算走完"会出现两套说法',
+    );
+    assertIncludes(appJs, 'setGuideProgress', '缺少进度写入函数');
+    assertIncludes(appJs, 'syncGuide();', 'setPage 末尾要挂钩 syncGuide，否则切页不换步');
+    assertIncludes(appJs, 'guideAllowed', '缺少 ?p / ?guide 深链的开关');
+
+    /* 题库默认知识点：三处都要说同一件事 */
+    assertIncludes(html, 'data-view="kg" aria-pressed="true"', '顶栏「分类视角」的默认项应当是知识点');
+    assertIncludes(appJs, "&view=' + DEFAULT_VIEW", 'iframe 的 src 要显式带视角，别依赖地图自己的默认值');
+    const mapHtml = readFileSync(join(ROOT, 'public/qbank/map.html'), 'utf8');
+    assertIncludes(mapHtml, "QP.get('view') === 'th' ? 'th' : 'kg'", '题库地图的默认视角应当落在知识点');
+
+    /* 第 2 页：老师不再是第三张等大的卡 */
+    assertNotIncludes(html, 'teacher-bar', '「陪学老师」不该再和模式卡同尺寸');
+    assertNotIncludes(html, 'id="teacherPick"', '旧的老师大框已由 #mentorRow 取代');
+    assertIncludes(appJs, 'MENTOR_ORDER.map(function (id) { return mrHtml(', '讲法的人那一行要按 MENTOR_ORDER 渲染四个人');
+  });
+
   it('能不能点由服务端能力位决定，不是前端写死', () => {
     assertIncludes(appJs, 'function applyModes(', '缺少按能力位渲染模式的 applyModes()');
     assertIncludes(appJs, 'capabilities && h.capabilities.modes', '应当从 /api/health 的 capabilities.modes 读可用模式');
