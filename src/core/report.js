@@ -18,7 +18,14 @@ import { safeStepRef } from './guard.js';
 import { buildReportReview } from './report-review.js';
 import { assessLearning } from './report-assessment.js';
 import { buildReportPractice } from './report-practice.js';
-export const REPORT_SCHEMA_VERSION='session-evidence-v3';
+export const REPORT_SCHEMA_VERSION='session-evidence-v7';
+
+/** Revision of report inputs, not just dialogue length. Detect legacy/stale snapshots. */
+export function reportEvidenceRevision(record) {
+  const text=JSON.stringify([record.turns??[],record.hintLog??[],record.formulaCards??[],Boolean(record.historyIncomplete)]);
+  let hash=2166136261;for(let i=0;i<text.length;i++)hash=Math.imul(hash^text.charCodeAt(i),16777619);
+  return `${text.length}:${hash>>>0}`;
+}
 
 /**
  * 从引擎响应累积一条会话记录（服务端维护）。
@@ -103,6 +110,7 @@ export function createSessionRecord(problemId) {
  * @returns {import('./types.js').Report}
  */
 export function buildReport(problem, record, meta) {
+  const evidenceRevision=reportEvidenceRevision(record??{});
   problem={topics:[],asked:[],givens:[],solutionGraphs:[],misconceptions:[],...problem};
   record={turns:[],hintLog:[],formulaCards:[],...record};
   for (const key of ['topics','asked','givens','solutionGraphs','misconceptions']) if (!Array.isArray(problem[key])) problem[key]=[];
@@ -208,6 +216,7 @@ export function buildReport(problem, record, meta) {
       model: meta.model,
       generatedAt: new Date().toISOString(),
       schemaVersion: REPORT_SCHEMA_VERSION,
+      evidenceRevision,
       partialSections,
       referenceUnverified:problem.source==='imported' && problem.referenceVerified!==true,
     },
