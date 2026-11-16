@@ -333,8 +333,106 @@ async function issueDevToken(store, now) {
   };
 }
 
-/** 环境变量里的两把钥匙。trim 与 admin.js 的 `adminEnabled` 同口径：空白等于没配。 */
-const devCodeOf = (env) => String(env?.PILOT_DEV_CODE ?? '').trim();
+/**
+ * 匿名设备票：进门不再验证任何人，但仍然需要一张"这是同一个浏览器"的票。
+ *
+ * ============================================================================
+ * 为什么票里自带身份，而不建一张 visitor 表
+ * ============================================================================
+ * `resolveToken` 目前有两条路：`role:'dev'` 从令牌记录里就地还原身份，
+ * 其余一律 `getUserById` 去 `test_user` 查人。匿名访客既不该进 `test_user`
+ * （那张表是"名单"，混进几百个浏览器就再也读不动了），也不值得为此新增一张表
+ * 与三份驱动实现 —— 身份本来就只是"这一台浏览器"。
+ *
+ * 所以走开发档那条路：`role:'visitor'` 的身份（`userId` + `displayName`）
+ * 只写在令牌记录里，解析时就地还原。代价是"改名"要换票（这一版不需要），
+ * 好处是**端口一行都不用加**，而且 `notMine` / `persistSession` 的归属判定
+ * 全部原样成立 —— 它们只认 `user.id`。
+ *
+ * @param {object} store
+ * @param {{ displayName?: string, now?: number }} [options]
+ * @returns {Promise<{ role: 'visitor', token: string, userId: string, displayName: string, expiresAt: string }>}
+ */
+export async function mintVisitor(store, { displayName = '', batchId = null, now = Date.now() } = {}) {
+  const seenAt = new Date(now).toISOString();
+  const userId = `g-${randomBytes(8).toString('hex')}`;
+  const token = randomBytes(32).toString('hex');
+  const expiresAt = new Date(now + TOKEN_TTL_MS).toISOString();
+  const batch = String(batchId ?? '').trim() || null;
+
+  await store.putToken({
+    tokenHash: tokenHash(token),
+    userId,
+    role: 'visitor',
+    displayName: normalizeVisitorName(displayName),
+    /**
+     * 批次写在令牌上（与开发档同一个做法）。
+     *
+     * 撤批次那一版里这里是 null，看板只能按日期看；现在给一个固定的标签，
+     * 会话与事件就能继续按批次归堆，老的整批导出与漏斗也还认得出来。
+     * 令牌不随批次变化 —— 这一版批次是固定的（PILOT_BATCH_ID），不是会追加的名单。
+     */
+    ...(batch ? { batchId: batch } : {}),
+    expiresAt,
+    createdAt: seenAt,
+  });
+
+  return {
+    role: 'visitor',
+    token,
+    userId,
+    displayName: normalizeVisitorName(displayName),
+    batchId: batch,
+    expiresAt,
+  };
+}
+
+/**
+ * 确保这个批次记录存在（不存在就建一条空批次）。
+ *
+ * 为什么需要：看板的按批次查询在批次不存在时回 404（`admin.js` 的 `batchOf`），
+ * 而免口令这一版没有任何"发号脚本"会顺手建批次。不建的话，老师打开老看板
+ * 只会看到"这个批次不存在"，看起来像坏了。
+ */
+export async function ensureBatch(store, batchId) {
+  const id = String(batchId ?? '').trim();
+  if (!id) return null;
+
+  const existing = await store.getBatch(id).catch(() => null);
+  if (existing) return existing;
+
+  const batch = {
+    id,
+    label: id,
+    questionIds: [],
+    /** 0 = 不限（与发号脚本写死 0 的口径一致） */
+    ocrCap: 0,
+    dailyCap: 0,
+    versionSha: null,
+    createdAt: new Date().toISOString(),
+  };
+  try {
+    await store.putBatch(batch);
+  } catch (err) {
+    console.warn(`[batch] 建批次 ${id} 失败：${err?.message ?? err}`);
+  }
+  return batch;
+}
+
+/**
+ * 访客自己填的称呼：只 trim、去控制字符、截到 24 字。
+ *
+ * 不校验、不拒绝、不回显"格式不对" —— 它不是身份，是老师看流水时的一个标签。
+ * 空串是合法的（"跳过"），看板显示"未署名"。
+ */
+export function normalizeVisitorName(value) {
+  return String(value ?? '')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .trim()
+    .slice(0, 24);
+}
+
+/** 环境变量里的两把钥匙。trim 与 admin.js 的 `adminEnabled` 同口径：空白等于没配。 */const devCodeOf = (env) => String(env?.PILOT_DEV_CODE ?? '').trim();
 const adminCodeOf = (env) => String(env?.ADMIN_CODE ?? '').trim();
 
 /**
@@ -412,9 +510,10 @@ export async function login(store, code, ip, now = Date.now(), env = process.env
  * @param {object} store
  * @param {string} token 客户端带来的明文令牌
  * @param {number} [now] 毫秒时间戳
+ * @param {string|null} [fallbackBatchId] 票上没有批次时用的标签（匿名票用当前 `PILOT_BATCH_ID`）
  * @returns {Promise<{ user: object, batchId: string|null, expiresAt: string } | null>}
  */
-export async function resolveToken(store, token, now = Date.now()) {
+export async function resolveToken(store, token, now = Date.now(), fallbackBatchId = null) {
   const raw = typeof token === 'string' ? token.trim() : '';
   if (!raw) return null;
 
@@ -431,6 +530,22 @@ export async function resolveToken(store, token, now = Date.now()) {
         displayName: String(record.displayName ?? DEV_DISPLAY_NAME),
       },
       batchId: typeof record.batchId === 'string' && record.batchId ? record.batchId : DEV_BATCH_ID,
+      expiresAt: record.expiresAt,
+    };
+  }
+
+  if (record.role === 'visitor') {
+    return {
+      user: {
+        id: String(record.userId),
+        displayName: String(record.displayName ?? ''),
+      },
+      /**
+       * 批次由发牌时写死（`PILOT_BATCH_ID`）。**票上没有时取当前标签**：
+       * 这一版之前签出去的票都没有批次，不回落的话，那些浏览器之后开的使用
+       * 会永远是"不归批"，而老师那边看起来就是"这个人怎么不在批次里"。
+       */
+      batchId: (typeof record.batchId === 'string' && record.batchId) || String(fallbackBatchId ?? '').trim() || null,
       expiresAt: record.expiresAt,
     };
   }

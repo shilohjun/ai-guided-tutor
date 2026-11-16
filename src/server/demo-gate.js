@@ -174,11 +174,11 @@ export function tokenFromHeaders(headers) {
  * ⚠️ 返回的 `user` 是库里的**完整账号记录**（含 `codeHash`、`disabled`）。
  * 它只用于服务端判定，任何路由都不得把它整个回给前端 —— 要回就回 `displayName` 之类的投影。
  */
-export async function resolveUser({ headers, store }) {
+export async function resolveUser({ headers, store, batchId = null }) {
   const token = tokenFromHeaders(headers);
   if (!token || !store) return null;
   try {
-    const identity = await resolveToken(store, token);
+    const identity = await resolveToken(store, token, Date.now(), batchId);
     if (!identity?.user) return null;
     return { user: identity.user, batchId: identity.batchId ?? null };
   } catch {

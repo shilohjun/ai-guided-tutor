@@ -7,7 +7,7 @@ import { run } from './runner.js';
 
 const filter = process.argv[2];
 
-const suites = ['text', 'guard', 'route', 'engine', 'probe', 'intake', 'analysis', 'verify', 'mathinput', 'symbolpanel', 'voice', 'ocr', 'personas', 'demo-gate', 'worker-adapter', 'cloudbase-adapter', 'deploy-config', 'cf-bundle', 'store', 'store-equivalence', 'store-cloudbase', 'events', 'auth', 'pilot-ui', 'session-persist', 'metrics', 'export', 'export-batch', 'admin-api', 'admin-ui', 'docs', 'ui', 'settings', 'ocr-quota', 'turn-budget', 'chat-turn', 'taxonomy', 'taxonomy-wire'];
+const suites = ['text', 'guard', 'route', 'engine', 'probe', 'intake', 'analysis', 'verify', 'mathinput', 'symbolpanel', 'voice', 'ocr', 'personas', 'demo-gate', 'worker-adapter', 'cloudbase-adapter', 'deploy-config', 'cf-bundle', 'store', 'store-equivalence', 'store-cloudbase', 'events', 'auth', 'pilot-ui', 'session-persist', 'metrics', 'export', 'export-batch', 'admin-api', 'admin-ui', 'usage-code', 'docs', 'ui', 'settings', 'ocr-quota', 'turn-budget', 'chat-turn', 'taxonomy', 'taxonomy-wire'];
 
 process.stdout.write('\n▶ 提示引擎测试套件\n\n');
 

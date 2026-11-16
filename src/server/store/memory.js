@@ -92,6 +92,10 @@ export async function openMemoryStore() {
   const batches = new Map();
   const members = new Map();
   const visits = new Map();
+  /** 完成码索引：键就是码本身（6 位数字），值是 { code, visitId, userId, createdAt } */
+  const usageCodes = new Map();
+  /** 每个人"当前还没结束的那一次使用"：一个 userId 最多一条 */
+  const openVisits = new Map();
   const sessions = new Map();
   /** 事件只能追加，不更新 —— 数组顺序就是写入顺序；读取时再按 seq 排（见 byEventOrder） */
   const events = [];
@@ -170,6 +174,46 @@ export async function openMemoryStore() {
     },
     async putVisit(visit) {
       write(visits, 'visit', visit?.id, visit);
+    },
+    /**
+     * 按开口时间取一批使用记录（看板的"按日期流水"）。
+     *
+     * 参数是 ISO 串而不是日期：时区换算一律在调用方做（服务端只认 ISO），
+     * 三个驱动才会给出同一批数据 —— 见 store/index.js 的口径说明。
+     */
+    async listVisitsSince(iso) {
+      const from = String(iso ?? '');
+      return [...visits.values()]
+        .filter((v) => String(v?.openedAt ?? '') >= from)
+        .sort(byFields('openedAt', 'id'))
+        .map((v) => structuredClone(v));
+    },
+
+    async getUsageCode(code) {
+      return read(usageCodes, String(code ?? ''));
+    },
+    async putUsageCode(record) {
+      write(usageCodes, 'usage_code', record?.code, record);
+    },
+
+    async getUsagePointer(userId) {
+      return read(openVisits, String(userId ?? ''));
+    },
+    /**
+     * 记住/忘掉"这个人当前那次没结束的使用"，以及"上一次自动收尾给了什么码"。
+     *
+     * 两个字段分开：`visitId` 是进行中的那一次，`lastEnded` 是"没点结束就被收尾"
+     * 时留给下一次打开看的那张收据（见 usage.js）。传 null 不是删除记录，
+     * 而是写一条 `visitId: null` —— file 驱动因此不需要引入删文件这条路径。
+     */
+    async setUsagePointer(userId, pointer) {
+      const key = String(userId ?? '');
+      if (!key) return;
+      write(openVisits, 'open_visit', key, {
+        userId: key,
+        visitId: pointer?.visitId ? String(pointer.visitId) : null,
+        lastEnded: pointer?.lastEnded ?? null,
+      });
     },
 
     async getSession(id) {

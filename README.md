@@ -14,7 +14,7 @@
 
 [![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](package.json)
 [![依赖](https://img.shields.io/badge/dependencies-0-brightgreen)](package.json)
-[![测试](https://img.shields.io/badge/tests-819%2F819-brightgreen)](test/run.js)
+[![测试](https://img.shields.io/badge/tests-845%2F845-brightgreen)](test/run.js)
 [![许可](https://img.shields.io/badge/license-UNLICENSED-lightgrey)](LICENSE)
 
 仓库地址：<https://github.com/shilohjun/ai-guided-tutor>
@@ -305,7 +305,7 @@ npm run preview:verify    # file:// 打开验收
 npm test
 ```
 
-当前注册 **819 个用例，全部通过**。`npm test` 跑完测试后会接着跑
+当前注册 **845 个用例，全部通过**。`npm test` 跑完测试后会接着跑
 `scripts/audit-ui-style.js`：它把设计令牌（间距 2/4/6/8/12/16/24/32、字号三档、
 嵌套圆角、语义色）做成可执行规则，样式一跑偏就报出来 —— 只靠人眼看不住。
 字号与控件尺寸参考 LeetCode 做题页后，再按中文密度收一档（中档题干 13/18.9、标签 11、按钮高 32、顶栏 52）。
@@ -406,6 +406,12 @@ DESIGN-TOKENS.md        设计 token 与可访问性说明
 ---
 
 ## 部署
+
+> **自托管（当前试点在用）**：一台 Ubuntu 24.04 + Nginx + systemd，学生入口
+> `http://101.33.230.189/pilot.html`（免口令进场，用完发完成码），老师入口
+> `/admin.html`（按完成码查）。完整运维手册见
+> [`docs/25-自托管部署-ubuntu-101.33.230.189.md`](docs/25-自托管部署-ubuntu-101.33.230.189.md)
+> —— 更新代码、备份、日志、安全现状都在那一份里。下面几节是云函数形态的部署说明。
 
 仓库包含 Vercel 部署配置。**公开 Demo 默认关闭真模型与拍照 OCR**——
 这个决定写在 `api/index.js` 里，而不是靠部署时“记得别配”：
