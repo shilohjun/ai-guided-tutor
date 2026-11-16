@@ -52,6 +52,8 @@ const TOKENS = 'token';
 const BATCHES = 'batch';
 const MEMBERS = 'batch_member';
 const VISITS = 'visit';
+const OPEN_VISITS = 'open_visit';
+const USAGE_CODES = 'usage_code';
 const SESSIONS = 'session';
 const EVENTS = 'event';
 const COUNTERS = 'counter';
@@ -318,6 +320,38 @@ export async function openCloudbaseStore(env = {}) {
     },
     async putVisit(visit) {
       await putRecord(VISITS, visit?.id, visit);
+    },
+    /**
+     * 按开口时间取一批使用记录（看板的"按日期流水"）。
+     *
+     * `openedAt` 存的是 ISO 串，字典序与时间序一致 —— 所以这里能用区间查询，
+     * 不需要另建索引。上界不在这里判：调用方要"某一天"，自己按 ISO 再筛一次。
+     */
+    async listVisitsSince(iso) {
+      const from = String(iso ?? '');
+      const rows = await queryAll(VISITS, { openedAt: command.gte(from) });
+      return rows.sort(byFields('openedAt', 'id'));
+    },
+
+    async getUsageCode(code) {
+      if (code === undefined || code === null || code === '') return null;
+      return queryOne(USAGE_CODES, { code: String(code) });
+    },
+    async putUsageCode(record) {
+      await putRecord(USAGE_CODES, record?.code, record);
+    },
+
+    async getUsagePointer(userId) {
+      if (!userId) return null;
+      return queryOne(OPEN_VISITS, { userId: String(userId) });
+    },
+    async setUsagePointer(userId, pointer) {
+      if (!userId) return;
+      await putRecord(OPEN_VISITS, userId, {
+        userId: String(userId),
+        visitId: pointer?.visitId ? String(pointer.visitId) : null,
+        lastEnded: pointer?.lastEnded ?? null,
+      });
     },
 
     async getSession(id) {

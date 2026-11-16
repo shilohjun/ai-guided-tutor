@@ -49,3 +49,9 @@ cloudbaserc.json
 
 # file 驱动的默认落盘目录（STORE_DIR 的缺省值）：本地跑开发与测试时才会出现
 .data/
+
+# 本地冒烟用的 file 驱动目录（scripts/smoke-usage.mjs 会重建）
+.data-usage-demo/
+
+# 临时目录（部署脚本、冒烟数据、一次性工具都在这里，里面可能有凭据）
+.tmp-*/

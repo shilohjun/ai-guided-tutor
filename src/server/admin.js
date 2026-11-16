@@ -62,6 +62,8 @@ import { exportBatch, exportSingle } from './export.js';
 import { ownerOf, eventsForSessions } from './events.js';
 import { safeEqual } from './demo-gate.js';
 import { readSessionRecord } from './session-store.js';
+import { dayWindow, describeUsage, findByCode, sessionsOf } from './usage.js';
+import { getProblemById } from '../core/registry.js';
 
 /** 产品只有四页（`setPage(5)` 只是 4 的别名）。越界的 maxPage 只能是坏数据。 */
 const MAX_PAGE = 4;
@@ -715,6 +717,118 @@ async function sendExport(res, store, url) {
 }
 
 // ---------------------------------------------------------------------------
+// 免口令这一版：按完成码查一次使用 / 按日期看流水
+// ---------------------------------------------------------------------------
+
+/**
+ * 一条会话在"这一次使用"里要露出来的那几格。
+ *
+ * 只给老师做判断用得上的：哪道题、做了多久、走到第几页、完没完、说了几轮。
+ * **对话正文不在这里**（那是 `/api/admin/session` 的事，一次只读一条），
+ * 否则一次使用里有五道题，这一个响应就会把五段对话一起吐出来。
+ */
+function usageSessionRow(session) {
+  const id = session?.problemId ?? null;
+  /**
+   * 题干前 40 字：老师手上有的是"这道题"，不是 `phy-emi-01`。
+   * 截断按字符不是字节 —— 中文按字节截会把一个字截成半个。
+   */
+  const stem = String(getProblemById(id)?.stem ?? '').replace(/\s+/g, ' ').trim();
+  return {
+    id: session?.id ?? null,
+    problemId: id,
+    problemStem: stem ? `${[...stem].slice(0, 40).join('')}${[...stem].length > 40 ? '…' : ''}` : null,
+    startedAt: session?.startedAt ?? null,
+    lastAt: session?.lastAt ?? null,
+    finished: Boolean(session?.finishedAt) || session?.endState === 'finished',
+    page: session?.progress?.maxPage ?? null,
+    turns: Number(session?.counters?.chatTurns ?? 0),
+    /** 有报告快照就说明这一题走完了四页；前端据此显示「看报告」入口的值不值 */
+    hasReport: Boolean(session?.reportSnapshot),
+  };
+}
+
+/**
+ * `GET /api/admin/usage?usageCode=482913`
+ *
+ * 这是这一版看板的**主入口**：老师手里只有一个码，输进来就该看到全部。
+ * 码必须是 6 位数字 —— 不做"模糊匹配"，否则 111111 会顺带查出一堆记录，
+ * 而老师会以为那就是学生报的那一个。
+ */
+async function sendUsageByCode(res, store, url) {
+  /**
+   * 参数叫 `usageCode` 而不是 `code`：`?code=` 在这个仓库里已经有主了
+   * （公网 Demo 的访问口令，见 demo-gate.js），而看板页有一条静态契约
+   * 禁止任何口令出现在查询串里（`test/admin-ui.test.js`）。两个"码"
+   * 混用一个参数名，迟早会有人把管理员口令填到这一格。
+   */
+  const code = String(url.searchParams.get('usageCode') ?? '').trim();
+  if (!/^\d{6}$/.test(code)) return answer(res, 400, { error: '完成码是 6 位数字' });
+
+  const found = await findByCode(store, code);
+  if (!found) return answer(res, 404, { error: '没有找到这个完成码对应的使用记录', code: 'USAGE_NOT_FOUND' });
+
+  const rows = found.sessions.map(usageSessionRow);
+  return answer(res, 200, {
+    code: found.code,
+    usage: describeUsage(found.visit, { sessions: found.sessions }),
+    /** 批次已经取消；老记录上那个值原样带出来，页面据此标"历史" */
+    batchId: found.visit?.batchId ?? null,
+    sessions: rows,
+  });
+}
+
+/**
+ * `GET /api/admin/day?date=2026-11-15`
+ *
+ * 撤掉批次之后，看板剩下的另一个动作就是"看某一天"。**只读，不写任何东西** ——
+ * 包括"超时自动收尾"：老师打开看板不该偷偷改数据（见文件头 G5）。
+ * 所以超时但还没人收尾的那一条显示 `idle: true`，码要等那个人下次打开才会有。
+ *
+ * 日期按**北京时间**解释（`dayWindow`），因为"今天"是老师嘴里的今天。
+ */
+async function sendDay(res, store, url) {
+  if (typeof store.listVisitsSince !== 'function') {
+    return answer(res, 503, { error: '这个部署的存储还读不了按日期的流水', retryable: false });
+  }
+
+  const win = dayWindow(url.searchParams.get('date'));
+  const all = await store.listVisitsSince(win.from);
+  const visits = all.filter((v) => {
+    const at = String(v?.openedAt ?? '');
+    return at >= win.from && at < win.to;
+  });
+
+  const rows = [];
+  let turns = 0;
+  for (const visit of visits) {
+    const sessions = await sessionsOf(store, visit);
+    turns += sessions.reduce((n, s) => n + Number(s?.counters?.chatTurns ?? 0), 0);
+    rows.push({
+      ...describeUsage(visit, { sessions }),
+      batchId: visit?.batchId ?? null,
+      sessions: sessions.map(usageSessionRow),
+    });
+  }
+  /** 新的在上：老师翻流水时先看刚发生的那几条 */
+  rows.sort((a, b) => String(b.openedAt ?? '').localeCompare(String(a.openedAt ?? '')));
+
+  return answer(res, 200, {
+    day: win.day,
+    rows,
+    summary: {
+      visits: rows.length,
+      /** "有人来过"按有名字的 + 没名字的各算一条，名字可能重复，所以只当量级看 */
+      named: rows.filter((r) => r.displayName).length,
+      ended: rows.filter((r) => r.endedAt).length,
+      idle: rows.filter((r) => r.idle).length,
+      chatTurns: turns,
+    },
+    generatedAt: new Date().toISOString(),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // 入口
 // ---------------------------------------------------------------------------
 
@@ -758,6 +872,9 @@ export async function handleAdminApi(req, res, url, { store, env } = {}) {
     if (route === 'users') return await sendUsers(res, store, url);
     /** 单人页：读一条会话的对话。只读，与导出那条路共用 `readSessionRecord` */
     if (route === 'session') return await sendSession(res, store, url);
+    /** 免口令这一版的两个新入口：按完成码查一次使用 / 看某一天的流水 */
+    if (route === 'usage') return await sendUsageByCode(res, store, url);
+    if (route === 'day') return await sendDay(res, store, url);
     if (route === 'export') return await sendExport(res, store, url);
   } catch (err) {
     /**

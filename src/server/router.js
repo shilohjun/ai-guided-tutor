@@ -56,7 +56,8 @@ import { PROBLEMS } from '../core/problems.data.js';
 import { DEFAULT_PERSONA, PERSONA_IDS, PERSONAS, normalizePersona, personaById, stylePersonaReply } from '../core/personas.js';
 import { openStore } from './store/index.js';
 import { handleAdminApi } from './admin.js';
-import { checkLoginRate, login, noteLoginFailure, noteLoginSuccess } from './auth.js';
+import { checkLoginRate, ensureBatch, login, mintVisitor, noteLoginFailure, noteLoginSuccess } from './auth.js';
+import { currentUsage, describeUsage, endUsage, sessionsOf, startUsage } from './usage.js';
 import { ownerOf, recordEvent, validateEvent } from './events.js';
 import { resolveUser, tokenFromHeaders } from './demo-gate.js';
 import {
@@ -671,7 +672,12 @@ async function resolveRequestUser(req) {
 
   const store = await getStore().catch(() => null);
   if (!store) return null;
-  return resolveUser({ headers: req.headers, store });
+  /**
+   * 第三个参数是"票上没有批次时用什么标签"。匿名票都按当前 `PILOT_BATCH_ID` 归批，
+   * 连改标签之前签出去的老票也一样 —— 否则那批浏览器之后开的使用会永远不归批。
+   */
+  const fallbackBatchId = String(envFor().PILOT_BATCH_ID ?? '').trim() || null;
+  return resolveUser({ headers: req.headers, store, batchId: fallbackBatchId });
 }
 
 /**
@@ -685,7 +691,7 @@ async function resolveRequestUser(req) {
  * **不配这个变量时完全不存在这条分支**：本地开发、现有测试、公网离线 Demo
  * 都照旧可用（设计稿要求的是"试点环境必须登录"，不是一个全局的强制开关）。
  */
-const LOGIN_EXEMPT_PATHS = new Set(['/api/health', '/api/auth/login']);
+const LOGIN_EXEMPT_PATHS = new Set(['/api/health', '/api/auth/login', '/api/auth/visitor']);
 
 function loginGuardBlocks(path, user) {
   if (envFor().PILOT_REQUIRE_LOGIN !== '1') return false;
@@ -1348,6 +1354,168 @@ export async function handleApi(req, res, url) {
       batchId: result.batchId,
       expiresAt: result.expiresAt,
     });
+    return true;
+  }
+
+  // ---- POST /api/auth/visitor（免口令进场：领一张匿名设备票） ----
+  /**
+   * 这一版不再有"学生输入口令"这一步：进门时客户端直接来领一张票。
+   *
+   * 票里带的是一个 `g-` 开头的随机 id 与可选称呼，**不是账号**（见 auth.js 的
+   * `mintVisitor`）。它存在的唯一理由是让归属重新成立 —— 没有它，`notMine`
+   * 在"没有身份"时一律放行，而 sessionId 是前端自己编的时间串，谁都能猜。
+   *
+   * 没有限速：这是唯一一个免费的写接口，而它写的只是一张票。真要被刷，
+   * 症状是库里多几条令牌记录，不会变成账单 —— 需要挡的时候在网关层挡。
+   */
+  if (path === '/api/auth/visitor' && req.method === 'POST') {
+    const body = await readJson(req).catch(() => ({}));
+    const store = await getStore().catch(() => null);
+    if (!store) {
+      sendStoreUnreadable(res);
+      return true;
+    }
+    /**
+     * 批次标签：没有发号动作之后，它是**部署级的常量**（`PILOT_BATCH_ID`，
+     * 默认 `pilot-1`）。会话与事件都从令牌上抄这一个值，所以老的整批导出、
+     * 按批次看漏斗都还认得出来；配成空串就是不归批，看板只能按日期看。
+     */
+    const batchId = String(envFor().PILOT_BATCH_ID ?? 'pilot-1').trim() || null;
+    try {
+      const issued = await mintVisitor(store, { displayName: body?.displayName, batchId, now: Date.now() });
+      /** 批次记录不存在就建一条：否则看板按批次查会回 404，看起来像坏了 */
+      if (batchId) await ensureBatch(store, batchId);
+      sendJson(res, 200, {
+        role: 'visitor',
+        token: issued.token,
+        userId: issued.userId,
+        displayName: issued.displayName,
+        batchId: issued.batchId ?? null,
+        expiresAt: issued.expiresAt,
+      });
+    } catch (err) {
+      console.warn(`[visitor] 发票失败：${err?.message ?? err}`);
+      sendJson(res, 503, { error: '这会儿进不来，请刷新页面重试。', retryable: true });
+    }
+    return true;
+  }
+
+  // ---- GET /api/usage/current（我这次用到哪了 / 上一次的码是什么） ----
+  /**
+   * 学生壳每次打开先问这一句：有没结束的就接着用，超时的当场收尾并把码带回来。
+   *
+   * **收尾只发生在学生这条路上**：看板读数据时不写任何东西（admin.js 的规矩）。
+   * 所以"没回来的人永远没有码"这个缺口由老师那一侧兜：看板按姓名 + 日期仍看得到。
+   */
+  if (path === '/api/usage/current' && req.method === 'GET') {
+    const me = req.__user;
+    if (!me?.user) {
+      sendJson(res, 401, { error: '请先登录', code: 'AUTH_REQUIRED' });
+      return true;
+    }
+    const store = await getStore().catch(() => null);
+    if (!store) {
+      sendStoreUnreadable(res);
+      return true;
+    }
+    const now = Date.now();
+    try {
+      const cur = await currentUsage(store, me.user.id, { now });
+      sendJson(res, 200, {
+        visit: cur.visit ? describeUsage(cur.visit, { now, sessions: cur.sessions }) : null,
+        lastEnded: cur.lastEnded ?? null,
+      });
+    } catch (err) {
+      console.warn(`[usage] 读当前使用失败：${err?.message ?? err}`);
+      sendStoreUnreadable(res);
+    }
+    return true;
+  }
+
+  // ---- POST /api/usage/start（开始 / 接着用） ----
+  /**
+   * **有没结束的就接着用**，不再开一条：否则一次坐下来会拿到两个码，
+   * 而看板上会多出一条"只写了半个字的使用"。名字只在第一次写进去。
+   */
+  if (path === '/api/usage/start' && req.method === 'POST') {
+    const me = req.__user;
+    if (!me?.user) {
+      sendJson(res, 401, { error: '请先登录', code: 'AUTH_REQUIRED' });
+      return true;
+    }
+    const store = await getStore().catch(() => null);
+    if (!store) {
+      sendJson(res, 503, { error: '这会儿进不来，请刷新页面重试。', retryable: true });
+      return true;
+    }
+    const now = Date.now();
+    try {
+      const started = await startUsage(store, {
+        userId: me.user.id,
+        displayName: me.user.displayName ?? '',
+        batchId: me.batchId ?? null,
+        now,
+      });
+      sendJson(res, 200, {
+        visitId: started.visit.id,
+        resumed: started.resumed,
+        displayName: started.visit.displayName ?? '',
+        lastEnded: started.lastEnded ?? null,
+      });
+    } catch (err) {
+      console.warn(`[usage] 开始使用失败：${err?.message ?? err}`);
+      sendJson(res, 503, { error: '这会儿进不来，请刷新页面重试。', retryable: true });
+    }
+    return true;
+  }
+
+  // ---- POST /api/usage/end（结束使用 → 发一个完成码） ----
+  /**
+   * 幂等：再点一次、刷新之后再点，回的是同一个码。
+   *
+   * 已经收尾（指针已清）但请求里带着 `visitId` 时，仍然按那条记录回码 ——
+   * 学生点了结束、网断了、重试时指针已经被别人（比如自己的另一次打开）清掉，
+   * 这时候回 409 等于把人家的码弄丢了。
+   */
+  if (path === '/api/usage/end' && req.method === 'POST') {
+    const me = req.__user;
+    if (!me?.user) {
+      sendJson(res, 401, { error: '请先登录', code: 'AUTH_REQUIRED' });
+      return true;
+    }
+    const body = await readJson(req).catch(() => ({}));
+    const store = await getStore().catch(() => null);
+    if (!store) {
+      sendStoreUnreadable(res);
+      return true;
+    }
+    const now = Date.now();
+    try {
+      const cur = await currentUsage(store, me.user.id, { now });
+      let visit = cur.visit;
+
+      if (!visit && body?.visitId) {
+        const asked = await store.getVisit(String(body.visitId)).catch(() => null);
+        if (asked && asked.userId === me.user.id) visit = asked;
+      }
+      if (!visit) {
+        sendJson(res, 409, { error: '这一次已经结束了', code: 'USAGE_ENDED' });
+        return true;
+      }
+
+      const ended = await endUsage(store, visit, { now, reason: 'manual' });
+      const closed = { ...visit, endedAt: ended.endedAt, endReason: ended.endReason, code: ended.code };
+      const sessions = await sessionsOf(store, closed);
+      sendJson(res, 200, {
+        code: ended.code,
+        endedAt: ended.endedAt,
+        reused: Boolean(ended.reused),
+        summary: describeUsage(closed, { now, sessions }),
+      });
+    } catch (err) {
+      console.warn(`[usage] 结束使用失败：${err?.message ?? err}`);
+      sendJson(res, 503, { error: '结束没有成功，请再点一次。', retryable: true });
+    }
     return true;
   }
 

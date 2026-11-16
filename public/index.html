@@ -57,8 +57,8 @@
     <div class="bank-tools" id="bankTools">
       <button class="bt" id="bankBack" type="button" aria-label="返回首页"><span aria-hidden="true">←</span><span class="lbl-full"> 返回</span></button>
       <div class="seg bt-seg" id="bankSeg" role="group" aria-label="分类视角">
-        <button type="button" data-view="th" aria-pressed="true">思路</button>
-        <button type="button" data-view="kg" aria-pressed="false">知识点</button>
+        <button type="button" data-view="kg" aria-pressed="true">知识点</button>
+        <button type="button" data-view="th" aria-pressed="false">思路</button>
       </div>
       <button class="bt" id="bankCollapse" type="button"><span class="lbl-full">收起分支</span><span class="lbl-mini">收起</span></button>
       <button class="bt" id="bankReset" type="button">复位</button>
@@ -86,6 +86,10 @@
     <div class="set-label">字号</div>
     <input class="set-range" id="uxRange" type="range" min="0" max="2" step="1" value="1" aria-label="字号" aria-valuetext="中">
     <div class="set-ticks" id="uxTicks" aria-hidden="true"><span>小</span><span class="is-on">中</span><span>大</span></div>
+  </div>
+  <div class="set-grp">
+    <div class="set-label">使用引导</div>
+    <button class="btn-ghost" id="guideReplay" type="button">重看一遍</button>
   </div>
 </div>
 
@@ -167,11 +171,7 @@
         <button class="btn-primary" id="go2" type="button" disabled>确认</button>
       </div>
 
-      <button class="goodbar" id="goodBar" type="button">
-        <span class="gb-ico" aria-hidden="true">✦</span>
-        <span class="gb-txt"><b>好题精练</b><em>按知识点与思路，挑一道真正吃透</em></span>
-        <span class="gb-go">进入题库 →</span>
-      </button>
+      <p class="p1-down"><i aria-hidden="true">↓</i><span>835 道精选题在下面</span></p>
     </div>
 
     <div class="p1-screen p1-map" id="p1Map">
@@ -226,20 +226,7 @@
             </span>
           </button>
         </div>
-        <div class="p2-teacher">
-          <button class="mode-bar teacher-bar" id="teacherPick" type="button" aria-pressed="true" aria-haspopup="dialog" aria-controls="mentorDlg" aria-expanded="false" title="换一位陪学老师">
-            <span class="av-frame" id="tpAvFrame" data-mentor="paimon" aria-hidden="true">
-              <img id="tpAv" src="/characters/profile/paimon.png" alt="" width="48" height="48">
-            </span>
-            <span class="mode-copy">
-              <span class="mode-title">陪学老师 · <span id="tpName">派蒙</span> <span class="tag brand" id="mentorTag">默认</span></span>
-              <span class="mode-desc" id="tpDesc">软萌亲切，温柔陪学</span>
-            </span>
-            <span class="mode-arrow" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
-            </span>
-          </button>
-        </div>
+        <div class="mentor-row" id="mentorRow" role="radiogroup" aria-label="讲法的人"></div>
       </div>
       <div class="p2-foot">
         <button class="btn-ghost" id="back1" type="button">返回</button>
@@ -439,6 +426,12 @@
       </div>
       <div class="mentor-grid" id="mentorGrid" role="radiogroup" aria-label="选择陪学老师"></div>
     </div>
+
+    <!-- 使用引导：三步共用一张卡，挂 body 上跨页（放进 .page 会在切页时被 display:none）。
+         内容由 guideCardHtml() 按步渲染；卡里没有遮罩，也不抢焦点。 -->
+    <div class="guide-ring" id="guideRing" aria-hidden="true" hidden></div>
+    <div class="guide" id="guide" role="region" aria-label="使用引导" hidden></div>
+    <div class="guide-toast" id="guideToast" role="status" hidden></div>
 
     <!-- 符号面板：两个输入框共用这一个。挂在 body 上、fixed 定位，
          因为它要逃出 .pane{overflow:hidden} 与 .p1{overflow-y:auto} 的裁剪。
@@ -712,6 +705,8 @@
       else { S.report = null; S.reportErr = '还没有开始做题。先在第 1 页选题，到第 3 页对话，报告会自动生成。'; renderReport(); }
     }
     $('#reportReturnBtn').hidden = n !== 3 || !REPORT_ORIGIN;
+    /* 引导跟着页走：切页先卸上一步，再按「当前页 + 进度」决定装哪一步 */
+    syncGuide();
   }
 
   document.addEventListener('click', function (e) {
@@ -1074,19 +1069,30 @@
     return !!dlg && !dlg.hidden;
   }
 
+  /**
+   * 第 2 页那一行「讲法的人」。
+   *
+   * 和浮层里的 pickHtml 不同：这里只留头像 + 名字，没有容器、没有第二行简介 ——
+   * 一行排得下四个人，才谈得上"直接点就换，不用开浮层"。
+   * 简介退到 title 里，指针停一下仍看得到。
+   */
+  function mrHtml(id, current) {
+    var m = mentorOf(id);
+    return '<button class="mr-pick" type="button" role="radio" aria-checked="' + (id === current) + '"' +
+      ' data-mentor="' + m.id + '" title="' + esc(m.tagline) + '">' +
+      '<span class="av-frame" data-mentor="' + m.id + '" aria-hidden="true">' +
+      '<img src="' + m.avatar + '" alt="" width="32" height="32"></span>' +
+      '<span class="mr-name">' + esc(m.name) + '</span></button>';
+  }
+
   function paintMentor() {
     var m = mentorOf(S.mentor);
     if ($('#mentorDlg')) {
       $('#mentorGrid').innerHTML = MENTOR_ORDER.map(function (id) { return pickHtml(id, S.mentor); }).join('');
     }
-    if ($('#teacherPick')) {
-      $('#tpName').textContent = m.name;
-      $('#tpDesc').textContent = m.tagline;
-      $('#tpAv').src = m.avatar;
-      $('#tpAvFrame').setAttribute('data-mentor', m.id);
-      /* 默认派蒙时标"默认"，换过之后标"已选" —— 一眼能看出是不是自己挑的 */
-      $('#mentorTag').textContent = S.mentor === 'paimon' ? '默认' : '已选';
-      $('#teacherPick').title = '换一位陪学老师（现在是' + m.name + '）';
+    if ($('#mentorRow')) {
+      $('#mentorRow').innerHTML = '<span class="mr-label">讲法的人</span>' +
+        MENTOR_ORDER.map(function (id) { return mrHtml(id, S.mentor); }).join('');
     }
     if ($('#chatMentor')) {
       $('#chatMentor').innerHTML = '<span class="av-frame" data-mentor="' + m.id + '" aria-hidden="true">' +
@@ -1115,9 +1121,7 @@
     if (!dlg || dlg.hidden) return;
     dlg.hidden = true;
     $('#mentorMask').hidden = true;
-    ['#teacherPick', '#chatMentor'].forEach(function (sel) {
-      if ($(sel)) $(sel).setAttribute('aria-expanded', 'false');
-    });
+    if ($('#chatMentor')) $('#chatMentor').setAttribute('aria-expanded', 'false');
     if (mentorTrigger && mentorTrigger.focus) mentorTrigger.focus();
     mentorTrigger = null;
   }
@@ -1132,8 +1136,13 @@
     renderChat();
   }
 
-  if ($('#teacherPick')) {
-    $('#teacherPick').addEventListener('click', function () { openMentor(this); });
+  /* 第 2 页那一行：点谁就是谁，直接换，不开浮层 */
+  if ($('#mentorRow')) {
+    $('#mentorRow').addEventListener('click', function (e) {
+      var el = e.target.closest('[data-mentor]');
+      if (!el) return;
+      setMentor(el.getAttribute('data-mentor'));
+    });
   }
   if ($('#chatMentor')) {
     $('#chatMentor').addEventListener('click', function () { openMentor(this); });
@@ -1152,6 +1161,182 @@
     if (e.key !== 'Escape' || !mentorOpen()) return;
     closeMentor();
   });
+
+  /* =====================================================================
+     使用引导
+     ---------------------------------------------------------------------
+     三步共用一个**进度值**：空 → '1' → '2' → 'done'。
+     为什么不是"看过没有"这个布尔：三步之间有先后，而走到一半关页面太正常了 ——
+     进度值天然回答了"他停在哪"，下次从那一步接着来。
+     syncGuide() 是唯一的调度者：切页、首次加载、重看，都走它。
+     ===================================================================== */
+  var GUIDE_KEY = 'bsj-guide';
+  var GUIDE_Q = new URLSearchParams(location.search);
+  var GUIDE_FORCE = GUIDE_Q.get('guide');   // '1' 重放 / '0' 关掉 / null 正常
+  var GUIDE_STEP = 0;                       // 当前展示到第几步，0 = 不展示
+  var GUIDE_TIMER = 0;
+
+  /* ?guide=1：先把进度清掉，之后一切照常 —— 这样"重放"不会变成每次都从第 1 步开始 */
+  if (GUIDE_FORCE === '1') { try { localStorage.removeItem(GUIDE_KEY); } catch (e) {} }
+
+  function guideProgress() {
+    try { return localStorage.getItem(GUIDE_KEY) || ''; } catch (e) { return ''; }
+  }
+  /** 全站唯一写 bsj-guide 的地方 */
+  function setGuideProgress(v) {
+    try { localStorage.setItem(GUIDE_KEY, v); } catch (e) {}
+  }
+  /** ?p=N 是逐页评审/截图深链：那种地址要的是干净页面，一条引导都不出 */
+  function guideAllowed() {
+    if (GUIDE_FORCE === '0') return false;
+    if (GUIDE_FORCE === '1') return true;
+    return !(Number(GUIDE_Q.get('p')) >= 2);
+  }
+
+  function guideDot(n, on) { return '<i class="' + (on === n ? 'is-on' : '') + '"></i>'; }
+
+  function guideCardHtml(n) {
+    var dots = '<span class="guide-dots" aria-hidden="true">' +
+      guideDot(1, n) + guideDot(2, n) + guideDot(3, n) + '</span>';
+    if (n === 1) {
+      return '<div class="guide-head"><b>先定从哪出道题</b>' +
+        '<button class="guide-x" type="button" data-guide-act="skip" aria-label="跳过引导">✕</button></div>' +
+        '<div class="guide-opts">' +
+          '<button class="guide-opt" type="button" data-guide-act="own">' +
+            '<span class="guide-ico" aria-hidden="true">✎</span>' +
+            '<span class="guide-copy"><b>我有题，直接发给你</b><em>拍照或粘贴，按你的题讲</em></span>' +
+          '</button>' +
+          '<button class="guide-opt is-main" type="button" data-guide-act="qbank" data-guide-path="qbank">' +
+            '<span class="guide-ico" aria-hidden="true">✦</span>' +
+            '<span class="guide-copy"><b>从精选题库挑一道 <span class="tag brand">推荐</span></b><em>835 道高考真题，默认按知识点挑</em></span>' +
+          '</button>' +
+        '</div>' +
+        '<div class="guide-foot">' + dots +
+          '<button class="guide-skip" type="button" data-guide-act="skip">跳过引导</button></div>';
+    }
+    return '<div class="guide-head"><b>再定怎么讲</b>' +
+        '<button class="guide-x" type="button" data-guide-act="skip" aria-label="跳过引导">✕</button></div>' +
+      '<p class="guide-txt">AI 伴学还在做，先选「自主训练」：先自己写，卡住再要提示。想换个人讲，点下面那四个头像。</p>' +
+      '<div class="guide-foot">' + dots +
+        '<button class="guide-next" type="button" data-guide-act="next">接着走</button></div>';
+  }
+
+  function guideClear() {
+    clearTimeout(GUIDE_TIMER);
+    GUIDE_STEP = 0;
+    if ($('#guide')) $('#guide').hidden = true;
+    if ($('#guideToast')) $('#guideToast').hidden = true;
+    if ($('#guideRing')) $('#guideRing').hidden = true;
+    document.body.removeAttribute('data-guide');
+  }
+
+  /** 把高亮环贴到目标元素上。位置每次现算 —— 三档字号会改高度。 */
+  function guideRingTo(sel) {
+    var ring = $('#guideRing'), box = sel ? $(sel) : null;
+    if (!ring) return;
+    if (!box) { ring.hidden = true; return; }
+    var r = box.getBoundingClientRect();
+    if (!r.width && !r.height) { ring.hidden = true; return; }
+    ring.style.left = r.left + 'px';
+    ring.style.top = r.top + 'px';
+    ring.style.width = r.width + 'px';
+    ring.style.height = r.height + 'px';
+    ring.hidden = false;
+  }
+
+  function guideShow(n) {
+    var card = $('#guide');
+    if (!card) return;
+    GUIDE_STEP = n;
+    card.innerHTML = guideCardHtml(n);
+    card.hidden = false;
+    document.body.setAttribute('data-guide', '1');
+    if ($('#guideRing')) $('#guideRing').hidden = true;
+    clearTimeout(GUIDE_TIMER);
+    /* 页面切换动画 320ms 会把内容推 6px：环等它停下来再量，否则差几个像素 */
+    GUIDE_TIMER = setTimeout(function () {
+      guideRingTo(n === 1 ? '#composer1' : '#modeList .mode-bar');
+    }, 340);
+  }
+
+  function guideToast() {
+    var t = $('#guideToast');
+    if (!t) return;
+    GUIDE_STEP = 3;
+    t.innerHTML = '<span>卡在哪就说哪，<b>我只给提示，不给答案</b>。</span>' +
+      '<button class="guide-toast-x" type="button" aria-label="关闭提示">✕</button>';
+    t.hidden = false;
+    document.body.removeAttribute('data-guide');
+    clearTimeout(GUIDE_TIMER);
+    /* 六秒后自己退，退掉就算整轮走完 */
+    GUIDE_TIMER = setTimeout(function () {
+      setGuideProgress('done');
+      guideClear();
+    }, 6000);
+  }
+
+  function syncGuide() {
+    guideClear();
+    if (!guideAllowed()) return;
+    var prog = guideProgress();
+    if (prog === 'done') return;
+    if (S.page === 1 && prog === '') guideShow(1);
+    else if (S.page === 2 && (prog === '' || prog === '1')) guideShow(2);
+    else if (S.page === 3 && (prog === '1' || prog === '2')) guideToast();
+  }
+
+  if ($('#guide')) {
+    $('#guide').addEventListener('click', function (e) {
+      var el = e.target.closest('[data-guide-act]');
+      if (!el) return;
+      var act = el.getAttribute('data-guide-act');
+      if (act === 'skip') { setGuideProgress('done'); guideClear(); return; }
+      if (act === 'own') {
+        setGuideProgress('1');
+        guideClear();
+        var box = $('#input1');
+        if (box) box.focus();
+        return;
+      }
+      if (act === 'qbank') {
+        setGuideProgress('1');
+        guideClear();
+        if (window.__openBankAt) window.__openBankAt('kg');
+        return;
+      }
+      if (act === 'next') { setGuideProgress('2'); guideClear(); }
+    });
+  }
+  if ($('#guideToast')) {
+    $('#guideToast').addEventListener('click', function () {
+      setGuideProgress('done');
+      guideClear();
+    });
+  }
+  /* Esc 关引导：capture 先跑，并把默认行为标掉 —— 后面那些 Esc 处理器认这个标记 */
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || !GUIDE_STEP || e.defaultPrevented) return;
+    e.preventDefault();
+    setGuideProgress('done');
+    guideClear();
+  }, true);
+  window.addEventListener('resize', function () {
+    if (GUIDE_STEP === 1) guideRingTo('#composer1');
+    else if (GUIDE_STEP === 2) guideRingTo('#modeList .mode-bar');
+  });
+  if ($('#p1')) {
+    $('#p1').addEventListener('scroll', function () {
+      if (GUIDE_STEP === 1) guideRingTo('#composer1');
+    }, { passive: true });
+  }
+  if ($('#guideReplay')) {
+    $('#guideReplay').addEventListener('click', function () {
+      try { localStorage.removeItem(GUIDE_KEY); } catch (e) {}
+      setOpen(false);
+      setPage(1);
+      syncGuide();
+    });
+  }
 
   /** 进对话页：没有题就先回第一页选题（空态不假装能开始） */
   function enterSolving() {
@@ -2157,6 +2342,9 @@
   /* 老师选择器要在 /api/health 回来之前就画好：它不依赖服务端（见 MENTORS 的注释） */
   paintMentor();
 
+  /* 使用引导：等首屏分层淡入落定（0.62s + 0.14s 延迟）再出现，别和入场动画抢 */
+  setTimeout(syncGuide, 600);
+
   API.health().then(function (h) {
     S.health = h;
     applyModes(h.capabilities && h.capabilities.modes);
@@ -2179,6 +2367,13 @@
     var root = document.documentElement;
     var p1 = $('#p1'), home = $('#p1Home'), mapSec = $('#p1Map'), frame = $('#qbFrame');
     var mapLoaded = false;
+    /**
+     * 默认视角：知识点。
+     *
+     * 显式写进 src，不靠地图自己的默认值 —— 否则哪天地图那边改回思路，
+     * 就会出现"顶栏说知识点、图里是思路"的分裂，而且没有任何地方会报错。
+     */
+    var DEFAULT_VIEW = 'kg';
     function loadMap() {
       if (mapLoaded) return;
       mapLoaded = true;
@@ -2187,7 +2382,7 @@
         frame.removeEventListener('load', once);
         if (mapSec) mapSec.classList.add('is-ready');
       });
-      frame.src = '/qbank/map.html?embedded=1&theme=' + theme;
+      frame.src = '/qbank/map.html?embedded=1&theme=' + theme + '&view=' + DEFAULT_VIEW;
     }
     function openMap() {
       loadMap();
@@ -2225,25 +2420,31 @@
       if (viewerEl && !viewerEl.hidden) { e.stopPropagation(); closeViewer(); return; }
       if (p1 && p1.scrollTop > 40) { e.stopPropagation(); closeMap(); }
     });
-    var goodBar = $('#goodBar');
-    if (goodBar) goodBar.addEventListener('click', openMap);
-
     /* 题库控件：宿主顶栏发指令，地图在 iframe 里照做 */
     function toMap(msg) {
       if (!frame || !frame.contentWindow) return;
       try { frame.contentWindow.postMessage(msg, location.origin); } catch (err) { }
     }
+    /**
+     * 切视角：顶栏的分段控件与地图内部必须一起动。
+     * 只改一边就会出现"顶栏说知识点、图里还是思路" —— 这种分裂不会报错，只会让人不信。
+     */
+    function bankView(view) {
+      var seg = $('#bankSeg');
+      if (seg) Array.prototype.forEach.call(seg.children, function (o) {
+        o.setAttribute('aria-pressed', String(o.getAttribute('data-view') === view));
+      });
+      toMap({ type: 'qbank:view', view: view });
+    }
+    /* 引导里那条「从精选题库挑一道」：先切到知识点，再滚下去 */
+    window.__openBankAt = function (view) { if (view) bankView(view); openMap(); };
+
     var bankTools = $('#bankTools');
     if (bankTools) {
       $('#bankBack').addEventListener('click', closeMap);
       var bankSeg = $('#bankSeg');
       Array.prototype.forEach.call(bankSeg.children, function (b) {
-        b.addEventListener('click', function () {
-          Array.prototype.forEach.call(bankSeg.children, function (o) {
-            o.setAttribute('aria-pressed', String(o === b));
-          });
-          toMap({ type: 'qbank:view', view: b.getAttribute('data-view') });
-        });
+        b.addEventListener('click', function () { bankView(b.getAttribute('data-view')); });
       });
       $('#bankCollapse').addEventListener('click', function () { toMap({ type: 'qbank:collapse' }); });
       $('#bankReset').addEventListener('click', function () { toMap({ type: 'qbank:reset' }); });
@@ -2261,7 +2462,7 @@
       })(fillBtn[fi]);
     }
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && p1 && p1.scrollTop > 40) { e.stopPropagation(); closeMap(); }
+      if (e.key === 'Escape' && !e.defaultPrevented && p1 && p1.scrollTop > 40) { e.stopPropagation(); closeMap(); }
     });
     /* 题库题：输入框位置直接摊开带公式图的题干；引擎仍读 textarea 里的纯文本 */
     function renderPicked(q) {

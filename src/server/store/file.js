@@ -44,6 +44,8 @@ const TOKENS = 'token';
 const BATCHES = 'batch';
 const MEMBERS = 'batch_member';
 const VISITS = 'visit';
+const OPEN_VISITS = 'open_visit';
+const USAGE_CODES = 'usage_code';
 const SESSIONS = 'session';
 const EVENTS = 'events';
 const COUNTERS = 'counter';
@@ -322,6 +324,32 @@ export async function openFileStore(env = {}) {
     },
     async putVisit(visit) {
       writeRecord(VISITS, visit?.id, visit);
+    },
+    async listVisitsSince(iso) {
+      const from = String(iso ?? '');
+      return readAll(VISITS)
+        .filter((v) => String(v?.openedAt ?? '') >= from)
+        .sort(byFields('openedAt', 'id'));
+    },
+
+    async getUsageCode(code) {
+      return readRecord(USAGE_CODES, code);
+    },
+    async putUsageCode(record) {
+      writeRecord(USAGE_CODES, record?.code, record);
+    },
+
+    async getUsagePointer(userId) {
+      return readRecord(OPEN_VISITS, String(userId ?? ''));
+    },
+    async setUsagePointer(userId, pointer) {
+      const key = String(userId ?? '');
+      if (!key) return;
+      writeRecord(OPEN_VISITS, key, {
+        userId: key,
+        visitId: pointer?.visitId ? String(pointer.visitId) : null,
+        lastEnded: pointer?.lastEnded ?? null,
+      });
     },
 
     async getSession(id) {

@@ -70,8 +70,8 @@ window.addEventListener('error', function (e) { document.title = 'JSERR: ' + e.m
       <div class="vs-row">
         <span class="vs-label">分类视角</span>
         <div class="seg" role="tablist" aria-label="分类视角">
-          <button type="button" role="tab" data-view="th" data-tip="按解题思路分层：9 大类 → 29 个细分方法；同一方法下的题归成一簇，适合按思路找同类题">思路</button>
           <button type="button" role="tab" data-view="kg" data-tip="按教材知识点分层：6 模块 → 22 章 → 94 个叶子；点开一层就多一列，选到叶子就列出这一支的题">知识点</button>
+          <button type="button" role="tab" data-view="th" data-tip="按解题思路分层：9 大类 → 29 个细分方法；同一方法下的题归成一簇，适合按思路找同类题">思路</button>
         </div>
       </div>
       <div class="vs-row">
@@ -219,7 +219,8 @@ window.addEventListener('error', function (e) { document.title = 'JSERR: ' + e.m
 
   /* ---------- 状态 ---------- */
   var S = {
-    view: QP.get('view') === 'kg' ? 'kg' : 'th',
+    /* 默认按知识点选题：这是产品对外讲的第一句话。"思路"要显式点名（?view=th）。 */
+    view: QP.get('view') === 'th' ? 'th' : 'kg',
     open: { kg: new Set(['kg:root']), th: new Set(['th:root']) },
     prev: new Map(),
     nodes: [], links: [], spines: [],
