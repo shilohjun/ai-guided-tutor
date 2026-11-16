@@ -44,7 +44,7 @@ import { safeStepRef } from '../core/guard.js';
 import { understandProblem } from '../core/intake.js';
 import { getProblemById, listProblems, getImportMeta, getProblemAnalysis, registerImportedProblem, registryStats } from '../core/registry.js';
 import { toStudentAnalysis } from '../core/analysis.js';
-import { createSessionRecord, appendTurn, buildReport } from '../core/report.js';
+import { createSessionRecord, appendTurn, buildReport, REPORT_SCHEMA_VERSION, reportEvidenceRevision } from '../core/report.js';
 import { assessLearning } from '../core/report-assessment.js';
 import { numericAttempts } from '../core/learning-evidence.js';
 import { captureProblem, sessionProblem, missingProblem } from './problem-snapshot.js';
@@ -1839,6 +1839,13 @@ export async function handleApi(req, res, url) {
       const preview=numericAttempts(problem,[...session.record.hintLog,{utterance,form:'unverified',
         suppressed:true,deliveredLevel:0,at:input.at}],{formulaCards:session.record.formulaCards});
       const quotes=preview.subquestions.flatMap(q=>q.evidence.filter(e=>e.turn===session.record.hintLog.length && e.result==='correct').map(e=>e.quote));
+      const currentAssessment=assessLearning(problem,{...session.record,hintLog:[...session.record.hintLog,
+        {utterance,form:'unverified',suppressed:true,deliveredLevel:0,at:input.at}]});
+      const explained=currentAssessment.knowledge.flatMap(k=>{
+        const e=k.evidence?.at(-1);
+        return e?.turn===session.record.hintLog.length&&e.result==='correct'&&e.explained
+          ? [{checkpoint:k.title,quote:e.quote}] : [];
+      });
       response = await session.engine.handleTurn({
         problemId,
         utterance,
@@ -1850,9 +1857,12 @@ export async function handleApi(req, res, url) {
         sessionId: session.id,
         persona,
         deadlineAt,
+        learningProgress:{explained,allAskedSubmitted:preview.completion.total>0&&preview.completion.answered===preview.completion.total,
+          numericUnverified:preview.completion.verifiable<preview.completion.total},
         // Server-generated only: a request body cannot supply grading decisions.
         learningVerdict:preview.completion.total ? {complete:preview.completion.complete,
-          expectedCount:preview.completion.total,remainingCount:preview.completion.total-preview.completion.completed,correctQuotes:quotes} : null,
+          expectedCount:preview.completion.total,remainingCount:preview.completion.total-preview.completion.completed,correctQuotes:quotes,
+          incorrectQuotes:preview.subquestions.flatMap(q=>q.evidence.filter(e=>e.turn===session.record.hintLog.length&&e.result==='incorrect').map(e=>e.quote))} : null,
       });
     } catch (error) {
       input.status='failed';
@@ -2058,7 +2068,10 @@ export async function handleApi(req, res, url) {
     const knownProblem=sessionProblem(session,getProblemById(session.problemId));
     const problem=knownProblem ?? missingProblem(session.problemId);
     // Upgrade the known previous algorithm once, keeping exactly what the student saw in history.
-    if (knownProblem && session.reportSnapshot?.meta?.schemaVersion==='session-evidence-v2') {
+    if (knownProblem && session.reportSnapshot && (
+      ['session-evidence-v2','session-evidence-v3','session-evidence-v4','session-evidence-v5','session-evidence-v6'].includes(session.reportSnapshot.meta?.schemaVersion) ||
+      (session.reportSnapshot.meta?.schemaVersion===REPORT_SCHEMA_VERSION &&
+       session.reportSnapshot.meta.evidenceRevision!==reportEvidenceRevision(session.record)))) {
       (session.reportHistory ??= []).push({reportSnapshot:session.reportSnapshot,
         reportBuiltAt:session.reportBuiltAt,archivedAt:new Date().toISOString(),reason:'report-algorithm-upgrade'});
       session.reportSnapshot=null;session.reportBuiltAt=null;

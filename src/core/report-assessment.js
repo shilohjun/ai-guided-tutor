@@ -5,6 +5,9 @@
 import { numericAttempts,hasConcreteHelp } from './learning-evidence.js';
 import { processFeedback } from './report-process.js';
 import { canonicalize } from './text.js';
+import { checkpointAssessment } from './report-checkpoints.js';
+import {conceptStatements} from './report-claims.js';
+import {buildLearningSummary} from './report-priority.js';
 
 const compact = s => canonicalize(String(s ?? '')).replace(/\s+/g, '');
 const QUESTION = /[?？]|是不是|是否|对不对|可以吗|对吗|为什么|怎么|如何|能否/;
@@ -112,14 +115,21 @@ export function assessLearning(problem, record) {
       const {r} = state;
       if ((record.formulaCards ?? []).some(card=>!card.at || !log.at || card.at<=log.at)) state.help=true;
       let evaluated = false;
-      for (const clause of raw.split(/[。；;\n]/).filter(Boolean)) {
-        const current = clause.split(/现在改为|现在应为|改正为|更正为/).at(-1);
+      for (const clause of conceptStatements(raw)) {
+        const current = clause.split(/现在改为|现在应为|改正为|更正为|而是/).at(-1);
         const text = compact(current);
         if (ACK.test(current) || QUESTION.test(current) || CONFUSION.test(current) || NON_ASSERTION.test(current)) continue;
         const priorWrong = state.events.some(e => e.result === 'incorrect');
         const contradicted = r.wrong?.test(text) && !NEGATED.test(current);
         const corrected = r.correct.test(text) && !NEGATED.test(current) && !contradicted;
-        if (!contradicted && !corrected) continue;
+        if (!contradicted && !corrected) {
+          const target={cutting:'E',circuit:'I',flux:'[Φφ]',area:'S','resistor-power':'P(?:R|_R|ᵣ)'}[r.id];
+          const changed=target&&new RegExp(`(?<![A-Za-z])${target}=[A-Za-zΦφΔ]`).test(text);
+          if(changed&&((r.correct.test(text)&&NEGATED.test(current))||(!r.wrong?.test(text)&&!NEGATED.test(current)))) {
+            state.events.push({result:'unverified',quote:current.slice(0,160),turn,messageIndex:log.studentMessageIndex??turn*2});
+          }
+          continue;
+        }
         // Exact repetition of an earlier assistant reply is not independent evidence.
         const copied = logs.slice(0,turn).some(l => compact(l.hintText).includes(text) && text.length >= 6);
         if (copied) continue;
@@ -147,11 +157,14 @@ export function assessLearning(problem, record) {
     const lastVerdict = events.filter(e => e.result !== 'confused').at(-1);
     let status = 'unknown';
     if (latest?.result === 'correct') status = latest.independent && latest.explained ? 'mastered' : 'consolidate';
-    else if (latest?.result === 'incorrect') status = errorTurns.size >= 2 ? 'weak' : 'consolidate';
+    else if (latest?.result === 'incorrect') status = 'weak';
     const state=latest?.result==='correct' ? latest.demonstrated ? 'completed_after_demonstration'
       : latest.assisted ? 'completed_with_hint' : 'independently_completed'
       : latest?.result==='incorrect' ? 'still_incorrect' : 'insufficient_evidence';
-    knowledge.push({id:r.id,title:r.title,status,state,everIncorrect:events.some(e=>e.result==='incorrect'),
+    const detail=latest?.result==='unverified' ? '后续表达已改变，先前判断失效，当前待核验' : latest?.result==='incorrect' ? '有明确错误，尚未修正' : latest?.result==='correct'
+      ? events.some(e=>e.result==='incorrect') ? '曾有错误，本题已修正，需独立验证'
+      : latest.assisted ? '提示后完成，需独立验证' : latest.explained ? '本题能说明依据' : '能列式，依据仍待说明' : '尚无足够作答证据';
+    knowledge.push({id:r.id,title:r.title,status,state,detail,everIncorrect:events.some(e=>e.result==='incorrect'),
       corrected:latest?.result==='correct' && events.some(e=>e.result==='incorrect'),evidence:events});
     const difficulty = events.some(e => ['incorrect','confused'].includes(e.result));
     if (!difficulty) continue;
@@ -166,14 +179,18 @@ export function assessLearning(problem, record) {
   }
   const numeric = numericAttempts(problem,logs,{formulaCards:record.formulaCards,historyIncomplete:record.historyIncomplete});
   // Answer completion is evidence for this attempt, not mastery of every topic on the question.
+  const checkpoints=checkpointAssessment(problem,record);
+  const existing=new Set(knowledge.map(k=>k.id));
+  knowledge.push(...checkpoints.knowledge.filter(k=>k.evidence.length&&!existing.has(k.id)));
+  feedback.push(...checkpoints.feedback.filter(f=>!existing.has(f.id)));
   const STATE_LABEL={independently_completed:'独立完成，知识掌握待核验',completed_with_hint:'提示后完成',
     completed_after_demonstration:'示范后完成',still_incorrect:'仍有错误',insufficient_evidence:'尚未作答或待核验'};
   if (!knowledge.length && ['qbank','imported','session-only'].includes(problem.source)) {
     for (const q of numeric.subquestions) knowledge.push({id:q.id,
-      title:`${q.title}（${q.completed && q.state==='insufficient_evidence' ? '结果已核验，完成方式待核验' : STATE_LABEL[q.state]}）`,
+      title:`${q.title}（${q.answered&&!q.verifiable ? '已作答，结果待核验' : q.completed && q.state==='insufficient_evidence' ? '结果已核验，完成方式待核验' : STATE_LABEL[q.state]}）`,
       status:q.state==='still_incorrect' && new Set(q.evidence.filter(e=>e.result==='incorrect' && e.assisted).map(e=>e.turn)).size>=2
         ? 'weak' : q.state==='still_incorrect' || q.completed ? 'consolidate' : 'unknown',
-      state:q.state,evidence:q.evidence});
+      state:q.state,evidence:q.evidence,everIncorrect:q.everIncorrect,corrected:q.corrected});
     if (!knowledge.length) for (const topic of problem.reportReview?.knowledge ?? []) {
       knowledge.push({id:topic.id,title:topic.title,status:'unknown',state:'insufficient_evidence',evidence:[]});
     }
@@ -182,13 +199,17 @@ export function assessLearning(problem, record) {
   // a still-incorrect numeric answer in a different subquestion.
   feedback.push(...numeric.feedback.filter(n => !feedback.some(f =>
     f.evidence.some(e => e.result === 'incorrect' && n.evidence.some(ne => ne.quote === e.quote)))));
-  const process=processFeedback(logs,{knownFeedback:feedback,resolved:states.flatMap(s=>{
+  const process=processFeedback(logs,{knownFeedback:feedback,checkpoints:checkpoints.knowledge,resolved:[...states.flatMap(s=>{
     const event=s.events.at(-1);
     return event?.result==='correct' ? [{id:s.r.id,refs:s.r.refs,turn:event.turn}] : [];
-  })});
+  }),...checkpoints.knowledge.flatMap(k=>{
+    const last=k.evidence.at(-1);
+    return last?.result==='correct'&&last.explained ? [{id:k.id,refs:[],turn:last.turn,helpTurns:k.helpTurns,requestTurns:k.requestTurns,
+      quote:last.quote,messageIndex:last.messageIndex,transferTask:k.transferTask}] : [];
+  })]});
   feedback.push(...process);
   if (!states.length) for (const item of process) {
-    knowledge.push({id:item.id,title:item.title+'（求助记录，待核验）',status:'unknown',
+    knowledge.push({id:item.id,title:item.title+(item.status==='corrected'?'（已有解释，需独立验证）':'（求助记录，待核验）'),status:item.status==='corrected'?'consolidate':'unknown',
       state:'insufficient_evidence',evidence:item.evidence});
   }
   // No recognizable request focus: preserve uncertainty without inventing a concept/error.
@@ -201,8 +222,9 @@ export function assessLearning(problem, record) {
   }
   const verifiedSteps=[...new Set(knowledge.flatMap(k=>k.status==='mastered'
     ? states.find(s=>s.r.id===k.id)?.r.refs ?? [] : []))];
-  return {version:'evidence-v1',scope:'本题表现，不代表长期掌握',knowledge,
+  const summary=buildLearningSummary({knowledge,feedback});
+  return {version:'evidence-v1',scope:'本题表现，不代表长期掌握',knowledge,...summary,
     subquestions:numeric.subquestions,completion:numeric.completion,verifiedSteps,
-    accuracy:numeric.accuracy,
+    accuracy:numeric.accuracy,checkpointCoverage:checkpoints.coverage,
     feedback:feedback.sort((a,b) => a.priority-b.priority)};
 }
