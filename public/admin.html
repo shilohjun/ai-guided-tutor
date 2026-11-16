@@ -362,7 +362,48 @@ body{
 
 <main class="wrap main">
 
-  <p class="empty" id="firstNote">填好口令与批次后点「载入」。口令只存在这台浏览器里，不写进网页、也不进链接；载入之前，这个页面里没有任何数据。</p>
+  <p class="empty" id="firstNote">免口令这一版：学生进门不用口令，用完了会拿到一个 6 位完成码。填好上面的口令，再输完成码点「查这一次」；也可以直接看某一天。口令只存在这台浏览器里，不写进网页、也不进链接。</p>
+
+  <!-- ============ 主入口一：按完成码查一次使用 ============ -->
+  <section class="card" id="usageCard">
+    <div class="card-head">
+      <h2>按完成码查</h2>
+      <p class="card-sub">学生点「结束使用」时拿到的那 6 位数字。输进来，看到的就是那一次使用。</p>
+    </div>
+
+    <form class="loadbar" id="usageForm" autocomplete="off">
+      <label class="field field-batch">
+        <span class="field-label">完成码</span>
+        <input class="input" id="usageCode" type="text" inputmode="numeric" maxlength="6"
+               autocomplete="off" spellcheck="false" placeholder="6 位数字">
+      </label>
+      <div class="field field-act">
+        <button class="btn btn-primary" id="usageBtn" type="submit">查这一次</button>
+      </div>
+    </form>
+    <p class="hint" id="usageHint">上面填口令，这里填完成码，两样都要。</p>
+    <div id="usageOut" hidden></div>
+  </section>
+
+  <!-- ============ 主入口二：某一天的流水 ============ -->
+  <section class="card" id="dayCard">
+    <div class="card-head">
+      <h2>看某一天</h2>
+      <p class="card-sub">这一天里的每一次使用：谁、几点、做了几道题、结没结束、有没有码。</p>
+    </div>
+
+    <form class="loadbar" id="dayForm" autocomplete="off">
+      <label class="field field-batch">
+        <span class="field-label">日期</span>
+        <input class="input" id="dayInput" type="date">
+      </label>
+      <div class="field field-act">
+        <button class="btn" id="dayBtn" type="submit">看这一天</button>
+      </div>
+    </form>
+    <p class="hint" id="dayHint"></p>
+    <div id="dayOut" hidden></div>
+  </section>
 
   <div id="board" hidden>
 
@@ -1288,6 +1329,233 @@ body{
     return hint('口令与批次都填好了，点「载入」。');
   }
 
+  /* ---------------- 免口令：按完成码 / 按日期 ---------------- */
+
+  function adminCode() { return $('codeInput').value.trim(); }
+  function usageSay(msg) { $('usageHint').textContent = msg; }
+  function daySay(msg) { $('dayHint').textContent = msg; }
+
+  /** 一行文字。一律用 textContent 拼：名字与完成码都是外部输入 */
+  function line(cls, value) {
+    var p = document.createElement('p');
+    p.className = cls;
+    p.textContent = value;
+    return p;
+  }
+
+  /**
+   * 按完成码查一次使用。
+   *
+   * 只收 6 位数字：不做模糊匹配 —— 111 会顺带查出一堆记录，
+   * 而老师会以为那就是学生报的那一个。
+   */
+  function lookupUsage(ev) {
+    if (ev) ev.preventDefault();
+    var raw = $('usageCode').value.replace(/\D/g, '').slice(0, 6);
+    $('usageCode').value = raw;
+    if (!adminCode()) { usageSay('先在上面填管理员口令。'); return; }
+    if (raw.length !== 6) { usageSay('完成码是 6 位数字。'); return; }
+
+    $('usageBtn').disabled = true;
+    usageSay('正在查 ' + raw + ' …');
+    request('/api/admin/usage?usageCode=' + encodeURIComponent(raw)).then(function (data) {
+      renderUsageCard(data);
+      usageSay('这一次使用的开始时间是 ' + stamp(data.usage && data.usage.openedAt) + '。');
+    }).catch(function (err) {
+      $('usageOut').hidden = true;
+      usageSay(err.message);
+    }).then(function () {
+      $('usageBtn').disabled = false;
+    });
+  }
+
+  function renderUsageCard(data) {
+    var box = $('usageOut');
+    box.textContent = '';
+    var u = data.usage || {};
+
+    var head = document.createElement('div');
+    head.className = 'batch-line';
+    var name = document.createElement('span');
+    name.className = 'batch-name';
+    name.textContent = u.displayName || '未署名';
+    var meta = document.createElement('span');
+    meta.className = 'batch-meta';
+    meta.textContent =
+      '完成码 ' + (data.code || '—') +
+      ' · 开始 ' + stamp(u.openedAt) +
+      ' · ' + (u.endedAt
+        ? (u.endReason === 'idle' ? '自动收尾 ' : '结束 ') + stamp(u.endedAt)
+        : '还没结束') +
+      ' · ' + cnt(u.minutes) + ' 分钟 · ' + cnt(u.sessionCount) + ' 道题';
+    head.appendChild(name);
+    head.appendChild(meta);
+    box.appendChild(head);
+
+    var rows = Array.isArray(data.sessions) ? data.sessions : [];
+    if (!rows.length) {
+      box.appendChild(line('empty', '这一次没有做题记录（只打开了页面）。'));
+      box.hidden = false;
+      return;
+    }
+
+    var list = document.createElement('ul');
+    list.className = 'sess-list';
+    rows.forEach(function (s, i) {
+      var li = document.createElement('li');
+      li.className = 'sess';
+
+      var wrap = document.createElement('div');
+      wrap.className = 'sess-line';
+
+      var info = document.createElement('span');
+      info.className = 'sess-meta';
+      /** 题干优先：老师认得的是那道题，不是 `phy-emi-01` */
+      var what = s.problemStem || s.problemId || '—';
+      info.textContent = '第 ' + (i + 1) + ' 道 · ' + what
+        + ' · 走到第 ' + (s.page || '—') + ' 页 · ' + cnt(s.turns) + ' 轮对话';
+      info.title = s.problemId || '';
+
+      var tag = sessTag({ finished: s.finished });
+
+      var btn = sessButton('查看对话', function (b) { readUsageTurns(li, s, b); });
+      if (!s.turns) btn.disabled = true;
+
+      wrap.appendChild(info);
+      wrap.appendChild(tag);
+      wrap.appendChild(btn);
+      li.appendChild(wrap);
+      list.appendChild(li);
+    });
+    box.appendChild(list);
+    box.hidden = false;
+  }
+
+  /**
+   * 在读码查出来的使用卡里读一段对话。
+   *
+   * 与"人的列表"那条路共用 `renderTurns`：渲染规则只许有一份 —— 两边各写一份，
+   * 迟早出现"这边把学生原话当标记渲染、那边不会"。面板按会话挂在它自己那一行下面，
+   * 再点一次收起。
+   */
+  function readUsageTurns(host, session, btn) {
+    var id = txt(session.id, '');
+    if (!id) { usageSay('这条记录没有会话号，读不出对话。'); return; }
+
+    var panel = host.querySelector('[data-testid="conversation"]');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.className = 'conv-box';
+      panel.setAttribute('data-testid', 'conversation');
+      host.appendChild(panel);
+    }
+
+    /** 再点一次同一行 = 收起，不重新请求 */
+    if (!panel.hidden && panel.getAttribute('data-for') === id) {
+      panel.hidden = true;
+      btn.textContent = '查看对话';
+      return;
+    }
+
+    panel.hidden = false;
+    panel.setAttribute('data-for', id);
+    panelState(panel, '正在读取这段对话…', 'empty');
+    btn.disabled = true;
+
+    request('/api/admin/session?sessionId=' + encodeURIComponent(id))
+      .then(function (data) {
+        /** 晚到的旧响应：这一块已经换成别的会话了，丢掉 */
+        if (panel.getAttribute('data-for') !== id) return;
+        renderTurns(panel, data && data.turns);
+        btn.textContent = '收起对话';
+      })
+      .catch(function (err) {
+        if (panel.getAttribute('data-for') !== id) return;
+        panelState(panel, sessionFriendly(err), 'alert alert-bad');
+      })
+      .then(function () { btn.disabled = false; });
+  }
+
+  /** 某一天的流水。只读 —— 超时但没人收尾的那条显示"已超时"，不在这里补码。 */
+  function loadDay(ev) {
+    if (ev) ev.preventDefault();
+    if (!adminCode()) { daySay('先在上面填管理员口令。'); return; }
+    var day = $('dayInput').value;
+    $('dayBtn').disabled = true;
+    daySay('正在读 ' + (day || '今天') + ' …');
+    request('/api/admin/day' + (day ? '?date=' + encodeURIComponent(day) : '')).then(function (data) {
+      renderDay(data);
+      var s = data.summary || {};
+      daySay('这一天 ' + cnt(s.visits) + ' 次使用 · 已结束 ' + cnt(s.ended) + ' 次 · '
+        + cnt(s.idle) + ' 次超时 · ' + cnt(s.chatTurns) + ' 轮对话。');
+    }).catch(function (err) {
+      $('dayOut').hidden = true;
+      daySay(err.message);
+    }).then(function () {
+      $('dayBtn').disabled = false;
+    });
+  }
+
+  function renderDay(data) {
+    var box = $('dayOut');
+    box.textContent = '';
+    var rows = Array.isArray(data.rows) ? data.rows : [];
+    if (!rows.length) {
+      box.appendChild(line('empty', '这一天还没有人打开过。'));
+      box.hidden = false;
+      return;
+    }
+
+    var wrap = document.createElement('div');
+    wrap.className = 'table-wrap';
+    var table = document.createElement('table');
+    table.className = 'tbl';
+
+    var thead = document.createElement('thead');
+    var htr = document.createElement('tr');
+    ['开始', '称呼', '状态', '完成码', '题数', '时长'].forEach(function (title) {
+      var th = document.createElement('th');
+      th.textContent = title;
+      htr.appendChild(th);
+    });
+    thead.appendChild(htr);
+    table.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    rows.forEach(function (r) {
+      var tr = document.createElement('tr');
+      var status = r.endedAt
+        ? (r.endReason === 'idle' ? '自动收尾' : '已结束')
+        : (r.idle ? '进行中（已超时）' : '进行中');
+
+      [stamp(r.openedAt), r.displayName || '未署名', status,
+        r.code || (r.batchId ? '历史（' + r.batchId + '）' : '—'),
+        cnt(r.sessionCount), cnt(r.minutes) + ' 分'].forEach(function (value, index) {
+        var td = document.createElement('td');
+        td.textContent = String(value);
+        /** 有码的那一格点一下就开这一次的详情：老师手上只有码，别让他再抄一遍 */
+        if (index === 3 && r.code) {
+          var b = document.createElement('button');
+          b.className = 'btn';
+          b.type = 'button';
+          b.textContent = String(value);
+          b.addEventListener('click', function () {
+            $('usageCode').value = r.code;
+            lookupUsage();
+          });
+          td.textContent = '';
+          td.appendChild(b);
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    box.appendChild(wrap);
+    box.hidden = false;
+  }
+
   /* ---------------- 导出 ---------------- */
 
   /**
@@ -1365,6 +1633,12 @@ body{
       fromUrl = '';
     }
     if (fromUrl) $('batchInput').value = fromUrl;
+    /**
+     * 免口令这一版没有发号动作，批次是**部署级的一个固定标签**
+     * （服务端 `PILOT_BATCH_ID`，默认 `pilot-1`）。这里预填它，
+     * 老师打开看板只需要填口令、点「载入」。
+     */
+    else if (!$('batchInput').value) $('batchInput').value = 'pilot-1';
 
     /* 口令从上一次成功的载入来；第一次打开时是空的 */
     var saved = readStore(CODE_KEY);
@@ -1399,6 +1673,17 @@ body{
     });
 
     $('cmpBtn').addEventListener('click', compare);
+
+    /* 免口令这一版的两个主入口：按完成码 / 按日期 */
+    $('usageForm').addEventListener('submit', lookupUsage);
+    $('dayForm').addEventListener('submit', loadDay);
+    $('usageCode').addEventListener('input', function () {
+      this.value = String(this.value || '').replace(/\D/g, '').slice(0, 6);
+    });
+    /* 日期默认今天（北京时间）：老师打开就想看"今天" */
+    try {
+      $('dayInput').value = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+    } catch (err) { /* 日期控件不可用时留空 = 服务端按今天算 */ }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

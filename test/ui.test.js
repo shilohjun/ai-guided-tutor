@@ -77,6 +77,47 @@ describe('前端 · DOM 契约（防止"点了没反应"）', () => {
     assert(missing.length === 0, '以下 id 在 index.html 里不存在，运行时会静默失效：\n  ' + missing.join('\n  '));
   });
 
+  /**
+   * 符号面板的入口必须真的存在。
+   *
+   * 这条是补一个真实事故：面板 2026-10-28 随着 index.html 整页重写消失了，
+   * commit message 一个字没提，而当时全仓**没有一条断言问过"界面上还有符号入口吗"** ——
+   * 清单还在、替换规则还在、用例还在跑，CI 全绿，谁都没发现。
+   *
+   * 所以这里钉三件事：题干框和对话框各有一个入口、两个入口指向同一个面板容器、
+   * 渲染模块真的被加载。下一回整页重写会在这里先红。
+   */
+  it('两个输入框都有符号入口，且指向同一个面板容器', () => {
+    const triggers = [...html.matchAll(/<button[^>]*data-sym-trigger="(input[13])"[^>]*>/g)];
+    const bound = triggers.filter((m) => m[0].includes('aria-controls="symPanel"'));
+    assertEquals(
+      bound.length,
+      2,
+      '题干输入框（#input1）与对话输入框（#input3）各要有一个符号入口，且都指向 #symPanel；' +
+        `实际找到 ${triggers.length} 个入口、其中 ${bound.length} 个指向 #symPanel`,
+    );
+    assertIncludes(html, 'id="symPanel"', '面板容器 #symPanel 不存在');
+    assertIncludes(html, 'data-sym-grid', '面板缺少格子容器 data-sym-grid');
+    assertIncludes(html, 'src="/symbolpanel.js"', '面板渲染模块 public/symbolpanel.js 没有被加载');
+  });
+
+  /**
+   * 语音入口同样要两处都有，理由同上一条 —— 而且它已经翻过一次车：
+   * 第 3 页从一开始就有麦克风，第 1 页（题干）从来没有；第 3 页那个还是个桩，
+   * 点一下只改 placeholder，连 SpeechRecognition 都没碰过。两条都没人测。
+   */
+  it('两个输入框都有语音入口，且都绑到了自己的文本框', () => {
+    const triggers = [...html.matchAll(/<button[^>]*data-mic-for="(input[13])"[^>]*>/g)];
+    const targets = new Set(triggers.map((m) => m[1]));
+    assertEquals(
+      targets.size,
+      2,
+      '题干输入框（#input1）与对话输入框（#input3）各要有一个语音入口；' +
+        `实际绑到的目标：${[...targets].join(',') || '（无）'}`,
+    );
+    assertIncludes(html, 'src="/voice.js"', '语音模块 public/voice.js 没有被加载');
+  });
+
   it('学生解题页不含任何"防泄题 / 教研"面板（那些内容不该出现在学生面前）', () => {
     const start = htmlVisible.indexOf('data-page="3"');
     const end = htmlVisible.indexOf('data-page="4"');
@@ -177,6 +218,42 @@ describe('前端 · 四步流程契约（新版单文件）', () => {
     assertIncludes(aiBtn, '暂未更新', 'AI 伴学要说明为什么点不了');
     assertNotIncludes(aiBtn, '推荐', 'AI 伴学不该被推荐');
     assertIncludes(appJs, "mode: 'self'", '初始模式必须是自主训练');
+  });
+
+  it('使用引导：三步各有落点、进度只写一处、题库默认按知识点', () => {
+    /**
+     * 首页底部那条「好题精练」按钮已经取消，换成一次性的三步引导。
+     * 这条测试守三件容易悄悄坏掉的事：
+     *
+     * ① **三步都真的存在**：卡片、高亮环、提示条少一个，引导就退化成一句空话；
+     * ② **进度只有一个写入点**：多写一处，就会出现"这步算走完、那步不算"的分叉；
+     * ③ **题库默认按知识点**：顶栏分段控件、iframe 的 src、地图自己的默认值
+     *    说的必须是同一件事 —— 只改一处不会报错，只会让人不信。
+     */
+    for (const id of ['guide', 'guideRing', 'guideToast', 'guideReplay', 'mentorRow']) {
+      assertIncludes(html, 'id="' + id + '"', '缺少使用引导/选老师相关的 #' + id);
+    }
+    assertIncludes(appJs, 'data-guide-path="qbank"', '引导里要留着「从精选题库挑一道」这条路');
+
+    assertEquals(
+      (appJs.match(/localStorage\.setItem\(GUIDE_KEY/g) ?? []).length,
+      1,
+      '引导进度（bsj-guide）必须只有一个写入点，否则"哪一步算走完"会出现两套说法',
+    );
+    assertIncludes(appJs, 'setGuideProgress', '缺少进度写入函数');
+    assertIncludes(appJs, 'syncGuide();', 'setPage 末尾要挂钩 syncGuide，否则切页不换步');
+    assertIncludes(appJs, 'guideAllowed', '缺少 ?p / ?guide 深链的开关');
+
+    /* 题库默认知识点：三处都要说同一件事 */
+    assertIncludes(html, 'data-view="kg" aria-pressed="true"', '顶栏「分类视角」的默认项应当是知识点');
+    assertIncludes(appJs, "&view=' + DEFAULT_VIEW", 'iframe 的 src 要显式带视角，别依赖地图自己的默认值');
+    const mapHtml = readFileSync(join(ROOT, 'public/qbank/map.html'), 'utf8');
+    assertIncludes(mapHtml, "QP.get('view') === 'th' ? 'th' : 'kg'", '题库地图的默认视角应当落在知识点');
+
+    /* 第 2 页：老师不再是第三张等大的卡 */
+    assertNotIncludes(html, 'teacher-bar', '「陪学老师」不该再和模式卡同尺寸');
+    assertNotIncludes(html, 'id="teacherPick"', '旧的老师大框已由 #mentorRow 取代');
+    assertIncludes(appJs, 'MENTOR_ORDER.map(function (id) { return mrHtml(', '讲法的人那一行要按 MENTOR_ORDER 渲染四个人');
   });
 
   it('能不能点由服务端能力位决定，不是前端写死', () => {

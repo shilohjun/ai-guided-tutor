@@ -103,12 +103,96 @@ body{
   #gateForm{padding:22px 18px 14px}
   #gateForm h1{font-size:18px}
 }
+/* ---------------- 问候屏（免口令进场，默认这一屏） ---------------- */
+#hello{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+#helloCard{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px 24px 18px}
+#helloCard h1{margin:0 0 6px;font-size:20px;line-height:1.3;letter-spacing:.02em}
+#helloCard .lead{margin:0 0 18px;color:var(--ink-2);font-size:13px;line-height:1.7}
+#helloName{
+  width:100%;padding:11px 13px;font-size:16px;color:var(--ink);
+  background:#fff;border:1px solid var(--line);border-radius:10px;outline:none;font-family:inherit;
+}
+#helloName:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(47,111,94,.12)}
+#helloName::placeholder{color:var(--ink-3)}
+#helloGo{
+  margin-top:12px;width:100%;padding:11px;font:inherit;font-size:15px;color:#fff;
+  background:var(--brand);border:0;border-radius:10px;cursor:pointer;
+}
+#helloGo:hover{background:#2a6353}
+#helloGo[disabled]{opacity:.55;cursor:default}
+#helloSkip{margin-top:6px;width:100%;padding:8px;font:inherit;font-size:13px;color:var(--ink-2);background:none;border:0;cursor:pointer}
+#helloSkip:hover{color:var(--ink)}
+#helloNote{margin:14px 0 0;font-size:12px;line-height:1.7;color:var(--ink-3)}
+#lastCode{
+  margin:0 0 16px;padding:10px 12px;font-size:13px;line-height:1.7;color:#7a5a12;
+  background:#fdf5e2;border:1px solid #f0e3c2;border-radius:10px;
+}
+#lastCode b{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.14em;color:#5b4308}
+/* ---------------- 收尾页：只有一个码 ---------------- */
+#done{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+#doneCard{
+  width:100%;max-width:420px;background:var(--card);border:1px solid var(--line);
+  border-radius:16px;padding:30px 24px 20px;text-align:center;
+}
+#doneCard .kicker{margin:0 0 4px;font-size:12px;letter-spacing:.16em;color:var(--ink-3)}
+#doneCode{
+  margin:10px 0 2px;font:600 38px/1.15 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.16em;color:var(--ink);
+}
+#doneHint{margin:8px 0 0;font-size:13px;line-height:1.7;color:var(--ink-2)}
+#doneSum{
+  margin:16px 0 0;padding:12px;font-size:13px;line-height:1.8;color:var(--ink-2);
+  background:var(--paper);border:1px solid var(--line);border-radius:10px;text-align:left;
+}
+#copyCode,#again{margin-top:12px;width:100%;padding:11px;font:inherit;font-size:15px;border-radius:10px;cursor:pointer}
+#copyCode{color:#fff;background:var(--brand);border:0}
+#copyCode:hover{background:#2a6353}
+#again{color:var(--ink-2);background:none;border:1px solid var(--line)}
+#again:hover{color:var(--ink);border-color:#d6cfc3}
+#doneMsg{min-height:18px;margin:10px 0 0;font-size:12px;color:var(--ink-3)}
+@media (max-width:420px){
+  #doneCode{font-size:32px}
+  #helloCard,#doneCard{padding:22px 18px 16px}
+  #helloCard h1{font-size:18px}
+}
 </style>
 </head>
 <body>
 
-<!-- ===================== 门：口令 ===================== -->
-<main id="gate" data-testid="login">
+<!-- ===================== 问候屏：免口令进场（默认这一屏） ===================== -->
+<!--
+  这一屏不验证任何人。"怎么称呼你"只是记录上的一个标签，可以跳过；
+  票（匿名设备票）在点「开始」那一刻由服务端发下来，学生完全看不见它。
+-->
+<main id="hello" data-testid="hello">
+  <div id="helloCard">
+    <h1>步步解</h1>
+    <p class="lead">精做一题，胜过滥刷百题。<br>用完了点右上角「结束使用」，会给你一个完成码。</p>
+    <p id="lastCode" hidden></p>
+    <input id="helloName" type="text" maxlength="24" autocomplete="off"
+           placeholder="怎么称呼你（可以跳过）" aria-label="怎么称呼你">
+    <button id="helloGo" type="button">开始</button>
+    <button id="helloSkip" type="button">跳过，直接开始</button>
+    <p id="helloNote">完成码是这一次使用的凭据，把它发给老师就行。</p>
+  </div>
+</main>
+
+<!-- ===================== 收尾页：只有一个码 ===================== -->
+<!-- 这一屏只干一件事：让人把码抄走。完整报告在使用中（产品页第 4 页）就能看。 -->
+<main id="done" data-testid="done" hidden>
+  <div id="doneCard">
+    <p class="kicker">本次完成码</p>
+    <p id="doneCode" aria-live="polite">------</p>
+    <p id="doneHint">把这一串发给老师。这一次已经结束 —— 再练就是新的一次使用，会给你另一个完成码。</p>
+    <p id="doneSum"></p>
+    <button id="copyCode" type="button">复制完成码</button>
+    <button id="again" type="button">再练一次（会换新码）</button>
+    <p id="doneMsg"></p>
+  </div>
+</main>
+
+<!-- ===================== 门：口令（只在 ?key=1 时出现，给调试与看板用） ===================== -->
+<main id="gate" data-testid="login" hidden>
   <form id="gateForm" novalidate>
     <h1>步步解</h1>
     <p class="lead">这是内测，输入老师发给你的口令</p>
@@ -123,7 +207,7 @@ body{
 <div id="stage" hidden>
   <header id="bar">
     <img src="/brand.png" alt="步步解" width="20" height="20">
-    <button id="out" type="button">退出</button>
+    <button id="out" type="button">结束使用</button>
   </header>
   <p id="devbar" hidden>
     <b>调试</b> · 引擎 <span id="devEngine">读取中…</span>
@@ -159,6 +243,7 @@ body{
   var TOKEN_KEY = 'bsj-token';
   var VISIT_KEY = 'bsj-visit';
   var ADMIN_KEY = 'bsj-admin';
+  var NAME_KEY = 'bsj-name';
 
   /**
    * 接口基址 —— 与成品页同一套判断。
@@ -184,6 +269,18 @@ body{
   var gateCode = document.getElementById('gateCode');
   var gateGo = document.getElementById('gateGo');
   var gateMsg = document.getElementById('gateMsg');
+  var hello = document.getElementById('hello');
+  var helloName = document.getElementById('helloName');
+  var helloGo = document.getElementById('helloGo');
+  var helloSkip = document.getElementById('helloSkip');
+  var helloNote = document.getElementById('helloNote');
+  var lastCode = document.getElementById('lastCode');
+  var done = document.getElementById('done');
+  var doneCode = document.getElementById('doneCode');
+  var doneSum = document.getElementById('doneSum');
+  var doneMsg = document.getElementById('doneMsg');
+  var copyBtn = document.getElementById('copyCode');
+  var againBtn = document.getElementById('again');
   var stage = document.getElementById('stage');
   var outBtn = document.getElementById('out');
   var devbar = document.getElementById('devbar');
@@ -382,7 +479,10 @@ body{
       S.batchId = data.batchId || '';
       /** 登录事件允许没有归属（这是唯一一条例外，见 events.js 的 allowsNoOwner） */
       send('login', { displayName: S.displayName });
-      openVisit().then(openStage);
+      beginUsage(S.displayName).catch(function (err) {
+        setBusy(false);
+        say(err && err.message ? err.message : '这会儿进不来，请刷新页面重试');
+      });
     }).catch(function (err) {
       setBusy(false);
       say(err && err.message ? err.message : '登录没成功，请稍后再试');
@@ -401,26 +501,241 @@ body{
   }
 
   /**
-   * 落地先开一次访问：页 1–2 的事件挂在 visitId 上（那时还没有会话），
-   * 没有它，漏斗的第一格永远是 0 —— 而且**不会报错**。
-   * 失败不阻塞页面：学生要能做上题，一次打开记录不该挡住它。
+   * 开始（或接着）一次使用：领票 → 开场 → 把产品页挂上来。
+   *
+   * 「有没结束的就接着用」是服务端判的（见 usage.js 的 `startUsage`），
+   * 所以刷新页面、锁屏回来都不会变成第二次使用 —— 这条不成立的话，
+   * 一次坐下来会拿到两个码，而看板上会多出一条只写了半个字的使用。
    */
-  function openVisit() {
-    return apiFetch('/api/visit', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: '{}'
+  function beginUsage(displayName) {
+    return ensureTicket(displayName).then(function () {
+      return apiFetch('/api/usage/start', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{}'
+      });
     }).then(function (res) {
       if (res.status === 401) { expire(); return null; }
       return res.json().then(function (data) { return data; }, function () { return null; });
     }).then(function (data) {
-      if (!data) return;
-      S.visitId = String(data.visitId || '');
-      try { if (S.visitId) sessionStorage.setItem(VISIT_KEY, S.visitId); } catch (e) {}
-      var count = Array.isArray(data.questionIds) ? data.questionIds.length : 0;
-      send('visit_open', { questionCount: count });
-    }).catch(function () { /* 开访问失败不阻塞 */ });
+      if (!data || !data.visitId) throw new Error('这会儿进不来，请刷新页面重试');
+      S.visitId = String(data.visitId);
+      try { sessionStorage.setItem(VISIT_KEY, S.visitId); } catch (e) {}
+      S.displayName = data.displayName || S.displayName;
+      send('visit_open', { questionCount: 0 });
+      setHelloBusy(false);
+      openStage();
+    });
   }
+
+  /**
+   * 领票：只在这台浏览器还没有票的时候发生。
+   *
+   * 名字随票一起写进令牌记录（服务端不再有账号表），所以**起一次名就够了**：
+   * 同一个浏览器换名字不会改身份 —— 改了就等于把上一次的记录换一个人。
+   */
+  function ensureTicket(displayName) {
+    var existing = readToken();
+    if (existing) { S.token = existing; return Promise.resolve(); }
+
+    return fetch(API_BASE + '/api/auth/visitor', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ displayName: displayName || '' })
+    }).then(function (res) {
+      return res.json().then(function (data) { return { ok: res.ok, data: data }; }, function () { return { ok: false, data: null }; });
+    }).then(function (r) {
+      if (!r.ok || !r.data || !r.data.token) throw new Error('这会儿进不来，请刷新页面重试');
+      S.token = String(r.data.token);
+      writeToken(S.token);
+      S.displayName = r.data.displayName || '';
+      /** 登录事件允许没有归属（这是唯一一条例外，见 events.js 的 allowsNoOwner） */
+      send('login', { displayName: S.displayName });
+    });
+  }
+
+  /* =====================================================================
+     3b. 问候屏与收尾页（免口令这一版的两个新屏）
+     ===================================================================== */
+
+  function helloMsg(msg) { text(helloNote, msg); }
+
+  function setHelloBusy(on) {
+    helloGo.disabled = Boolean(on);
+    helloSkip.disabled = Boolean(on);
+    helloName.readOnly = Boolean(on);
+  }
+
+  function showHello() {
+    clearStage();
+    done.hidden = true;
+    gate.hidden = true;
+    hello.hidden = false;
+    var saved = '';
+    try { saved = localStorage.getItem(NAME_KEY) || ''; } catch (e) { /* 隐私模式下取不到就用空的 */ }
+    if (saved) helloName.value = saved;
+    helloMsg('完成码是这一次使用的凭据，把它发给老师就行。');
+    setHelloBusy(false);
+    try { helloName.focus(); } catch (e) { /* 某些宿主没有焦点 */ }
+  }
+
+  /** 上一次没点结束就被收尾：把那个码显在一次，让它不至于丢 */
+  function showLastCode(code) {
+    lastCode.hidden = false;
+    text(lastCode, '');
+    var lead = document.createTextNode('上一次没有点「结束使用」，已经自动收尾。完成码：');
+    var strong = document.createElement('b');
+    strong.textContent = String(code);
+    var tail = document.createTextNode('（刷新后就不再显示，记下来发给老师）');
+    lastCode.appendChild(lead);
+    lastCode.appendChild(strong);
+    lastCode.appendChild(tail);
+  }
+
+  /** 两小时内回来：直接回到刚才那一次，不重新开场 */
+  function resumeInto(visit) {
+    S.visitId = String(visit.visitId || '');
+    S.displayName = visit.displayName || S.displayName;
+    try { if (S.visitId) sessionStorage.setItem(VISIT_KEY, S.visitId); } catch (e) {}
+    openStage();
+  }
+
+  /**
+   * 开门前先问一句"我这次用到哪了"。
+   *
+   * 三种回答：还有没结束的（直接进）、超时被收尾了（在问候屏上给码）、
+   * 什么都没有（正常问候）。票失效（401）就把票清掉，下一次「开始」重新领一张。
+   */
+  function probe() {
+    if (!readToken()) return Promise.resolve();
+    S.token = readToken();
+    return apiFetch('/api/usage/current').then(function (res) {
+      if (res.status === 401) { S.token = ''; writeToken(''); return null; }
+      return res.json().then(function (data) { return data; }, function () { return null; });
+    }).then(function (data) {
+      if (!data) return;
+      if (data.lastEnded && data.lastEnded.code) showLastCode(data.lastEnded.code);
+      if (data.visit) resumeInto(data.visit);
+    }).catch(function () { /* 问不到就按"没有进行中的"处理，不挡人进门 */ });
+  }
+
+  function startFromHello(skip) {
+    var name = skip ? '' : String(helloName.value || '').trim();
+    if (name) { try { localStorage.setItem(NAME_KEY, name); } catch (e) {} }
+    setHelloBusy(true);
+    resetSession();
+    S.expired = false;
+    beginUsage(name).catch(function (err) {
+      setHelloBusy(false);
+      helloMsg(err && err.message ? err.message : '这会儿进不来，请刷新页面重试');
+    });
+  }
+
+  helloGo.addEventListener('click', function () { startFromHello(false); });
+  helloSkip.addEventListener('click', function () { startFromHello(true); });
+  helloName.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); startFromHello(false); }
+  });
+
+  /* =====================================================================
+     3c. 结束使用 → 收尾页
+     ===================================================================== */
+
+  /**
+   * 结束是**终点**：结束之后这一次不能再进，想再练就是一次新的使用、新的码。
+   *
+   * 弹一次确认，是因为误触的代价很贵（这一次结束了，码就定了）；
+   * 而"没点结束就离开"有服务端的宽限兜底（见 usage.js）。
+   */
+  function endUsageNow() {
+    if (!S.visitId) { showHello(); return; }
+    var ok = window.confirm('结束后这一次就结束了，会给你一个完成码。确定吗？');
+    if (!ok) return;
+
+    flush();
+    outBtn.disabled = true;
+    apiFetch('/api/usage/end', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ visitId: S.visitId })
+    }).then(function (res) {
+      return res.json().then(function (data) { return { status: res.status, data: data }; }, function () { return { status: res.status, data: null }; });
+    }).then(function (r) {
+      outBtn.disabled = false;
+      if (r.status === 401) { expire(); return; }
+      if (!r.data || !r.data.code) {
+        text(doneMsg, '');
+        backToStageWithError(r.data && r.data.error ? r.data.error : '结束没有成功，请再点一次。');
+        return;
+      }
+      showDone(r.data.code, r.data.summary);
+    }).catch(function () {
+      outBtn.disabled = false;
+      backToStageWithError('结束没有成功，请检查网络后再点一次。');
+    });
+  }
+
+  function backToStageWithError(msg) {
+    text(fatal, msg);
+    fatal.hidden = false;
+  }
+
+  function showDone(code, summary) {
+    /** 这一次已经结束：埋点就此停下，别再把后续操作记到这一条上 */
+    S.expired = true;
+    S.queue.length = 0;
+    clearStage();
+    hello.hidden = true;
+    gate.hidden = true;
+    done.hidden = false;
+    text(doneCode, code);
+    var bits = [];
+    if (summary && summary.displayName) bits.push('称呼：' + summary.displayName);
+    if (summary) {
+      bits.push('做了 ' + Number(summary.sessionCount || 0) + ' 道题');
+      bits.push('用时 ' + Math.max(1, Number(summary.minutes || 1)) + ' 分钟');
+    }
+    text(doneSum, bits.join('　·　'));
+    text(doneMsg, '');
+    outBtn.disabled = false;
+    /**
+     * 「再练一次」必须在这里**重新可用**。
+     *
+     * 它点下去时会自己 disable 一次（防连点开两次使用），只有失败分支会把它打开 ——
+     * 而成功之后这一屏是被藏起来的，所以第二次结束后回到这里时，它还是禁用状态，
+     * 症状就是"第二次结束之后，再练一次点不动了"，而且不报错。
+     */
+    againBtn.disabled = false;
+    copyBtn.disabled = false;
+    try { copyBtn.focus(); } catch (e) { /* 同上 */ }
+  }
+
+  copyBtn.addEventListener('click', function () {
+    var code = String(doneCode.textContent || '').trim();
+    if (!code || code === '------') return;
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(code).then(function () {
+        text(doneMsg, '已复制');
+      }, function () {
+        text(doneMsg, '复制不了，请手动记下这 6 个数字');
+      });
+    } else {
+      text(doneMsg, '复制不了，请手动记下这 6 个数字');
+    }
+  });
+
+  /** 再练一次 = 一次新的使用、新的码（服务端那边上一次已经收尾了） */
+  againBtn.addEventListener('click', function () {
+    resetSession();
+    S.expired = false;
+    done.hidden = true;
+    againBtn.disabled = true;
+    beginUsage(S.displayName).catch(function (err) {
+      againBtn.disabled = false;
+      done.hidden = false;
+      text(doneMsg, err && err.message ? err.message : '这会儿进不来，请刷新页面重试');
+    });
+  });
 
   function openStage() {
     /**
@@ -431,6 +746,8 @@ body{
      */
     if (S.expired) return;
     gate.hidden = true;
+    hello.hidden = true;
+    done.hidden = true;
     stage.hidden = false;
     if (S.role === 'dev') {
       devbar.hidden = false;
@@ -715,8 +1032,14 @@ body{
   /**
    * 入场方式：题库 / 粘贴 / 拍照。
    *
-   * 命中成品页现有的入口（好题精练 #goodBar、相机 #cam1、输入框 #input1）——
-   * 这三个 id 是成品页的公开结构，改它们等于改产品页，所以只读不写。
+   * 命中成品页现有的入口（引导里那条「从精选题库挑一道」= [data-guide-path="qbank"]、
+   * 相机 #cam1、输入框 #input1）—— 这几个选择器是成品页的公开结构，改它们等于改产品页，
+   * 所以只读不写。
+   *
+   * 历史：这条埋点原先认的是首页底部那条「好题精练」按钮（#goodBar）。
+   * 那个按钮已经取消，题库入口改成一次性使用引导里的选项，于是判据换到
+   * data-guide-path 上 —— 引导只出现一次，所以这个漏斗现在记的是
+   * "第一次从题库进来的人"，而不是"点过按钮的次数"。
    *
    * 一次打开只记**第一次**选的方式：之后再换入口改变不了"他是怎么进来的"，
    * 多发只会把漏斗的入口分布算重。
@@ -731,7 +1054,7 @@ body{
     doc.addEventListener('click', function (ev) {
       var target = ev.target;
       if (!target || typeof target.closest !== 'function') return;
-      if (target.closest('#goodBar')) intake('qbank');
+      if (target.closest('[data-guide-path="qbank"]')) intake('qbank');
       else if (target.closest('#cam1')) intake('photo');
     }, true);
     doc.addEventListener('paste', function (ev) {
@@ -800,44 +1123,13 @@ body{
   }
 
   /* =====================================================================
-     6. 过期与退出：都把页面带回门口
+     6. 过期、收尾与启动
      ===================================================================== */
 
-  /**
-   * 登录过期：**不自动重试**。
-   *
-   * 令牌过期或被停用时，学生看到的第一句话必须告诉他下一步做什么。
-   * 自动重试在这里是有害的：它会把一次 401 变成一串 401，而登录口那边
-   * 每一次都算一次失败（同一对 (来源, 口令) 攒满 5 次就锁十五分钟）。
-   *
-   * 顺手清掉这一次打开的痕迹：换账号是常态（同一台电脑、同一个浏览器），
-   * 上一个人的 visitId 留在 sessionStorage 里就会被下一个人接着用。
-   */
-  function expire() {
-    if (S.expired) return;
-    S.expired = true;
-    S.queue.length = 0;
-    S.token = '';
-    writeToken('');
-    try { sessionStorage.removeItem(VISIT_KEY); } catch (e) {}
-    teardown();
-    say('登录过期了，请重新输入口令');
-  }
-
-  function quit() {
-    flush();
-    S.expired = true;
-    S.token = '';
-    writeToken('');
-    try { sessionStorage.removeItem(VISIT_KEY); } catch (e) {}
-    teardown();
-    say('');
-  }
-
-  function teardown() {
+  /** 只把"使用中"这一层拆掉，界面的去向由调用方决定 */
+  function clearStage() {
     if (S.observer) { try { S.observer.disconnect(); } catch (e) {} S.observer = null; }
     stage.hidden = true;
-    gate.hidden = false;
     frameBox.textContent = '';
     fatal.hidden = true;
     text(fatal, '');
@@ -849,31 +1141,56 @@ body{
     S.visitId = '';
     S.intake = '';
     S.stems = {};
-    setBusy(false);
-    gateCode.value = '';
-    gateCode.focus();
   }
 
-  outBtn.addEventListener('click', quit);
+  /**
+   * 票失效（401）：**不自动重试**，清票，回到问候屏。
+   *
+   * 自动重试在这里是有害的：一次失败会被变成一串失败，而新的票一发，
+   * 那个人的"上一次使用"就再也没人对得上了。让他在问候屏上重新点一次「开始」，
+   * 服务端会给他一张新票、一次新的使用、一个新的码 —— 这是这一版接受的代价。
+   */
+  function expire() {
+    if (S.expired) return;
+    S.expired = true;
+    S.queue.length = 0;
+    S.token = '';
+    writeToken('');
+    try { sessionStorage.removeItem(VISIT_KEY); } catch (e) {}
+    showHello();
+    helloMsg('这一次的票失效了，重新点「开始」就好。');
+  }
+
+  outBtn.addEventListener('click', endUsageNow);
 
   /* =====================================================================
      7. 启动
      ===================================================================== */
 
+  /** `?key=1` 才出现口令那一屏：它是给调试与看板用的，不是给学生用的 */
+  function wantsKeyGate() {
+    return /[?&]key=1(?:&|$)/.test(location.search);
+  }
+
   /**
-   * 每次打开都从门口进。
+   * 每次打开：默认是问候屏；如果这台浏览器上还有一次没结束的使用，直接接着用。
    *
-   * 上一轮留下的令牌在这里**主动清掉**，不做"自动续用"：
-   * 试点期间同一台机器换人是常态，而"打开就是上一个人的页面"是最难解释的一种错。
-   * 代价说在明处：刷新页面要重新输一次口令，会话也从新的一轮开始 ——
-   * 续做那条**本来就是产品负责人砍掉的那一块**，这里不偷偷留一个后门。
+   * 票**不再每次打开时清掉** —— 清了就等于"刷新一次 = 一次新的使用"，
+   * 而学生按一下 F5 就会让老师那边多出一条没码的记录。上一版之所以要清，
+   * 是因为那时候"换人用同一台电脑"靠输口令来区分；现在靠「结束使用」来区分。
    */
   (function boot() {
-    S.token = '';
-    writeToken('');
-    try { sessionStorage.removeItem(VISIT_KEY); } catch (e) {}
+    S.token = readToken();
     setBusy(false);
-    gateCode.focus();
+    if (wantsKeyGate()) {
+      gate.hidden = false;
+      done.hidden = true;
+      hello.hidden = true;
+      gateCode.focus();
+      return;
+    }
+    showHello();
+    probe();
   })();
 })();
 </script>

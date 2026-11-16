@@ -506,17 +506,18 @@ describe('拍照识题 · 路由契约', () => {
    * 视图层换成五页结构后，判据跟着换成新 DOM ——
    * **断言要守的是"入口直接可见"这件事，不是那个旧的 id**。
    */
-  it('拍照入口必须直接可见：不在折叠块里，且排在题库之前', () => {
+  it('拍照入口必须直接可见：不在折叠块里，且题库入口不再是一条常驻按钮', () => {
     const camIdx = newUi.indexOf('id="cam1"');
     assert(camIdx > 0, '首页找不到拍照入口（#cam1）');
 
     const composerIdx = newUi.lastIndexOf('class="composer"', camIdx);
     assert(composerIdx > 0, '拍照入口必须长在输入框里（它和文字输入是同一个入口）');
 
-    /* 首页不再内置一份题库列表：题库改成整屏地图，入口是底部那条「好题精练」。
-       判据仍然是"拍照排在题库入口之前" —— 题库是备选，拍照是主入口之一。 */
-    const bankIdx = newUi.indexOf('id="goodBar"', camIdx);
-    assert(bankIdx > camIdx, '拍照入口应排在题库入口（好题精练）之前 —— 题库是备选，拍照是主入口之一');
+    /* 首页不再内置一份题库列表，也不再有一条常驻的「好题精练」大按钮：
+       题库入口交给一次性使用引导（[data-guide-path="qbank"]）与下滑本身。
+       判据从"某个 id 排在某处"改成"首页没有那个常驻按钮，但引导里留着这条路"。 */
+    assert(!newUi.includes('id="goodBar"'), '首页不该再有常驻的「好题精练」按钮，题库入口由使用引导承担');
+    assertIncludes(newUi, 'data-guide-path="qbank"', '引导里必须留着「从精选题库挑一道」这条路');
 
     const segment = newUi.slice(composerIdx, camIdx);
     assert(
