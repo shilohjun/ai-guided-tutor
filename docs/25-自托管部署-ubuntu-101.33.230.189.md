@@ -71,6 +71,11 @@ sudo systemctl restart bubujie
 会：`git fetch` → 落后就 `pull --ff-only` → 比对服务器上的 `/opt/bubujie/.deployed-rev`
 → 不同才打包上传（40 MB）→ 解包 → 重启 → 本机健康检查 → 公网健康检查 → 打印地址。
 
+**"版本"是哪个提交**：不是 `HEAD`，而是**最后一次改动"要发的东西"**（`package.json` /
+`server/` / `src/` / `public/` / `scripts/smoke-usage.mjs`）的那个提交。所以只改
+`docs/`、`test/`、README 的提交**不会**触发部署 —— 否则"有提交就同步"会变成
+"每改一次文档就重启一次生产"。脚本会同时打印 `HEAD` 和 `发布版本`，两者不同是正常的。
+
 常用开关：
 
 | 开关 | 作用 |

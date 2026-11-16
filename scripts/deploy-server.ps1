@@ -43,12 +43,22 @@ if ($Pull) {
   }
 }
 
-$rev = (git rev-parse --short HEAD).Trim()
+$head = (git rev-parse --short HEAD).Trim()
+
+# 发布版本 = **最后一次改动"要发的东西"** 的那个提交，不是 HEAD。
+# 为什么：docs/ 、test/ 、.github/ 这些根本不在包里，只改它们不该触发一次
+# 40 MB 的上传 + 重启（那会让"有新提交就同步"变成"每次改文档都重启生产"）。
+$shipped = @('package.json', 'server', 'src', 'public', 'scripts/smoke-usage.mjs')
+$rev = (git log -1 --format=%h -- $shipped).Trim()
+if (-not $rev) { $rev = $head }
+
 $branch = (git rev-parse --abbrev-ref HEAD).Trim()
-$dirty = git status --porcelain | Where-Object { $_ -notmatch '^\?\?' }
-Write-Host "分支 $branch · 版本 $rev"
+$dirty = git status --porcelain | Where-Object { $_ -notmatch '^\?\?' } |
+  Where-Object { ($_ -split '\s+')[-1] -match '^(package\.json|server/|src/|public/|scripts/smoke-usage\.mjs)' }
+Write-Host "分支 $branch · HEAD $head · 发布版本 $rev"
+if ($head -ne $rev) { Write-Host "（HEAD 只改了文档/测试之类，不影响部署）" }
 if ($dirty) {
-  Write-Host "⚠ 有未提交改动，它们也会被打包发上去：" -ForegroundColor Yellow
+  Write-Host "⚠ 要发的东西里有未提交改动，它们也会被打包发上去：" -ForegroundColor Yellow
   $dirty | Select-Object -First 8 | ForEach-Object { Write-Host "    $_" -ForegroundColor Yellow }
 }
 
