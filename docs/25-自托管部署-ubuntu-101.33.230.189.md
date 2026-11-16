@@ -105,6 +105,37 @@ curl -s localhost:5173/api/health | head -c 120
 
 前端是静态文件、`cache-control: no-store`，**不用清任何缓存**，学生刷新就是新版。
 
+### 5.3 换一个人来部署，需要准备什么
+
+**三个前提，缺一不可：**
+
+1. **仓库读写权**（GitHub 上 `shilohjun/ai-guided-tutor` 的 collaborator）——不然拉不到代码、也推不了 commit；
+2. **服务器的一把钥匙**：自己的 SSH 密钥（推荐），或者服务器的 `ubuntu` 密码；
+3. **能跑 PowerShell 的机器**（Windows 自带；macOS/Linux 装 `pwsh` 也能跑同一个脚本），或者按上面"手工步骤"用 bash 做。
+
+**给自己配一把钥匙（在服务器上执行一次即可）：**
+
+```powershell
+# ① 本机生成（Windows 下 .pub 可能没写出来，用 ssh-keygen -y -f 补）
+ssh-keygen -t ed25519 -f .deploy-key\<你的名字>
+ssh-keygen -y -f .deploy-key\<你的名字>   # 把输出这一行复制走
+
+# ② 把输出那一行追加到服务器的 ~/.ssh/authorized_keys（登录服务器后执行）
+echo 'ssh-ed25519 AAAA…（你刚复制的那一行）' >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+
+# ③ 验证（回到本机）
+ssh -i .deploy-key\<你的名字> ubuntu@101.33.230.189 'echo ok'
+```
+
+拿到 `ok` 之后：
+
+```powershell
+.\scripts\deploy-server.ps1 -SshKey .deploy-key\<你的名字> -Pull
+```
+
+**⚠️ 这把钥匙等同于生产部署权**：能改线上代码、能重启服务。别提交（`.gitignore` 里已经有 `.deploy-key/`）、别发群里、别放到聊天记录里。谁离开团队，就把那一行从服务器 `authorized_keys` 里删掉。
+
 ## 6. 备份与恢复
 
 ```bash
