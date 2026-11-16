@@ -320,6 +320,8 @@ export interface Turn {
 }
 
 export interface HintRequest {
+  /** Internal server-computed evidence only; /api/chat never accepts this field from a client. */
+  learningVerdict?: { complete: boolean; expectedCount: number; remainingCount: number; correctQuotes: string[] } | null;
   problemId: string;
   /** 本轮学生输入 */
   utterance: string;
@@ -329,6 +331,8 @@ export interface HintRequest {
   mode: 'self_training' | 'ai_companion';
   /** 学生是否显式求助 */
   explicitHelpSeeking?: boolean;
+  /** 本轮由哪位老师说话；缺省为派蒙（只影响措辞，不影响层级与保密） */
+  persona?: string;
 }
 
 export interface HintResponse {
@@ -618,6 +622,11 @@ export interface EnginePathEntry {
 /** 学生在对话中能拿到的一切。注意这里没有任何教研字段。 */
 export interface StudentTurnPayload {
   message: string;
+  /**
+   * 这一轮说话的老师。前端据此换头像与名字；
+   * 旧消息保留当时那位老师，所以它跟着每条 turn 走，而不是一个全局设置。
+   */
+  persona: { id: string; name: string; avatar: string };
   hint: {
     level: HintLevel;
     levelName: string;
@@ -714,13 +723,25 @@ export interface DraftInput {
   forbidden: string[];
   /** 学生卡点性质的提示策略骨架 */
   strategy: string;
+  /** 老师人格 id；真模型据此拼接《教学规范》与语言风格，离线桩不使用 */
+  persona?: string;
 }
 
 // ---------------------------------------------------------------------------
 // 学习报告
 // ---------------------------------------------------------------------------
 
+export type LearningState = 'independently_completed' | 'completed_with_hint' |
+  'completed_after_demonstration' | 'still_incorrect' | 'insufficient_evidence';
+
 export interface Report {
+  assessment?: {
+    knowledge: {id:string; title:string; status:'mastered'|'consolidate'|'weak'|'unknown'; state?:LearningState; evidence:unknown[]}[];
+    subquestions: {id:string;title:string;state:LearningState;verifiable:boolean;completed:boolean;everIncorrect:boolean;corrected:boolean;evidence:unknown[]}[];
+    completion: {completed:number;total:number;percent:number|null;complete:boolean;verifiable:number};
+    accuracy: {correct:number;total:number;percent:number|null};
+    feedback: unknown[];
+  };
   problemId: string;
   problemTitle: string;
   /** 卡点清单 */
@@ -740,7 +761,7 @@ export interface Report {
     guardBlocked: number;
   };
   /** 独立完成度 */
-  independence: { score: number; completedSteps: number; totalSteps: number; note: string };
+  independence: { score: number|null; completedSteps: number; totalSteps: number; note: string; basis?:string };
   /** 深层问题（跨卡点归纳的认知缺口） */
   deeperIssues: string[];
   /** 举一反三建议（只给定点，不代做） */

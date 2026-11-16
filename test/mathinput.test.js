@@ -15,7 +15,6 @@ import {
   toSuperscript,
   toSubscript,
   GREEK,
-  PALETTE,
 } from '../public/mathinput.js';
 
 /**
@@ -145,18 +144,8 @@ describe('符号输入 · 面板与工具', () => {
     assertEquals(toSubscript('03'), '₀₃');
   });
 
-  it('面板按"学生实际用到的频率"分组，上标与下标排在最前', () => {
-    assertEquals(PALETTE[0].group, '上标');
-    assertEquals(PALETTE[1].group, '下标');
-    assert(PALETTE.length >= 4, '面板至少要覆盖上标/下标/希腊/运算');
-  });
-
-  it('面板里没有重复项会让人困惑（`Δ` 同时属于希腊与其它是有意的，检查其余不重复）', () => {
-    const counts = new Map();
-    for (const g of PALETTE) for (const it of g.items) counts.set(it, (counts.get(it) ?? 0) + 1);
-    const dupes = [...counts.entries()].filter(([k, v]) => v > 1 && k !== 'Δ').map(([k]) => k);
-    assertEquals(dupes.join(','), '', `面板有重复符号：${dupes.join(',')}`);
-  });
+  /* 面板的清单和插入逻辑已搬到 public/symbolpanel.js，
+     形状与插入的断言跟着搬到 test/symbolpanel.test.js —— 清单是那边的真相。 */
 
   it('希腊字母表覆盖物理常用量（电阻 Ω、角速度 ω、磁通 Φ、密度 ρ、波长 λ）', () => {
     for (const name of ['Omega', 'omega', 'Phi', 'rho', 'lambda', 'mu', 'theta', 'Delta']) {

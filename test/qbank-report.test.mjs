@@ -9,10 +9,52 @@ import { getProblemById } from '../src/core/registry.js';
 import { buildReport,createSessionRecord } from '../src/core/report.js';
 import { toStudentProblem,handleApi } from '../src/server/router.js';
 
-test('all 152 source questions retain answers, full images and every knowledge/method association',()=>{
-  assert.equal(QBANK_IDS.length,152);
-  assert.equal(QBANK_GRAPHS.knowledge.flatMap(m=>m.children.flatMap(c=>c.children)).length,75);
-  assert.equal(QBANK_GRAPHS.methods.flatMap(m=>m.children).length,28);
+test('legacy question identities and semantic knowledge paths survive the merge',()=>{
+  const legacy=JSON.parse(readFileSync(new URL('./fixtures/qbank-legacy-ids.json',import.meta.url),'utf8'));
+  const byId=new Map(QBANK_SOURCE.map(q=>[q.i,q]));
+  for (const old of legacy.questions) assert.equal(byId.get(old.i)?.code,old.code,`legacy question ${old.i}`);
+  // Synthetic graph IDs may change between exports; the full semantic path must remain.
+  const paths=new Set(QBANK_GRAPHS.knowledge.flatMap(m=>m.children.flatMap(c=>c.children.map(l=>JSON.stringify([m.name,c.name,l.name])))));
+  for (const old of legacy.knowledge) assert.ok(paths.has(JSON.stringify(old.path)),old.path.join('/'));
+});
+
+test('picker, embedded map and report registry share the same 835 usable questions',()=>{
+  const data=JSON.parse(readFileSync(new URL('../public/qbank/data.json',import.meta.url),'utf8'));
+  const map=readFileSync(new URL('../public/qbank/map.html',import.meta.url),'utf8');
+  const embedded=JSON.parse(map.match(/<script type="application\/json" id="qdata">([\s\S]*?)<\/script>/)[1]);
+  assert.deepEqual(embedded,data);
+  assert.equal(data.qs.length,835);
+  assert.deepEqual(data.qs.map(q=>q.i),QBANK_SOURCE.map(q=>q.i));
+  const excluded=JSON.parse(readFileSync(new URL('../docs/qbank-import-excluded.json',import.meta.url),'utf8'));
+  assert.equal(excluded.length,26);
+  for (const q of QBANK_SOURCE) {
+    const card=data.qs.find(x=>x.i===q.i);
+    assert.equal(card.c,q.code);
+    assert.equal(card.l,q.knowledgeIds[0]);
+    assert.equal(card.t2,q.t2 ? q.methodIds[0] : '');
+    assert.ok(!/figs\/[\w.-]+\.(?:png|jpe?g|webp|gif|svg)/i.test([q.stemHtml,...q.options.map(o=>o.html)].join('')),q.code);
+  }
+});
+
+test('chapter-only questions explicitly show unspecialized review without changing graph IDs',()=>{
+  const chapter=QBANK_SOURCE.filter(q=>q.knowledgeScope==='chapter');
+  assert.deepEqual(chapter.map(q=>q.code).sort(),['JS-2026-12','HB-2026-11','HUB-2026-05','YN-2026-11'].sort());
+  for (const q of chapter) {
+    const report=buildReport(getQbankProblem(`qbank-${q.i}`),createSessionRecord(`qbank-${q.i}`),{engine:'offline-stub'});
+    assert.deepEqual(report.review.knowledge.map(k=>k.id),q.knowledgeIds);
+    assert.ok(report.review.knowledge.every(k=>k.title.includes('未细分') && !k.formula));
+    assert.ok(!report.assessment.knowledge.some(k=>k.status==='mastered'));
+  }
+  // A chapter-only record must not mutate the reusable card used by explicitly tagged records.
+  const tagged=QBANK_SOURCE.find(q=>!q.knowledgeScope && q.knowledgeIds.some(id=>chapter.some(c=>c.knowledgeIds.includes(id))));
+  assert.ok(tagged);
+  assert.ok(!getQbankProblem(`qbank-${tagged.i}`).reportReview.knowledge.some(k=>k.title.includes('未细分')));
+});
+
+test('all 835 source questions retain answers, full images and every knowledge/method association',()=>{
+  assert.equal(QBANK_IDS.length,835);
+  assert.equal(QBANK_GRAPHS.knowledge.flatMap(m=>m.children.flatMap(c=>c.children)).length,94);
+  assert.equal(QBANK_GRAPHS.methods.flatMap(m=>m.children).length,29);
   for (const source of QBANK_SOURCE) {
     const p=getProblemById(`qbank-${source.i}`);
     assert.ok(p,p?.id);
@@ -50,7 +92,7 @@ test('knowledge is selected by stable source ID and does not mutate another ques
   const first=getQbankProblem('qbank-1'), second=getQbankProblem('qbank-2');
   assert.ok(first.reportReview.knowledge.some(k=>k.title==='光电效应'));
   assert.ok(second.reportReview.knowledge.some(k=>/折射/.test(k.title)));
-  assert.equal(getQbankProblem('qbank-153'),null);
+  assert.equal(getQbankProblem('qbank-836'),null);
   const r=buildReport(first,createSessionRecord(first.id),{engine:'offline-stub'});
   r.review.knowledge[0].title='mutated';
   assert.ok(!first.reportReview.knowledge.some(k=>k.title==='mutated'));
@@ -66,7 +108,7 @@ test('both selection paths use registered IDs; report renderer preserves all car
   const start=html.indexOf('  function renderReportReview(rep)');
   const end=html.indexOf('  /** 步骤标题',start);
   const host={innerHTML:''};
-  const c=vm.createContext({$:()=>host,esc:s=>String(s).replaceAll('<','&lt;'),reportFormula:k=>k.formula});
+  const c=vm.createContext({practiceButton:()=>'', $:()=>host,esc:s=>String(s).replaceAll('<','&lt;'),reportFormula:k=>k.formula});
   vm.runInContext(html.slice(start,end),c);
   const example=QBANK_SOURCE.find(q=>q.knowledgeIds.length>3 && q.methodIds.length>2);
   assert.ok(example);
@@ -77,6 +119,11 @@ test('both selection paths use registered IDs; report renderer preserves all car
 });
 
 test('every bank question has an API report even before the first chat turn',async()=>{
+  // 这条测的是"题库题有没有离线报告"，不是登录闸门。工作区 .env 一旦打开
+  // PILOT_REQUIRE_LOGIN=1（试点环境需要登录），这里就会整片被 401 拦住 ——
+  // 临时关掉、测完还原，别让本地配置冒充成功能回归。
+  const prevLogin=process.env.PILOT_REQUIRE_LOGIN;
+  process.env.PILOT_REQUIRE_LOGIN='0';
   const {createServer}=await import('node:http');
   const server=createServer((req,res)=>handleApi(req,res,new URL(req.url,'http://localhost')).catch(e=>{
     res.statusCode=500;res.end(String(e));
@@ -94,9 +141,10 @@ test('every bank question has an API report even before the first chat turn',asy
       assert.equal(report.meta.recordMissing,true);
       assert.deepEqual(turns,[]);
     }
-    const invalid=await fetch(`${base}/api/report?sessionId=missing&problemId=qbank-153`);
+    const invalid=await fetch(`${base}/api/report?sessionId=missing&problemId=qbank-836`);
     assert.equal(invalid.status,404);
   } finally {
+    if (prevLogin===undefined) delete process.env.PILOT_REQUIRE_LOGIN; else process.env.PILOT_REQUIRE_LOGIN=prevLogin;
     server.closeAllConnections();
     await new Promise(resolve=>server.close(resolve));
   }

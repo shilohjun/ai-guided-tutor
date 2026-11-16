@@ -77,6 +77,47 @@ describe('前端 · DOM 契约（防止"点了没反应"）', () => {
     assert(missing.length === 0, '以下 id 在 index.html 里不存在，运行时会静默失效：\n  ' + missing.join('\n  '));
   });
 
+  /**
+   * 符号面板的入口必须真的存在。
+   *
+   * 这条是补一个真实事故：面板 2026-10-28 随着 index.html 整页重写消失了，
+   * commit message 一个字没提，而当时全仓**没有一条断言问过"界面上还有符号入口吗"** ——
+   * 清单还在、替换规则还在、用例还在跑，CI 全绿，谁都没发现。
+   *
+   * 所以这里钉三件事：题干框和对话框各有一个入口、两个入口指向同一个面板容器、
+   * 渲染模块真的被加载。下一回整页重写会在这里先红。
+   */
+  it('两个输入框都有符号入口，且指向同一个面板容器', () => {
+    const triggers = [...html.matchAll(/<button[^>]*data-sym-trigger="(input[13])"[^>]*>/g)];
+    const bound = triggers.filter((m) => m[0].includes('aria-controls="symPanel"'));
+    assertEquals(
+      bound.length,
+      2,
+      '题干输入框（#input1）与对话输入框（#input3）各要有一个符号入口，且都指向 #symPanel；' +
+        `实际找到 ${triggers.length} 个入口、其中 ${bound.length} 个指向 #symPanel`,
+    );
+    assertIncludes(html, 'id="symPanel"', '面板容器 #symPanel 不存在');
+    assertIncludes(html, 'data-sym-grid', '面板缺少格子容器 data-sym-grid');
+    assertIncludes(html, 'src="/symbolpanel.js"', '面板渲染模块 public/symbolpanel.js 没有被加载');
+  });
+
+  /**
+   * 语音入口同样要两处都有，理由同上一条 —— 而且它已经翻过一次车：
+   * 第 3 页从一开始就有麦克风，第 1 页（题干）从来没有；第 3 页那个还是个桩，
+   * 点一下只改 placeholder，连 SpeechRecognition 都没碰过。两条都没人测。
+   */
+  it('两个输入框都有语音入口，且都绑到了自己的文本框', () => {
+    const triggers = [...html.matchAll(/<button[^>]*data-mic-for="(input[13])"[^>]*>/g)];
+    const targets = new Set(triggers.map((m) => m[1]));
+    assertEquals(
+      targets.size,
+      2,
+      '题干输入框（#input1）与对话输入框（#input3）各要有一个语音入口；' +
+        `实际绑到的目标：${[...targets].join(',') || '（无）'}`,
+    );
+    assertIncludes(html, 'src="/voice.js"', '语音模块 public/voice.js 没有被加载');
+  });
+
   it('学生解题页不含任何"防泄题 / 教研"面板（那些内容不该出现在学生面前）', () => {
     const start = htmlVisible.indexOf('data-page="3"');
     const end = htmlVisible.indexOf('data-page="4"');
@@ -140,13 +181,13 @@ describe('前端 · 文案不会被当成纯文本显示', () => {
   });
 });
 
-describe('前端 · 五页流程契约（新版单文件）', () => {
+describe('前端 · 四步流程契约（新版单文件）', () => {
   /**
    * 这一组守的是"用户点得到、且点了有正确反应"。
    * 之前守的是旧壳里的两张模式卡与一个开关；新版把口径换成了：
    * 五页随时可切、AI 伴学按能力位置灰、第 5 页三张卡。
    */
-  const PAGE_NAMES = ['题目', '方式', '解题', '报告', '巩固'];
+  const PAGE_NAMES = ['题目', '方式', '解题', '报告'];
   const pageMarkup = (n) => {
     const start = html.indexOf('<section class="page" data-page="' + n + '"');
     const end = html.indexOf('<section class="page" data-page="' + (n + 1) + '"');
@@ -155,8 +196,8 @@ describe('前端 · 五页流程契约（新版单文件）', () => {
   const page2 = pageMarkup(2);
   const router = readFileSync(join(ROOT, 'src/server/router.js'), 'utf8');
 
-  it('步骤条就是这五页，而且五页都能点（没有 disabled）', () => {
-    assertIncludes(appJs, "var PAGES = ['题目', '方式', '解题', '报告', '巩固'];", '步骤条文案要与五页一致（第 5 页叫"巩固"）');
+  it('步骤条为四步，报告内可直接开练（没有 disabled）', () => {
+    assertIncludes(appJs, "var PAGES = ['题目', '方式', '解题', '报告'];", '步骤条文案要与五页一致（第 5 页叫"巩固"）');
     const stepper = appJs.slice(appJs.indexOf('function renderStepper'), appJs.indexOf('function setPage'));
     assertIncludes(stepper, 'PAGES.map(', '步骤条要遍历 PAGES 渲染，而不是另抄一份页名');
     assertIncludes(stepper, 'data-goto=', '每个步骤按钮都要带 data-goto，点了才能切页');
@@ -201,19 +242,11 @@ describe('前端 · 五页流程契约（新版单文件）', () => {
     assertIncludes(router, 'safeStepRef', '步骤只允许翻译已经走过的，防提前泄题');
   });
 
-  it('第 5 页是两张卡：重做 / 同类题', () => {
-    for (const id of ['redoBtn', 'startRelated']) {
-      assertIncludes(html, 'id="' + id + '"', '第 5 页缺少 ' + id);
-    }
-    assertIncludes(html, '重做这道题', '缺少"重做"卡');
-    assertIncludes(html, '同类题再练', '缺少"同类题"卡');
-
-    const seg = html.slice(
-      html.indexOf('<section class="page" data-page="5"'),
-      html.indexOf('<section class="page" data-page="5"') + 4000
-    );
-    const cards = (seg.match(/class="bar-card"/g) || []).length;
-    assert(cards === 2, '第 5 页只保留两张卡，实际 ' + cards + ' 张');
+  it('报告操作固定在滚动区上方，原第五页已合并', () => {
+    assertNotIncludes(html, 'data-page="5"', '不保留重复的第五页');
+    for (const id of ['reportRedo', 'reportFinish', 'reportReturnBtn']) assertIncludes(html, 'id="' + id + '"', '缺少必要操作 ' + id);
+    assert(html.indexOf('id="reportRedo"') < html.indexOf('id="reportScroll"'), '重做应位于报告滚动区上方');
+    assertNotIncludes(html, 'id="go5"', '报告底部不再放下一步按钮');
   });
 
   it('同类题按题库的真实双轴标签筛，不再用 topics 字符串猜', () => {
@@ -229,9 +262,22 @@ describe('前端 · 五页流程契约（新版单文件）', () => {
     assertNotIncludes(appJs, "API.req('/api/related", '页五已经不再走服务端的 related 接口');
   });
 
-  it('报告页的下一步是"巩固"，不是"迁移"', () => {
-    assertIncludes(html, '下一步 · 巩固', '报告页的按钮要指向巩固');
-    assertNotIncludes(htmlVisible, '迁移', '第 5 页已经不叫"迁移"了');
+  it('报告卡片按训练目标开练，跳过报告复用抽屉', () => {
+    assertIncludes(appJs, 'data-practice=', '卡片应提供练习入口');
+    assertIncludes(appJs, "$('#skipToPractice').addEventListener", '跳过报告需要直接进入抽屉');
+    assertIncludes(appJs, 'REL.target', '针对性练习不能自动扩大范围');
+  });
+
+  it('逐页评审的深链 ?p=N 真的有调用点（只定义不调用等于失效）', () => {
+    /**
+     * 这段曾经是"函数写得挺好、就是没人调"：带 ?p=3 打开会安静地停在首页，
+     * 连截图脚本都被它骗过去 —— 拍出来的五页其实全是首页。
+     * 所以这里盯的不是函数存在，而是**调用点**存在。
+     */
+    assertIncludes(appJs, 'function maybeReviewJump()', '缺少深链落页函数');
+    assert(/maybeReviewJump\(\);/.test(appJs), '?p=N 的落页函数没有任何调用点');
+    assertIncludes(appJs, "if (!S.bank.length) return;", '深链要等题库到货，否则会被空列表挡回去');
+    assertIncludes(appJs, 'maybeReviewJump();', '题库取回后要立刻决定落哪一页');
   });
 
   it('答案功能与教师功能在新版里一点入口都不留', () => {
@@ -380,5 +426,83 @@ describe('前端 · 超长题目在框内滚动，而不是把整页拉长', () 
 
   it('不靠 100vh 的 max-height 硬顶高度（旧壳里那套会和页面滚动打架）', () => {
     assert(!/max-height:\s*calc\(100vh/.test(style), '不该再用 100vh 的 max-height 硬顶高度');
+  });
+});
+
+describe('前端 · 首屏摊开的题库题干里，$…$ 也要画出来', () => {
+  /**
+   * 现场：从地图里选 2025 浙江第 17 题（bankId 168），首屏输入区展开题干，
+   * 看到的是 `$T_{1} = 300 \,\mathrm{K}$` 这种 LaTeX 原文。
+   *
+   * 根因不是数据坏了，是新旧两批题库的公式放了两种形态：
+   *   · 旧题（265/835）：公式是 <img class="qf"> 图片，塞进 DOM 就是图
+   *   · 新题（570/835）：公式是 $…$ 原文，塞进 DOM 还是字
+   * 所以凡是把 stemHtml 塞进 DOM 的地方，后面都必须补一次 KaTeX。
+   * 第 3 页左栏、完整题预览都补了，首屏的 renderPicked 漏了。
+   */
+  const from = appJs.indexOf('function renderPicked');
+  const to = appJs.indexOf('function landPickedQuestion');
+  const pickedSrc = from >= 0 && to > from ? appJs.slice(from, to) : '';
+
+  it('renderPicked 在塞完 stemHtml 之后要过一遍 BsjMath.renderMathIn', () => {
+    assert(pickedSrc.length > 0, '在 index.html 里找不到 renderPicked');
+    assertIncludes(pickedSrc, 'renderMathIn', '首屏摊开题干后要调用 BsjMath.renderMathIn，否则新题库的 $…$ 会原样显示');
+  });
+
+  it('题干详情拿不到时的兜底文本也一样要画', () => {
+    // catch 里写的是 esc(q.stem)，索引里的 stem 同样带 $…$（570/835 道如此）
+    const catchAt = pickedSrc.indexOf('.catch(');
+    assert(catchAt > 0, 'renderPicked 里应当有详情读取失败的兜底');
+    assertIncludes(pickedSrc.slice(catchAt), 'paint()', '兜底分支也要走同一个画公式的收尾，否则断网时又是一屏 LaTeX');
+  });
+});
+
+describe('前端 · 公式自动渲染：不用每个显示点都手写一遍', () => {
+  /**
+   * 反复事故的收口：每次新增一个「把题干塞进页面」的地方，都得记得补一次
+   * renderMathIn；漏一次就是一屏 $T_{1} = 300 \,\mathrm{K}$。
+   *
+   * 现在把这件事收进 public/math.js —— 一个 MutationObserver 兜底。
+   * 首页、题库地图、题库工坊三个文档都引了这个文件，所以改这一处就全覆盖；
+   * 以后新加的页面、新加的显示点，都不用再想起来这件事。
+   */
+  const mathJs = readFileSync(join(ROOT, 'public/math.js'), 'utf8');
+
+  it('math.js 里装了 MutationObserver 兜底', () => {
+    assertIncludes(mathJs, 'MutationObserver', 'math.js 要用 MutationObserver 自动发现新内容');
+    assertIncludes(mathJs, 'characterData', '文字节点被原地改写也要能看见');
+    assertIncludes(mathJs, 'requestAnimationFrame', '一帧内的多次变更要合并成一次渲染');
+  });
+
+  it('可以一键关掉，观察器句柄也拿得到（出问题时能排查）', () => {
+    assertIncludes(mathJs, 'autoRender', '要有 BsjMath.autoRender 这样的开关');
+    assertIncludes(mathJs, 'BsjMath.observer', '观察器要挂在 BsjMath 上');
+  });
+
+  it('全局扫描不许闯进输入框', () => {
+    // textarea 的默认值本身就是一个文本子节点，被替换成 span 之后 value 就废了
+    const skipLine = (mathJs.match(/var skipAlways = .*/) || [''])[0];
+    assert(skipLine.length > 0, 'renderMathIn 的 skip 名单要写成 var skipAlways = ... 一行，便于核对');
+    for (const sel of ['textarea', 'input', 'select', 'option']) {
+      assertIncludes(skipLine, sel, 'skip 名单要含 ' + sel);
+    }
+  });
+});
+
+describe('前端 · 题库地图的卡片不会把公式卡在 ⟨式⟩ 上', () => {
+  /**
+   * 现场：题库地图的卡片是两段式渲染 —— 先用 data.json 的纯文本铺（老题那里
+   * 只能写成 ⟨式⟩），再异步取回 rich HTML 把公式图填进去。
+   *
+   * 问题在第二步只补 `list.slice(0, 80)`：835 张卡里只有前 80 张会被补。
+   * 实测 103 道题的纯文本带 ⟨式⟩，前 80 张命中 22 道，剩下 81 道永远停在占位符。
+   * 现在改成按可见性懒补，并用这条测试钉住。
+   */
+  const mapHtml = readFileSync(join(ROOT, 'public/qbank/map.html'), 'utf8');
+
+  it('补公式不再有「只补前 N 张」的截断', () => {
+    assert(!/slice\(0,\s*80\)/.test(mapHtml), '曾经 list.slice(0,80)：超出 80 张的卡片永远显示 ⟨式⟩');
+    assertIncludes(mapHtml, 'IntersectionObserver', '要按卡片是否进入视口来补，而不是按序号');
+    assertIncludes(mapHtml, '__hydrateJob', '观察器命中后要能取回这张卡的详情任务');
   });
 });

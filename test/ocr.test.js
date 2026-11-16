@@ -80,6 +80,19 @@ describe('拍照识题 · 配置读取', () => {
     assertEquals(c.retries, 0, '默认重试必须是 0 —— 按次计费，重试就是再花钱');
   });
 
+  /**
+   * F1：默认超时从 30000 改成 12000。
+   *
+   * 30 秒**正好等于云函数墙**：函数在第 30 秒被网关掐掉时，代码一行都不跑 ——
+   * 错误回不来、额度也已经记不上了，学生看到的是"一直在转"。
+   * 12 秒留出 18 秒给"写事件 + 回响应"。本地的 node 服务没有这道墙，
+   * 所以这个默认值只会在线上变成"识别总是失败"，而本地永远复现不出来。
+   */
+  it('超时默认 12 秒（30 秒正好等于云函数墙，会被网关先掐掉），且仍可配置', () => {
+    assertEquals(readOcrConfig({}).timeoutMs, 12000, '默认超时必须小于云函数墙');
+    assertEquals(readOcrConfig({ ALIYUN_OCR_TIMEOUT_MS: '5000' }).timeoutMs, 5000, '显式配置仍然优先');
+  });
+
   it('健康检查只报形态，绝不回传 AppCode', () => {
     const s = ocrStatus({ ALIYUN_OCR_APPCODE: APPCODE });
     const dumped = JSON.stringify(s);

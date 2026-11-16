@@ -1,0 +1,366 @@
+[
+  {
+    "sourceIndex": 161,
+    "code": "ZJ1-2025-09",
+    "type": "单选",
+    "province": "浙江",
+    "difficulty": "中",
+    "missingRefs": [
+      "figs/09a.png",
+      "figs/09b.png",
+      "figs/09c.png",
+      "figs/09d.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 271,
+    "code": "AH-2025-06",
+    "type": "单选",
+    "province": "安徽",
+    "difficulty": "中",
+    "missingRefs": [
+      "figs/06b.png",
+      "figs/06c.png",
+      "figs/06d.png",
+      "figs/06e.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 305,
+    "code": "GD-2025-07",
+    "type": "单选",
+    "province": "广东",
+    "difficulty": "难",
+    "missingRefs": [
+      "figs/07c.png",
+      "figs/07d.png",
+      "figs/07e.png",
+      "figs/07f.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 333,
+    "code": "JS-2025-05",
+    "type": "单选",
+    "province": "江苏",
+    "difficulty": "易",
+    "missingRefs": [
+      "figs/05a.png",
+      "figs/05b.png",
+      "figs/05c.png",
+      "figs/05d.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 352,
+    "code": "JX-2025-09",
+    "type": "多选",
+    "province": "江西",
+    "difficulty": "中",
+    "missingRefs": [
+      "figs/09a.png",
+      "figs/09b.png",
+      "figs/09c.png",
+      "figs/09d.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 364,
+    "code": "HE-2025-06",
+    "type": "单选",
+    "province": "河北",
+    "difficulty": "中",
+    "missingRefs": [
+      "figs/06b.png",
+      "figs/06c.png",
+      "figs/06d.png",
+      "figs/06e.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 377,
+    "code": "HA-2025-04",
+    "type": "单选",
+    "province": "河南",
+    "difficulty": "中",
+    "missingRefs": [
+      "figs/04b.png",
+      "figs/04c.png",
+      "figs/04d.png",
+      "figs/04e.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 378,
+    "code": "HA-2025-05",
+    "type": "单选",
+    "province": "河南",
+    "difficulty": "易",
+    "missingRefs": [
+      "figs/05b.png",
+      "figs/05c.png",
+      "figs/05d.png",
+      "figs/05e.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 423,
+    "code": "HU-2025-02",
+    "type": "单选",
+    "province": "湖南",
+    "difficulty": "易",
+    "missingRefs": [
+      "figs/02a.png",
+      "figs/02b.png",
+      "figs/02c.png",
+      "figs/02d.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 498,
+    "code": "SN-2025-01",
+    "type": "单选",
+    "province": "陕晋宁青",
+    "difficulty": "易",
+    "missingRefs": [
+      "figs/01a.png",
+      "figs/01b.png",
+      "figs/01c.png",
+      "figs/01d.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 500,
+    "code": "SN-2025-03",
+    "type": "单选",
+    "province": "陕晋宁青",
+    "difficulty": "易",
+    "missingRefs": [
+      "figs/03b.png",
+      "figs/03c.png",
+      "figs/03d.png",
+      "figs/03e.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 505,
+    "code": "SN-2025-08",
+    "type": "多选",
+    "province": "陕晋宁青",
+    "difficulty": "中",
+    "missingRefs": [
+      "figs/08b.png",
+      "figs/08c.png",
+      "figs/08d.png",
+      "figs/08e.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 516,
+    "code": "HL-2025-04",
+    "type": "单选",
+    "province": "黑吉辽内",
+    "difficulty": "中",
+    "missingRefs": [
+      "figs/04b.png",
+      "figs/04c.png",
+      "figs/04d.png",
+      "figs/04e.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 517,
+    "code": "HL-2025-05",
+    "type": "单选",
+    "province": "黑吉辽内",
+    "difficulty": "中",
+    "missingRefs": [
+      "figs/05a.png",
+      "figs/05b.png",
+      "figs/05c.png",
+      "figs/05d.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 568,
+    "code": "XK-2024-01",
+    "type": "单选",
+    "province": "全国新课标",
+    "difficulty": "易",
+    "missingRefs": [
+      "figs/01a.jpg",
+      "figs/01b.jpg",
+      "figs/01c.jpg",
+      "figs/01d.jpg"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 582,
+    "code": "QJ-2024-02",
+    "type": "单选",
+    "province": "全国甲卷",
+    "difficulty": "易",
+    "missingRefs": [
+      "figs/02b.png",
+      "figs/02c.png",
+      "figs/02d.png",
+      "figs/02e.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 588,
+    "code": "QJ-2024-08",
+    "type": "多选",
+    "province": "全国甲卷",
+    "difficulty": "中",
+    "missingRefs": [
+      "figs/08b.png",
+      "figs/08c.png",
+      "figs/08d.png",
+      "figs/08e.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 617,
+    "code": "TJ-2024-03",
+    "type": "单选",
+    "province": "天津",
+    "difficulty": "易",
+    "missingRefs": [
+      "figs/03a.png",
+      "figs/03b.png",
+      "figs/03c.png",
+      "figs/03d.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 618,
+    "code": "TJ-2024-04",
+    "type": "单选",
+    "province": "天津",
+    "difficulty": "中",
+    "missingRefs": [
+      "figs/04a.png",
+      "figs/04b.png",
+      "figs/04c.png",
+      "figs/04d.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 624,
+    "code": "TJ-2024-09",
+    "type": "实验",
+    "province": "天津",
+    "difficulty": "中",
+    "missingRefs": [
+      "figs/09d.png",
+      "figs/09e.png",
+      "figs/09f.png",
+      "figs/09g.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 631,
+    "code": "AH-2024-04",
+    "type": "单选",
+    "province": "安徽",
+    "difficulty": "易",
+    "missingRefs": [
+      "figs/04b1.jpg",
+      "figs/04b2.jpg",
+      "figs/04b3.jpg",
+      "figs/04b4.jpg"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 650,
+    "code": "SD-2024-08",
+    "type": "单选",
+    "province": "山东",
+    "difficulty": "中",
+    "missingRefs": [
+      "figs/08b1.png",
+      "figs/08b2.png",
+      "figs/08b3.png",
+      "figs/08b4.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 667,
+    "code": "GD-2024-07",
+    "type": "单选",
+    "province": "广东",
+    "difficulty": "中",
+    "missingRefs": [
+      "figs/07b1.png",
+      "figs/07b2.png",
+      "figs/07b3.png",
+      "figs/07b4.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 714,
+    "code": "JX-2024-08",
+    "type": "多选",
+    "province": "江西",
+    "difficulty": "易",
+    "missingRefs": [
+      "figs/08a.png",
+      "figs/08b.png",
+      "figs/08c.png",
+      "figs/08d.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 775,
+    "code": "HU-2024-05",
+    "type": "单选",
+    "province": "湖南",
+    "difficulty": "中",
+    "missingRefs": [
+      "figs/05a.png",
+      "figs/05b.png",
+      "figs/05c.png",
+      "figs/05d.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  },
+  {
+    "sourceIndex": 847,
+    "code": "CQ-2024-01",
+    "type": "单选",
+    "province": "重庆",
+    "difficulty": "易",
+    "missingRefs": [
+      "figs/01a.png",
+      "figs/01b.png",
+      "figs/01c.png",
+      "figs/01d.png"
+    ],
+    "reason": "选项图片没有内联进导出文件，选项位置只剩 figs/*.png 文件名，界面上没有图可看"
+  }
+]

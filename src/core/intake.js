@@ -55,6 +55,48 @@ export const MIN_STEM_LENGTH = 8;
  * @param {{ adapter?: object, subjectHint?: string|null }} [options]
  * @returns {Promise<import('./types.js').IntakeResult>}
  */
+/**
+ * 懒加载的归类模块句柄。
+ *
+ * taxonomy 会拉进题库全文与 2MB 关键点数据；读题路径很多（云函数、Worker、脚本）
+ * 并不都需要归类，所以这里只在真正读题时才 import 一次。
+ */
+let taxonomyModule = null;
+
+/**
+ * 题干 → 既有知识叶 / 方法节点的候选。
+ *
+ * 这是"陌生题也能落到既有分类"的第一步：先给候选，再让模型在闭集里选。
+ * 任何失败都返回 null —— 归类是增益，不能成为读题的前置条件。
+ */
+async function loadCandidates(text, excludeId = null) {
+  try {
+    taxonomyModule ??= await import('./taxonomy.js');
+    return taxonomyModule.classifyText(text, { topK: 5, excludeId });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 给"读题"这一步套一层总预算。
+ *
+ * 真模型自己也有超时（AbortController），但上游一旦出现"连接建起来了、包却不回来"，
+ * 请求层可能长时间不返回（实测遇到过一次 39 分钟不回的调用）。读题是学生在等的那一步，
+ * 卡住等于产品挂了 —— 所以这里再加一道兜底：到点就降级成骨架，宁可路径粗一点，也不能让请求悬着。
+ */
+function withBudget(promise, ms) {
+  let timer = null;
+  const guard = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error(`读题超时（${ms} ms）`);
+      err.code = 'LLM_TIMEOUT';
+      reject(err);
+    }, ms);
+  });
+  return Promise.race([promise, guard]).finally(() => clearTimeout(timer));
+}
+
 export async function understandProblem(rawText, options = {}) {
   const startedAt = Date.now();
   const text = String(rawText ?? '').trim();
@@ -66,10 +108,30 @@ export async function understandProblem(rawText, options = {}) {
   let parsed = null;
   let usedModel = false;
 
+  /**
+   * 陌生题先归类：题干 → 既有知识叶 / 方法节点的候选列表。
+   *
+   * 为什么要懒加载：taxonomy 依赖 2MB 的关键点数据 + 题库全文，
+   * 而 intake 会被很多不需要归类的路径 import。动态 import 让它只在真读题时进内存，
+   * 顺带也把"CF Worker 包体 / 冷启动"这层风险关在门外。
+   * 失败一律当作"没有候选" —— 归类是增益，不该成为读题的前置条件。
+   */
+  // excludeId 只给评测用：把"这道题自己"从库里剔掉，才等于一道真陌生题。
+  // 产品路径永远不传它（新题本来就不在库中）。
+  const candidates = await loadCandidates(text, options.excludeId ?? null);
+
   const adapter = options.adapter;
   if (adapter && typeof adapter.understandProblem === 'function') {
     try {
-      parsed = await adapter.understandProblem({ rawText: text, subjectHint: options.subjectHint ?? null });
+      const budgetMs = Number.isFinite(options.timeoutMs) && options.timeoutMs > 0 ? options.timeoutMs : 45000;
+      parsed = await withBudget(
+        adapter.understandProblem({
+          rawText: text,
+          subjectHint: options.subjectHint ?? null,
+          candidates,
+        }),
+        budgetMs,
+      );
       usedModel = true;
     } catch (err) {
       warnings.push(`模型读题失败，已降级为通用骨架：${clip(err?.message ?? err, 160)}`);
@@ -84,6 +146,7 @@ export async function understandProblem(rawText, options = {}) {
   const { problem, analysis } = normalizeIntake(source, text, {
     subjectHint: options.subjectHint ?? null,
     warnings,
+    candidates,
   });
 
   return {
@@ -161,6 +224,13 @@ export function normalizeIntake(source, rawText, opts = {}) {
     : deriveTopics(graphs, subject);
   if (!stringList(src.topics).length) warnings.push('模型未给出知识点，已从路径步骤的概念反推');
 
+  // ---- 知识归类（陌生题 → 既有 94 叶 / 38 方法节点）----
+  // 闭集原则：只接受候选里出现过的 id。模型的偏好可以有，但不能发明树上没有的节点。
+  const tax = pickTaxonomy(src, opts.candidates, warnings);
+  if (tax.source === 'none') {
+    warnings.push('本题没能归到既有知识树（题干与题库节点都不够像），知识点位置留空，比硬塞一个错的更安全');
+  }
+
   // ---- 错因 ----
   const misconceptions = normalizeMisconceptions(src.misconceptions, warnings);
   if (!misconceptions.length) {
@@ -205,6 +275,14 @@ export function normalizeIntake(source, rawText, opts = {}) {
     createdAt: new Date().toISOString(),
     subject,
     topics: topicSource.slice(0, 8),
+    /**
+     * 归类结果（陌生题落到既有树上）。
+     * leafId 是 leafCard() 的 id；methodIds 是 methodCard() 的 id。
+     * taxonomySource 说明来源：model=模型在候选里选的，lexical=检索直接定的，none=没归类。
+     */
+    leafId: tax.leafId,
+    methodIds: tax.methodIds,
+    taxonomySource: tax.source,
     difficulty: normalizeDifficulty(src.difficulty),
     /** 关键：题干一律用**学生粘贴的原文**，不用模型改写过的版本 */
     stem: rawText.trim(),
@@ -219,6 +297,41 @@ export function normalizeIntake(source, rawText, opts = {}) {
   };
 
   return { problem, analysis: buildAnalysis(problem, src, warnings) };
+}
+
+/**
+ * 从"模型给的"和"检索给的"里挑出最终归类。
+ *
+ * 优先级：模型在候选里选的 > 检索的 top1 > 不归类。
+ * 宁可空着也不硬塞 —— 错的知识点会让学生照着错的地图找路。
+ */
+function pickTaxonomy(src, candidates, warnings) {
+  const leafIds = new Set((candidates?.leaves ?? []).map((l) => l.id));
+  const methodIds = new Set((candidates?.methods ?? []).map((m) => m.id));
+
+  const modelLeaf = typeof src.leafId === 'string' ? src.leafId.trim() : '';
+  const modelMethods = stringList(src.methodIds).slice(0, 3);
+
+  let fromModel = false;
+  let leafId = null;
+  if (modelLeaf) {
+    if (leafIds.has(modelLeaf)) {
+      leafId = modelLeaf;
+      fromModel = true;
+    } else {
+      warnings.push(`模型给的知识点「${clip(modelLeaf, 20)}」不在候选里，已丢弃`);
+    }
+  }
+
+  let picked = modelMethods.filter((id) => methodIds.has(id)).slice(0, 2);
+  if (picked.length) fromModel = true;
+  else if (modelMethods.length) warnings.push('模型给的方法标签不在候选里，已丢弃');
+
+  // 模型没表态时，用检索兜底；置信度不够就留空
+  if (!leafId && candidates?.confident) leafId = candidates.leaves[0].id;
+  if (!picked.length && candidates?.methodConfident) picked = [candidates.methods[0].id];
+
+  return { leafId, methodIds: picked, source: fromModel ? 'model' : leafId || picked.length ? 'lexical' : 'none' };
 }
 
 function buildAnalysis(problem, src, warnings) {
@@ -308,17 +421,31 @@ function normalizeGraphs(rawGraphs, rawText, warnings) {
  * 而双通道交叉校验（locate.js 的核心机制）会退化成单通道 ——
  * 模型一旦误判就没有第二意见，这正是"错误的提示比不给提示伤害更大"的场景。
  */
-function ensureCues(cues, title, concepts) {
-  const clean = cues.map((c) => normalize(c).replace(/[，,。.\s]/g, '')).filter((c) => c.length >= 2 && c.length <= 10);
+export function ensureCues(cues, title, concepts) {
+  const clean = cues.map(stripCuePunct).filter((c) => c.length >= 2 && c.length <= 10);
   if (clean.length >= 2) return [...new Set(clean)].slice(0, 6);
 
   // 从标题与概念里派生：按标点切成短语，取 2~8 字的片段
   const derived = [];
   for (const chunk of `${title} ${concepts.join(' ')}`.split(/[\s、,，/（）()：:；;]+/)) {
-    const t = normalize(chunk).replace(/[，,。.\s]/g, '');
+    const t = stripCuePunct(chunk);
     if (t.length >= 2 && t.length <= 8) derived.push(t);
   }
   return [...new Set([...clean, ...derived])].slice(0, 6);
+}
+
+/**
+ * 去掉标点，但保住小数点。
+ *
+ * 原来的写法是 `.replace(/[，,。.\s]/g, '')`，把 "." 当句号一并删了 ——
+ * 于是"0.02 秒"变成"002 秒"、"2.5 N"变成"25 N"。
+ * cue 是要拿去跟学生原话做匹配的，数字一旦被改，
+ * "读到小数点后两位"这种话就永远匹配不上。
+ */
+function stripCuePunct(text) {
+  return normalize(text)
+    .replace(/[，,。\s]/g, '')
+    .replace(/(?<!\d)\.|\.(?!\d)/g, '');
 }
 
 // ---------------------------------------------------------------------------

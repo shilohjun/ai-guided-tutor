@@ -600,6 +600,53 @@ body[data-page="1"] .tb-center,body[data-page="2"] .tb-center{opacity:0;pointer-
 .send-btn:hover{background:var(--brand-strong)}
 .send-btn[disabled]{background:var(--surface-3);color:var(--ink-3);cursor:not-allowed}
 
+/* =====================================================================
+   符号面板
+   ---------------------------------------------------------------------
+   物理公式里的 ² μ Ω √ 在普通键盘上打不出来 —— 写不出来，学生就只能用文字绕，
+   思路的表达精度直接下降。面板是给"不会打"的人兜底的，不是唯一入口。
+
+   两点和旧版不同，都是被现在的布局逼出来的：
+   1) 浮层挂在 <body> 上、fixed 定位。第 3 页的输入框长在 .pane{overflow:hidden}
+      里，第 1 页长在 .p1{overflow-y:auto} 里 —— 绝对定位的浮层在这两处都会被裁掉，
+      表现就是"点开了只看到一条边"。
+   2) 两页共用同一个面板，靠 data-sym-trigger 指向各自的输入框。
+   ===================================================================== */
+.sym-trigger{font-family:var(--font-sans);font-size:var(--fs-body);font-weight:700;line-height:1}
+/* 题库的题已经灌进输入框时，文本框被只读卡片顶掉，符号与语音都没有落点 —— 入口跟着一起收起来 */
+.composer.is-picked .sym-trigger,
+.composer.is-picked .mic-btn{display:none}
+
+.sympanel{
+  position:fixed;left:0;top:0;z-index:45;
+  width:min(480px,calc(100vw - 32px));
+  display:flex;flex-direction:column;gap:6px;padding:8px;
+  background:var(--surface);border:1px solid var(--line-strong);
+  border-radius:var(--r-sub);box-shadow:var(--shadow-2);
+  /* 高度由 public/symbolpanel.js 钳到"输入框上方还剩多少"，超出的部分格子自己滚 */
+  overflow:hidden;
+}
+.sympanel[hidden]{display:none}
+.symgrid{display:flex;flex-direction:column;gap:6px;min-height:0;overflow-y:auto}
+.symgroup{display:flex;align-items:center;gap:8px}
+.symgroup-label{flex:none;width:32px;text-align:right;font-size:var(--fs-meta);font-weight:400;color:var(--ink-3)}
+.symrow{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
+.symcell{
+  min-width:32px;height:32px;padding:0 6px;
+  display:grid;place-items:center;
+  font-family:var(--font-sans);font-size:var(--fs-body);font-weight:600;line-height:1;color:var(--ink);
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-inner);
+  cursor:pointer;transition:background .12s,border-color .12s,color .12s;
+}
+.symcell:hover{background:var(--brand-tint);border-color:var(--brand-line);color:var(--brand-ink)}
+.symcell:active{background:var(--brand-tint)}
+/* 手机：格子放大到能稳妥点中的尺寸（44px），分组标签收窄一点省宽度 */
+@media (max-width:640px){
+  .sympanel{width:min(100%,calc(100vw - 24px));gap:8px}
+  .symgroup-label{width:24px}
+  .symcell{min-width:44px;height:44px;padding:0 8px}
+}
+
 /* 识别成功：图挂在输入框右侧、文字直接落进输入框本体 */
 .composer-main{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
 .composer-main textarea{flex:1;min-width:0}
@@ -877,6 +924,92 @@ body.is-qb{overflow:hidden}
   gap:8px;padding:0 0 16px;width:min(748px,100%);
 }
 .p2-foot .note{font-size:var(--fs-body);color:var(--ink-3);font-weight:400}
+
+/* =====================================================================
+   5.1 陪学老师：跟模式卡同层的一个大选择框
+   ---------------------------------------------------------------------
+   四位老师是"同一道题的不同讲法"，所以它和两张模式卡是同一层上的选择：
+   默认派蒙，选过就记住（bsj-mentor），不选就一直是派蒙。
+   点开的是浮层而不是第五屏 —— 步骤条只有四步，不该多出一个不在条上的页。
+   ===================================================================== */
+
+/* —— 头像取景 ——
+   四张素材各自是独立裁的去底头像。做头像时素材本身就得是"脸在正中"的方图：
+   靠 CSS 平移只在 s=1 时管用，而一平移，另一侧就没有像素补上（会长出一条空白），
+   单纯放大又会把头顶切掉。所以取景问题在**素材层**解决，这里只负责圆形裁切与留白。
+   建华的素材曾偏左 60px，已按 characters/body 的原图重裁（脸居中、且裁掉了左侧的板子）；
+   其余三位目前的构图可以直接用。 */
+.av-frame{
+  position:relative;overflow:hidden;flex:none;
+  border-radius:var(--r-circle);
+}
+.av-frame img{
+  position:absolute;inset:0;
+  width:100%;height:100%;
+  object-fit:cover;
+  /* 留给"确实需要微调"的极端情况；正常情况下不设 --fx/--fy，等于不位移 */
+  transform:translate(var(--fx,0),var(--fy,0));
+}
+
+/* —— 页面二：与两张模式卡同宽同高，排在同一列里 —— */
+.teacher-bar .av-frame{width:48px;height:48px}
+
+/* —— 选老师层：居中浮层，点谁就是谁，点完即关 —— */
+.mentor-mask{position:fixed;inset:0;z-index:60;background:rgba(17,17,22,.40)}
+.mentor{
+  position:fixed;z-index:61;left:50%;top:50%;
+  transform:translate(-50%,-50%);
+  width:min(720px,calc(100vw - 32px));
+  max-height:calc(100% - 32px);
+  display:flex;flex-direction:column;gap:16px;
+  padding:24px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--r-card);
+  box-shadow:var(--shadow-2);
+}
+.mentor-head{display:flex;align-items:flex-start;gap:16px}
+.mentor-head h2{font-size:var(--fs-sub);font-weight:700;line-height:var(--lh-sub)}
+.mentor-head p{margin-top:4px;font-size:var(--fs-body);color:var(--ink-3)}
+.mentor-head .icon-btn{margin-left:auto}
+.mentor-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;overflow:auto}
+.pick{
+  display:flex;align-items:center;gap:8px;
+  padding:8px;
+  background:var(--surface-2);
+  border:1px solid var(--line);
+  border-radius:var(--r-sub);
+  color:var(--ink-2);
+  font-size:var(--fs-body);font-weight:600;
+  text-align:left;
+  transition:.16s;
+}
+.pick:hover{border-color:var(--line-strong);background:var(--surface)}
+.pick[aria-checked="true"]{border-color:var(--brand);background:var(--brand-tint);color:var(--brand-ink)}
+.pick .av-frame{width:48px;height:48px}
+.pick-copy{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pick-copy b{font-weight:700}
+.pick-copy em{font-style:normal;font-size:var(--fs-meta);font-weight:400;color:var(--ink-3)}
+
+/* —— 对话里的老师标识：谁在说话，点一下就能换 —— */
+.chat-mentor{
+  display:inline-flex;align-items:center;gap:4px;flex:none;
+  padding:2px 8px 2px 2px;
+  background:var(--surface-2);
+  border:1px solid var(--line);
+  border-radius:var(--r-pill);
+  color:var(--ink-2);
+  font-size:var(--fs-meta);font-weight:600;
+  transition:.16s;
+}
+.chat-mentor:hover{border-color:var(--line-strong);color:var(--ink)}
+.chat-mentor .av-frame{width:var(--ico-sm);height:var(--ico-sm)}
+.chat-mentor[aria-expanded="true"]{border-color:var(--brand);color:var(--brand-ink)}
+/* 气泡旁的头像跟着老师走，尺寸沿用原有的 26px 槽位 */
+.msg .av .av-frame{width:var(--av-img);height:var(--av-img)}
+@container (max-width:380px){
+  .chat-mentor .cm-name{display:none}
+}
 
 /* =====================================================================
    6. 页面三：左右分栏工作台
@@ -1371,6 +1504,45 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   .set-mask{display:block;background:rgba(17,17,22,.40)}
   @keyframes setUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 }
+
+/* Report controls stay outside the report's scrolling region. */
+.p4 .report-toolbar{width:min(860px,100%);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid var(--line);background:var(--paper)}
+.report-toolbar>div{display:flex;align-items:center;gap:16px}
+.report-toolbar strong{font-size:var(--fs-body);line-height:var(--lh-body)}
+.report-toolbar .duration{font-size:var(--fs-meta);color:var(--ink-3)}
+.p4 .p4-scroll{justify-content:flex-start;padding-top:16px;padding-bottom:24px}
+.p4 .review-practice{display:inline-flex;margin-top:12px;padding:4px 8px;border:1px solid var(--brand-line);border-radius:var(--r-inner);background:var(--surface);color:var(--brand-ink);font-family:var(--font-sans);font-size:var(--fs-meta);line-height:var(--lh-body);cursor:pointer}
+.p4 .review-practice:hover{background:var(--brand-tint)}
+.p4 .practice-empty{font-size:var(--fs-meta);line-height:var(--lh-body);color:var(--ink-3);margin-top:8px}
+.rel-item .rel-reason{display:block;font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink-2);margin-top:8px}
+.rel-error{font-size:var(--fs-body);line-height:var(--lh-body);color:var(--coral);padding:8px 16px}
+.pane-head .chat-next{margin-left:auto;white-space:nowrap;font-size:var(--fs-meta)}
+@media(max-width:600px){.p4 .report-toolbar{align-items:flex-start;gap:8px;padding:12px 0}.report-toolbar>div:first-child{flex-direction:column;align-items:flex-start;gap:4px}.report-toolbar .report-actions{gap:8px}.report-actions button{padding-left:8px;padding-right:8px}.tb-right #reportReturnBtn{font-size:var(--fs-meta);padding:4px 8px}}
+
+/* Recommended questions: full preview before starting a session. */
+.rel-preview{margin:auto;padding:0;width:min(840px,calc(100vw - 32px));height:min(88vh,900px);max-height:88vh;max-width:none;overflow:hidden;border:1px solid var(--line-strong);border-radius:var(--r-card);background:var(--surface);color:var(--ink);box-shadow:var(--shadow-2)}
+.rel-preview::backdrop{background:rgba(17,17,22,.42)}
+.rel-preview-shell{height:100%;min-height:0;display:flex;flex-direction:column}
+.rel-preview-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-shrink:0;padding:16px 24px;border-bottom:1px solid var(--line)}
+.rel-preview-head h2{font-size:var(--fs-sub);line-height:var(--lh-sub);font-weight:600}
+.rel-preview-head p{font-size:var(--fs-meta);line-height:var(--lh-body);color:var(--ink-3);margin-top:4px}
+.rel-preview-body{flex:1;min-height:0;padding:16px 24px;overscroll-behavior:contain}
+.rel-preview-reason{padding:8px 16px;margin-bottom:16px;background:var(--brand-tint);color:var(--ink-2);border:1px solid var(--brand-line);border-radius:var(--r-inner);font-size:var(--fs-body);line-height:var(--lh-body)}
+.rel-preview .q-rich,.rel-preview .q-opts-r{font-size:var(--fs-sub);line-height:2;overflow-wrap:anywhere}
+.rel-preview .q-rich p{margin:8px 0 16px}
+.rel-preview .q-rich img.qf,.rel-preview .q-opts-r img.qf{display:inline-block;height:1.22em;width:auto;max-width:100%;object-fit:contain;vertical-align:-.22em;margin:0 2px}
+.rel-preview .q-rich img.qfig,.rel-preview .q-opts-r img.qfig{display:block;max-width:100%;max-height:260px;width:auto;height:auto;margin:16px auto;object-fit:contain;border:0;border-radius:var(--r-inner)}
+.rel-preview-options{font-size:var(--fs-body);line-height:var(--lh-body);font-weight:600;margin:16px 0 8px}
+.rel-preview .q-opts-r{list-style:none;padding:0;margin:0}
+.rel-preview .q-opts-r li{display:flex;align-items:baseline;gap:12px;padding:12px 16px;margin:8px 0;border:1px solid var(--line);border-radius:var(--r-inner);background:var(--surface)}
+.rel-preview .q-opts-r li>b{flex:none;color:var(--brand-ink);font-family:var(--font-sans);font-size:var(--fs-body)}
+.rel-preview .q-opts-r li>span{min-width:0;flex:1}
+.rel-preview-footer{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:12px 24px;border-top:1px solid var(--line);background:var(--surface)}
+.rel-preview-note{font-size:var(--fs-meta);line-height:var(--lh-body);color:var(--ink-3)}
+.rel-preview-error{flex-basis:100%;font-size:var(--fs-body);line-height:var(--lh-body);color:var(--coral);margin:0}
+.rel-preview-head .rel-x{font-size:var(--fs-title);line-height:1}
+@media(max-width:600px){.rel-preview{width:calc(100vw - 16px);height:92vh;max-height:92vh}.rel-preview-head{padding:12px 16px}.rel-preview-body{padding:12px 16px}.rel-preview-footer{padding:12px 16px}.rel-preview .q-opts-r li{padding:8px 12px;gap:8px}.rel-preview-footer .btn-primary{white-space:nowrap}}
+html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var(--r-inner)}
 </style>
 <link rel="stylesheet" href="/vendor/katex/katex.min.css">
 </head>
@@ -1392,6 +1564,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   </div>
 
   <div class="tb-right">
+    <button class="bt" id="reportReturnBtn" type="button" hidden>返回原报告</button>
     <div class="bank-tools" id="bankTools">
       <button class="bt" id="bankBack" type="button" aria-label="返回首页"><span aria-hidden="true">←</span><span class="lbl-full"> 返回</span></button>
       <div class="seg bt-seg" id="bankSeg" role="group" aria-label="分类视角">
@@ -1469,11 +1642,17 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 12h16M12 4v16"/></svg>
                 物理 · 高中
               </span>
-              <span class="c-hint" id="pickHint">支持文字、拍照识别</span>
+              <span class="c-hint" id="pickHint">支持文字、语音、拍照识别</span>
               <button class="picked-clear" id="pickedClear" type="button" hidden>重新输入</button>
               <button class="ocr-retry" id="ocrRetry" type="button" hidden>重新识别</button>
             </div>
             <div class="c-right">
+              <button class="icon-btn mic-btn" id="mic1" type="button" aria-label="语音输入" aria-pressed="false" data-mic-for="input1">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="3" width="6" height="10.5" rx="3"></rect>
+                  <path d="M5.5 11a6.5 6.5 0 0 0 13 0"></path><path d="M12 17.5V21"></path>
+                </svg>
+              </button>
               <button class="icon-btn" id="cam1" type="button" aria-label="拍照上传题目">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M4 8h2.6l1.4-2h8l1.4 2H20a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"></path>
@@ -1481,6 +1660,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
                 </svg>
               </button>
               <input type="file" id="file1" accept="image/*" hidden>
+              <button class="icon-btn sym-trigger" id="symBtn1" type="button" aria-label="符号面板" aria-expanded="false" aria-controls="symPanel" data-sym-trigger="input1">Ω</button>
               <button class="send-btn" id="send1" type="button" aria-label="确认题目" disabled>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M12 19V5"></path><path d="M6 11l6-6 6 6"></path>
@@ -1519,7 +1699,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       <div class="p2-col">
         <div class="p2-head">
           <h2>选一种做题方式</h2>
-          <p>同一道题，两种陪法</p>
+          <p>同一道题，两种陪法 · 再挑一位合拍的老师</p>
         </div>
         <div class="p2-quote" id="p2quote">
           <span>当前题目</span>
@@ -1557,6 +1737,20 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
             </span>
           </button>
         </div>
+        <div class="p2-teacher">
+          <button class="mode-bar teacher-bar" id="teacherPick" type="button" aria-pressed="true" aria-haspopup="dialog" aria-controls="mentorDlg" aria-expanded="false" title="换一位陪学老师">
+            <span class="av-frame" id="tpAvFrame" data-mentor="paimon" aria-hidden="true">
+              <img id="tpAv" src="/characters/profile/paimon.png" alt="" width="48" height="48">
+            </span>
+            <span class="mode-copy">
+              <span class="mode-title">陪学老师 · <span id="tpName">派蒙</span> <span class="tag brand" id="mentorTag">默认</span></span>
+              <span class="mode-desc" id="tpDesc">软萌亲切，温柔陪学</span>
+            </span>
+            <span class="mode-arrow" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+            </span>
+          </button>
+        </div>
       </div>
       <div class="p2-foot">
         <button class="btn-ghost" id="back1" type="button">返回</button>
@@ -1582,8 +1776,9 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       <section class="pane">
         <div class="pane-head">
           <strong>对话</strong>
+          <button class="chat-mentor" id="chatMentor" type="button" aria-haspopup="dialog" aria-expanded="false" title="换一位陪学老师"></button>
           <span class="tag" id="qIndexTag">0 个提问</span>
-          <span class="tag" id="stepTag">第 1 / 5 步</span>
+          <span class="tag" id="stepTag">第 1 / 5 步</span><button class="btn-ghost chat-next" id="skipToPractice" type="button">继续练习</button>
         </div>
         <div class="chat-wrap">
           <div class="chat-body scroller" id="chatBody"></div>
@@ -1596,7 +1791,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
             <textarea id="input3" placeholder="说说你的下一步…" aria-label="对话输入"></textarea>
             <div class="composer-bar">
               <div class="c-left">
-                <button class="icon-btn sm mic-btn" id="micBtn" type="button" aria-label="语音输入">
+                <button class="icon-btn sm mic-btn" id="micBtn" type="button" aria-label="语音输入" aria-pressed="false" data-mic-for="input3">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="9" y="3" width="6" height="10.5" rx="3"></rect>
                     <path d="M5.5 11a6.5 6.5 0 0 0 13 0"></path><path d="M12 17.5V21"></path>
@@ -1608,6 +1803,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
                     <circle cx="12" cy="13.2" r="3.2"></circle>
                   </svg>
                 </button>
+                <button class="icon-btn sm sym-trigger" id="symBtn3" type="button" aria-label="符号面板" aria-expanded="false" aria-controls="symPanel" data-sym-trigger="input3">Ω</button>
                 <input type="file" id="file3" accept="image/*" hidden>
               </div>
               <div class="c-right">
@@ -1627,7 +1823,11 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   <!-- ================= 页面四 ================= -->
   <section class="page" data-page="4">
     <div class="p4">
-      <div class="p4-scroll scroller">
+      <div class="report-toolbar" aria-label="报告操作">
+        <div><strong>学习报告</strong><span class="duration">学习时长：<strong id="durNum">—</strong> 分钟</span></div>
+        <div class="report-actions"><button class="btn-ghost" id="reportRedo" type="button">重做本题</button><button class="btn-primary" id="reportFinish" type="button">结束学习</button></div>
+      </div>
+      <div class="p4-scroll scroller" id="reportScroll">
         <div class="report-load" id="reportLoad" hidden>
           <span class="spin" aria-hidden="true"></span>
           <span>正在生成学习报告…</span>
@@ -1673,63 +1873,11 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
           <div class="wrong" id="wrongList"></div>
         </div>
       </div>
-
-      <div class="p4-foot">
-        <span class="duration">学习时长：<strong id="durNum">—</strong> 分钟</span>
-        <button class="btn-primary" id="go5" type="button">下一步 · 巩固</button>
-      </div>
     </div>
   </section>
 
   <!-- ================= 页面五 ================= -->
-  <section class="page" data-page="5">
-    <div class="p5">
-      <div class="p5-col scroller">
-        <div class="bar-card">
-          <button class="bar-row" id="redoBtn" type="button">
-            <span class="bar-ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v5h5"></path>
-              </svg>
-            </span>
-            <span class="bar-copy">
-              <span class="bar-title">重做这道题</span>
-              <span class="bar-desc">不看提示，独立再走一遍；卡住的位置会比第一次更清楚</span>
-            </span>
-            <span class="bar-arrow" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
-            </span>
-          </button>
-        </div>
 
-        <div class="bar-card" id="relatedCard">
-          <button class="bar-row" id="startRelated" type="button">
-            <span class="bar-ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="4" width="7" height="7" rx="2"></rect>
-                <rect x="14" y="13" width="7" height="7" rx="2"></rect>
-                <path d="M10 7.5h4.5a2 2 0 0 1 2 2V13"></path>
-                <path d="M14 16.5h-4.5a2 2 0 0 1-2-2V11"></path>
-              </svg>
-            </span>
-            <span class="bar-copy">
-              <span class="bar-title">同类题再练</span>
-              <span class="bar-desc">同一知识点换一道题，把刚学会的规律再用一次</span>
-            </span>
-            <span class="bar-arrow" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
-            </span>
-          </button>
-
-        </div>
-      </div>
-
-      <div class="p5-foot">
-        <span class="note" id="p5note">—</span>
-        <button class="btn-ghost" id="homeBtn2" type="button">返回首页</button>
-      </div>
-    </div>
-  </section>
 
 </div>
 
@@ -1740,28 +1888,46 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     <aside class="rel-drawer" id="relDrawer" role="dialog" aria-modal="true" aria-labelledby="relTitle" aria-hidden="true">
       <div class="rel-head">
         <div class="rel-title">
-          <h2 id="relTitle">同类题再练</h2>
-          <p>同知识点或同思路，换一道再走一遍</p>
+          <h2 id="relTitle">选择练习</h2>
+          <p id="relGoal">按知识点或方法选择题目</p>
         </div>
         <button class="rel-x" id="relClose" type="button" aria-label="关闭同类题">
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </div>
-      <div class="rel-filters">
+      <div class="rel-filters" id="relFilters">
         <label class="rel-f"><span>知识点</span><select id="relKgSel"></select></label>
         <label class="rel-f"><span>思路</span><select id="relThSel"></select></label>
       </div>
-      <div class="rel-list scroller" id="relList"></div>
+      <div class="rel-list scroller" id="relList"></div><p class="rel-error" id="relError" role="alert" hidden></p>
       <div class="rel-busy" id="relBusy" hidden>
         <span class="spin" aria-hidden="true"></span>
         <b>正在读题…</b>
         <em>AI 正在理解题干与公式，几秒钟</em>
       </div>
       <div class="rel-foot">
-        <span id="relCount"></span>
+        <span id="relCount" aria-live="polite"></span>
         <button class="btn-ghost" id="relShuffle" type="button">换一换</button>
       </div>
     </aside>
+
+    <dialog class="rel-preview" id="relPreview" aria-labelledby="relPreviewTitle">
+      <div class="rel-preview-shell">
+        <div class="rel-preview-head">
+          <div><h2 id="relPreviewTitle">完整题目</h2><p id="relPreviewMeta"></p></div>
+          <button class="rel-x" id="relPreviewClose" type="button" aria-label="关闭题目预览">×</button>
+        </div>
+        <div class="rel-preview-body scroller" id="relPreviewBody">
+          <p class="rel-preview-reason" id="relPreviewReason" hidden></p>
+          <div id="relPreviewQuestion"></div>
+        </div>
+        <div class="rel-preview-footer">
+          <p class="rel-preview-error" id="relPreviewError" role="alert" hidden></p>
+          <span class="rel-preview-note">先看完整题目，再开始练习</span>
+          <button class="btn-primary" id="relPreviewStart" type="button" disabled>开始练习</button>
+        </div>
+      </div>
+    </dialog>
 
     <div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-label="题目照片">
       <img id="viewerImg" alt="题目照片">
@@ -1770,17 +1936,76 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       </button>
     </div>
 
+    <!-- 选老师：第 2 页的大框与第 3 页栏头共用这一层 -->
+    <div class="mentor-mask" id="mentorMask" hidden></div>
+    <div class="mentor" id="mentorDlg" role="dialog" aria-modal="true" aria-labelledby="mentorTitle" hidden>
+      <div class="mentor-head">
+        <div>
+          <h2 id="mentorTitle">选一位陪学老师</h2>
+          <p>同一道题，四种讲法。点谁就用谁的讲法，之后还能换。</p>
+        </div>
+        <button class="icon-btn" id="mentorClose" type="button" aria-label="关闭">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="mentor-grid" id="mentorGrid" role="radiogroup" aria-label="选择陪学老师"></div>
+    </div>
+
+    <!-- 符号面板：两个输入框共用这一个。挂在 body 上、fixed 定位，
+         因为它要逃出 .pane{overflow:hidden} 与 .p1{overflow-y:auto} 的裁剪。
+         格子由 public/symbolpanel.js 按清单渲染，清单只有一份。 -->
+    <div class="sympanel" id="symPanel" role="group" aria-label="符号" hidden>
+      <div class="symgrid" data-sym-grid></div>
+    </div>
+
 <script src="/vendor/katex/katex.min.js"></script>
 <script src="/math.js"></script>
+<script type="module" src="/symbolpanel.js"></script>
+<script type="module" src="/voice.js"></script>
 <script>
 (function () {
   'use strict';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var SVG_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l4.5 4.5L20 7"/></svg>';
-  var AVATAR = '<img src="/brand.png" alt="" width="26" height="26">';
 
-  var PAGES = ['题目', '方式', '解题', '报告', '巩固'];
+  /**
+   * 四位陪学老师的前端投影。
+   *
+   * 与 src/core/personas.js 的 PERSONAS 一一对应（名字、简介、图片路径），
+   * test/personas.test.js 会核对两份，避免服务端和页面各改各的。
+   * 在前端留一份的理由只有一个：第 2 页要在 /api/health 回来之前就画得出来。
+   */
+  var MENTORS = {
+    paimon: { id: 'paimon', name: '派蒙', tagline: '软萌亲切，温柔陪学', avatar: '/characters/profile/paimon.png' },
+    hermione: { id: 'hermione', name: '赫敏', tagline: '毒舌学姐，精准点拨', avatar: '/characters/profile/hermione.png' },
+    zhuge: { id: 'zhuge', name: '诸葛亮', tagline: '运筹帷幄，纵观全局', avatar: '/characters/profile/zhuge.png' },
+    jianhua: { id: 'jianhua', name: '建华教授', tagline: '严谨治学，一丝不苟', avatar: '/characters/profile/jianhua.png' }
+  };
+  var MENTOR_ORDER = ['paimon', 'hermione', 'zhuge', 'jianhua'];
+  var MENTOR_KEY = 'bsj-mentor';
+
+  function mentorOf(id) { return MENTORS[id] || MENTORS.paimon; }
+
+  function readMentor() {
+    try {
+      var v = localStorage.getItem(MENTOR_KEY);
+      return MENTORS[v] ? v : 'paimon';
+    } catch (e) { return 'paimon'; }
+  }
+
+  /**
+   * 每条 AI 消息都记下"当时是谁在说"。
+   * 换老师只该影响之后的话，不该把已经说过的话改写成另一个人的口吻。
+   * 头像统一走 .av-frame：圆形裁切 + 每个老师自己的取景（见 CSS 那段注释）。
+   */
+  function avatarHtml(id) {
+    var m = mentorOf(id);
+    return '<span class="av-frame" data-mentor="' + m.id + '">' +
+      '<img src="' + m.avatar + '" alt="" width="26" height="26"></span>';
+  }
+
+  var PAGES = ['题目', '方式', '解题', '报告'];
 
   /* ---------------- 基础工具 ---------------- */
   function esc(s) {
@@ -1803,9 +2028,21 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   };
 
   /* ---------------- 接口层 ---------------- */
+  /**
+   * 接口基址。
+   *
+   * 腾讯云静态托管域（*.tcloudbaseapp.com）只发静态文件，不会把 /api 转给云函数；
+   * 同一环境的 HTTP 访问服务在 *.service.tcloudbase.com 上，所以那一侧要跨域取。
+   * 本地、Vercel、Workers 都是同源，返回空串即可。
+   */
+  var API_BASE = (function () {
+    var m = /^([a-z0-9-]+?)-[0-9]+\.tcloudbaseapp\.com$/.exec(location.hostname);
+    return m ? 'https://' + m[1] + '.service.tcloudbase.com' : '';
+  })();
+
   var API = {
     req: function (path, opt) {
-      return fetch(path, opt).then(function (res) {
+      return fetch(API_BASE + path, opt).then(function (res) {
         return res.text().then(function (raw) {
           var data = null;
           try { data = raw ? JSON.parse(raw) : null; } catch (e) { data = null; }
@@ -1836,6 +2073,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     problems: function () { return API.req('/api/problems'); },
     problem: function (id) { return API.req('/api/problem?id=' + encodeURIComponent(id)); },
     importProblem: function (text, opt) { return API.post('/api/problem/import', { rawText: text }, opt); },
+    startSession: function (body) { return API.post('/api/session/start', body); },
     chat: function (body) { return API.post('/api/chat', body); },
     report: function (sid, pid) { return API.req('/api/report?sessionId=' + encodeURIComponent(sid) + '&problemId=' + encodeURIComponent(pid || '')); },
     ocr: function (image) { return API.post('/api/ocr', { image: image }); }
@@ -1848,6 +2086,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     bank: [], bankErr: null,
     picked: null, problem: null,
     mode: 'self', sessionId: null,
+    /** 当前陪学老师：默认派蒙，选过就记住（bsj-mentor） */
+    mentor: readMentor(),
     turns: [], progress: { index: null, count: 0, done: [], labels: {} },
     done: false, busy: false,
     report: null, reportTurns: [], reportErr: null,
@@ -1954,6 +2194,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   var REDUCED_MQ = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   function setPage(n) {
+    if (n === 5) n = 4; // 兼容旧链接；练习不再占一页。
+    if (n < 1 || n > 4) return;
     // 五页随时可以切：没有数据就进空态，而不是把人弹回第 1 页
     if (n > S.max) S.max = n;
     S.page = n;
@@ -1980,7 +2222,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       if (S.sessionId) loadReport();
       else { S.report = null; S.reportErr = '还没有开始做题。先在第 1 页选题，到第 3 页对话，报告会自动生成。'; renderReport(); }
     }
-    if (n === 5) { loadRelated(); renderP5Note(); }
+    $('#reportReturnBtn').hidden = n !== 3 || !REPORT_ORIGIN;
   }
 
   document.addEventListener('click', function (e) {
@@ -1988,7 +2230,6 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     if (el && !el.disabled) setPage(Number(el.dataset.goto));
   });
   $('#homeBtn').addEventListener('click', function () { setPage(1); });
-  $('#homeBtn2').addEventListener('click', function () { setPage(1); });
 
   /* 输入框跟着内容长高，长题干不会挤在一条缝里，发送键始终贴着文字底部 */
   function autosizeInput() {
@@ -2255,7 +2496,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
 
   function goPage2() {
     if (S.reading) return;
-    if (S.problem && S.picked) { setPage(2); return; }
+    if (S.problem && S.picked) { prepareLearningSession(); setPage(2); return; }
     var typed = $('#input1').value.trim();
     if (!S.picked && !typed) return;
 
@@ -2269,6 +2510,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
 
     task.then(function (res) {
       S.problem = res.problem;
+      prepareLearningSession(typed);
       hydrateBankDetail();
       if (!S.picked) S.picked = { id: res.problem.id, topics: res.problem.topics, source: 'imported' };
       $('#p2text').textContent = S.problem.stem;
@@ -2324,6 +2566,104 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   });
   $('#back1').addEventListener('click', function () { setPage(1); });
 
+  /* ---------------- 陪学老师 ----------------
+     页面二是跟模式卡并排的一个大选择框：它只负责"点开"，不改变
+     "点模式卡即进入"的流程；不选就一直是派蒙。
+     页面三的栏头再放一个老师标识，点开是同一层 —— 不必退回第二页。
+     换人只影响之后的话，历史消息保留各自的老师（见 avatarHtml 的注释）。 */
+  function pickHtml(id, current) {
+    var m = mentorOf(id);
+    return '<button class="pick" type="button" role="radio" aria-checked="' + (id === current) + '" data-mentor="' + m.id + '">' +
+      '<span class="av-frame" data-mentor="' + m.id + '" aria-hidden="true">' +
+      '<img src="' + m.avatar + '" alt="" width="48" height="48"></span>' +
+      '<span class="pick-copy"><b>' + esc(m.name) + '</b><em>' + esc(m.tagline) + '</em></span>' +
+      '</button>';
+  }
+
+  function mentorOpen() {
+    var dlg = $('#mentorDlg');
+    return !!dlg && !dlg.hidden;
+  }
+
+  function paintMentor() {
+    var m = mentorOf(S.mentor);
+    if ($('#mentorDlg')) {
+      $('#mentorGrid').innerHTML = MENTOR_ORDER.map(function (id) { return pickHtml(id, S.mentor); }).join('');
+    }
+    if ($('#teacherPick')) {
+      $('#tpName').textContent = m.name;
+      $('#tpDesc').textContent = m.tagline;
+      $('#tpAv').src = m.avatar;
+      $('#tpAvFrame').setAttribute('data-mentor', m.id);
+      /* 默认派蒙时标"默认"，换过之后标"已选" —— 一眼能看出是不是自己挑的 */
+      $('#mentorTag').textContent = S.mentor === 'paimon' ? '默认' : '已选';
+      $('#teacherPick').title = '换一位陪学老师（现在是' + m.name + '）';
+    }
+    if ($('#chatMentor')) {
+      $('#chatMentor').innerHTML = '<span class="av-frame" data-mentor="' + m.id + '" aria-hidden="true">' +
+        '<img src="' + m.avatar + '" alt="" width="24" height="24"></span>' +
+        '<span class="cm-name">' + esc(m.name) + '</span>';
+    }
+  }
+
+  /** 打开选老师层的那个按钮：关掉时焦点要回到它身上，而不是跳去另一个页面 */
+  var mentorTrigger = null;
+
+  function openMentor(trigger) {
+    var dlg = $('#mentorDlg');
+    if (!dlg) return;
+    mentorTrigger = trigger || null;
+    paintMentor();
+    $('#mentorMask').hidden = false;
+    dlg.hidden = false;
+    if (trigger && trigger.setAttribute) trigger.setAttribute('aria-expanded', 'true');
+    var checked = $('#mentorGrid .pick[aria-checked="true"]');
+    setTimeout(function () { (checked || $('#mentorClose')).focus(); }, 0);
+  }
+
+  function closeMentor() {
+    var dlg = $('#mentorDlg');
+    if (!dlg || dlg.hidden) return;
+    dlg.hidden = true;
+    $('#mentorMask').hidden = true;
+    ['#teacherPick', '#chatMentor'].forEach(function (sel) {
+      if ($(sel)) $(sel).setAttribute('aria-expanded', 'false');
+    });
+    if (mentorTrigger && mentorTrigger.focus) mentorTrigger.focus();
+    mentorTrigger = null;
+  }
+
+  /** 选完之后：记住、重画、把对话里的头像一并换成新老师 */
+  function setMentor(id) {
+    var m = mentorOf(id);
+    if (m.id === S.mentor) return;
+    S.mentor = m.id;
+    try { localStorage.setItem(MENTOR_KEY, m.id); } catch (e) {}
+    paintMentor();
+    renderChat();
+  }
+
+  if ($('#teacherPick')) {
+    $('#teacherPick').addEventListener('click', function () { openMentor(this); });
+  }
+  if ($('#chatMentor')) {
+    $('#chatMentor').addEventListener('click', function () { openMentor(this); });
+  }
+  if ($('#mentorGrid')) {
+    $('#mentorGrid').addEventListener('click', function (e) {
+      var el = e.target.closest('[data-mentor]');
+      if (!el) return;
+      setMentor(el.getAttribute('data-mentor'));
+      closeMentor();
+    });
+  }
+  if ($('#mentorMask')) $('#mentorMask').addEventListener('click', closeMentor);
+  if ($('#mentorClose')) $('#mentorClose').addEventListener('click', closeMentor);
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || !mentorOpen()) return;
+    closeMentor();
+  });
+
   /** 进对话页：没有题就先回第一页选题（空态不假装能开始） */
   function enterSolving() {
     if (!S.problem) { setPage(1); return; }
@@ -2339,14 +2679,38 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   });
 
   /* ---------------- 会话 ---------------- */
-  function startSession() {
-    S.sessionId = 'ui-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+  function prepareLearningSession(original) {
+    var pid=S.problem && S.problem.id;
+    if (!pid) return;
+    if (S.preparedProblemId===pid && S.preparedSessionId) return;
+    S.preparedProblemId=pid;
+    S.preparedSessionId='ui-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,7);
+    S.preparedMaterial={sessionId:S.preparedSessionId,problemId:pid,originalStem:original || S.problem.stem,
+      image:typeof ocrShot==='string' ? ocrShot : null};
+    // Keep rejection handled while the student is still choosing a mode; retry before chat/report.
+    S.sessionReady=API.startSession(S.preparedMaterial).then(function(){return true;},function(){return false;});
+  }
+  function ensureLearningSession() {
+    var material=S.activeSessionMaterial;
+    if (!material) return Promise.resolve();
+    return Promise.resolve(S.sessionReady).then(function(ok){
+      if (ok) return;
+      return API.startSession(material).then(function(d){S.sessionReady=Promise.resolve(true);return d;});
+    });
+  }
+  function startSession(preserveReport) {
+    if (!preserveReport) REPORT_ORIGIN = null;
+    if (!S.preparedSessionId || S.preparedProblemId!==S.problem.id) prepareLearningSession();
+    S.sessionId = S.preparedSessionId;
+    S.activeSessionMaterial=S.preparedMaterial;
+    S.preparedSessionId=null; S.preparedProblemId=null;
     S.turns = [];
     S.done = false;
     S.busy = false;
     S.report = null;
     S.reportTurns = [];
     S.reportErr = null;
+    S.turnReady = Promise.resolve();
     S.progress = { index: null, count: S.problem.stepCount || 0, done: [], labels: {} };
     S.sessionStart = Date.now();
     S.ledger.push({ problemId: S.problem.id, done: false, at: Date.now() });
@@ -2390,16 +2754,31 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     if (q.figure) {
       html += '<div class="fig"><div class="fig-note"><b>图示</b><p>' + esc(q.figure) + '</p></div></div>';
     }
-    if (q.givens && q.givens.length) {
-      html += '<div class="left-block known"><h3>已知</h3><ul>' + q.givens.map(function (g) {
+    /* 模型偶尔会把整段题干当成「已知 / 求」回吐（题库题尤其容易，因为公式在纯文本里
+       是〔式〕占位）。这里收一道：去掉占位符、压掉空白、丢掉过长条目、最多 6 条。 */
+    function tidyItems(list) {
+      var out = [];
+      (list || []).forEach(function (raw) {
+        var t = String(raw == null ? '' : raw).replace(/〔式〕/g, '').replace(/\s+/g, ' ').trim();
+        if (!t || t.length > 40) return;
+        out.push(t);
+      });
+      return out.slice(0, 6);
+    }
+    var givens = tidyItems(q.givens);
+    if (givens.length) {
+      html += '<div class="left-block known"><h3>已知</h3><ul>' + givens.map(function (g) {
         return '<li><code>' + esc(g) + '</code></li>';
       }).join('') + '</ul></div>';
     }
-    var asked = Array.isArray(q.asked) ? q.asked : (q.asked ? [q.asked] : []);
+    var askedRaw = Array.isArray(q.asked) ? q.asked : (q.asked ? [q.asked] : []);
+    var asked = tidyItems(askedRaw);
     if (asked.length) {
       html += '<div class="left-block ask"><h3>求</h3><p>' + asked.map(function (a) {
         return '<code>' + esc(a) + '</code>';
       }).join('　') + '</p></div>';
+    } else if (askedRaw.length) {
+      html += '<div class="left-block ask"><h3>求</h3><p><code>见题干各小问</code></p></div>';
     }
     body.innerHTML = html;
     /* 左栏的题干 / 已知 / 求里也可能带 $...$，就地画出来（引擎读到的仍是原文） */
@@ -2496,7 +2875,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       return '<div class="msg err" data-i="' + i + '"><div class="bubble">' +
         '<p>' + esc(m.text) + '</p></div></div>';
     }
-    var av = m.role === 'ai' ? '<span class="av">' + AVATAR + '</span>' : '';
+    var av = m.role === 'ai' ? '<span class="av">' + avatarHtml(m.mentor) + '</span>' : '';
     var next = m.next ? '<div class="next-ask">' + esc(m.next) + '</div>' : '';
     return '<div class="msg ' + (m.role === 'ai' ? 'ai' : 'me') + '" data-i="' + i + '">' + av +
       '<div class="bubble">' + paraHtml(m.text) + next + '</div></div>';
@@ -2520,7 +2899,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       html = S.turns.map(msgHtml).join('');
     }
     if (S.busy) {
-      html += '<div class="msg ai"><span class="av">' + AVATAR + '</span>' +
+      html += '<div class="msg ai"><span class="av">' + avatarHtml(S.mentor) + '</span>' +
         '<div class="bubble dots"><i></i><i></i><i></i>' +
         '<span class="dots-label">正在思考…</span></div></div>';
     }
@@ -2568,13 +2947,14 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     S.busy = true;
     renderChat();
 
-    API.chat({
+    S.turnReady=ensureLearningSession().then(function(){ return API.chat({
       sessionId: S.sessionId,
       problemId: S.problem.id,
       utterance: text,
       mode: S.mode === 'self' ? 'self_training' : 'ai_companion',
-      explicitHelpSeeking: helpFlag
-    }).then(function (r) {
+      explicitHelpSeeking: helpFlag,
+      persona: S.mentor
+    }); }).then(function (r) {
       var p = r.progress || {};
       S.progress = {
         index: typeof p.stepIndex === 'number' ? p.stepIndex : S.progress.index,
@@ -2588,6 +2968,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
         text: hint.text || r.message || '（本轮没有返回内容）',
         next: hint.nextAsk || null,
         concepts: hint.concepts || [],
+        /** 这一句是谁说的：以服务端回的为准，历史消息不会因为换老师而被改写 */
+        mentor: (r.persona && r.persona.id) || S.mentor,
         stepIndex: typeof p.stepIndex === 'number' ? p.stepIndex : null,
         at: Date.now()
       });
@@ -2599,18 +2981,11 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       if (r.completion) {
         var entry = S.ledger[S.ledger.length - 1];
         if (entry && entry.problemId === S.problem.id) {
-          entry.seen = entry.seen || {};
-          (r.completion.matched || []).forEach(function (m) {
-            entry.seen[m.value + '|' + m.unit] = 1;
-          });
-          entry.expected = r.completion.expectedCount || entry.expected || 0;
-          entry.matched = Math.min(Object.keys(entry.seen).length, entry.expected || 99);
-          if (entry.expected && entry.matched >= entry.expected) {
-            entry.done = true;
-            S.done = true;
-          }
+          entry.expected = r.completion.expectedCount || 0;
+          entry.matched = r.completion.answeredCount || 0;
+          entry.done = Boolean(r.completion.complete);
         }
-        if (r.completion.complete) S.done = true;
+        S.done = Boolean(r.completion.complete);
       }
       // 有过真实对话之后，报告页就该可达（报告是实时的，不必等做完）
       if (S.max < 4) {
@@ -2654,13 +3029,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     send(el.textContent, true);
   });
 
-  /* 语音：后端没有识别服务，不伪造转写结果 */
-  $('#micBtn').addEventListener('click', function () {
-    var input = $('#input3');
-    input.focus();
-    input.placeholder = '语音识别未接入，请直接输入文字';
-    setTimeout(function () { input.placeholder = '说说你的下一步…'; }, 2600);
-  });
+  /* 语音：真正的识别在 public/voice.js（浏览器自带的 Web Speech API）。
+     这里原来是个桩 —— 点一下只改 placeholder，连 SpeechRecognition 都没碰过。 */
 
   /* 拍照：识别成文字后填进输入框，由学生确认再发送 */
   $('#cam3').addEventListener('click', function () {
@@ -2736,13 +3106,18 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     if (!S.sessionId) return;
     S.reportLoading = true;
     renderReport();
-    API.report(S.sessionId, S.problem && S.problem.id).then(function (d) {
+    var reportSession = S.sessionId;
+    var pendingTurn=S.turnReady || Promise.resolve();
+    var reportProblemId=S.problem && S.problem.id;
+    Promise.resolve(pendingTurn).catch(function(){}).then(ensureLearningSession).then(function(){return API.report(reportSession,reportProblemId);}).then(function (d) {
+      if (S.sessionId !== reportSession) return;
       S.reportLoading = false;
       S.report = d.report;
       S.reportTurns = d.turns || [];
       S.reportErr = null;
       renderReport();
     }).catch(function (err) {
+      if (S.sessionId !== reportSession) return;
       S.reportLoading = false;
       S.report = null;
       S.reportErr = err.message;
@@ -2755,7 +3130,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     var list = rep && rep.assessment ? rep.assessment.knowledge || [] : [];
     return {
       ok: list.filter(function (x) { return x.status === 'mastered'; }).map(function (x) { return x.title; }),
-      warn: list.filter(function (x) { return x.status === 'consolidate'; }).map(function (x) { return x.title; }),
+      warn: list.filter(function (x) { return x.status === 'consolidate' || x.status === 'unknown'; }).map(function (x) { return x.title + (x.status === 'unknown' && !/待核验|证据不足|尚未作答/.test(x.title) ? '（证据不足，待核验）' : ''); }),
       bad: list.filter(function (x) { return x.status === 'weak'; }).map(function (x) { return x.title; })
     };
   }
@@ -2778,6 +3153,19 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   }
 
   /** 内容来自报告接口的配套卡，不从参考答案或步骤标题拼出“方法”。 */
+  function availablePractice(entry) {
+    var attempted = S.ledger.map(function (x) { return x.problemId; });
+    return ((entry && entry.items) || []).filter(function (q) {
+      return q.problemId !== (S.problem && S.problem.id) && attempted.indexOf(q.problemId) < 0;
+    }).slice(0, 3);
+  }
+  function practiceButton(entry, kind, index) {
+    if (!availablePractice(entry).length) return kind === 'gaps'
+      ? '<p class="practice-empty">暂无已核验且难度合适的新题，可先按建议重做本题。</p>' : '';
+    var label = kind === 'gaps' ? '针对这处卡点练习' : kind === 'knowledge' ? '巩固这一知识点' : '练习这一方法';
+    return '<button class="review-practice" type="button" data-practice="' + kind + '" data-practice-index="' + index + '">' + label + ' →</button>';
+  }
+
   function renderReportReview(rep) {
     var review = rep && rep.review;
     var host = $('#reportReview');
@@ -2798,13 +3186,13 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
         return (ki === 3 ? '<details class="review-more review-detail"><summary>展开其余知识点</summary><div class="review-knowledge">' : '') + '<article class="review-item"><div class="review-title"><span>' + esc(k.title) + '</span>' +
           (k.formula ? '<span class="review-formula">' + reportFormula(k) + '</span>' : '') + '</div>' +
           '<p class="review-copy">' + esc(k.meaning) + '</p>' +
-          '<details class="review-detail"><summary>适用条件</summary><p>' + esc(k.condition) + '</p></details></article>' + (ki === knowledge.length - 1 && ki >= 3 ? '</div></details>' : '');
+          '<details class="review-detail"><summary>适用条件</summary><p>' + esc(k.condition) + '</p></details>' + practiceButton(rep.practice && rep.practice.knowledge[ki], 'knowledge', ki) + '</article>' + (ki === knowledge.length - 1 && ki >= 3 ? '</div></details>' : '');
       }).join('') + '</div></section><section class="review-part"><h3>思路点拨</h3><div class="review-methods">' +
       methods.map(function (m, mi) {
         return (mi === 2 ? '<details class="review-more review-detail"><summary>展开其余方法</summary><div class="review-methods">' : '') + '<article class="review-method"><h4>' + esc(m.title) + '</h4>' + (m.family ? '<div class="review-family">' + esc(m.family) + '</div>' : '') + '<p><strong>核心原理：</strong>' + esc(m.principle) + '</p>' +
           '<p><strong>本题应用：</strong>' + esc(m.use) + '</p>' +
           '<details class="review-detail"><summary>适用范围与易错点</summary><p><strong>适用范围：</strong>' + esc(m.when) +
-          '</p><p><strong>适用限制与易错点：</strong>' + esc(m.boundary) + '</p></details></article>' + (mi === methods.length - 1 && mi >= 2 ? '</div></details>' : '');
+          '</p><p><strong>适用限制与易错点：</strong>' + esc(m.boundary) + '</p></details>' + practiceButton(rep.practice && rep.practice.methods[mi], 'methods', mi) + '</article>' + (mi === methods.length - 1 && mi >= 2 ? '</div></details>' : '');
       }).join('') + '</div></section><p class="review-note">' + esc(review.note || '') + '</p>';
   }
 
@@ -2830,6 +3218,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   }
 
   function renderReport() {
+    $('#reportRedo').disabled = !S.problem || Boolean(S.busy || S.reportLoading);
     var rep = S.report;
     renderReportReview(rep);
     var assessment = rep && rep.assessment;
@@ -2869,6 +3258,18 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       $('#reportAlert').hidden = false;
       $('#reportAlert').textContent = '尚无本题对话记录，以下展示题库配套知识与方法；暂不判断个人掌握情况。';
     }
+    if (rep.meta && rep.meta.problemContextMissing) {
+      $('#reportAlert').hidden=false;
+      $('#reportAlert').textContent='原题上下文暂缺，已保留学习过程与对话；正确率和掌握情况等待核验，不需要重做。';
+    }
+    if (rep.meta && rep.meta.referenceUnverified) {
+      $('#reportAlert').hidden=false;
+      $('#reportAlert').textContent='本题参考答案尚未可靠核验，先展示学习过程与待核验项，不生成推测的正确率或掌握结论。';
+    }
+    if (rep.meta && rep.meta.unprocessedInputs) {
+      $('#reportAlert').hidden=false;
+      $('#reportAlert').textContent='部分输入尚未完成AI处理，已保留原文；报告仅统计已有核验证据，可返回解题页重试。';
+    }
     var buckets = levelBuckets(rep);
     $('#mWeak').textContent = buckets.bad[0] || '证据不足，暂未确认';
     $('#mWeak').parentNode.classList.toggle('warn', buckets.bad.length > 0);
@@ -2876,13 +3277,13 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     $('#lvWarn').innerHTML = chips(buckets.warn, '暂无充分证据');
     $('#lvBad').innerHTML = chips(buckets.bad, '暂无充分证据');
     $('#lvOk').title = '仅指本题：无具体提示，独立作答正确且说明依据；不代表长期掌握。';
-    $('#lvWarn').title = '本题出现明确错误、提示后完成或尚缺独立解释；纠正后仍需巩固。';
+    $('#lvWarn').title = '包括提示后完成、明确错误和证据不足的待核验项；证据不足不等于不会，纠正后也不等于长期掌握。';
     $('#lvBad').title = '获得具体提示后，同一概念仍至少出现两次明确错误。';
 
     var items = assessment ? (assessment.feedback || []).slice(0, 3) : [];
     $('#wrongCount').textContent = items.length + ' 条';
     $('#wrongList').innerHTML = items.length
-      ? items.map(function (item) {
+      ? items.map(function (item, fi) {
           var fixed = item.status === 'corrected';
           var evidence = (item.evidence || []).map(function (e) {
             return '<p>学生原话：' + esc(e.quote) + '</p>';
@@ -2892,13 +3293,13 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
             '<span class="tag">' + (fixed ? '✓ 本题已纠正' : '! 待继续') + '</span></div>' +
             '<p class="review-copy"><strong>卡点：</strong>' + esc(item.finding) + '</p>' +
             '<p class="review-copy"><strong>改进：</strong>' + esc(item.action) + '</p>' +
-            '<details class="review-detail"><summary>查看对话依据</summary>' + evidence + '</details></div>';
+            '<details class="review-detail"><summary>查看对话依据</summary>' + evidence + '</details>' + practiceButton(rep.practice && rep.practice.gaps[fi], 'gaps', fi) + '</div>';
         }).join('')
       : '<div class="wrong-empty">暂无足够证据归纳具体卡点；未发现错误不等于已经掌握。</div>';
 
   }
 
-  $('#go5').addEventListener('click', function () { setPage(5); });
+
 
   /* ---------------- 页面五：迁移 ---------------- */
   /**
@@ -2921,15 +3322,36 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     renderRelList();
   }
 
-  function renderP5Note() {
-    var doneCount = S.ledger.filter(function (x) { return x.done; }).length;
-    $('#p5note').textContent = '本轮共 ' + (S.ledger.length || 1) + ' 题 · ' + durationMinutes() + ' 分钟 · 独立完成 ' + doneCount + ' 题';
+  var REPORT_ORIGIN = null;
+  var REPORT_FIELDS = ['problem','picked','pickedBank','sessionId','turns','done','progress','report','reportTurns','reportErr','sessionStart','activeSessionMaterial','sessionReady'];
+  function rememberReport() {
+    if (S.page !== 4 || !S.problem || !S.report || S.reportLoading) return;
+    REPORT_ORIGIN = {};
+    REPORT_FIELDS.forEach(function (k) { REPORT_ORIGIN[k] = S[k]; });
+    REPORT_ORIGIN.scroll = $('#reportScroll').scrollTop;
   }
-
-  $('#redoBtn').addEventListener('click', function () {
-    if (!S.problem) return;
-    startSession();
-    setPage(3);
+  $('#reportRedo').addEventListener('click', function () {
+    if (!S.problem || S.busy || S.reportLoading) return;
+    rememberReport(); startSession(true); setPage(3);
+  });
+  $('#reportFinish').addEventListener('click', function () {
+    closeRelDrawer(); setPage(1);
+    $('#p1note').textContent = '本次学习已结束。刷新前可从报告步骤再次查看本题报告。';
+  });
+  $('#reportReturnBtn').addEventListener('click', function () {
+    if (!REPORT_ORIGIN || S.busy) return;
+    var saved = REPORT_ORIGIN;
+    REPORT_FIELDS.forEach(function (k) { S[k] = saved[k]; });
+    S.reportLoading = false; S.busy = false;
+    setPage(4); renderReport(); $('#reportScroll').scrollTop = saved.scroll || 0;
+  });
+  $('#skipToPractice').addEventListener('click', function () { if (!S.busy) openRelDrawer(); });
+  $('.p4').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-practice]');
+    if (!b || !S.report || !S.report.practice) return;
+    var kind = b.dataset.practice, index = Number(b.dataset.practiceIndex);
+    var entry = (S.report.practice[kind] || [])[index];
+    openRelDrawer({kind:kind, items:availablePractice(entry), origin:b});
   });
 
   $('#readingRetry').addEventListener('click', function () {
@@ -2937,13 +3359,9 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     goPage2();
   });
 
-  $('#startRelated').addEventListener('click', function () {
-    if (!S.problem) return;
-    openRelDrawer();
-  });
 
   /* ---------------- 页五：同类题抽屉 ---------------- */
-  var REL = { open: false, kg: '', th: '', seen: {}, built: false };
+  var REL = { open: false, kg: '', th: '', seen: {}, built: false, target: null, origin: null, offset: 0 };
 
   function currentBankRecord() {
     if (!S.bank) return null;
@@ -3001,9 +3419,10 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   }
 
   function relCandidates() {
+    if (REL.target) return REL.target.items;
     var all = S.bank || [];
     var cur = currentBankRecord();
-    var out = all.filter(function (q) { return !cur || q.bankId !== cur.bankId; });
+    var out = all.filter(function (q) { return (!cur || q.bankId !== cur.bankId) && q.id !== (S.problem && S.problem.id) && !S.ledger.some(function (x) { return x.problemId === q.id; }); });
     if (REL.kg) out = out.filter(function (q) { return q.leafId === REL.kg; });
     if (REL.th) out = out.filter(function (q) { return q.th2Id === REL.th; });
     return out.slice(0, 300);
@@ -3016,22 +3435,27 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   }
 
   function renderRelList() {
-    var list = relCandidates();
-    var box = $('#relList');
-    if (!list.length) {
-      box.innerHTML = '<p class="rel-empty">' + esc(emptyRelText()) + '</p>';
-    } else {
-      box.innerHTML = list.map(function (q) {
-        return '<button class="rel-item" type="button" data-relpick="' + q.bankId + '">' +
-          '<span class="m"><b>' + esc(q.type || '题') + '</b> 难度 ' + (q.difficulty || '—') + '/5 · ' + esc(q.province || '') + '</span>' +
-          '<span class="s">' + esc(q.sub || '') + '</span></button>';
-      }).join('');
-    }
-    $('#relCount').textContent = list.length ? (list.length + ' 道可选') : '没有可选的题';
+    var all = relCandidates(), list = all.slice(REL.offset, REL.offset + 3), box = $('#relList');
+    if (!all.length) box.innerHTML = '<p class="rel-empty">' + esc(REL.target ? '暂无符合当前训练目标的新题，不扩大推荐范围。' : emptyRelText()) + '</p>';
+    else box.innerHTML = list.map(function (q) {
+      return '<button class="rel-item" type="button" data-relpick="' + q.bankId + '">' +
+        '<span class="m"><b>' + esc(q.code || q.type || '题') + '</b> 难度 ' + (q.difficulty || '—') + '/5 · ' + esc(q.province || '') + '</span>' +
+        '<span class="s">' + esc(q.sub || q.preview || q.target || '') + '</span>' +
+        (q.reason ? '<span class="rel-reason">推荐理由：' + esc(q.reason) + '</span>' : '') + '<span class="rel-reason">查看完整题目与选项 →</span></button>';
+    }).join('');
+    $('#relCount').textContent = all.length ? '共 ' + all.length + ' 道，展示 ' + list.length + ' 道' : '没有可选的题';
+    $('#relShuffle').hidden = Boolean(REL.target) || all.length <= 3;
     syncRelUi();
   }
 
-  function openRelDrawer() {
+  function openRelDrawer(target) {
+    REL.target = target && Array.isArray(target.items) ? target : null;
+    REL.origin = (REL.target && REL.target.origin) || document.activeElement;
+    REL.offset = 0;
+    $('#relFilters').hidden = Boolean(REL.target);
+    $('#relTitle').textContent = REL.target ? (REL.target.kind === 'gaps' ? '卡点针对练习' : REL.target.kind === 'knowledge' ? '知识巩固练习' : '方法应用练习') : '选择下一道题';
+    $('#relGoal').textContent = REL.target ? (REL.target.kind === 'gaps' ? '仅推荐已核对卡点与难度的题目，不自动扩大范围。' : '依据本张卡片的知识或方法标签推荐。') : '跳过报告时，可按知识点或方法自行选择练习。';
+    $('#relError').hidden = true;
     REL.open = true;
     var cur = currentBankRecord();
     buildRelFilters();
@@ -3053,11 +3477,13 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     d.focus({ preventScroll: true });
   }
   function closeRelDrawer() {
+    closeRelPreview();
     REL.open = false;
     var d = $('#relDrawer');
     d.classList.remove('on');
     d.setAttribute('aria-hidden', 'true');
     $('#relScrim').hidden = true;
+    if (REL.origin && REL.origin.isConnected) REL.origin.focus({preventScroll:true});
   }
 
   $('#relClose').addEventListener('click', closeRelDrawer);
@@ -3066,63 +3492,172 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     var pick = e.target.closest('[data-relpick]');
     if (pick) {
       var id = Number(pick.dataset.relpick);
-      var q = (S.bank || []).filter(function (x) { return x.bankId === id; })[0];
-      if (q) startBankPractice(q, pick);
+      var q = relCandidates().filter(function (x) { return x.bankId === id; })[0];
+      if (q) openRelPreview(q, pick);
       return;
     }
   });
   $('#relKgSel').addEventListener('change', function (e) {
-    REL.kg = e.target.value;
+    REL.kg = e.target.value; REL.offset = 0;
     renderRelList();
   });
   $('#relThSel').addEventListener('change', function (e) {
-    REL.th = e.target.value;
+    REL.th = e.target.value; REL.offset = 0;
     renderRelList();
   });
   $('#relShuffle').addEventListener('click', function () {
-    var list = relCandidates();
-    if (list.length < 2) return;
-    var first = list.shift();
-    list.push(first);
-    var box = $('#relList');
-    box.innerHTML = list.map(function (q) {
-      return '<button class="rel-item" type="button" data-relpick="' + q.bankId + '">' +
-        '<span class="m"><b>' + esc(q.type || '题') + '</b> 难度 ' + (q.difficulty || '—') + '/5 · ' + esc(q.province || '') + '</span>' +
-        '<span class="s">' + esc(q.sub || '') + '</span></button>';
-    }).join('');
+    var count = relCandidates().length;
+    REL.offset = REL.offset + 3 >= count ? 0 : REL.offset + 3;
+    renderRelList();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (!REL.open || $('#relPreview').open) return;
+    if (e.key === 'Escape') { e.preventDefault(); closeRelDrawer(); return; }
+    if (e.key !== 'Tab') return;
+    var nodes = Array.prototype.filter.call($('#relDrawer').querySelectorAll('button,select,[tabindex="0"]'), function (x) { return !x.disabled && x.getClientRects().length; });
+    if (!nodes.length) return;
+    var first = nodes[0], last = nodes[nodes.length - 1], active = document.activeElement;
+    if (e.shiftKey && (active === first || active === $('#relDrawer'))) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && (active === last || active === $('#relDrawer'))) { e.preventDefault(); first.focus(); }
   });
 
-  /* 从题库挑一道题直接开练：先按纯文本读题，再进第 3 页 */
-  function startBankPractice(q, btn) {
-    if (btn) btn.disabled = true;
-    var busyEl = $('#relBusy');
-    if (busyEl) busyEl.hidden = false;
-    fetch('/qbank/q/' + q.bankId + '.json').then(function (r) {
-      if (!r.ok) throw new Error('题库读取失败');
+  /* Full question preview: browsing never creates or replaces a learning session. */
+  var REL_PREVIEW = null;
+  var BANK_DETAILS = Object.create(null);
+  function fetchBankDetail(bankId) {
+    if (!Number.isInteger(bankId) || bankId < 1) return Promise.reject(new Error('无效的题目编号'));
+    if (BANK_DETAILS[bankId]) return Promise.resolve(BANK_DETAILS[bankId]);
+    return fetch('/qbank/q/' + bankId + '.json').then(function (r) {
+      if (!r.ok) throw new Error('题库读取失败，请关闭预览后重新选择');
       return r.json();
     }).then(function (det) {
-      var opts = (det.options || []).map(function (o) { return o.l + ' ' + o.text; }).join('\n');
-      var text = (det.stemText || q.sub) + (opts ? '\n' + opts : '');
-      $('#input1').value = text;
-      S.picked = null;
-      S.pickedBank = q.bankId;
-      S.problem = null;
+      if (det.i !== bankId || typeof det.stemHtml !== 'string' || !Array.isArray(det.options)) throw new Error('题目内容不完整，请稍后重试');
+      BANK_DETAILS[bankId] = det;
+      return det;
+    });
+  }
+  function safeBankHtml(html) {
+    var t = document.createElement('template');
+    t.innerHTML = String(html || '');
+    var allowed = ['P','DIV','SPAN','STRONG','B','EM','I','SUB','SUP','BR','UL','OL','LI','TABLE','TBODY','TR','TD','TH','IMG'];
+    Array.prototype.forEach.call(t.content.querySelectorAll('*'), function (el) {
+      if (allowed.indexOf(el.tagName) < 0) { el.remove(); return; }
+      Array.prototype.slice.call(el.attributes).forEach(function (a) {
+        var keep = (a.name === 'class' && /^(?:qf|qfig)$/.test(a.value)) ||
+          (a.name === 'src' && el.tagName === 'IMG' && /^data:image\/(?:webp|png|jpeg|gif);base64,/i.test(a.value)) ||
+          (a.name === 'alt' && el.tagName === 'IMG') ||
+          (['width','height','colspan','rowspan'].indexOf(a.name) >= 0 && /^\d{1,5}$/.test(a.value));
+        if (!keep) el.removeAttribute(a.name);
+      });
+      if (el.tagName === 'IMG' && !el.getAttribute('src')) el.remove();
+    });
+    return t.innerHTML;
+  }
+  function fullBankQuestionHtml(det) {
+    var body = '<div class="q-rich">' + safeBankHtml(det.stemHtml) + '</div>';
+    if (det.options.length) body += '<h3 class="rel-preview-options">' + (det.ty === '多选' ? '选项（多选题）' : '选项') + '</h3><ol class="q-opts-r">' +
+      det.options.map(function (o) { return '<li><b>' + esc(o.l) + '</b><span>' + safeBankHtml(o.html || '') + '</span></li>'; }).join('') + '</ol>';
+    return body;
+  }
+  function openRelPreview(q, opener) {
+    var state = {question:q, opener:opener, detail:null, starting:false};
+    REL_PREVIEW = state;
+    $('#relPreviewTitle').textContent = q.code ? q.code + ' · 完整题目' : '第 ' + q.bankId + ' 题';
+    $('#relPreviewMeta').textContent = '正在读取完整题目…';
+    $('#relPreviewQuestion').innerHTML = '<p class="rel-preview-note" role="status">正在加载题干、图片与选项…</p>';
+    $('#relPreviewReason').textContent = q.reason ? '推荐理由：' + q.reason : '';
+    $('#relPreviewReason').hidden = !q.reason;
+    $('#relPreviewError').hidden = true;
+    $('#relPreviewStart').disabled = true;
+    $('#relPreviewStart').textContent = '开始练习';
+    var preview = $('#relPreview');
+    if (!preview.open) preview.showModal();
+    $('#relPreviewBody').scrollTop = 0;
+    $('#relDrawer').inert = true;
+    $('#relDrawer').setAttribute('aria-hidden', 'true');
+    fetchBankDetail(q.bankId).then(function (det) {
+      // Closing a slow request or selecting another question cannot reopen stale content.
+      if (REL_PREVIEW !== state || !preview.open) return;
+      state.detail = det;
+      $('#relPreviewTitle').textContent = det.code + ' · 完整题目';
+      $('#relPreviewMeta').textContent = [det.src,det.ty,'难度：' + det.d].filter(Boolean).join(' ｜ ');
+      $('#relPreviewQuestion').innerHTML = fullBankQuestionHtml(det);
+      /* 新题库的行内公式是 $…$ 原文（旧题是图片），预览里也画出来 */
+      if (typeof window !== 'undefined' && window.BsjMath && window.BsjMath.renderMathIn) window.BsjMath.renderMathIn($('#relPreviewQuestion'));
+      $('#relPreviewStart').disabled = false;
+    }).catch(function (err) {
+      if (REL_PREVIEW !== state || !preview.open) return;
+      $('#relPreviewMeta').textContent = '题目暂未加载完成';
+      $('#relPreviewQuestion').textContent = '无法读取完整题目，关闭后可重新选择。';
+      $('#relPreviewError').textContent = err.message;
+      $('#relPreviewError').hidden = false;
+    });
+  }
+  function closeRelPreview() {
+    if ($('#relPreview').open) $('#relPreview').close();
+  }
+  $('#relPreviewClose').addEventListener('click', closeRelPreview);
+  $('#relPreview').addEventListener('close', function () {
+    // A delayed close event from the previous opening must not clear a newly opened one.
+    if ($('#relPreview').open) return;
+    var state = REL_PREVIEW;
+    REL_PREVIEW = null;
+    $('#relDrawer').inert = false;
+    $('#relDrawer').setAttribute('aria-hidden', REL.open ? 'false' : 'true');
+    if (REL.open && state && state.opener && state.opener.isConnected) state.opener.focus({preventScroll:true});
+  });
+  $('#relPreview').addEventListener('click', function (e) {
+    if (e.target !== $('#relPreview')) return;
+    var r = $('#relPreview').getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) closeRelPreview();
+  });
+  $('#relPreviewStart').addEventListener('click', function () {
+    var state = REL_PREVIEW;
+    if (!state || !state.detail || state.starting) return;
+    state.starting = true;
+    $('#relPreviewError').hidden = true;
+    startBankPractice(state.question, $('#relPreviewStart'), state);
+  });
+
+  /* Only confirmation creates a practice session. Failed/cancelled requests keep the report. */
+  function startBankPractice(q, btn, state) {
+    if (btn) { btn.disabled = true; btn.textContent = '正在开始…'; }
+    var details = state && state.detail ? Promise.resolve(state.detail) : fetchBankDetail(q.bankId);
+    return details.then(function (det) {
+      if (state && (REL_PREVIEW !== state || !$('#relPreview').open)) return;
       return API.problem('qbank-' + q.bankId).then(function (res) {
+        if (state && (REL_PREVIEW !== state || !$('#relPreview').open)) return;
+        if (!res.problem || res.problem.id !== 'qbank-' + q.bankId) throw new Error('题目读取失败，请重新选择');
+        var opts = (det.options || []).map(function (o) { return o.l + ' ' + o.text; }).join('\n');
+        rememberReport();
+        $('#input1').value = (det.stemText || q.sub || '') + (opts ? '\n' + opts : '');
+        S.picked = null;
+        S.pickedBank = q.bankId;
         S.problem = res.problem;
-        hydrateBankDetail();
+        // Use exactly the already-previewed assets; no second request or formula flash.
+        S.problem.qbId = q.bankId;
+        S.problem.stemHtml = det.stemHtml;
+        S.problem.richOptions = det.options;
+        S.problem.qbMeta = {ty:det.ty,d:det.d,p:det.p,mod:det.mod,chap:det.chap,leaf:det.leaf};
         $('#p2text').textContent = S.problem.stem;
         $('#p1note').textContent = '';
-        startSession();
+        startSession(Boolean(REPORT_ORIGIN));
+        closeRelPreview();
         closeRelDrawer();
         setPage(3);
       });
     }).catch(function (err) {
-      setNote('无法开始这道题：' + err.message, true);
+      if (state && (REL_PREVIEW !== state || !$('#relPreview').open)) return;
+      var error = state ? $('#relPreviewError') : $('#relError');
+      error.hidden = false;
+      error.textContent = '无法开始这道题：' + err.message;
     }).then(function () {
-      if (btn) btn.disabled = false;
-      if (busyEl) busyEl.hidden = true;
+      if (state && REL_PREVIEW !== state) return;
+      if (state) state.starting = false;
+      if (btn) { btn.disabled = false; btn.textContent = '开始练习'; }
     });
   }
+
 
   /* ---------------- 初始化 ---------------- */
   renderStepper();
@@ -3130,6 +3665,8 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   renderXP();
   renderChat();
   paintMode();
+  /* 老师选择器要在 /api/health 回来之前就画好：它不依赖服务端（见 MENTORS 的注释） */
+  paintMentor();
 
   API.health().then(function (h) {
     S.health = h;
@@ -3194,7 +3731,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
     window.__openBank = openMap;
     window.__closeBank = closeMap;
     document.addEventListener('keydown', function (e) {
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape' || $('#relPreview').open || e.defaultPrevented) return;
       if (REL.open) { e.stopPropagation(); closeRelDrawer(); return; }
       if (viewerEl && !viewerEl.hidden) { e.stopPropagation(); closeViewer(); return; }
       if (p1 && p1.scrollTop > 40) { e.stopPropagation(); closeMap(); }
@@ -3247,6 +3784,13 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
       body.innerHTML = '<p class="picked-loading">正在展开题目…</p>';
       var i = q && q.i;
       if (!i) { body.innerHTML = ''; return; }
+      /* 题库里的公式有新旧两种形态：旧题是 <img class="qf"> 图片，新题（570/835 道）
+         是 $…$ 原文。所以凡是把 stemHtml 塞进 DOM 之后都得再走一遍 KaTeX ——
+         第 3 页左栏、完整题预览都这么做了，这里当初漏了，
+         表现就是题干原样显示 $T_{1} = 300 \,\mathrm{K}$。 */
+      function paint() {
+        if (window.BsjMath && window.BsjMath.renderMathIn) window.BsjMath.renderMathIn(body);
+      }
       fetch('/qbank/q/' + i + '.json').then(function (r) {
         return r.ok ? r.json() : null;
       }).then(function (det) {
@@ -3260,8 +3804,10 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
           html += '</ol>';
         }
         body.innerHTML = html;
+        paint();
       }).catch(function () {
         body.innerHTML = '<p>' + esc((q && q.stem) || '') + '</p>';
+        paint();
       });
     }
 
@@ -3358,6 +3904,15 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
           moduleName: q.m, chapId: q.k, leafId: q.l, thId: q.t, th2Id: q.t2, sub: q.s };
       });
       S.bankErr = null;
+      if (REL.open) renderRelated();
+      /**
+       * 题库到货之后再决定落哪一页。
+       *
+       * `?p=N` 是逐页评审/截图用的深链：它要真实跑一遍读题与会话，
+       * 所以必须等题库能取到第一道题 —— 早于这里调用只会被 S.bank.length 挡回去，
+       * 表现就是"带了 ?p=3 却停在首页"。这个函数以前只定义没人调用，等于深链失效。
+       */
+      maybeReviewJump();
     }).catch(function (err) { S.bankErr = err.message; });
   }
   loadQBankList();
@@ -3372,6 +3927,7 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   function maybeReviewJump() {
     var n = Number(new URLSearchParams(location.search).get('p'));
     if (!n || n < 2 || n > 5) return;
+    if (n === 5) n = 4;
     if (!S.bank.length) return;
     S.picked = S.bank[0];
     API.problem(S.picked.id).then(function (res) {

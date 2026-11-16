@@ -1,0 +1,1409 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="robots" content="noindex,nofollow">
+<title>步步解 · 试点看板</title>
+<!--
+  试点看板 · 单文件壳。
+
+  · 这个文件里没有任何批次、学生、会话数据，也没有写死任何批次号。
+    它只是一层壳：口令与批次都由人填，数据全部由 /api/admin/* 在口令通过后现取。
+  · 口令存在浏览器的 localStorage['bsj-admin']（与学生令牌 bsj-token 分开），
+    只走请求头 x-admin-code，不进链接、也不写进网页。
+  · 没有配置 ADMIN_CODE 的部署不要发布这个文件——它只是壳，但会告诉别人有看板。
+-->
+<style>
+/* =====================================================================
+   0. 令牌：与 public/index.html 同一套（纸白底 + 一个主色 + 三个语义色）
+      字号只有三档 11 / 13 / 18；间距只取 2/4/6/8/12/16/24/32
+   ===================================================================== */
+:root{
+  --font-sans:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-mono:"JetBrains Mono","Cascadia Mono",Consolas,monospace;
+
+  --paper:#F7F8FA;
+  --surface:#FFFFFF;
+  --surface-2:#F4F5F7;
+  --line:#E6E8EC;
+  --line-strong:#D3D6DC;
+
+  --ink:#1A1A1A;
+  --ink-2:#4A4A4A;
+  --ink-3:#6E6E6E;
+
+  --brand:#4F46C8;
+  --brand-strong:#3D3599;
+  --brand-tint:#EEEDFB;
+  --brand-line:#D5D2F2;
+
+  --amber:#8A6A2A;
+  --amber-tint:#FBF3E4;
+  --amber-line:#EBD9B8;
+
+  --coral:#B23B3B;
+  --coral-tint:#FBEDED;
+  --coral-line:#EDC9C9;
+
+  --fs-s:11px;
+  --fs-m:13px;
+  --fs-l:18px;
+
+  --r-card:16px;
+  --r-inner:8px;
+  --r-pill:999px;
+
+  --shadow:0 1px 2px rgba(26,26,26,.04),0 8px 24px rgba(26,26,26,.05);
+}
+
+/* =====================================================================
+   1. 基础
+   ===================================================================== */
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--font-sans);
+  font-size:var(--fs-m);
+  line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1040px;margin:0 auto;padding:0 24px}
+.main{padding-top:24px;padding-bottom:32px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* =====================================================================
+   2. 头部：口令 + 批次 + 载入
+   ===================================================================== */
+.head{background:var(--surface);border-bottom:1px solid var(--line);padding:24px 0 16px}
+.head-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.head-row h1{margin:0;font-size:var(--fs-l);font-weight:700;letter-spacing:.01em}
+.head-note{margin:0;color:var(--ink-3);font-size:var(--fs-s)}
+.loadbar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-top:16px}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field-label{font-size:var(--fs-s);font-weight:600;color:var(--ink-3)}
+.field-code{flex:0 1 240px}
+.field-batch{flex:1 1 320px}
+.field-act{flex-direction:row;gap:8px}
+.input{
+  width:100%;
+  height:32px;
+  padding:0 12px;
+  border:1px solid var(--line-strong);
+  border-radius:var(--r-inner);
+  background:var(--surface);
+  color:var(--ink);
+  font-family:var(--font-sans);
+  font-size:var(--fs-m);
+  min-width:0;
+}
+.input:focus{outline:2px solid var(--brand);outline-offset:1px;border-color:var(--brand)}
+.btn{
+  height:32px;
+  padding:0 16px;
+  border:1px solid var(--line-strong);
+  border-radius:var(--r-pill);
+  background:var(--surface);
+  color:var(--ink-2);
+  font-family:var(--font-sans);
+  font-size:var(--fs-m);
+  font-weight:600;
+  white-space:nowrap;
+  cursor:pointer;
+}
+.btn:hover:not(:disabled){background:var(--brand-tint);border-color:var(--brand-line);color:var(--brand-strong)}
+.btn:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.btn:disabled{background:var(--surface-2);border-color:var(--line);color:var(--ink-3);cursor:not-allowed}
+.btn-primary{background:var(--brand);border-color:var(--brand);color:#FFFFFF}
+.btn-primary:hover:not(:disabled){background:var(--brand-strong);border-color:var(--brand-strong);color:#FFFFFF}
+.btn-primary:disabled{background:var(--surface-2);border-color:var(--line);color:var(--ink-3)}
+.hint{margin-top:12px;color:var(--ink-3);font-size:var(--fs-s);min-height:16px}
+.alert{
+  margin-top:12px;
+  padding:8px 12px;
+  border:1px solid var(--brand-line);
+  border-radius:var(--r-inner);
+  background:var(--brand-tint);
+  color:var(--ink-2);
+  font-size:var(--fs-s);
+}
+.alert-bad{border-color:var(--coral-line);border-left:2px solid var(--coral);background:var(--coral-tint);color:var(--ink)}
+
+/* =====================================================================
+   3. 用量行与批次行
+   ===================================================================== */
+.usage{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px;
+  padding:8px 16px;
+  border:1px solid var(--line);
+  border-radius:var(--r-pill);
+  background:var(--surface);
+  color:var(--ink-2);
+  font-size:var(--fs-s);
+}
+.usage b{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+/* 系统失败轮次用警示色：它非 0 时这一屏的头条数字（0 会话 / 0.0%）是假的 */
+.usage .usage-warn{color:var(--coral)}
+.usage-dot{color:var(--line-strong)}
+.batch-line{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-top:16px}
+.batch-name{font-size:var(--fs-l);font-weight:700}
+.batch-meta{color:var(--ink-3);font-size:var(--fs-s);font-variant-numeric:tabular-nums}
+
+/* =====================================================================
+   4. 四个数
+   ===================================================================== */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:16px}
+.kpi{
+  padding:16px;
+  border:1px solid var(--line);
+  border-radius:var(--r-card);
+  background:var(--surface);
+  box-shadow:var(--shadow);
+  min-width:0;
+}
+.kpi-key{margin:0;color:var(--ink-3);font-size:var(--fs-s);font-weight:600}
+.kpi-num{margin-top:6px;font-size:var(--fs-l);font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums}
+.kpi-note{margin-top:2px;color:var(--ink-3);font-size:var(--fs-s)}
+
+/* =====================================================================
+   5. 卡片与漏斗
+   ===================================================================== */
+.card{
+  margin-top:16px;
+  padding:24px;
+  border:1px solid var(--line);
+  border-radius:var(--r-card);
+  background:var(--surface);
+  box-shadow:var(--shadow);
+}
+.card-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.card-head h2{margin:0;font-size:var(--fs-m);font-weight:700;letter-spacing:.02em}
+.card-sub{margin:0;color:var(--ink-3);font-size:var(--fs-s)}
+.note{
+  margin-top:16px;
+  padding:8px 12px;
+  border:1px solid var(--amber-line);
+  border-left:2px solid var(--amber);
+  border-radius:var(--r-inner);
+  background:var(--amber-tint);
+  color:var(--ink);
+  font-size:var(--fs-s);
+}
+.empty{
+  margin-top:16px;
+  padding:16px;
+  border:1px dashed var(--line-strong);
+  border-radius:var(--r-card);
+  background:var(--surface-2);
+  color:var(--ink-2);
+  font-size:var(--fs-m);
+}
+.bars{display:flex;align-items:flex-end;gap:12px;margin-top:24px}
+.bar{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px}
+.bar-num{font-size:var(--fs-l);font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums}
+.bar-track{
+  width:100%;
+  height:160px;
+  display:flex;
+  align-items:flex-end;
+  overflow:hidden;
+  border-radius:var(--r-inner);
+  background:var(--surface-2);
+}
+.bar-fill{
+  width:100%;
+  border-radius:var(--r-inner) var(--r-inner) 0 0;
+  background:var(--brand);
+  transition:height .3s ease;
+}
+.bar-label{font-size:var(--fs-m);font-weight:600}
+.bar-dwell{color:var(--ink-3);font-size:var(--fs-s)}
+.bar-dwell-value{color:var(--ink-2);font-weight:600;font-variant-numeric:tabular-nums}
+.conv{margin-top:16px;color:var(--ink-2);font-size:var(--fs-s);font-variant-numeric:tabular-nums}
+
+/* =====================================================================
+   6. 对比、表格、导出
+   ===================================================================== */
+.cmp-bar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-top:16px}
+.cmp-bar .field{flex:1 1 280px}
+.cmp-note{margin-top:12px;color:var(--ink-3);font-size:var(--fs-s)}
+.table-wrap{overflow-x:auto;margin-top:16px}
+/* 窄屏下名单比屏幕宽：让它自己在框里横向滚，而不是把时间挤成四行、把徽标挤成一列竖排 */
+.table-wrap .tbl{min-width:560px}
+.tbl{width:100%;border-collapse:collapse;font-size:var(--fs-m)}
+.tbl caption{text-align:left}
+.tbl th,.tbl td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl thead th{color:var(--ink-3);font-size:var(--fs-s);font-weight:600;white-space:nowrap}
+.tbl tbody tr:last-child td{border-bottom:0}
+.cell-num{text-align:right;font-variant-numeric:tabular-nums}
+.cell-strong{font-weight:600}
+.cell-sub{color:var(--ink-3);font-size:var(--fs-s);font-family:var(--font-mono)}
+.cell-time{white-space:nowrap;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.badge{
+  display:inline-block;
+  padding:2px 8px;
+  border:1px solid var(--amber-line);
+  border-radius:var(--r-pill);
+  background:var(--amber-tint);
+  color:var(--amber);
+  font-size:var(--fs-s);
+  font-weight:600;
+  white-space:nowrap;
+}
+.export-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-top:16px}
+.export-row .field{flex:1 1 280px}
+
+/* =====================================================================
+   7. 页脚
+   ===================================================================== */
+.foot{margin-top:32px;padding-top:16px;border-top:1px solid var(--line);color:var(--ink-2);font-size:var(--fs-m)}
+.foot p{margin:0}
+.foot-sub{margin-top:6px;color:var(--ink-3);font-size:var(--fs-s)}
+
+/* =====================================================================
+   8. 单人页：点一行就地展开的会话列表与对话
+
+   状态（未完成 / 已放弃 / 已完成）一律有一句中文，颜色只是第二重提示 ——
+   打印成黑白、或者看的人分不清红绿时，只剩颜色的状态等于没有状态。
+   ===================================================================== */
+.row-person{cursor:pointer}
+.row-person:hover td{background:var(--brand-tint)}
+.row-person:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
+.detail-row td{background:var(--surface-2);border-bottom:1px solid var(--line)}
+.detail{padding:12px 16px;border-left:2px solid var(--brand);border-radius:var(--r-inner);background:var(--surface)}
+.detail-head{margin:0 0 6px;color:var(--ink-3);font-size:var(--fs-s);font-weight:600}
+.detail-empty{margin-top:0}
+.sess-list{list-style:none;margin:0;padding:0}
+.sess{padding:8px 0;border-top:1px solid var(--line)}
+.sess:first-child{border-top:0;padding-top:0}
+.sess-line{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.sess-meta{flex:1 1 320px;min-width:0;color:var(--ink-2);font-size:var(--fs-s);font-variant-numeric:tabular-nums}
+.sess-tag{
+  padding:2px 8px;
+  border:1px solid var(--line-strong);
+  border-radius:var(--r-pill);
+  background:var(--surface-2);
+  color:var(--ink-3);
+  font-size:var(--fs-s);
+  font-weight:600;
+  white-space:nowrap;
+}
+.sess-tag-drop{border-color:var(--coral-line);background:var(--coral-tint);color:var(--coral)}
+.sess-tag-done{border-color:var(--brand-line);background:var(--brand-tint);color:var(--brand-strong)}
+.btn-mini{height:24px;padding:0 12px;font-size:var(--fs-s)}
+.conv-box{
+  margin-top:8px;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:var(--r-inner);
+  background:var(--surface);
+}
+.turn{padding:8px 12px;border-radius:var(--r-inner)}
+.turn + .turn{margin-top:8px}
+/* 学生靠右一点、AI 靠左一点，加上底色与中文角色名：三重区分，缺一样也还认得出来 */
+.turn-me{margin-left:24px;border:1px solid var(--line);background:var(--surface-2)}
+.turn-ai{margin-right:24px;border:1px solid var(--brand-line);background:var(--brand-tint)}
+.turn-other{margin-right:24px;border:1px solid var(--amber-line);background:var(--amber-tint)}
+.turn-role{margin:0 0 2px;color:var(--ink-3);font-size:var(--fs-s);font-weight:700}
+/* pre-wrap：学生原话里的换行与空行就是原话的一部分，不能被 CSS 吃掉 */
+.turn-text{white-space:pre-wrap;word-break:break-word;color:var(--ink);font-size:var(--fs-m)}
+
+/* =====================================================================
+   9. 窄屏
+   ===================================================================== */
+@media (max-width:760px){
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .card{padding:16px}
+  .bar-track{height:112px}
+  .sess-meta{flex:1 1 100%}
+  .turn-me{margin-left:12px}
+  .turn-ai,.turn-other{margin-right:12px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important}
+}
+</style>
+</head>
+<body>
+
+<header class="head">
+  <div class="wrap">
+    <div class="head-row">
+      <h1>试点看板</h1>
+      <p class="head-note">四页漏斗：题目 → 方式 → 解题 → 报告</p>
+    </div>
+
+    <form class="loadbar" id="loadForm" autocomplete="off">
+      <label class="field field-code">
+        <span class="field-label">管理员口令</span>
+        <input class="input" id="codeInput" type="password" autocomplete="off" spellcheck="false" placeholder="ADMIN_CODE">
+      </label>
+      <label class="field field-batch">
+        <span class="field-label">批次</span>
+        <input class="input" id="batchInput" type="text" autocomplete="off" spellcheck="false" placeholder="批次号（在链接上，或由我们发给你）">
+      </label>
+      <div class="field field-act">
+        <button class="btn btn-primary" id="loadBtn" type="submit" disabled>载入</button>
+        <button class="btn" id="clearBtn" type="button">清除口令</button>
+      </div>
+    </form>
+
+    <p class="hint" id="hint"></p>
+    <p class="alert" id="alert" role="alert" hidden></p>
+  </div>
+</header>
+
+<main class="wrap main">
+
+  <p class="empty" id="firstNote">填好口令与批次后点「载入」。口令只存在这台浏览器里，不写进网页、也不进链接；载入之前，这个页面里没有任何数据。</p>
+
+  <div id="board" hidden>
+
+    <!-- 用量行：OCR 两个上限为 0（没配）时显示"不限" -->
+    <div class="usage" data-usage>
+      <span>今日 OCR <b data-use="ocrDaily">—</b>/<b data-use="dailyCap">—</b></span>
+      <span class="usage-dot">·</span>
+      <span>本批 OCR <b data-use="ocrBatch">—</b>/<b data-use="ocrCap">—</b></span>
+      <span class="usage-dot">·</span>
+      <span>对话 <b data-use="chat">—</b> 轮</span>
+      <span class="usage-dot">·</span>
+      <span>一轮失败率 <b data-use="fail">—</b></span>
+      <!--
+        系统失败轮次：只在非 0 时出现。
+        一批全是 TURN_SLOW / UPSTREAM 时，那几轮在落会话之前就返回了 ——
+        看板会显示「0 会话 · 0.0% 一轮失败率」，和"学生没来"长得一模一样。
+        这个数存在的唯一理由就是让那一屏看得出来是平台坏了。
+      -->
+      <span id="orphanItem" hidden><span class="usage-dot">·</span> 系统失败轮次 <b class="usage-warn" data-use="orphanTurns">—</b></span>
+    </div>
+
+    <div class="batch-line">
+      <span class="batch-name" id="batchName">—</span>
+      <span class="batch-meta" id="batchMeta">—</span>
+    </div>
+
+    <!-- 四个数：打开 / 答题 / 走到报告 / 一轮失败率 -->
+    <section class="kpis" aria-label="四个数">
+      <div class="kpi">
+        <p class="kpi-key">打开人数</p>
+        <div class="kpi-num" data-kpi="visits">—</div>
+        <p class="kpi-note">按打开次数算</p>
+      </div>
+      <div class="kpi">
+        <p class="kpi-key">答题人数</p>
+        <div class="kpi-num" data-kpi="sessions">—</div>
+        <p class="kpi-note">有作答会话的人</p>
+      </div>
+      <div class="kpi">
+        <p class="kpi-key">走到报告</p>
+        <div class="kpi-num" data-kpi="finished">—</div>
+        <p class="kpi-note">做完一题的人</p>
+      </div>
+      <div class="kpi">
+        <p class="kpi-key">一轮失败率</p>
+        <div class="kpi-num" data-kpi="turnFailure">—</div>
+        <p class="kpi-note">对话轮里失败的比例</p>
+      </div>
+    </section>
+
+    <!-- 漏斗：四根柱子，标签就是四页 -->
+    <section class="card" aria-label="四页漏斗">
+      <div class="card-head">
+        <h2>四页漏斗</h2>
+        <p class="card-sub">第一根柱子按打开次数算，其余三根按不同的人算；停留是这一页这批人的平均。</p>
+      </div>
+
+      <p class="note" id="funnelNote" hidden>样本太少，先看走势不要看百分比。</p>
+      <p class="empty" id="funnelEmpty" hidden>这批还没有人打开链接。先把链接发出去，过一会儿再回来看。</p>
+
+      <div class="bars" id="bars" role="group" aria-label="四页漏斗">
+        <div class="bar" data-stage="1">
+          <div class="bar-num">—</div>
+          <div class="bar-track" aria-hidden="true"><div class="bar-fill"></div></div>
+          <div class="bar-label">题目</div>
+          <div class="bar-dwell">停留 <b class="bar-dwell-value">—</b></div>
+        </div>
+        <div class="bar" data-stage="2">
+          <div class="bar-num">—</div>
+          <div class="bar-track" aria-hidden="true"><div class="bar-fill"></div></div>
+          <div class="bar-label">方式</div>
+          <div class="bar-dwell">停留 <b class="bar-dwell-value">—</b></div>
+        </div>
+        <div class="bar" data-stage="3">
+          <div class="bar-num">—</div>
+          <div class="bar-track" aria-hidden="true"><div class="bar-fill"></div></div>
+          <div class="bar-label">解题</div>
+          <div class="bar-dwell">停留 <b class="bar-dwell-value">—</b></div>
+        </div>
+        <div class="bar" data-stage="4">
+          <div class="bar-num">—</div>
+          <div class="bar-track" aria-hidden="true"><div class="bar-fill"></div></div>
+          <div class="bar-label">报告</div>
+          <div class="bar-dwell">停留 <b class="bar-dwell-value">—</b></div>
+        </div>
+      </div>
+
+      <p class="conv" id="conv" hidden></p>
+    </section>
+
+    <!-- 批次对比：没有"列出所有批次"的接口，所以对照批次也要手输 -->
+    <section class="card" aria-label="批次对比">
+      <div class="card-head">
+        <h2>批次对比</h2>
+        <p class="card-sub">同题单、同指标，两版并排。服务端没有「列出所有批次」的接口，所以对照这一格也要手输。</p>
+      </div>
+      <div class="cmp-bar">
+        <label class="field">
+          <span class="field-label">对照批次</span>
+          <input class="input" id="cmpInput" type="text" autocomplete="off" spellcheck="false" placeholder="另一个批次的批次号">
+        </label>
+        <button class="btn" id="cmpBtn" type="button">对比</button>
+      </div>
+      <p class="alert" id="cmpAlert" role="alert" hidden></p>
+      <div id="cmpOut" hidden></div>
+      <p class="cmp-note" id="cmpNote"></p>
+    </section>
+
+    <!-- 人的列表 -->
+    <section class="card" aria-label="人的列表">
+      <div class="card-head">
+        <h2>人的列表</h2>
+        <p class="card-sub">代号 + 题数 + 最后停在哪一页。真名不进数据库，只在你自己手上的发号表里。点一行就地展开这个人的作答记录。</p>
+      </div>
+      <p class="empty" id="usersEmpty" hidden>这个批次还没有人。把链接发出去之后再回来看。</p>
+      <p class="alert alert-bad" id="usersNote" role="alert" hidden></p>
+      <div class="table-wrap" id="usersWrap">
+        <table class="tbl">
+          <caption class="sr-only">这个批次的人</caption>
+          <thead>
+            <tr>
+              <th scope="col">代号</th>
+              <th scope="col" class="cell-num">题数</th>
+              <th scope="col" class="cell-num">走完</th>
+              <th scope="col">最后停在</th>
+              <th scope="col">最后活动</th>
+              <th scope="col">状态</th>
+            </tr>
+          </thead>
+          <tbody id="usersBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 导出 -->
+    <section class="card" aria-label="导出">
+      <div class="card-head">
+        <h2>导出</h2>
+        <p class="card-sub">整批是一个 zip：students.csv / sessions.csv / events.jsonl / turns.jsonl / reports/ / README.md，不含真名。</p>
+      </div>
+      <div class="export-row">
+        <button class="btn btn-primary" id="exportBatch" type="button">导出整批</button>
+        <label class="field">
+          <span class="field-label">单条：会话号</span>
+          <input class="input" id="sessionInput" type="text" autocomplete="off" spellcheck="false" placeholder="会话号在整批导出的 sessions.csv 里">
+        </label>
+        <button class="btn" id="exportSession" type="button">导出这一条</button>
+      </div>
+    </section>
+
+  </div>
+
+  <footer class="foot">
+    <p>这批数据回答的是<b>会不会用</b>，不回答有没有效果。</p>
+    <p class="foot-sub">口径：打开人数按打开次数算，其余按不同的人算；时长为该页的平均停留；时间一律服务端生成的 UTC。</p>
+    <p class="foot-sub">看板显示 0 会话、但对话或系统失败轮次非零，说明这一批发生了系统性失败（多半是模型 Key 或超时），不是学生没来。</p>
+  </footer>
+
+</main>
+
+<!--
+  单人页的展开区。整块是 inert 的模板：点一行才克隆一份插到那一行后面，
+  所以页面上同时只有被点开的那几个人。这里一个数据都没有 ——
+  会话列表、对话全部由 /api/admin/users 与 /api/admin/session 现取。
+
+  对话面板（data-testid="conversation"）整个展开区只有一块，
+  点另一条的「查看对话」是把它**挪**过去（appendChild 移动节点，不是再插一块），
+  于是连点十条也只有一块对话，不会越堆越长。
+-->
+<template id="personTpl">
+  <div class="detail" data-testid="person-detail">
+    <p class="detail-head">这个人的作答记录（最近的在前）</p>
+    <p class="empty detail-empty" hidden>还没有作答记录</p>
+    <ul class="sess-list"></ul>
+    <p class="note detail-note" hidden></p>
+    <div class="conv-box" data-testid="conversation" hidden></div>
+  </div>
+</template>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------------- 常量与状态 ---------------- */
+
+  /**
+   * 口令的键名。
+   *
+   * 与学生令牌 `bsj-token` 分开：两把钥匙不能互相开锁。
+   * 口令只进请求头 `x-admin-code`，绝不进查询串 ——
+   * 查询串会进浏览器历史、进代理日志、进别人发来的截图。
+   */
+  var CODE_KEY = 'bsj-admin';
+
+  /** 四页的名字（产品只有四页）。柱子的标签与页号一一对应。 */
+  var PAGES = ['题目', '方式', '解题', '报告'];
+
+  /** 当前载入的那一批；对比要用它做左列 */
+  var S = { id: '', overview: null, users: [] };
+
+  /* ---------------- 小工具 ---------------- */
+
+  function $(id) { return document.getElementById(id); }
+
+  /** 这个数存在吗（null / 空串 / NaN 都算不存在） */
+  function has(value) {
+    if (value === null || value === undefined || value === '') return false;
+    return Number.isFinite(Number(value));
+  }
+
+  /** 计数：坏值一律 0（与 metrics 的 finiteNumber 同口径，不把 NaN 显示成人） */
+  function cnt(value) {
+    var num = Number(value);
+    return Number.isFinite(num) ? Math.round(num) : 0;
+  }
+
+  function int(value) { return String(cnt(value)); }
+
+  /** 比率（0–1，四位小数）→ 一位小数的百分比；没有这个数就是"没有" */
+  function pct(value) {
+    return has(value) ? (Number(value) * 100).toFixed(1) + '%' : '—';
+  }
+
+  /** 毫秒 → 秒（一位小数）。0 与 0.0 是不同的结论，0 一律显示"—" */
+  function sec(ms) {
+    var num = Number(ms);
+    return Number.isFinite(num) && num > 0 ? (num / 1000).toFixed(1) + ' 秒' : '—';
+  }
+
+  /** 上限 0 = 没配额度，显示"不限"而不是 0/0 */
+  function cap(value) {
+    var num = Number(value);
+    return Number.isFinite(num) && num > 0 ? String(Math.round(num)) : '不限';
+  }
+
+  function txt(value, fallback) {
+    var str = value === null || value === undefined ? '' : String(value).trim();
+    return str || fallback;
+  }
+
+  /**
+   * 服务端时间戳（UTC ISO 串）→ 显示用。
+   *
+   * 刻意不经过 Date：学生机器的时钟与浏览器时区都不可信，
+   * 而这是服务端生成的时间，只该原样展示，不该被本地时区改写。
+   */
+  function stamp(iso) {
+    var str = String(iso || '');
+    return str.length >= 16 ? str.slice(0, 10) + ' ' + str.slice(11, 16) + ' UTC' : '—';
+  }
+
+  /** perPage 里按页号取那一行（不靠数组顺序，接口换个顺序也不会画错柱子） */
+  function pageRow(perPage, page) {
+    if (!Array.isArray(perPage)) return {};
+    for (var i = 0; i < perPage.length; i += 1) {
+      if (perPage[i] && cnt(perPage[i].page) === page) return perPage[i];
+    }
+    return {};
+  }
+
+  /* localStorage 在隐私模式 / 被禁时读写会抛，所以每次都包一层 */
+  function readStore(key) {
+    try { return window.localStorage.getItem(key); } catch (err) { return null; }
+  }
+  function writeStore(key, value) {
+    try { window.localStorage.setItem(key, value); } catch (err) { /* 存不了就用一次性的 */ }
+  }
+  function dropStore(key) {
+    try { window.localStorage.removeItem(key); } catch (err) { /* 同上 */ }
+  }
+
+  /* ---------------- 说话 ---------------- */
+
+  function hint(msg) { $('hint').textContent = msg; }
+
+  /** 页面级结果：一处显示，"bad" 只影响配色，不改文案 */
+  function say(msg, kind) {
+    var box = $('alert');
+    var text = String(msg || '');
+    box.textContent = text;
+    box.hidden = !text;
+    box.className = 'alert' + (kind === 'bad' ? ' alert-bad' : '');
+  }
+
+  function cmpSay(msg) {
+    var box = $('cmpAlert');
+    var text = String(msg || '');
+    box.textContent = text;
+    box.hidden = !text;
+  }
+
+  /**
+   * 状态码 → 人话。
+   *
+   * 三句话对应三件不同的事，因为要做的动作不同：
+   * 404 别试了（部署没开看板 / 批次不存在）、401 改口令、503 刷新重试。
+   * 一律不回英文栈、也不让裸状态码当文案。
+   */
+  function friendly(status, serverError) {
+    if (status === 401) return '口令不对。请检查管理员口令后重试。';
+    if (status === 404) return '这个部署没开看板，或批次不存在。';
+    if (status === 503) return '读取失败，请刷新重试。';
+    if (status === 400) return txt(serverError, '请求少了参数，请刷新后重试。');
+    return txt(serverError, '请求没有成功') + '（' + status + '），请刷新重试。';
+  }
+
+  function parseJson(raw) {
+    try { return raw ? JSON.parse(raw) : null; } catch (err) { return null; }
+  }
+
+  /**
+   * 全页唯一的网络入口。
+   *
+   * 为什么只留一个：口令要带在每一处请求上，兜错的话术要一致 ——
+   * 两个入口迟早会有一处忘了带 `x-admin-code`，而那个失败长得像"这批没数据"。
+   *
+   * `wantBlob` 只给导出用：zip 是二进制，按文本读会把它毁掉。
+   * 非 200 时一律先读 JSON 里那句 error，再抛出去 —— 导出那条路据此
+   * 显示人话而不是下载一个空文件。
+   */
+  function request(path, wantBlob) {
+    var headers = { 'x-admin-code': $('codeInput').value.trim() };
+    return fetch(path, { headers: headers, cache: 'no-store' }).then(function (res) {
+      if (!res.ok) {
+        return res.text().then(function (raw) {
+          var body = parseJson(raw);
+          var err = new Error(friendly(res.status, body && body.error));
+          err.status = res.status;
+          err.body = body;
+          throw err;
+        });
+      }
+      if (wantBlob) return res.blob();
+      return res.text().then(function (raw) {
+        var body = parseJson(raw);
+        if (body === null) throw new Error('返回的数据看不懂，请刷新重试。');
+        return body;
+      });
+    }, function () {
+      throw new Error('连不上服务器。请确认服务还在运行、网络正常，然后重试。');
+    });
+  }
+
+  /* ---------------- 渲染 ---------------- */
+
+  /** 用量行：今日 OCR / 本批 OCR（上限 0 显示"不限"）· 对话轮数 · 一轮失败率 · 系统失败轮次 */
+  function renderUsage(usage) {
+    var data = usage || {};
+    var orphan = cnt(data.orphanTurns);
+    var map = {
+      ocrDaily: int(data.ocrDaily),
+      dailyCap: cap(data.dailyCap),
+      ocrBatch: int(data.ocrBatch),
+      ocrCap: cap(data.ocrCap),
+      chat: int(data.chatTurns),
+      fail: pct(data.turnFailureRate),
+      orphanTurns: int(orphan)
+    };
+    var nodes = document.querySelectorAll('[data-use]');
+    for (var i = 0; i < nodes.length; i += 1) {
+      var key = nodes[i].getAttribute('data-use');
+      nodes[i].textContent = map[key] === undefined ? '—' : map[key];
+    }
+    /**
+     * 系统失败轮次为 0 时整项收起（连前面的分隔点一起）。
+     * 留一行恒为 0 的项，只会让真正非 0 的那一行更难被看见 ——
+     * 而这个数存在的唯一理由就是"平台坏了"必须和"学生没来"长得不一样。
+     */
+    $('orphanItem').hidden = orphan === 0;
+  }
+
+  /** 四个数：打开人数 / 答题人数 / 走到报告 / 一轮失败率 */
+  function renderKpis(funnel, summary) {
+    var f = funnel || {};
+    var s = summary || {};
+    var map = {
+      visits: int(f.p1),
+      sessions: int(s.userCount),
+      finished: int(f.p4),
+      turnFailure: pct(s.turnFailureRate)
+    };
+    var nodes = document.querySelectorAll('[data-kpi]');
+    for (var i = 0; i < nodes.length; i += 1) {
+      var key = nodes[i].getAttribute('data-kpi');
+      nodes[i].textContent = map[key] === undefined ? '—' : map[key];
+    }
+  }
+
+  /** 四根柱子：数值标在柱子上；空批次收起来，样本不足不写百分比 */
+  function renderFunnel(funnel, summary) {
+    var f = funnel || {};
+    var s = summary || {};
+    var counts = [cnt(f.p1), cnt(f.p2), cnt(f.p3), cnt(f.p4)];
+    var max = Math.max(1, counts[0], counts[1], counts[2], counts[3]);
+
+    var nodes = document.querySelectorAll('[data-stage]');
+    for (var i = 0; i < nodes.length; i += 1) {
+      var page = cnt(nodes[i].getAttribute('data-stage'));
+      var index = page - 1;
+      var row = pageRow(f.perPage, page);
+      var share = Math.round((counts[index] / max) * 100);
+      nodes[i].querySelector('.bar-num').textContent = int(counts[index]);
+      nodes[i].querySelector('.bar-fill').style.height = share + '%';
+      nodes[i].querySelector('.bar-dwell-value').textContent = sec(row.avgDwellMs);
+    }
+
+    /* 空批次：一根柱子都不画，只留一句话（"没人用"与"没读到"必须长得不一样） */
+    var empty = counts[0] === 0 && cnt(s.sessionCount) === 0;
+    $('bars').hidden = empty;
+    $('funnelEmpty').hidden = !empty;
+
+    var small = !!f.sampleTooSmall;
+    $('funnelNote').hidden = empty || !small;
+
+    var conv = $('conv');
+    conv.hidden = empty || small;
+    if (!conv.hidden) conv.textContent = convText(f, counts);
+  }
+
+  /** 转化率那一行；掉点最多的一级单独说一句（并列时用服务端给的那一级） */
+  function convText(funnel, counts) {
+    var f = funnel || {};
+    var c = f.conversion || {};
+    var parts = [
+      '题目 → 方式 ' + pct(c.p1_p2),
+      '方式 → 解题 ' + pct(c.p2_p3),
+      '解题 → 报告 ' + pct(c.p3_p4)
+    ];
+    var text = parts.join(' · ');
+    var drop = cnt(f.dropOffPage);
+    if (drop >= 2 && drop <= 4) {
+      var lost = counts[drop - 2] - counts[drop - 1];
+      if (lost > 0) text += ' · 掉得最多的一级是 ' + PAGES[drop - 2] + ' → ' + PAGES[drop - 1] + '，少了 ' + lost + ' 人';
+    }
+    return text;
+  }
+
+  /** 人的列表：只用 DOM API 拼，代号里的任何字符都不会被当成标记 */
+  function renderUsers(rows) {
+    var list = Array.isArray(rows) ? rows : [];
+    var body = $('usersBody');
+    body.textContent = '';
+    $('usersNote').hidden = true;
+    $('usersWrap').hidden = list.length === 0;
+    $('usersEmpty').hidden = list.length > 0;
+    if (!list.length) return;
+
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < list.length; i += 1) frag.appendChild(userRow(list[i]));
+    body.appendChild(frag);
+  }
+
+  function userRow(row) {
+    var data = row || {};
+    var tr = document.createElement('tr');
+
+    /**
+     * 每一行都点得开：展开区就插在这一行后面（`tr.nextSibling`），不跳转、不改 URL。
+     * 老师一边看漏斗一边看人，跳走一次就回不来了。键盘也能开（Enter / 空格）。
+     */
+    tr.className = 'row-person';
+    tr.setAttribute('data-user-row', String(data.userId || ''));
+    tr.setAttribute('aria-expanded', 'false');
+    tr.tabIndex = 0;
+    tr.addEventListener('click', function () { togglePerson(tr, data); });
+    tr.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      ev.preventDefault();
+      togglePerson(tr, data);
+    });
+
+    var who = document.createElement('td');
+    who.className = 'cell-strong';
+    who.textContent = txt(data.displayName, '未知');
+    if (data.userId) {
+      var sub = document.createElement('div');
+      sub.className = 'cell-sub';
+      sub.textContent = String(data.userId);
+      who.appendChild(sub);
+    }
+    tr.appendChild(who);
+
+    tr.appendChild(cell(int(data.sessions), 'cell-num'));
+    tr.appendChild(cell(int(data.finished), 'cell-num'));
+    tr.appendChild(cell(cnt(data.lastPage) > 0 ? '第 ' + cnt(data.lastPage) + ' 页' : '—', ''));
+    tr.appendChild(cell(stamp(data.lastAt), 'cell-time'));
+
+    var status = document.createElement('td');
+    if (data.abandoned) {
+      var badge = document.createElement('span');
+      badge.className = 'badge';
+      badge.textContent = '可能放弃';
+      status.appendChild(badge);
+    } else {
+      status.textContent = '—';
+    }
+    tr.appendChild(status);
+
+    return tr;
+  }
+
+  function cell(text, cls) {
+    var td = document.createElement('td');
+    td.textContent = text;
+    if (cls) td.className = cls;
+    return td;
+  }
+
+  /* ---------------- 单人页：点一行，就地展开 ---------------- */
+
+  /** 这一行后面已经展开的那块（没有就 null）。展开区永远是本行的下一个兄弟节点 */
+  function detailRowOf(tr) {
+    var after = tr.nextSibling;
+    return after && after.getAttribute && after.getAttribute('data-person-row') !== null ? after : null;
+  }
+
+  /**
+   * 收起 / 展开一个人。
+   *
+   * 展开区是**紧跟在那一行后面的另一行**（整行 td 横跨全表），不是新页面，也不改 URL。
+   * 展开块从 `#personTpl` 克隆：页面上同时只有被点开的那几个人，模板里一个数据都没有。
+   */
+  function togglePerson(tr, data) {
+    var open = detailRowOf(tr);
+    if (open) {
+      tr.parentNode.removeChild(open);
+      tr.setAttribute('aria-expanded', 'false');
+      return;
+    }
+
+    var after = tr.nextSibling;
+    var holder = document.createElement('tr');
+    holder.className = 'detail-row';
+    holder.setAttribute('data-person-row', String(data.userId || ''));
+
+    var td = document.createElement('td');
+    td.colSpan = columnCount();
+    td.appendChild(buildDetail(data));
+    holder.appendChild(td);
+
+    /* after 为 null 时（点是最后一行）插到末尾，正好 */
+    tr.parentNode.insertBefore(holder, after);
+    tr.setAttribute('aria-expanded', 'true');
+  }
+
+  /** 展开区那一格要横跨整张表：列数从表头数出来，表加一列也不用回来改这里 */
+  function columnCount() {
+    var head = $('usersBody').parentNode.querySelector('thead tr');
+    return head ? head.children.length : 1;
+  }
+
+  /** 克隆一份展开区，把这个人自己的会话填进去（空态是一句话，不是空白） */
+  function buildDetail(data) {
+    var person = data || {};
+    var region = $('personTpl').content.firstElementChild.cloneNode(true);
+    var list = Array.isArray(person.sessionList) ? person.sessionList : [];
+
+    if (list.length) {
+      var frag = document.createDocumentFragment();
+      for (var i = 0; i < list.length; i += 1) frag.appendChild(sessItem(region, list[i]));
+      region.querySelector('.sess-list').appendChild(frag);
+    } else {
+      region.querySelector('.sess-list').hidden = true;
+      region.querySelector('.detail-empty').hidden = false;
+    }
+
+    /* 截断必须说出来：不说的话「只有 50 条」会被读成「他只做了 50 道」 */
+    if (person.sessionListTruncated) {
+      var note = region.querySelector('.detail-note');
+      note.textContent = '只显示最近 50 条';
+      note.hidden = false;
+    }
+
+    return region;
+  }
+
+  /**
+   * 展开区里的一条会话：`第 N 道 · 题目 id · 停在页 M · 开始时间` + 中文状态 + 两个按钮。
+   *
+   * 顺序（最近的在前）由接口给：`sessionList` 已按 `startedAt` 降序排过，
+   * 页面不再排一遍 —— 两处各排一份，迟早会给出两个不同的"最近"。
+   */
+  function sessItem(region, item) {
+    var session = item || {};
+    var li = document.createElement('li');
+    li.className = 'sess';
+
+    var line = document.createElement('div');
+    line.className = 'sess-line';
+
+    var meta = document.createElement('span');
+    meta.className = 'sess-meta';
+    meta.textContent = sessMeta(session);
+    line.appendChild(meta);
+
+    line.appendChild(sessTag(session));
+    line.appendChild(sessButton('查看对话', function (btn) { readTurns(region, session, li, btn); }));
+    line.appendChild(sessButton('导出这条', function (btn) {
+      var id = txt(session.id, '');
+      /* 没有会话号是数据坏了（接口从不省略它）：说一句，不去下一个空包 */
+      if (!id) { say('这条记录没有会话号，导不出来。', 'bad'); return; }
+      /* 与"导出这一条"同一个下载路径：Blob + 本地下载，非 200 先读服务端那句人话 */
+      download('/api/admin/export?sessionId=' + encodeURIComponent(id), 'bubujie-session.zip', btn);
+    }));
+
+    li.appendChild(line);
+    return li;
+  }
+
+  /** 一行会话的时间线那半句；认不出的字段写"未知"，不编一个具体的错位置 */
+  function sessMeta(session) {
+    var s = session || {};
+    var no = questionNo(s.questionIndex);
+    var page = cnt(s.page);
+    var started = stamp(s.startedAt);
+    var parts = [
+      no > 0 ? '第 ' + no + ' 道' : '题号未知',
+      txt(s.problemId, '题目未知'),
+      page > 0 ? '停在页 ' + page : '没开始作答',
+      started === '—' ? '开始时间未知' : '开始 ' + started
+    ];
+    return parts.join(' · ');
+  }
+
+  /** 题单序号（接口给的是 0 起）→ 人看的第几道；认不出的回 0，页面据此写"题号未知" */
+  function questionNo(value) {
+    if (value === null || value === undefined || value === '') return 0;
+    var num = Number(value);
+    /* 不直接 Number(x)+1：Number(null) 是 0，会把"没记题号"画成"第 1 道" */
+    return Number.isFinite(num) ? Math.floor(num) + 1 : 0;
+  }
+
+  /** 状态是**一句话**，颜色只是第二重提示（打印成黑白也还认得） */
+  function sessTag(session) {
+    var s = session || {};
+    var tag = document.createElement('span');
+    var done = Boolean(s.finished);
+    var dropped = !done && Boolean(s.abandoned);
+    tag.className = 'sess-tag' + (done ? ' sess-tag-done' : dropped ? ' sess-tag-drop' : '');
+    tag.textContent = done ? '已完成' : dropped ? '已放弃' : '未完成';
+    return tag;
+  }
+
+  function sessButton(label, onClick) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-mini';
+    btn.textContent = label;
+    btn.addEventListener('click', function () { onClick(btn); });
+    return btn;
+  }
+
+  /**
+   * 读一条会话的对话。
+   *
+   * 面板是**同一个节点**，只是挪到被点的那一行下面（`appendChild` 是移动，不是再插一块）：
+   * 于是"换一条看"天然就是替换，绝不会堆出一列对话。
+   */
+  function readTurns(region, session, li, btn) {
+    var id = txt(session.id, '');
+    var panel = region.querySelector('[data-testid="conversation"]');
+    if (!id) { say('这条记录没有会话号，读不出对话。', 'bad'); return; }
+
+    panel.hidden = false;
+    panelState(panel, '正在读取这段对话…', 'empty');
+    /* 面板上记住"现在这一块是谁的"：晚到的旧响应据此认出来丢掉 ——
+       否则连点两个人的对话，慢的那份会落在后点的那一行下面，读起来像另一个学生的原话 */
+    panel.setAttribute('data-for', id);
+    li.appendChild(panel);
+    if (btn) btn.disabled = true;
+
+    request('/api/admin/session?sessionId=' + encodeURIComponent(id))
+      .then(function (data) {
+        if (panel.getAttribute('data-for') !== id) return;
+        renderTurns(panel, data && data.turns);
+      })
+      .catch(function (err) {
+        if (panel.getAttribute('data-for') !== id) return;
+        panelState(panel, sessionFriendly(err), 'alert alert-bad');
+      })
+      .then(function () { if (btn) btn.disabled = false; });
+  }
+
+  /**
+   * 401 / 503 用页面统一的那三句（改口令、刷新重试），404 单独一句 ——
+   * 在"看一段对话"这个上下文里说"批次不存在"是答非所问：这条记录不在了，别再点。
+   * 无论哪一种都不把 JSON 原文贴出来。
+   */
+  function sessionFriendly(err) {
+    if (err && err.status === 404) return '这条学习记录不存在，可能已经被清理了。';
+    return (err && err.message) || '读不出这段对话，请刷新重试。';
+  }
+
+  /** 面板里只留一句话（读取中 / 空 / 出错都走这里，省得三种写法各错一处） */
+  function panelState(panel, msg, cls) {
+    panel.textContent = '';
+    var line = document.createElement('p');
+    line.className = cls;
+    line.textContent = String(msg || '');
+    panel.appendChild(line);
+  }
+
+  /**
+   * `turns` → 对话面板。
+   *
+   * **只用 `textContent`**：学生原话里只要出现一个 `<`，拼字符串就把它变成标记
+   * （轻则显示错，重则注入）。换行靠 CSS 的 `pre-wrap`，不靠 `<br>`。
+   */
+  function renderTurns(panel, turns) {
+    var list = Array.isArray(turns) ? turns : [];
+    if (!list.length) { panelState(panel, '这段对话没有内容', 'empty'); return; }
+
+    panel.textContent = '';
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < list.length; i += 1) frag.appendChild(turnBlock(list[i]));
+    panel.appendChild(frag);
+  }
+
+  /** 一条发言：角色名用中文写出来（不靠颜色），正文原样给 */
+  function turnBlock(turn) {
+    var t = turn || {};
+    var role = String(t.role || '');
+    var me = role === 'student';
+    var ai = role === 'ai';
+
+    var box = document.createElement('div');
+    box.className = 'turn ' + (me ? 'turn-me' : ai ? 'turn-ai' : 'turn-other');
+
+    var who = document.createElement('p');
+    who.className = 'turn-role';
+    who.textContent = me ? '学生' : ai ? 'AI 老师' : '其他记录';
+
+    var said = document.createElement('div');
+    said.className = 'turn-text';
+    /* 不 trim：首尾的空行是学生原话的一部分，抄进教研结论时要和他说的一样 */
+    var body = typeof t.text === 'string' ? t.text : (t.text === null || t.text === undefined ? '' : String(t.text));
+    /* 一个字都没有的条目（系统事件）不留一个空气泡 —— 空框看起来像渲染坏了 */
+    said.textContent = body.trim() ? body : '（这条没有文字）';
+
+    box.appendChild(who);
+    box.appendChild(said);
+    return box;
+  }
+
+  /** 把一份 overview 摊平成对比表要的那几个数（坏输入一律落到 0 / —） */
+  function metricsOf(overview) {
+    var view = overview || {};
+    var f = view.funnel || {};
+    var s = view.summary || {};
+    return {
+      batch: view.batch || {},
+      p1: cnt(f.p1),
+      p4: cnt(f.p4),
+      conv: f.conversion || {},
+      small: !!f.sampleTooSmall,
+      users: cnt(s.userCount),
+      fail: s.turnFailureRate,
+      p50: s.latencyP50,
+      p90: s.latencyP90
+    };
+  }
+
+  function renderCompare(current, other) {
+    var a = metricsOf(current);
+    var b = metricsOf(other);
+    var rows = [
+      ['打开人数', int(a.p1), int(b.p1)],
+      ['答题人数', int(a.users), int(b.users)],
+      ['走到报告', int(a.p4), int(b.p4)],
+      ['题目 → 方式', a.small ? '样本太少' : pct(a.conv.p1_p2), b.small ? '样本太少' : pct(b.conv.p1_p2)],
+      ['方式 → 解题', a.small ? '样本太少' : pct(a.conv.p2_p3), b.small ? '样本太少' : pct(b.conv.p2_p3)],
+      ['解题 → 报告', a.small ? '样本太少' : pct(a.conv.p3_p4), b.small ? '样本太少' : pct(b.conv.p3_p4)],
+      ['一轮失败率', pct(a.fail), pct(b.fail)],
+      ['中位延迟', sec(a.p50), sec(b.p50)],
+      ['90 分位延迟', sec(a.p90), sec(b.p90)]
+    ];
+
+    var box = $('cmpOut');
+    box.textContent = '';
+
+    var table = document.createElement('table');
+    table.className = 'tbl';
+    var caption = document.createElement('caption');
+    caption.className = 'sr-only';
+    caption.textContent = '两个批次的同一组指标';
+    table.appendChild(caption);
+
+    var thead = document.createElement('thead');
+    var head = document.createElement('tr');
+    head.appendChild(th('指标', '', 'col'));
+    head.appendChild(th(txt(a.batch.label, txt(a.batch.id, '本批')), 'cell-num', 'col'));
+    head.appendChild(th(txt(b.batch.label, txt(b.batch.id, '对照')), 'cell-num', 'col'));
+    thead.appendChild(head);
+    table.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    for (var i = 0; i < rows.length; i += 1) {
+      var tr = document.createElement('tr');
+      tr.appendChild(th(rows[i][0], ''));
+      tr.appendChild(cell(rows[i][1], 'cell-num'));
+      tr.appendChild(cell(rows[i][2], 'cell-num'));
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+
+    box.appendChild(table);
+    box.hidden = false;
+  }
+
+  function th(text, cls, scope) {
+    var node = document.createElement('th');
+    node.scope = scope || 'row';
+    node.textContent = text;
+    if (cls) node.className = cls;
+    return node;
+  }
+
+  /** 两批都出现的人 = 配对的人。没有成员表接口，只能靠代号 id 取交集。 */
+  function idSet(rows) {
+    /* 无原型对象：代号里即使出现 __proto__ 这类键，也只会是一条普通记录 */
+    var out = Object.create(null);
+    var list = Array.isArray(rows) ? rows : [];
+    for (var i = 0; i < list.length; i += 1) {
+      var id = list[i] && list[i].userId ? String(list[i].userId) : '';
+      if (id) out[id] = true;
+    }
+    return out;
+  }
+
+  function markOverlap(mine, theirs) {
+    var a = idSet(mine);
+    var b = idSet(theirs);
+    var both = 0;
+    var key;
+    for (key in b) {
+      if (Object.prototype.hasOwnProperty.call(b, key) && a[key]) both += 1;
+    }
+    $('cmpNote').textContent =
+      '两批都出现的人：' + both + ' 人（本批 ' + countKeys(a) + ' 人 / 对照 ' + countKeys(b) + ' 人）。';
+  }
+
+  function countKeys(obj) {
+    var total = 0;
+    for (var key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) total += 1;
+    }
+    return total;
+  }
+
+  function renderBoard(data) {
+    var batch = data.batch || {};
+    var summary = data.summary || {};
+    var questions = Array.isArray(batch.questionIds) ? batch.questionIds.length : 0;
+
+    $('batchName').textContent = txt(batch.label, txt(batch.id, '（这一批没有名字）'));
+    $('batchMeta').textContent =
+      '题单 ' + questions + ' 题 · 版本 ' + txt(batch.versionSha, '—').slice(0, 12) +
+      ' · 数据截止 ' + stamp(data.generatedAt) +
+      ' · 中位延迟 ' + sec(summary.latencyP50);
+
+    renderUsage(data.usage);
+    renderKpis(data.funnel, data.summary);
+    renderFunnel(data.funnel, data.summary);
+
+    /* 换了批次，上一次的对比结果就不再对应当前这一批了 */
+    $('cmpOut').hidden = true;
+    $('cmpNote').textContent = '';
+    cmpSay('');
+  }
+
+  /* ---------------- 载入 ---------------- */
+
+  function load() {
+    var id = $('batchInput').value.trim();
+    var code = $('codeInput').value.trim();
+    if (!id || !code) { syncForm(); return; }
+
+    S.id = id;
+    $('loadBtn').disabled = true;
+    say('正在读取 ' + id + ' …');
+
+    request('/api/admin/overview?batchId=' + encodeURIComponent(id))
+      .then(function (data) {
+        if (!data || !data.funnel) throw new Error('返回的数据不完整，请刷新重试。');
+        /* 只有取成功了才记住口令：免得把一个错口令留在机器上，下次还用它 */
+        writeStore(CODE_KEY, code);
+        S.overview = data;
+        $('board').hidden = false;
+        $('firstNote').hidden = true;
+        renderBoard(data);
+        say('已载入：数据截止 ' + stamp(data.generatedAt) + '。');
+
+        return request('/api/admin/users?batchId=' + encodeURIComponent(id)).then(function (rows) {
+          S.users = Array.isArray(rows) ? rows : [];
+          renderUsers(S.users);
+        }, function (err) {
+          /* 名单读失败不推翻上面那一屏：数字已经显示出来了，这里单独说一句 */
+          $('usersWrap').hidden = true;
+          $('usersEmpty').hidden = true;
+          $('usersNote').textContent = '名单没取到：' + err.message;
+          $('usersNote').hidden = false;
+        });
+      })
+      .catch(function (err) {
+        $('board').hidden = true;
+        $('firstNote').hidden = false;
+        say(err.message, 'bad');
+      })
+      .then(function () {
+        $('loadBtn').disabled = false;
+        syncForm();
+      });
+  }
+
+  /** 表单状态与那一行提示：缺什么就说什么，缺着就不让点 */
+  function syncForm() {
+    var id = $('batchInput').value.trim();
+    var code = $('codeInput').value.trim();
+    $('loadBtn').disabled = !id || !code;
+    if (!id && !code) return hint('填口令与批次号。批次号也可以写在链接上（?batch= 后面那段），打开时会自动填好。');
+    if (!id) return hint('还差批次号。链接上带批次号时，打开这个页面会自动填好。');
+    if (!code) return hint('还差管理员口令。口令不进链接、不写进网页，只存在这台浏览器里。');
+    return hint('口令与批次都填好了，点「载入」。');
+  }
+
+  /* ---------------- 导出 ---------------- */
+
+  /**
+   * 导出。
+   *
+   * 走 Blob + 对象 URL：非 200 时服务端回的是 JSON（"这条学习记录不存在"这类人话），
+   * 先把它读出来显示，不能直接当 zip 存成文件 —— 老师拿到一个打不开的空包，
+   * 会以为是数据没了。
+   */
+  function download(path, filename, button) {
+    if (button) button.disabled = true;
+    say('正在打包 ' + filename + ' …');
+
+    request(path, true)
+      .then(function (blob) {
+        if (!blob || !blob.size) throw new Error('导出件是空的，请刷新后重试。');
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        /* 立刻撤销会让部分浏览器中断下载，延后收回 */
+        window.setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+        say('已开始下载 ' + filename + '。');
+      })
+      .catch(function (err) {
+        var body = err && err.body;
+        /* 401 用页面统一的那句；其余优先用服务端那句（它分得清"这条不在了"和"读不出来"） */
+        say(err && err.status === 401 ? err.message : (body && body.error) || err.message, 'bad');
+      })
+      .then(function () {
+        if (button) button.disabled = false;
+      });
+  }
+
+  /* ---------------- 对比 ---------------- */
+
+  function compare() {
+    var id = $('cmpInput').value.trim();
+    if (!id) { cmpSay('先填对照批次的批次号。'); return; }
+    if (!S.overview) { cmpSay('先载入本批数据，再对比。'); return; }
+
+    $('cmpBtn').disabled = true;
+    cmpSay('');
+    $('cmpNote').textContent = '';
+
+    request('/api/admin/overview?batchId=' + encodeURIComponent(id))
+      .then(function (data) {
+        renderCompare(S.overview, data);
+        return request('/api/admin/users?batchId=' + encodeURIComponent(id)).then(function (rows) {
+          markOverlap(S.users, rows);
+        }, function () {
+          $('cmpNote').textContent = '对照批次的名单没取到，两批都出现的人算不出来。';
+        });
+      })
+      .catch(function (err) {
+        $('cmpOut').hidden = true;
+        cmpSay(err.message);
+      })
+      .then(function () {
+        $('cmpBtn').disabled = false;
+      });
+  }
+
+  /* ---------------- 启动 ---------------- */
+
+  function boot() {
+    /* 批次优先从链接来（?batch=），没有就让人手输 */
+    var fromUrl = '';
+    try {
+      fromUrl = new URLSearchParams(location.search).get('batch') || '';
+    } catch (err) {
+      fromUrl = '';
+    }
+    if (fromUrl) $('batchInput').value = fromUrl;
+
+    /* 口令从上一次成功的载入来；第一次打开时是空的 */
+    var saved = readStore(CODE_KEY);
+    if (saved) $('codeInput').value = saved;
+
+    syncForm();
+    if (fromUrl) say('已从链接读到批次号：' + fromUrl + '。填好口令后点「载入」。');
+
+    $('loadForm').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      load();
+    });
+    $('batchInput').addEventListener('input', syncForm);
+    $('codeInput').addEventListener('input', syncForm);
+
+    $('clearBtn').addEventListener('click', function () {
+      dropStore(CODE_KEY);
+      $('codeInput').value = '';
+      syncForm();
+      say('口令已清除。下次载入要重新输入。');
+    });
+
+    $('exportBatch').addEventListener('click', function () {
+      if (!S.id) { say('先载入一个批次再导出。', 'bad'); return; }
+      download('/api/admin/export?batchId=' + encodeURIComponent(S.id), 'bubujie-batch.zip', $('exportBatch'));
+    });
+
+    $('exportSession').addEventListener('click', function () {
+      var sid = $('sessionInput').value.trim();
+      if (!sid) { say('先填会话号。会话号在整批导出的 sessions.csv 里。', 'bad'); return; }
+      download('/api/admin/export?sessionId=' + encodeURIComponent(sid), 'bubujie-session.zip', $('exportSession'));
+    });
+
+    $('cmpBtn').addEventListener('click', compare);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+</body>
+</html>

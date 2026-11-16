@@ -85,8 +85,24 @@ export function looksLikeHelpRequest(utterance = '') {
 
 export function decideLevel({ problem, diagnosis, history, explicitHelpSeeking, mode }) {
   const reasons = [];
+  /**
+   * 自主训练下的静默，只留给"学生正在自己写"这一种情况。
+   *
+   * 旧口径是"没显式求助一律沉默"，但规范（languages/00「反馈-意义-留白」、
+   * languages/20「探明进度 → 只给方向或肯定 → 留白」）要求的是：
+   * 老师开口之后，学生回一句"是电功率""这一步用动能定理"就是在作答，
+   * 必须接住并核验 —— 沉默等于把学生晾在那儿。
+   * 所以只有他真的说"我先算/我试试/嗯"时，才把时间还给他。
+   */
   if (mode === 'self_training' && !explicitHelpSeeking) {
-    return { level: null, reason: '自主训练：学生未主动求助，保持静默观测', suppressed: true };
+    const lastStudentText = [...history].reverse().find((t) => t.role === 'student')?.text ?? '';
+    const stillWorking =
+      !/[？?]/.test(lastStudentText) &&
+      /(我先|我试试|让我想|我先算|我先写|等等|我在算)/.test(lastStudentText);
+    const filler = /^(嗯|哦|好|行|知道了|明白了|收到|ok)[。！!.\s]*$/i.test(String(lastStudentText).trim());
+    if (stillWorking || filler) {
+      return { level: null, reason: '自主训练：学生表示自己在写/只是应声，先不打断', suppressed: true };
+    }
   }
   const hasPriorContext = history.some(t => t.role === 'ai' && !t.suppressed && t.metaStep != null);
   // 仅当前路径、步骤、卡点的已交付提示支撑升级；兼容旧会话缺失的元数据。
