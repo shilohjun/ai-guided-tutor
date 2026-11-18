@@ -935,24 +935,21 @@ body.is-qb{overflow:hidden}
    建华的素材曾偏左 60px，已按 characters/body 的原图重裁（脸居中、且裁掉了左侧的板子）；
    其余三位目前的构图可以直接用。 */
 .av-frame{
-  position:relative;overflow:hidden;flex:none;display:block;
-  width:var(--av);height:var(--av);
-  border-radius:50%;
+  position:relative;overflow:hidden;flex:none;
+  border-radius:var(--r-circle);
 }
-/* 四张都是方图，脸不在几何中心。放大后用 left/top 把脸放到圆心，圆外的道具被裁掉。 */
 .av-frame img{
-  position:absolute;max-width:none;object-fit:cover;
-  width:145%;height:145%;left:-22%;top:-12%;
+  position:absolute;inset:0;
+  width:100%;height:100%;
+  object-fit:cover;
+  /* 留给"确实需要微调"的极端情况；正常情况下不设 --fx/--fy，等于不位移 */
+  transform:translate(var(--fx,0),var(--fy,0));
 }
-.av-frame[data-mentor="paimon"] img{width:150%;height:150%;left:-25%;top:-14%}
-.av-frame[data-mentor="hermione"] img{width:175%;height:175%;left:-62%;top:-28%}
-.av-frame[data-mentor="zhuge"] img{width:165%;height:165%;left:-26%;top:-22%}
-.av-frame[data-mentor="jianhua"] img{width:135%;height:135%;left:-18%;top:-14%}
 
 /* —— 页面二：一行头像，不占卡片的位置 ——
    没有外框、没有背景：它要看起来像一句注解，不像第三张卡。
    hover 才给一块浅底，让"能点"这件事在指针下显形。 */
-.mentor-row{display:flex;align-items:center;gap:12px;min-height:48px;flex-wrap:nowrap;min-width:0;max-width:100%;overflow-x:auto;touch-action:pan-x;overscroll-behavior-x:contain}
+.mentor-row{display:flex;align-items:center;gap:12px;min-height:48px;flex-wrap:wrap}
 .mr-label{flex:none;font-size:var(--fs-body);color:var(--ink-3);font-weight:400}
 .mr-pick{
   display:inline-flex;align-items:center;gap:6px;flex:none;
