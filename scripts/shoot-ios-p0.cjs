@@ -336,6 +336,15 @@ const MEASURE = `(() => {
   await waitUntil(cdp, "document.body.getAttribute('data-page') === '4'", '裸页报告');
   measures['index-360-report-opened'] = true;
 
+  await setPhone(cdp, 390, 844);
+  await cdp.send('Page.navigate', { url: BASE + '/?p=2&theme=light&guide=0' });
+  await waitUntil(cdp, "document.body.getAttribute('data-page') === '2' && document.querySelectorAll('#mentorRow .mr-pick').length === 4", '选老师');
+  await sleep(400);
+  await save('mentor-390.png');
+  await setPhone(cdp, 360, 780);
+  await sleep(300);
+  await save('mentor-360.png');
+
   await setDesktop(cdp);
   await cdp.send('Page.navigate', { url: BASE + '/?p=3&theme=light&guide=0' });
   await waitUntil(cdp, "document.body.getAttribute('data-page') === '3'", '桌面解题页');

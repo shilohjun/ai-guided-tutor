@@ -289,6 +289,18 @@ describe('前端 · 四步流程契约（新版单文件）', () => {
     assert(/touch-action:\s*none/.test(style), '把手上要禁止浏览器接管滑动');
   });
 
+  it('快捷问句是一行横滑，不换行、也不把整页撑宽', () => {
+    const style = (html.match(/<style>([\s\S]*?)<\/style>/) || [null, ''])[1];
+    const sugs = style.match(/\.sugs\{([^}]*)\}/);
+    assert(sugs, '要有 .sugs');
+    assert(/flex-wrap:\s*nowrap/.test(sugs[1]), '问句不要折成两行');
+    assert(/overflow-x:\s*auto/.test(sugs[1]), '放不下时在这一行里横滑');
+    assert(/touch-action:\s*pan-x/.test(sugs[1]), '手指要能横着滑');
+    assert(/min-width:\s*0/.test(sugs[1]), '这一行不能按内容把页面撑宽');
+    const foot = style.match(/\.chat-foot\{([^}]*)\}/);
+    assert(foot && /min-width:\s*0/.test(foot[1]), '输入区作为弹性子项也要能收缩');
+  });
+
   it('第 2 页：自主训练默认选中并标"推荐"，AI 伴学禁用并标"暂未更新"', () => {
     const selfAt = page2.indexOf('data-mode="self"');
     const aiAt = page2.indexOf('data-mode="ai"');
