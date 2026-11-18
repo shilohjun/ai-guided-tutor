@@ -28,11 +28,6 @@
   var ux = oneOf(q.get('ux'), ['s', 'm', 'l']) || oneOf(read('bsj-ux'), ['s', 'm', 'l']) || 'm';
   root.setAttribute('data-ux', ux);
 
-  /* 窄屏题目长短：没存过就是短。只读 sessionStorage，不在首屏写入。 */
-  var stem = 'short';
-  try { if (sessionStorage.getItem('bsj-stem-len') === 'full') stem = 'full'; } catch (e) {}
-  root.setAttribute('data-stem', stem);
-
   window.__PREF__ = pref;
   window.__UX__ = ux;
 })();
@@ -1070,18 +1065,8 @@ body.is-qb{overflow:hidden}
 }
 .pane-body{flex:1;min-height:0;padding:16px}
 
-/* 窄屏题目：默认两行缩略。桌面不显示这组控件，左栏仍是整题。 */
-.stem-len,.stem-full,.stem-bar{display:none}
-.stem-bar{
-  align-items:flex-start;gap:8px;width:100%;
-  padding:8px 16px 12px;text-align:left;color:var(--ink-2);
-}
-.stem-bar span{
-  flex:1;min-width:0;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
-  font-size:var(--fs-body);line-height:var(--lh-body);text-align:left;
-}
-.stem-bar em{flex:none;font-style:normal;font-weight:600;font-size:var(--fs-meta);color:var(--brand-ink);line-height:var(--lh-body)}
+/* 窄屏才出现「展开全部」。桌面左栏本来就是整题。 */
+.stem-open{display:none}
 .stem-mask{position:fixed;inset:0;z-index:60;background:rgba(17,17,22,.40)}
 .stem-mask[hidden],.stem-pop[hidden]{display:none}
 .stem-pop{
@@ -1094,8 +1079,7 @@ body.is-qb{overflow:hidden}
 .stem-pop-head h2{font-size:var(--fs-sub);font-weight:700;line-height:var(--lh-sub)}
 .stem-pop-head p{margin-top:4px;font-size:var(--fs-meta);color:var(--ink-3)}
 .stem-pop-head .icon-btn{margin-left:auto}
-.stem-pop-xp{flex:none;padding:8px 16px 0}
-.stem-pop-body{flex:1;min-height:0;padding:8px 16px 16px}
+.stem-pop-body{flex:1;min-height:0;padding:16px}
 
 /* 左栏题目 */
 .q-rich img.qf{display:inline-block;vertical-align:-0.22em;margin:0 2px;max-width:100%;height:auto}
@@ -1442,18 +1426,17 @@ body.resizing *{cursor:col-resize !important}
 /* 小屏兜底 */
 @media (max-width:760px){
   .brand-sub,.pstep .lbl{display:none}
-  /* 题目按内容撑高，对话吃掉剩下的高度。不再对半切。 */
-  .work{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);grid-template-areas:"problem" "chat"}
-  #problemPane{grid-area:problem}
-  #chatPane{grid-area:chat}
-  .splitter{display:none}
+  /* 题目高度由 --stem-h 连续决定，默认大约两行。中间那条是可拖的把手。 */
+  .work{grid-template-columns:1fr;grid-template-rows:auto 44px minmax(0,1fr);grid-template-areas:"problem" "split" "chat"}
+  #problemPane{grid-area:problem;height:var(--stem-h,112px)}
+  #problemPane .pane-body{padding:8px 16px}
+  #splitter{grid-area:split;display:flex;align-items:center;justify-content:center;height:44px;min-height:44px;touch-action:none;cursor:row-resize}
+  #splitter::before{width:48px;height:4px}
+  #chatPane{grid-area:chat;min-height:0}
   #problemPane .pane-head .tag{display:none}
-  .stem-len{display:flex;margin-left:auto}
-  .stem-full{display:inline-flex}
-  html[data-stem="short"] #problemPane .pane-body{display:none}
-  html[data-stem="short"] .stem-bar{display:flex}
-  html[data-stem="full"] #problemPane{max-height:38vh}
-  html[data-stem="full"] #problemPane .pane-body{flex:1;min-height:0}
+  .stem-open{display:inline-flex;margin-left:auto}
+  body.resizing-y{cursor:row-resize;user-select:none}
+  body.resizing-y *{cursor:row-resize !important}
   .metrics{grid-template-columns:1fr}
   /**
    * 顶栏原来是三栏等分网格：中间步骤条是 auto 宽度，窄屏下它和右边的模式开关
@@ -1947,22 +1930,14 @@ body[data-guide="1"] .p1-down{display:none}
         <div class="pane-head">
           <strong>题目</strong>
           <div class="xp" id="xp" aria-label="解题进度"></div>
-          <div class="seg stem-len" id="stemLen" role="group" aria-label="题目显示长短">
-            <button type="button" data-stem="short" aria-pressed="true">短</button>
-            <button type="button" data-stem="full" aria-pressed="false">展开</button>
-          </div>
-          <button class="btn-ghost stem-full" id="stemOpen" type="button">全文</button>
+          <button class="btn-ghost stem-open" id="stemOpen" type="button">展开全部</button>
           <span class="tag" id="qKind">计算题</span>
           <span class="tag" id="qTopic">牛顿第二定律</span>
         </div>
-        <button class="stem-bar" id="stemBar" type="button" aria-label="查看完整题目">
-          <span id="stemPreview">—</span>
-          <em>全文</em>
-        </button>
         <div class="pane-body scroller" id="leftBody"></div>
       </section>
 
-      <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" aria-valuenow="50" tabindex="0" aria-label="拖动调整左右宽度"></div>
+      <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" aria-valuenow="50" aria-valuemin="28" aria-valuemax="72" tabindex="0" aria-label="拖动调整左右宽度"></div>
 
       <section class="pane" id="chatPane">
         <div class="pane-head">
@@ -2145,7 +2120,6 @@ body[data-guide="1"] .p1-down{display:none}
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </div>
-      <div class="stem-pop-xp" id="stemPopXp" aria-label="解题进度"></div>
       <div class="stem-pop-body scroller" id="stemPopBody"></div>
     </div>
 
@@ -3134,22 +3108,35 @@ body[data-guide="1"] .p1-down{display:none}
   }
 
   /* ---------------- 页面三：左栏 ---------------- */
-  var STEM_KEY = 'bsj-stem-len';
+  /** 窄屏题目高度（像素）。没存过就用样式里的默认两行。对话、报告入口和输入要留得住。 */
+  var STEM_H_KEY = 'bsj-stem-h';
+  var STEM_MIN = 112;
+  var CHAT_MIN = 240;
 
-  function stemPlain(q) {
-    return String((q && q.stem) || '').replace(/\s+/g, ' ').trim();
+  function phoneStem() {
+    return window.matchMedia('(max-width: 760px)').matches;
   }
 
-  /** 窄屏题目长短。没存过、或存了别的值，都是短。桌面不看这个属性。 */
-  function applyStemLen(mode, persist) {
-    mode = mode === 'full' ? 'full' : 'short';
-    document.documentElement.setAttribute('data-stem', mode);
-    $$('#stemLen [data-stem]').forEach(function (b) {
-      b.setAttribute('aria-pressed', String(b.getAttribute('data-stem') === mode));
-    });
-    if (persist) {
-      try { sessionStorage.setItem(STEM_KEY, mode); } catch (e) {}
+  function stemMax() {
+    var h = (work && work.clientHeight) || 0;
+    return Math.max(STEM_MIN, h - 44 - CHAT_MIN);
+  }
+
+  function applyStemH(px, persist) {
+    var max = stemMax();
+    px = Math.round(Math.min(max, Math.max(STEM_MIN, Number(px) || STEM_MIN)));
+    document.documentElement.style.setProperty('--stem-h', px + 'px');
+    if (phoneStem() && splitter) {
+      splitter.setAttribute('aria-orientation', 'horizontal');
+      splitter.setAttribute('aria-label', '拖动调整题目高度');
+      splitter.setAttribute('aria-valuemin', String(STEM_MIN));
+      splitter.setAttribute('aria-valuemax', String(max));
+      splitter.setAttribute('aria-valuenow', String(px));
     }
+    if (persist) {
+      try { sessionStorage.setItem(STEM_H_KEY, String(px)); } catch (e) {}
+    }
+    return px;
   }
 
   function openStemPop() {
@@ -3157,7 +3144,6 @@ body[data-guide="1"] .p1-down{display:none}
     var body = $('#leftBody');
     if (!pop || !body) return;
     $('#stemPopBody').innerHTML = body.innerHTML;
-    $('#stemPopXp').innerHTML = ($('#xp') && $('#xp').innerHTML) || '';
     var meta = [];
     if ($('#qKind') && $('#qKind').textContent && $('#qKind').textContent !== '—') meta.push($('#qKind').textContent);
     if ($('#qTopic') && $('#qTopic').textContent && $('#qTopic').textContent !== '—') meta.push($('#qTopic').textContent);
@@ -3179,8 +3165,6 @@ body[data-guide="1"] .p1-down{display:none}
     var body = $('#leftBody');
     if (!body) return;
     var q = S.problem;
-    var preview = $('#stemPreview');
-    if (preview) preview.textContent = stemPlain(q) || '还没有题目';
     if (!q) {
       body.innerHTML = '<div class="pane-empty">还没有题目。<br>回第 1 页选一道库里的题，或把你的题粘贴进来。</div>';
       $('#qKind').textContent = '—';
@@ -3243,15 +3227,11 @@ body[data-guide="1"] .p1-down{display:none}
     if ($('#stemPop') && !$('#stemPop').hidden) openStemPop();
   }
 
-  applyStemLen(document.documentElement.getAttribute('data-stem'), false);
-  if ($('#stemLen')) {
-    $('#stemLen').addEventListener('click', function (e) {
-      var b = e.target.closest('[data-stem]');
-      if (!b) return;
-      applyStemLen(b.getAttribute('data-stem'), true);
-    });
-  }
-  if ($('#stemBar')) $('#stemBar').addEventListener('click', openStemPop);
+  (function () {
+    var saved = 0;
+    try { saved = Number(sessionStorage.getItem(STEM_H_KEY)); } catch (e) {}
+    if (saved) applyStemH(saved, false);
+  })();
   if ($('#stemOpen')) $('#stemOpen').addEventListener('click', openStemPop);
   if ($('#stemPopClose')) $('#stemPopClose').addEventListener('click', closeStemPop);
   if ($('#stemMask')) $('#stemMask').addEventListener('click', closeStemPop);
@@ -3578,43 +3558,83 @@ body[data-guide="1"] .p1-down{display:none}
 
   /* ---------------- 分栏拖拽 ---------------- */
   var dragging = false;
+  var dragMode = 'x';
+  var dragStartY = 0;
+  var dragStartH = 0;
   var splitRaf = 0;
+  var problemPane = $('#problemPane');
   function setSplit(pct) {
     pct = Math.min(72, Math.max(28, pct));
     work.style.setProperty('--split', pct + '%');
-    splitter.setAttribute('aria-valuenow', String(Math.round(pct)));
+    if (!phoneStem()) {
+      splitter.setAttribute('aria-orientation', 'vertical');
+      splitter.setAttribute('aria-label', '拖动调整左右宽度');
+      splitter.setAttribute('aria-valuemin', '28');
+      splitter.setAttribute('aria-valuemax', '72');
+      splitter.setAttribute('aria-valuenow', String(Math.round(pct)));
+    }
     // 左栏变宽/变窄，能塞下的步骤数就变了 —— 下帧重算一次，不要在拖拽里逐像素算
     if (S.page === 3 && !splitRaf) {
       splitRaf = requestAnimationFrame(function () { splitRaf = 0; renderXP(); });
     }
   }
-  splitter.addEventListener('pointerdown', function (e) {
+  function onSplitDown(e) {
     dragging = true;
+    dragMode = phoneStem() ? 'y' : 'x';
+    if (dragMode === 'y' && problemPane) dragStartH = problemPane.getBoundingClientRect().height;
+    dragStartY = e.clientY;
     splitter.classList.add('is-drag');
-    document.body.classList.add('resizing');
+    document.body.classList.add(dragMode === 'y' ? 'resizing-y' : 'resizing');
     try { splitter.setPointerCapture(e.pointerId); } catch (err) {}
     e.preventDefault();
-  });
-  splitter.addEventListener('pointermove', function (e) {
+  }
+  function onSplitMove(e) {
     if (!dragging) return;
+    if (dragMode === 'y') {
+      applyStemH(dragStartH + (e.clientY - dragStartY), false);
+      e.preventDefault();
+      return;
+    }
     var r = work.getBoundingClientRect();
     setSplit(((e.clientX - r.left) / r.width) * 100);
-  });
+  }
   function endDrag() {
+    if (dragging && dragMode === 'y' && problemPane) {
+      applyStemH(problemPane.getBoundingClientRect().height, true);
+    }
     dragging = false;
     splitter.classList.remove('is-drag');
     document.body.classList.remove('resizing');
+    document.body.classList.remove('resizing-y');
   }
+  splitter.addEventListener('pointerdown', onSplitDown, { passive: false });
+  splitter.addEventListener('pointermove', onSplitMove, { passive: false });
+  splitter.addEventListener('touchmove', function (e) {
+    if (dragging && dragMode === 'y') e.preventDefault();
+  }, { passive: false });
   splitter.addEventListener('pointerup', endDrag);
   splitter.addEventListener('pointercancel', endDrag);
-  splitter.addEventListener('dblclick', function () { setSplit(50); });
+  splitter.addEventListener('dblclick', function () {
+    if (phoneStem()) applyStemH(STEM_MIN, true);
+    else setSplit(50);
+  });
   splitter.addEventListener('keydown', function (e) {
+    if (phoneStem()) {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      e.preventDefault();
+      var now = problemPane ? problemPane.getBoundingClientRect().height : STEM_MIN;
+      applyStemH(now + (e.key === 'ArrowDown' ? 16 : -16), true);
+      return;
+    }
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     e.preventDefault();
     var cur = parseFloat(splitter.getAttribute('aria-valuenow')) || 50;
     setSplit(cur + (e.key === 'ArrowLeft' ? -2 : 2));
   });
-  window.addEventListener('resize', function () { if (S.page === 3) renderXP(); });
+  window.addEventListener('resize', function () {
+    if (S.page === 3) renderXP();
+    if (phoneStem() && problemPane) applyStemH(problemPane.getBoundingClientRect().height, false);
+  });
 
   /* ---------------- 页面四：学习报告（/api/report） ---------------- */
   function loadReport() {

@@ -160,7 +160,7 @@ const MEASURE = `(() => {
     setModeDisplay: setMode ? getComputedStyle(setMode).display : null,
     report: pack(btn, fr),
     step4: pack(step, fr),
-    stem: doc ? doc.documentElement.getAttribute('data-stem') : null,
+    stemH: doc ? (doc.documentElement.style.getPropertyValue('--stem-h') || '').trim() : null,
     problemH: doc && doc.querySelector('#problemPane') ? Math.round(doc.querySelector('#problemPane').getBoundingClientRect().height) : null,
     chatH: doc && doc.querySelector('#chatPane') ? Math.round(doc.querySelector('#chatPane').getBoundingClientRect().height) : null,
     viewportH: vh
@@ -232,21 +232,44 @@ const MEASURE = `(() => {
   measures['pilot-430-after-chat'] = await evaluate(cdp, MEASURE);
 
   await setPhone(cdp, 390, 844);
+  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
   await sleep(300);
-  await evaluate(cdp, "document.querySelector('#frame').contentDocument.querySelector('#stemBar').click()");
+  const beforeDrag = await evaluate(cdp, `(() => {
+    const frame = document.querySelector('#frame').getBoundingClientRect();
+    const doc = document.querySelector('#frame').contentDocument;
+    const s = doc.querySelector('#splitter').getBoundingClientRect();
+    const p = doc.querySelector('#problemPane').getBoundingClientRect();
+    return { x: frame.x + s.x + s.width / 2, y: frame.y + s.y + s.height / 2, problemH: p.height };
+  })()`);
+  const dragTo = beforeDrag.y + 140;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: beforeDrag.x, y: beforeDrag.y, id: 1 }] });
+  await sleep(80);
+  for (let step = 1; step <= 7; step++) {
+    const y = beforeDrag.y + (140 * step) / 7;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: beforeDrag.x, y, id: 1 }] });
+    await sleep(40);
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await sleep(300);
+  measures['pilot-390-before-drag'] = beforeDrag;
+  measures['pilot-390-after-drag'] = await evaluate(cdp, MEASURE);
+  const afterH = measures['pilot-390-after-drag'].problemH;
+  if (!(afterH > beforeDrag.problemH + 40)) {
+    throw new Error('触摸拖拽没有把题目拉高：' + beforeDrag.problemH + ' -> ' + afterH);
+  }
+  await save('G-pilot-stem-dragged-390.png');
+
+  await evaluate(cdp, "document.querySelector('#frame').contentDocument.querySelector('#stemOpen').click()");
   await waitUntil(cdp, "!document.querySelector('#frame').contentDocument.querySelector('#stemPop').hidden", '题目弹层');
   await sleep(300);
-  measures['pilot-390-stem-pop'] = await evaluate(cdp, MEASURE);
+  measures['pilot-390-stem-pop'] = await evaluate(cdp, `(() => {
+    const doc = document.querySelector('#frame').contentDocument;
+    const body = doc.querySelector('#stemPopBody').innerText || '';
+    return { hasStepDots: !!doc.querySelector('#stemPopXp') || !!doc.querySelector('#stemPop .xp-dot'), text: body.slice(0, 80) };
+  })()`);
   await save('F-pilot-stem-pop-390.png');
   await evaluate(cdp, "document.querySelector('#frame').contentDocument.querySelector('#stemPopClose').click()");
   await waitUntil(cdp, "document.querySelector('#frame').contentDocument.querySelector('#stemPop').hidden", '关上题目弹层');
-  await evaluate(cdp, "document.querySelector('#frame').contentDocument.querySelector('#stemLen [data-stem=\"full\"]').click()");
-  await waitUntil(cdp, "document.querySelector('#frame').contentDocument.documentElement.getAttribute('data-stem') === 'full'", '展开题目');
-  await sleep(300);
-  measures['pilot-390-stem-full'] = await evaluate(cdp, MEASURE);
-  await save('G-pilot-stem-full-390.png');
-  await evaluate(cdp, "document.querySelector('#frame').contentDocument.querySelector('#stemLen [data-stem=\"short\"]').click()");
-  await waitUntil(cdp, "document.querySelector('#frame').contentDocument.documentElement.getAttribute('data-stem') === 'short'", '回到短题');
 
   await evaluate(cdp, "document.querySelector('#out').click()");
   await waitUntil(cdp, "!document.querySelector('#endAsk').hidden", '结束确认');

@@ -263,30 +263,30 @@ describe('前端 · 四步流程契约（新版单文件）', () => {
     assert(/overflow:\s*hidden/.test(stepperBody), '放不下时收连接线，不要把第 4 步滚出屏幕');
   });
 
-  it('窄屏题目默认是两行短条，全文在弹层里，长短记在这次访问', () => {
-    assertIncludes(html, 'id="stemLen"', '要有长短切换');
-    assertIncludes(html, 'id="stemBar"', '短态要有可点的题干条');
-    assertIncludes(html, 'id="stemPop"', '完整题目要有弹层');
-    assertIncludes(html, 'id="problemPane"', '题目栏要能单独量高度');
-    assertIncludes(html, 'id="chatPane"', '对话栏要能单独量高度');
-    assertIncludes(html, '>短<', '短是默认档的名字');
-    assertIncludes(html, '>展开<', '展开是页内加长的名字');
-    assertIncludes(appJs, 'bsj-stem-len', '偏好要有稳定的键');
-    assertIncludes(appJs, 'sessionStorage.setItem(STEM_KEY', '长短记在这次访问里，不写进长期偏好');
-    assertIncludes(appJs, "mode === 'full' ? 'full' : 'short'", '没存过或存了别的值都回到短');
-    const boot = html.slice(0, html.indexOf('<style>'));
-    assertIncludes(boot, 'bsj-stem-len', '首屏就要读长短，避免先画出半屏题目');
-    assertIncludes(boot, "stem = 'short'", '首屏默认是短');
-    assertNotIncludes(boot, 'setItem', '首屏只读、不写');
+  it('窄屏题目用拖把手连续调高度，全文只留一个弹层入口', () => {
+    assertNotIncludes(html, 'id="stemLen"', '不再用短/展开开关');
+    assertNotIncludes(html, 'id="stemBar"', '题干末尾不再另放一个全文');
+    assertNotIncludes(html, 'id="stemPopXp"', '弹层里不放步骤圆点');
+    assertIncludes(html, 'id="stemOpen"', '要有一个打开全文的按钮');
+    assertIncludes(html, '>展开全部<', '按钮文案是「展开全部」');
+    assertEquals((html.match(/>全文</g) || []).length, 0, '「全文」不要再出现第二次');
+    assertIncludes(html, 'id="stemPop"', '完整题目仍是弹层');
+    assertIncludes(html, 'id="splitter"', '题目和对话之间要有可拖的分隔');
+    assertIncludes(appJs, 'bsj-stem-h', '拖过的高度记在这次访问里');
+    assertIncludes(appJs, 'sessionStorage.setItem(STEM_H_KEY', '只在松手时写入，不写进长期偏好');
+    assertIncludes(appJs, "addEventListener('pointerdown'", '鼠标和触摸都走 pointer');
+    assertIncludes(appJs, "addEventListener('touchmove'", 'iOS 上还要拦住 touchmove');
+    assertIncludes(appJs, '{ passive: false }', 'preventDefault 必须能生效');
     const style = (html.match(/<style>([\s\S]*?)<\/style>/) || [null, ''])[1];
     assert(
-      /@media \(max-width:760px\)\{[\s\S]*?grid-template-rows:\s*auto minmax\(0,\s*1fr\)/.test(style),
-      '窄屏题目按内容撑高，对话占剩余高度，不再对半切',
+      /@media \(max-width:760px\)\{[\s\S]*?#problemPane\{[^}]*height:\s*var\(--stem-h,\s*112px\)/.test(style),
+      '窄屏题目默认大约两行，高度连续可变',
     );
     assert(
-      /html\[data-stem="short"\] #problemPane \.pane-body\{display:\s*none\}/.test(style),
-      '短态不把整题留在页面上',
+      /#splitter\{[^}]*min-height:\s*44px/.test(style),
+      '拖把手的可点高度至少 44px',
     );
+    assert(/touch-action:\s*none/.test(style), '把手上要禁止浏览器接管滑动');
   });
 
   it('第 2 页：自主训练默认选中并标"推荐"，AI 伴学禁用并标"暂未更新"', () => {
