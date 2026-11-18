@@ -155,6 +155,25 @@ body{
   #helloCard,#doneCard{padding:22px 18px 16px}
   #helloCard h1{font-size:18px}
 }
+/* 结束前先问要不要看报告。两颗按钮都要在第一屏里，不靠系统 confirm 的「确定/取消」。 */
+#endAsk{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:16px}
+#endAskMask{position:absolute;inset:0;background:rgba(17,17,22,.40)}
+#endAskCard{
+  position:relative;width:100%;max-width:360px;background:var(--card);
+  border:1px solid var(--line);border-radius:16px;padding:20px 16px 12px;
+}
+#endAskTitle{margin:0 0 6px;font-size:18px;line-height:1.3}
+#endAskCopy{margin:0 0 12px;font-size:13px;line-height:1.7;color:var(--ink-2)}
+#endAskReport,#endAskEnd,#endAskStay{
+  display:block;width:100%;margin-top:8px;padding:11px;font:inherit;font-size:15px;
+  border-radius:10px;cursor:pointer;
+}
+#endAskReport{color:#fff;background:var(--brand);border:0}
+#endAskReport:hover{background:#2a6353}
+#endAskEnd{color:var(--ink);background:var(--card);border:1px solid var(--line)}
+#endAskEnd:hover{border-color:#d6cfc3}
+#endAskStay{color:var(--ink-2);background:none;border:0;padding:8px}
+#endAskStay:hover{color:var(--ink)}
 </style>
 </head>
 <body>
@@ -222,6 +241,17 @@ body{
   <div id="frameBox"></div>
 </div>
 
+<div id="endAsk" hidden>
+  <div id="endAskMask"></div>
+  <div id="endAskCard" role="dialog" aria-modal="true" aria-labelledby="endAskTitle">
+    <h2 id="endAskTitle">先看学习报告？</h2>
+    <p id="endAskCopy">这次还没打开学习报告。可以先看报告，也可以直接结束并领取完成码。</p>
+    <button id="endAskReport" type="button">查看报告</button>
+    <button id="endAskEnd" type="button">直接结束</button>
+    <button id="endAskStay" type="button">取消</button>
+  </div>
+</div>
+
 <!--
   成品页放在 <template> 里：登录之前**一个字节都不加载**。
 
@@ -261,7 +291,7 @@ body{
     visitId: '', stems: {},
     page: 0, intake: '',
     queue: [], timer: null, eventsSent: 0, eventsLost: 0, chatTurns: 0,
-    slowTimer: null, observer: null, expired: false
+    slowTimer: null, observer: null, expired: false, reportSeen: false
   };
 
   var gate = document.getElementById('gate');
@@ -288,6 +318,11 @@ body{
   var fatal = document.getElementById('fatal');
   var slow = document.getElementById('slow');
   var frameTpl = document.getElementById('frameTpl');
+  var endAsk = document.getElementById('endAsk');
+  var endAskReport = document.getElementById('endAskReport');
+  var endAskEnd = document.getElementById('endAskEnd');
+  var endAskStay = document.getElementById('endAskStay');
+  var endAskMask = document.getElementById('endAskMask');
 
   /* =====================================================================
      1. 小工具
@@ -437,6 +472,7 @@ body{
     S.eventsSent = 0;
     S.eventsLost = 0;
     S.chatTurns = 0;
+    S.reportSeen = false;
     if (S.observer) { try { S.observer.disconnect(); } catch (e) {} S.observer = null; }
   }
 
@@ -647,10 +683,36 @@ body{
    * 弹一次确认，是因为误触的代价很贵（这一次结束了，码就定了）；
    * 而"没点结束就离开"有服务端的宽限兜底（见 usage.js）。
    */
+  function closeEndAsk() {
+    if (endAsk) endAsk.hidden = true;
+  }
+
+  function openEndAsk() {
+    if (!endAsk) return;
+    endAsk.hidden = false;
+    try { endAskReport.focus(); } catch (e) {}
+  }
+
+  /** 点产品页步骤条的第 4 步。页码切换仍由成品页自己的 data-goto 处理。 */
+  function revealReport() {
+    closeEndAsk();
+    var frame = document.getElementById('frame');
+    var doc = frame && frame.contentDocument;
+    var step = doc && doc.querySelector('.pstep[data-goto="4"]');
+    if (step && typeof step.click === 'function') step.click();
+  }
+
   function endUsageNow() {
     if (!S.visitId) { showHello(); return; }
+    if (!S.reportSeen) { openEndAsk(); return; }
     var ok = window.confirm('结束后这一次就结束了，会给你一个完成码。确定吗？');
     if (!ok) return;
+    finishUsage();
+  }
+
+  function finishUsage() {
+    if (!S.visitId) { showHello(); return; }
+    closeEndAsk();
 
     flush();
     outBtn.disabled = true;
@@ -682,6 +744,7 @@ body{
 
   function showDone(code, summary) {
     /** 这一次已经结束：埋点就此停下，别再把后续操作记到这一条上 */
+    closeEndAsk();
     S.expired = true;
     S.queue.length = 0;
     clearStage();
@@ -1021,6 +1084,7 @@ body{
         send('page_exit', { page: S.page, via: via });
       }
       S.page = known ? page : 0;
+      if (known && page === 4) S.reportSeen = true;
       if (known) send('page_enter', { page: page });
     }
     S.observer = new w.MutationObserver(sync);
@@ -1162,6 +1226,13 @@ body{
   }
 
   outBtn.addEventListener('click', endUsageNow);
+  if (endAskReport) endAskReport.addEventListener('click', revealReport);
+  if (endAskEnd) endAskEnd.addEventListener('click', finishUsage);
+  if (endAskStay) endAskStay.addEventListener('click', closeEndAsk);
+  if (endAskMask) endAskMask.addEventListener('click', closeEndAsk);
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape' && endAsk && !endAsk.hidden) closeEndAsk();
+  });
 
   /* =====================================================================
      7. 启动

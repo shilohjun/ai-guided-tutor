@@ -205,6 +205,64 @@ describe('前端 · 四步流程契约（新版单文件）', () => {
     assert(!/disabled/.test(stepper), '步骤条不该再禁用任何一页 —— 没数据就进空态，不能把人弹回去');
   });
 
+  /**
+   * 手机上「查看学习报告」原先只在做完之后、而且画在对话滚动区里。
+   * 窄屏第一屏看不到它，学生只能结束使用。入口要在有过一轮真实对话后就常驻，
+   * 做完再强调，并且不靠把步骤条的滚动条藏起来才露出第 4 步。
+   */
+  it('解题页在至少一轮真实对话后就给出「查看报告」，做完再强调', () => {
+    assertIncludes(html, 'id="viewReportBtn"', '解题页要有稳定的查看报告按钮');
+    assertIncludes(html, '>查看报告<', '按钮必须带文字「查看报告」，不能只是图标');
+    assertIncludes(html, 'id="solveReport"', '入口要有自己的一块，不能只塞在对话气泡滚动区里');
+    const fnStart = appJs.indexOf('function syncSolveChrome');
+    const fnEnd = appJs.indexOf('function msgHtml');
+    assert(fnStart > 0 && fnEnd > fnStart, 'syncSolveChrome 应当存在，并且写在 msgHtml 之前');
+    const fn = appJs.slice(fnStart, fnEnd);
+    assertIncludes(fn, "m.role === 'me'", '有学生发出的一轮才算真实对话，不能一进解题页就亮');
+    assertIncludes(fn, '已完成，可查看报告', '做完后要在入口旁写明可以看报告');
+    assertIncludes(fn, 'btn-primary', '做完后入口要用主按钮强调');
+    assert(
+      !/if\s*\(\s*S\.done\s*\)[\s\S]{0,80}solveReport/.test(fn),
+      '常驻入口不能包在 if (S.done) 里 —— 没做完也要能点开报告',
+    );
+  });
+
+  it('做完后停用对话输入，并写明可以查看报告或重做', () => {
+    const fnStart = appJs.indexOf('function syncSolveChrome');
+    const fnEnd = appJs.indexOf('function msgHtml');
+    const fn = appJs.slice(fnStart, fnEnd);
+    assertIncludes(fn, '本题已完成，可以查看报告或重做', '完成态要有一句看得见的说明，不能只是发送没反应');
+    assertIncludes(fn, '.disabled = locked', '输入、发送和附件入口要跟着完成态停用');
+    assertIncludes(html, 'id="solveDoneHint"', '完成说明要有稳定落点，不能只改 placeholder');
+    assertIncludes(html, 'id="input3"', '对话输入框还在');
+  });
+
+  it('窄屏把模式开关收进设置，步骤条不再靠藏起来的横向滚动', () => {
+    assertIncludes(html, 'id="setModeSwitch"', '设置里要有一份模式开关，窄屏顶栏才腾得出第 4 步');
+    assertIncludes(html, 'id="setMode"', '模式开关要包在设置分组里');
+    const style = (html.match(/<style>([\s\S]*?)<\/style>/) || [null, ''])[1];
+    assert(
+      /@media \(max-width:760px\)\{[\s\S]*?#modeSwitch\{[^}]*display:\s*none\s*!important/.test(style),
+      '≤760px 顶栏里的「自主训练 / AI 伴学」必须让开',
+    );
+    assert(
+      /@media \(max-width:760px\)\{[\s\S]*?\.set-mode\{[^}]*display:\s*flex/.test(style),
+      '同一档宽度下，模式开关要出现在齿轮菜单里',
+    );
+    let stepperBody = '';
+    const mediaRe = /@media \(max-width:760px\)\{/g;
+    let mediaHit;
+    while ((mediaHit = mediaRe.exec(style))) {
+      const slice = style.slice(mediaHit.index, mediaHit.index + 1600);
+      const rule = slice.match(/\.stepper\{([^}]*)\}/);
+      if (rule) { stepperBody = rule[1]; break; }
+    }
+    assert(stepperBody, '窄屏应当有一条 .stepper 规则');
+    assert(!/scrollbar-width:\s*none/.test(stepperBody), '步骤条不该再把滚动条藏起来');
+    assert(!/overflow-x:\s*auto/.test(stepperBody), '步骤条不该再靠横向滚动才看得到第 4 步');
+    assert(/overflow:\s*hidden/.test(stepperBody), '放不下时收连接线，不要把第 4 步滚出屏幕');
+  });
+
   it('第 2 页：自主训练默认选中并标"推荐"，AI 伴学禁用并标"暂未更新"', () => {
     const selfAt = page2.indexOf('data-mode="self"');
     const aiAt = page2.indexOf('data-mode="ai"');

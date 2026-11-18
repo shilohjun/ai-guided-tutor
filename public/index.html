@@ -1124,6 +1124,15 @@ body.is-qb{overflow:hidden}
 .left-block + .left-block{margin-top:16px;padding-top:16px;border-top:1px dashed var(--line)}
 .done-row{display:flex;justify-content:flex-end;margin:0 0 8px}
 .done-row .btn-primary{padding:8px 16px}
+/* 解题页常驻报告入口：放在对话栏头里，窄屏不再多占一行把回复挤没 */
+.solve-report{flex:none;display:flex;align-items:center;gap:8px;min-width:0}
+.solve-report:not([hidden]){margin-left:auto}
+.solve-report:not([hidden]) + .chat-next{margin-left:0}
+.solve-report-note{margin:0 0 4px;font-size:var(--fs-meta);font-weight:600;line-height:var(--lh-body);color:var(--brand-ink)}
+.solve-done-hint{margin:0 0 8px;font-size:var(--fs-meta);font-weight:600;line-height:var(--lh-body);color:var(--brand-ink)}
+.chat-foot .icon-btn:disabled,
+.composer.sm .send-btn:disabled{opacity:.45;cursor:not-allowed}
+.composer.sm textarea:disabled{color:var(--ink-3);cursor:not-allowed}
 
 /* 分隔条 */
 .splitter{
@@ -1146,7 +1155,7 @@ body.resizing{cursor:col-resize;user-select:none}
 body.resizing *{cursor:col-resize !important}
 
 /* 右栏对话 */
-.chat-wrap{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 24px;padding-right:8px}
+.chat-wrap{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 24px;grid-template-rows:minmax(0,1fr);padding-right:8px;overflow:hidden}
 .chat-body{padding:16px 8px 16px 16px;display:flex;flex-direction:column;min-height:0}
 .msg{display:flex;gap:8px;margin-bottom:16px;animation:msgIn .22s ease both}
 .msg:last-child{margin-bottom:4px}
@@ -1407,16 +1416,20 @@ body.resizing *{cursor:col-resize !important}
   /**
    * 顶栏原来是三栏等分网格：中间步骤条是 auto 宽度，窄屏下它和右边的模式开关
    * 谁都不肯让，"1fr" 的两侧被压成 0 —— 品牌名竖着排、整页横向溢出。
-   * 窄屏改成 flex：两侧固定，步骤条可横向滚（它是唯一该让位的东西）。
+   * 窄屏改成 flex：两侧固定。模式开关收进齿轮，步骤条用可收缩的连接线，第 4 步留在屏内。
    */
   .topbar{display:flex;padding:0 16px;gap:8px}
   .tb-left,.tb-right{flex:none}
   .tb-div{display:none}
+  /* 模式开关让到齿轮里，步骤条才放得下第 4 步。连接线可缩，圆点不滚出屏幕。 */
+  #modeSwitch{display:none !important}
+  .tb-center{flex:1 1 auto;min-width:0}
   .stepper{
-    flex:1;min-width:0;justify-content:flex-start;
-    overflow-x:auto;scrollbar-width:none;
+    flex:1;min-width:0;width:100%;justify-content:flex-start;
+    overflow:hidden;
   }
-  .stepper::-webkit-scrollbar{display:none}
+  .pstep{flex:none;padding:4px 4px;gap:4px}
+  .pstep-line{flex:1 1 8px;width:auto;min-width:4px;max-width:16px;margin:0 2px}
   .brand-name{white-space:nowrap}
   .p1,.p2-col,.p3,.p4,.p5{padding-left:16px;padding-right:16px}
   .work{padding:16px}
@@ -1505,6 +1518,10 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
 .set-ticks{display:flex;justify-content:space-between;font-size:var(--fs-meta);color:var(--ink-3);font-weight:600}
 .set-ticks .is-on{color:var(--brand-ink)}
 
+/* 窄屏才把做题方式放进齿轮；桌面仍用顶栏那一枚 */
+.set-mode{display:none}
+.set-mode-seg{display:grid;grid-template-columns:1fr 1fr;width:100%}
+
 /* 小屏：贴底整宽抽屉。必须排在基础规则之后，否则桌面数值先到先赢 */
 @media (max-width:760px){
   .set{
@@ -1515,6 +1532,9 @@ html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
   }
   .set-mask{display:block;background:rgba(17,17,22,.40)}
   @keyframes setUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+}
+@media (max-width:760px){
+  .set-mode{display:flex}
 }
 
 /* Report controls stay outside the report's scrolling region. */
@@ -1711,6 +1731,13 @@ body[data-guide="1"] .p1-down{display:none}
 <!-- 设置：主题与字号。桌面锚在齿轮下方，≤760px 变贴底抽屉 -->
 <div class="set-mask" id="setMask" hidden></div>
 <div class="set" id="setPop" role="dialog" aria-label="设置" hidden>
+  <div class="set-grp set-mode" id="setMode">
+    <div class="set-label">做题方式</div>
+    <div class="seg set-mode-seg" id="setModeSwitch" role="group" aria-label="模式">
+      <button type="button" data-mode="self" aria-pressed="true">自主训练</button>
+      <button type="button" data-mode="ai" aria-pressed="false" disabled title="AI 伴学暂未上线">AI 伴学</button>
+    </div>
+  </div>
   <div class="set-grp">
     <div class="set-label">主题</div>
     <div class="seg set-seg" id="themeSeg" role="radiogroup" aria-label="主题">
@@ -1891,13 +1918,19 @@ body[data-guide="1"] .p1-down{display:none}
           <strong>对话</strong>
           <button class="chat-mentor" id="chatMentor" type="button" aria-haspopup="dialog" aria-expanded="false" title="换一位陪学老师"></button>
           <span class="tag" id="qIndexTag">0 个提问</span>
-          <span class="tag" id="stepTag">第 1 / 5 步</span><button class="btn-ghost chat-next" id="skipToPractice" type="button">继续练习</button>
+          <span class="tag" id="stepTag">第 1 / 5 步</span>
+          <div class="solve-report" id="solveReport" hidden>
+            <button class="btn-ghost" id="viewReportBtn" type="button" data-goto="4">查看报告</button>
+          </div>
+          <button class="btn-ghost chat-next" id="skipToPractice" type="button">继续练习</button>
         </div>
         <div class="chat-wrap">
           <div class="chat-body scroller" id="chatBody"></div>
           <div class="rail" id="rail" aria-label="提问索引"></div>
         </div>
         <div class="chat-foot" id="chatFoot">
+          <p class="solve-report-note" id="solveReportNote" hidden>已完成，可查看报告</p>
+          <p class="solve-done-hint" id="solveDoneHint" hidden>本题已完成，可以查看报告或重做</p>
           <div class="sugs" id="sugs"></div>
           <div class="composer sm">
             <div id="attachSlot"></div>
@@ -2653,7 +2686,7 @@ body[data-guide="1"] .p1-down{display:none}
     $$('#modeList .mode-bar').forEach(function (b) {
       b.setAttribute('aria-pressed', String(b.dataset.mode === S.mode));
     });
-    $$('#modeSwitch button').forEach(function (b) {
+    $$('#modeSwitch button, #setModeSwitch button').forEach(function (b) {
       b.setAttribute('aria-pressed', String(b.dataset.mode === S.mode));
     });
   }
@@ -2982,12 +3015,14 @@ body[data-guide="1"] .p1-down{display:none}
     setPage(3);
   }
 
-  $('#modeSwitch').addEventListener('click', function (e) {
+  function onModePick(e) {
     var el = e.target.closest('[data-mode]');
     if (!el || el.disabled) return;
     S.mode = el.dataset.mode;
     paintMode();
-  });
+  }
+  $('#modeSwitch').addEventListener('click', onModePick);
+  $('#setModeSwitch').addEventListener('click', onModePick);
 
   /* ---------------- 会话 ---------------- */
   function prepareLearningSession(original) {
@@ -3181,6 +3216,48 @@ body[data-guide="1"] .p1-down{display:none}
   }
 
   /* ---------------- 页面三：对话 ---------------- */
+  /**
+   * 报告入口与输入框的完成态。
+   * 有过学生自己发出的一轮就显示「查看报告」，不必等 S.done；
+   * 做完之后改成主按钮，并停用输入，避免发送被静默丢掉。
+   */
+  function syncSolveChrome() {
+    var chatted = S.turns.some(function (m) { return m.role === 'me'; });
+    var show = !!(S.problem && chatted);
+    var locked = !!(S.problem && S.done);
+    var bar = $('#solveReport');
+    var note = $('#solveReportNote');
+    var btn = $('#viewReportBtn');
+    var hint = $('#solveDoneHint');
+    var input = $('#input3');
+    var sendBtn = $('#send3');
+    if (bar) bar.hidden = !show;
+    if (note) {
+      note.hidden = !locked;
+      note.textContent = '已完成，可查看报告';
+    }
+    if (btn) {
+      btn.classList.toggle('btn-primary', locked);
+      btn.classList.toggle('btn-ghost', !locked);
+    }
+    if (hint) {
+      hint.hidden = !locked;
+      hint.textContent = '本题已完成，可以查看报告或重做';
+    }
+    if (input) {
+      input.disabled = locked;
+      input.placeholder = locked ? '' : '说说你的下一步…';
+      if (locked) input.value = '';
+    }
+    if (sendBtn) sendBtn.disabled = locked;
+    var sugs = $('#sugs');
+    if (sugs) sugs.hidden = locked;
+    ['#micBtn', '#cam3', '#symBtn3'].forEach(function (sel) {
+      var el = $(sel);
+      if (el) el.disabled = locked;
+    });
+  }
+
   function msgHtml(m, i) {
     if (m.role === 'err') {
       return '<div class="msg err" data-i="' + i + '"><div class="bubble">' +
@@ -3193,6 +3270,7 @@ body[data-guide="1"] .p1-down{display:none}
   }
 
   function renderChat() {
+    syncSolveChrome();
     var body = $('#chatBody');
     if (!S.problem) {
       body.innerHTML = '<div class="chat-empty"><p>还没有开始一道题。</p>' +
@@ -3250,7 +3328,8 @@ body[data-guide="1"] .p1-down{display:none}
     // 自己敲的话交给服务端按语句判断，否则自主训练等于每句都在求助
     var helpFlag = asksHelp === true;
     text = (text || '').trim();
-    if (!text || S.busy || S.done || !S.sessionId || !S.problem) return;
+    if (S.done) { syncSolveChrome(); return; }
+    if (!text || S.busy || !S.sessionId || !S.problem) return;
 
     S.turns.push({ role: 'me', text: text, at: Date.now() });
     $('#input3').value = '';
@@ -4264,6 +4343,20 @@ body[data-guide="1"] .p1-down{display:none}
   var p1El = document.getElementById('p1');
   if (p1El) {
     requestAnimationFrame(function () { p1El.classList.add('p1-ready'); });
+  }
+
+  /**
+   * 本地截图用：?simDone=1 时露出 __bsjMarkDone。
+   * 只改这一页的完成态外观，不写服务端，也不改报告结论。
+   * 离线桩常常不会把题标成做完，截「输入已停用」时由页面里调用它。
+   */
+  if (new URLSearchParams(location.search).get('simDone') === '1') {
+    window.__bsjMarkDone = function () {
+      S.done = true;
+      if (S.max < 4) S.max = 4;
+      renderChat();
+      renderStepper();
+    };
   }
 
   /* 便于逐页评审：/?p=3 之类直接落到某一页（会真实跑一遍读题与会话） */
