@@ -28,6 +28,11 @@
   var ux = oneOf(q.get('ux'), ['s', 'm', 'l']) || oneOf(read('bsj-ux'), ['s', 'm', 'l']) || 'm';
   root.setAttribute('data-ux', ux);
 
+  /* 窄屏题目长短：没存过就是短。只读 sessionStorage，不在首屏写入。 */
+  var stem = 'short';
+  try { if (sessionStorage.getItem('bsj-stem-len') === 'full') stem = 'full'; } catch (e) {}
+  root.setAttribute('data-stem', stem);
+
   window.__PREF__ = pref;
   window.__UX__ = ux;
 })();
@@ -1065,6 +1070,33 @@ body.is-qb{overflow:hidden}
 }
 .pane-body{flex:1;min-height:0;padding:16px}
 
+/* 窄屏题目：默认两行缩略。桌面不显示这组控件，左栏仍是整题。 */
+.stem-len,.stem-full,.stem-bar{display:none}
+.stem-bar{
+  align-items:flex-start;gap:8px;width:100%;
+  padding:8px 16px 12px;text-align:left;color:var(--ink-2);
+}
+.stem-bar span{
+  flex:1;min-width:0;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  font-size:var(--fs-body);line-height:var(--lh-body);text-align:left;
+}
+.stem-bar em{flex:none;font-style:normal;font-weight:600;font-size:var(--fs-meta);color:var(--brand-ink);line-height:var(--lh-body)}
+.stem-mask{position:fixed;inset:0;z-index:60;background:rgba(17,17,22,.40)}
+.stem-mask[hidden],.stem-pop[hidden]{display:none}
+.stem-pop{
+  position:fixed;z-index:61;left:16px;right:16px;top:8vh;bottom:8vh;
+  display:flex;flex-direction:column;min-height:0;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);
+  box-shadow:var(--shadow-2);overflow:hidden;
+}
+.stem-pop-head{flex:none;display:flex;align-items:flex-start;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.stem-pop-head h2{font-size:var(--fs-sub);font-weight:700;line-height:var(--lh-sub)}
+.stem-pop-head p{margin-top:4px;font-size:var(--fs-meta);color:var(--ink-3)}
+.stem-pop-head .icon-btn{margin-left:auto}
+.stem-pop-xp{flex:none;padding:8px 16px 0}
+.stem-pop-body{flex:1;min-height:0;padding:8px 16px 16px}
+
 /* 左栏题目 */
 .q-rich img.qf{display:inline-block;vertical-align:-0.22em;margin:0 2px;max-width:100%;height:auto}
 .q-rich img.qfig{display:block;margin:12px auto;max-width:100%;height:auto;border:1px solid var(--line);border-radius:10px}
@@ -1410,8 +1442,18 @@ body.resizing *{cursor:col-resize !important}
 /* 小屏兜底 */
 @media (max-width:760px){
   .brand-sub,.pstep .lbl{display:none}
-  .work{grid-template-columns:1fr;grid-template-rows:1fr 16px 1fr}
-  .splitter{cursor:row-resize}
+  /* 题目按内容撑高，对话吃掉剩下的高度。不再对半切。 */
+  .work{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);grid-template-areas:"problem" "chat"}
+  #problemPane{grid-area:problem}
+  #chatPane{grid-area:chat}
+  .splitter{display:none}
+  #problemPane .pane-head .tag{display:none}
+  .stem-len{display:flex;margin-left:auto}
+  .stem-full{display:inline-flex}
+  html[data-stem="short"] #problemPane .pane-body{display:none}
+  html[data-stem="short"] .stem-bar{display:flex}
+  html[data-stem="full"] #problemPane{max-height:38vh}
+  html[data-stem="full"] #problemPane .pane-body{flex:1;min-height:0}
   .metrics{grid-template-columns:1fr}
   /**
    * 顶栏原来是三栏等分网格：中间步骤条是 auto 宽度，窄屏下它和右边的模式开关
@@ -1901,19 +1943,28 @@ body[data-guide="1"] .p1-down{display:none}
   <!-- ================= 页面三 ================= -->
   <section class="page" data-page="3">
     <div class="work" id="work" style="--split:50%">
-      <section class="pane">
+      <section class="pane" id="problemPane">
         <div class="pane-head">
           <strong>题目</strong>
           <div class="xp" id="xp" aria-label="解题进度"></div>
+          <div class="seg stem-len" id="stemLen" role="group" aria-label="题目显示长短">
+            <button type="button" data-stem="short" aria-pressed="true">短</button>
+            <button type="button" data-stem="full" aria-pressed="false">展开</button>
+          </div>
+          <button class="btn-ghost stem-full" id="stemOpen" type="button">全文</button>
           <span class="tag" id="qKind">计算题</span>
           <span class="tag" id="qTopic">牛顿第二定律</span>
         </div>
+        <button class="stem-bar" id="stemBar" type="button" aria-label="查看完整题目">
+          <span id="stemPreview">—</span>
+          <em>全文</em>
+        </button>
         <div class="pane-body scroller" id="leftBody"></div>
       </section>
 
       <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" aria-valuenow="50" tabindex="0" aria-label="拖动调整左右宽度"></div>
 
-      <section class="pane">
+      <section class="pane" id="chatPane">
         <div class="pane-head">
           <strong>对话</strong>
           <button class="chat-mentor" id="chatMentor" type="button" aria-haspopup="dialog" aria-expanded="false" title="换一位陪学老师"></button>
@@ -2083,6 +2134,21 @@ body[data-guide="1"] .p1-down{display:none}
     </div>
 
     <!-- 选老师：第 2 页的大框与第 3 页栏头共用这一层 -->
+    <div class="stem-mask" id="stemMask" hidden></div>
+    <div class="stem-pop" id="stemPop" role="dialog" aria-modal="true" aria-labelledby="stemPopTitle" hidden>
+      <div class="stem-pop-head">
+        <div>
+          <h2 id="stemPopTitle">题目</h2>
+          <p id="stemPopMeta">—</p>
+        </div>
+        <button class="icon-btn" id="stemPopClose" type="button" aria-label="关闭题目">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="stem-pop-xp" id="stemPopXp" aria-label="解题进度"></div>
+      <div class="stem-pop-body scroller" id="stemPopBody"></div>
+    </div>
+
     <div class="mentor-mask" id="mentorMask" hidden></div>
     <div class="mentor" id="mentorDlg" role="dialog" aria-modal="true" aria-labelledby="mentorTitle" hidden>
       <div class="mentor-head">
@@ -3068,10 +3134,53 @@ body[data-guide="1"] .p1-down{display:none}
   }
 
   /* ---------------- 页面三：左栏 ---------------- */
+  var STEM_KEY = 'bsj-stem-len';
+
+  function stemPlain(q) {
+    return String((q && q.stem) || '').replace(/\s+/g, ' ').trim();
+  }
+
+  /** 窄屏题目长短。没存过、或存了别的值，都是短。桌面不看这个属性。 */
+  function applyStemLen(mode, persist) {
+    mode = mode === 'full' ? 'full' : 'short';
+    document.documentElement.setAttribute('data-stem', mode);
+    $$('#stemLen [data-stem]').forEach(function (b) {
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-stem') === mode));
+    });
+    if (persist) {
+      try { sessionStorage.setItem(STEM_KEY, mode); } catch (e) {}
+    }
+  }
+
+  function openStemPop() {
+    var pop = $('#stemPop');
+    var body = $('#leftBody');
+    if (!pop || !body) return;
+    $('#stemPopBody').innerHTML = body.innerHTML;
+    $('#stemPopXp').innerHTML = ($('#xp') && $('#xp').innerHTML) || '';
+    var meta = [];
+    if ($('#qKind') && $('#qKind').textContent && $('#qKind').textContent !== '—') meta.push($('#qKind').textContent);
+    if ($('#qTopic') && $('#qTopic').textContent && $('#qTopic').textContent !== '—') meta.push($('#qTopic').textContent);
+    $('#stemPopMeta').textContent = meta.join(' · ') || '完整题目';
+    if (window.BsjMath && window.BsjMath.renderMathIn) window.BsjMath.renderMathIn($('#stemPopBody'), { includeCode: true });
+    $('#stemMask').hidden = false;
+    pop.hidden = false;
+    try { $('#stemPopClose').focus(); } catch (e) {}
+  }
+
+  function closeStemPop() {
+    var pop = $('#stemPop');
+    if (!pop || pop.hidden) return;
+    pop.hidden = true;
+    $('#stemMask').hidden = true;
+  }
+
   function renderLeft() {
     var body = $('#leftBody');
     if (!body) return;
     var q = S.problem;
+    var preview = $('#stemPreview');
+    if (preview) preview.textContent = stemPlain(q) || '还没有题目';
     if (!q) {
       body.innerHTML = '<div class="pane-empty">还没有题目。<br>回第 1 页选一道库里的题，或把你的题粘贴进来。</div>';
       $('#qKind').textContent = '—';
@@ -3131,7 +3240,24 @@ body[data-guide="1"] .p1-down{display:none}
     if (window.BsjMath && window.BsjMath.renderMathIn) {
       window.BsjMath.renderMathIn(body, { includeCode: true });
     }
+    if ($('#stemPop') && !$('#stemPop').hidden) openStemPop();
   }
+
+  applyStemLen(document.documentElement.getAttribute('data-stem'), false);
+  if ($('#stemLen')) {
+    $('#stemLen').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-stem]');
+      if (!b) return;
+      applyStemLen(b.getAttribute('data-stem'), true);
+    });
+  }
+  if ($('#stemBar')) $('#stemBar').addEventListener('click', openStemPop);
+  if ($('#stemOpen')) $('#stemOpen').addEventListener('click', openStemPop);
+  if ($('#stemPopClose')) $('#stemPopClose').addEventListener('click', closeStemPop);
+  if ($('#stemMask')) $('#stemMask').addEventListener('click', closeStemPop);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeStemPop();
+  });
 
   /* ---------------- 页面三：解题进度 ----------------
    * 步骤放得下就整排固定呈现；放不下才收窄成「当前步 + 左右邻居」，

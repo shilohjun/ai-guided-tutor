@@ -159,7 +159,11 @@ const MEASURE = `(() => {
     modeDisplay: mode ? getComputedStyle(mode).display : null,
     setModeDisplay: setMode ? getComputedStyle(setMode).display : null,
     report: pack(btn, fr),
-    step4: pack(step, fr)
+    step4: pack(step, fr),
+    stem: doc ? doc.documentElement.getAttribute('data-stem') : null,
+    problemH: doc && doc.querySelector('#problemPane') ? Math.round(doc.querySelector('#problemPane').getBoundingClientRect().height) : null,
+    chatH: doc && doc.querySelector('#chatPane') ? Math.round(doc.querySelector('#chatPane').getBoundingClientRect().height) : null,
+    viewportH: vh
   };
 })()`;
 
@@ -229,6 +233,21 @@ const MEASURE = `(() => {
 
   await setPhone(cdp, 390, 844);
   await sleep(300);
+  await evaluate(cdp, "document.querySelector('#frame').contentDocument.querySelector('#stemBar').click()");
+  await waitUntil(cdp, "!document.querySelector('#frame').contentDocument.querySelector('#stemPop').hidden", '题目弹层');
+  await sleep(300);
+  measures['pilot-390-stem-pop'] = await evaluate(cdp, MEASURE);
+  await save('F-pilot-stem-pop-390.png');
+  await evaluate(cdp, "document.querySelector('#frame').contentDocument.querySelector('#stemPopClose').click()");
+  await waitUntil(cdp, "document.querySelector('#frame').contentDocument.querySelector('#stemPop').hidden", '关上题目弹层');
+  await evaluate(cdp, "document.querySelector('#frame').contentDocument.querySelector('#stemLen [data-stem=\"full\"]').click()");
+  await waitUntil(cdp, "document.querySelector('#frame').contentDocument.documentElement.getAttribute('data-stem') === 'full'", '展开题目');
+  await sleep(300);
+  measures['pilot-390-stem-full'] = await evaluate(cdp, MEASURE);
+  await save('G-pilot-stem-full-390.png');
+  await evaluate(cdp, "document.querySelector('#frame').contentDocument.querySelector('#stemLen [data-stem=\"short\"]').click()");
+  await waitUntil(cdp, "document.querySelector('#frame').contentDocument.documentElement.getAttribute('data-stem') === 'short'", '回到短题');
+
   await evaluate(cdp, "document.querySelector('#out').click()");
   await waitUntil(cdp, "!document.querySelector('#endAsk').hidden", '结束确认');
   measures['pilot-390-end-ask'] = await evaluate(cdp, `(() => {

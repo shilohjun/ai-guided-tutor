@@ -253,7 +253,7 @@ describe('前端 · 四步流程契约（新版单文件）', () => {
     const mediaRe = /@media \(max-width:760px\)\{/g;
     let mediaHit;
     while ((mediaHit = mediaRe.exec(style))) {
-      const slice = style.slice(mediaHit.index, mediaHit.index + 1600);
+      const slice = style.slice(mediaHit.index, mediaHit.index + 2800);
       const rule = slice.match(/\.stepper\{([^}]*)\}/);
       if (rule) { stepperBody = rule[1]; break; }
     }
@@ -261,6 +261,32 @@ describe('前端 · 四步流程契约（新版单文件）', () => {
     assert(!/scrollbar-width:\s*none/.test(stepperBody), '步骤条不该再把滚动条藏起来');
     assert(!/overflow-x:\s*auto/.test(stepperBody), '步骤条不该再靠横向滚动才看得到第 4 步');
     assert(/overflow:\s*hidden/.test(stepperBody), '放不下时收连接线，不要把第 4 步滚出屏幕');
+  });
+
+  it('窄屏题目默认是两行短条，全文在弹层里，长短记在这次访问', () => {
+    assertIncludes(html, 'id="stemLen"', '要有长短切换');
+    assertIncludes(html, 'id="stemBar"', '短态要有可点的题干条');
+    assertIncludes(html, 'id="stemPop"', '完整题目要有弹层');
+    assertIncludes(html, 'id="problemPane"', '题目栏要能单独量高度');
+    assertIncludes(html, 'id="chatPane"', '对话栏要能单独量高度');
+    assertIncludes(html, '>短<', '短是默认档的名字');
+    assertIncludes(html, '>展开<', '展开是页内加长的名字');
+    assertIncludes(appJs, 'bsj-stem-len', '偏好要有稳定的键');
+    assertIncludes(appJs, 'sessionStorage.setItem(STEM_KEY', '长短记在这次访问里，不写进长期偏好');
+    assertIncludes(appJs, "mode === 'full' ? 'full' : 'short'", '没存过或存了别的值都回到短');
+    const boot = html.slice(0, html.indexOf('<style>'));
+    assertIncludes(boot, 'bsj-stem-len', '首屏就要读长短，避免先画出半屏题目');
+    assertIncludes(boot, "stem = 'short'", '首屏默认是短');
+    assertNotIncludes(boot, 'setItem', '首屏只读、不写');
+    const style = (html.match(/<style>([\s\S]*?)<\/style>/) || [null, ''])[1];
+    assert(
+      /@media \(max-width:760px\)\{[\s\S]*?grid-template-rows:\s*auto minmax\(0,\s*1fr\)/.test(style),
+      '窄屏题目按内容撑高，对话占剩余高度，不再对半切',
+    );
+    assert(
+      /html\[data-stem="short"\] #problemPane \.pane-body\{display:\s*none\}/.test(style),
+      '短态不把整题留在页面上',
+    );
   });
 
   it('第 2 页：自主训练默认选中并标"推荐"，AI 伴学禁用并标"暂未更新"', () => {
