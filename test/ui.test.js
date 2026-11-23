@@ -533,6 +533,31 @@ describe('前端 · 公式自动渲染：不用每个显示点都手写一遍', 
     });
   });
 
+  describe('前端 · 题库懒加载', () => {
+    const workbench = readFileSync(join(ROOT, 'public/qbank/workbench.html'), 'utf8');
+    const map = readFileSync(join(ROOT, 'public/qbank/map.html'), 'utf8');
+
+    it('工作台只补可视题目行', () => {
+      assertIncludes(workbench, 'IntersectionObserver', '工作台列表应观察可视题目');
+      assertIncludes(workbench, 'rootMargin: \'300px 0px\'', '工作台应预取可视边界附近题目');
+      assertIncludes(workbench, 'hydrateObserver.unobserve(entry.target)', '已加载题目行应停止观察');
+    });
+
+    it('地图列表分批渲染并提供加载更多', () => {
+      assertIncludes(map, 'panelLimit = 30', '地图右侧题库应每批渲染 30 张');
+      assertIncludes(map, 'qlazy-more', '地图应提供加载更多入口');
+      assertIncludes(map, 'panelLimit += 30', '地图应按批追加题目');
+      assertIncludes(map, 'scrollHeight - box.scrollTop - box.clientHeight', '地图应在滚动到底部时追加题目');
+      assertIncludes(map, 'remaining <= 180', '地图应在接近底部时提前加载');
+      assertIncludes(map, 'insertAdjacentHTML', '追加加载应保留已有题目 DOM');
+      assertIncludes(map, 'box.scrollTop = oldScrollTop', '追加加载应保持原滚动位置');
+      assertIncludes(map, 'is-loading', '加载过程应提供明显过渡状态');
+      assertIncludes(map, 'lazyCardIn', '新增题目卡片应使用柔和淡入动画');
+      assertIncludes(map, 'qlazy-status', '加载过程中应显示独立文字提示');
+      assertIncludes(map, '正在加载更多题目', '文字提示应说明正在加载更多题目');
+    });
+  });
+
   describe('前端 · 公式图片随文字字号缩放', () => {
     const indexHtml = readFileSync(join(ROOT, 'public/index.html'), 'utf8');
     const workbenchHtml = readFileSync(join(ROOT, 'public/qbank/workbench.html'), 'utf8');

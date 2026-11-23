@@ -275,25 +275,43 @@ window.addEventListener('error', function (e) { document.title = 'JSERR: ' + e.m
 
   /* 结果行：先纯文本，再逐条取回 rich 题干（公式图 + KaTeX） */
   var hydrateToken = 0;
+  var hydrateObserver = null;
   function hydrateRows(slice) {
     var token = ++hydrateToken;
-    var idx = 0, active = 0;
+    if (hydrateObserver) { hydrateObserver.disconnect(); hydrateObserver = null; }
+    var queue = [], active = 0;
     function pump() {
-      while (active < 6 && idx < slice.length) {
-        var q = slice[idx++];
+      while (active < 6 && queue.length) {
+        var job = queue.shift();
         active += 1;
-        (function (item) {
-          loadDetail(item.i).then(function (det) {
-            if (token !== hydrateToken) return;
-            var cell = $('[data-stem="' + item.i + '"]', $('#rows'));
-            if (!cell || !det.stemHtml) return;
-            cell.innerHTML = previewHtml(det.stemHtml);
-            mathIn(cell);
-          }).catch(function () { }).then(function () { active -= 1; pump(); });
-        })(q);
+        loadDetail(job.item.i).then(function (det) {
+          if (token !== hydrateToken) return;
+          var cell = $('[data-stem="' + det.i + '"]', $('#rows'));
+          if (!cell || !det.stemHtml) return;
+          cell.innerHTML = previewHtml(det.stemHtml);
+          mathIn(cell);
+        }).catch(function () { }).then(function () { active -= 1; pump(); });
       }
     }
-    pump();
+    if (typeof IntersectionObserver === 'undefined') {
+      queue = slice.map(function (item) { return { item: item }; });
+      pump();
+      return;
+    }
+    hydrateObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        hydrateObserver.unobserve(entry.target);
+        if (entry.target.__hydrateJob) queue.push(entry.target.__hydrateJob);
+      });
+      pump();
+    }, { root: $('#rows'), rootMargin: '300px 0px' });
+    slice.forEach(function (item) {
+      var row = $('.row[data-i="' + item.i + '"]', $('#rows'));
+      if (!row) return;
+      row.__hydrateJob = { item: item };
+      hydrateObserver.observe(row);
+    });
   }
 
   /* ---------------------------------------------------------------- 详情 */
