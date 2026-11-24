@@ -34,7 +34,7 @@ test('independent correct explanation is needed for mastery; correction demotes 
 
 test('one mistaken turn is not repeated evidence; corrections cannot clear a different concept', () => {
   const a=assess(log('先提示一下',{deliveredLevel:2,form:'direction'}),log('I=E/R；电阻只有R'));
-  assert.equal(circuit(a).status,'consolidate');
+  assert.equal(circuit(a).status,'weak');
   const b=assess(log('I=E/R'),log('因为匀速，所以合力为零',{stepIndex:6}));
   assert.equal(b.feedback.find(f=>f.id==='circuit').status,'pending');
 });
@@ -107,4 +107,10 @@ test('rubric scope respects variable motion and capacitor circuits', () => {
   assert.equal(assessOther('phy-emi-03','因为匀速，所以合力为零').knowledge.some(k=>k.status==='mastered'),false);
   assert.ok(assessOther('phy-emi-05','电容器不影响运动').feedback.some(f=>f.id==='capacitor-branches'));
   assert.equal(assessOther('phy-emi-05','I=E/(R+r)').knowledge.some(k=>k.id==='circuit'),false);
+});
+
+test('an unreviewed revised circuit formula revokes an earlier mastered verdict',()=>{
+  const a=assess(log('因为导体棒电阻与R串联，所以I=E/(R+r)'),log('我改成I=E/(R-r)'));
+  assert.equal(circuit(a).status,'unknown');
+  assert.equal(circuit(a).state,'insufficient_evidence');
 });

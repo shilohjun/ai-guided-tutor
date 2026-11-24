@@ -55,3 +55,6 @@ cloudbaserc.json
 
 # 临时目录（部署脚本、冒烟数据、一次性工具都在这里，里面可能有凭据）
 .tmp-*/
+
+# 部署私钥（scripts/deploy-server.ps1 用；绝不入库）
+.deploy-key/

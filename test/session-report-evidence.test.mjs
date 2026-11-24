@@ -282,16 +282,16 @@ test('unknown report labels do not repeat the pending-verification suffix',()=>{
 });
 
 test('opening a cached v2 report upgrades its analysis once while retaining the original report',async()=>{
-  await withServer(async({call,store})=>{
+  for(const version of ['session-evidence-v2','session-evidence-v5','session-evidence-v6']) await withServer(async({call,store})=>{
     const q=getQbankProblem('qbank-344');
     const session=createLiveSession({id:'cached-v2',problemId:q.id});
     session.problemSnapshot=captureProblem(q);
     session.record.hintLog=[log('我的方向判断对吗'),log('这一步该用哪条规律')];
-    const old={problemId:q.id,assessment:{feedback:[],knowledge:[]},meta:{schemaVersion:'session-evidence-v2'}};
+    const old={problemId:q.id,assessment:{feedback:[],knowledge:[]},meta:{schemaVersion:version}};
     session.reportSnapshot=old;
     await store.putSession(snapshotSession(session));
     const fresh=await call('/api/report?sessionId=cached-v2');
-    assert.equal(fresh.report.meta.schemaVersion,'session-evidence-v3');
+    assert.equal(fresh.report.meta.schemaVersion,'session-evidence-v7');
     assert.ok(fresh.report.assessment.feedback.some(f=>f.id==='process-direction'));
     let stored=await store.getSession('cached-v2');
     assert.deepEqual(stored.reportHistory[0].reportSnapshot,old);
@@ -299,5 +299,39 @@ test('opening a cached v2 report upgrades its analysis once while retaining the 
     assert.deepEqual(repeat.report,fresh.report);
     stored=await store.getSession('cached-v2');
     assert.equal(stored.reportHistory.length,1);
+  });
+});
+
+test('a stale current-version report cannot hide later corrected choices after cold loading',async()=>{
+  await withServer(async({call,store})=>{
+    const q=getQbankProblem('qbank-1');
+    const session=createLiveSession({id:'revision-mismatch',problemId:q.id});
+    session.problemSnapshot=captureProblem(q);
+    session.record.hintLog=[log('我选A')];
+    session.reportSnapshot=buildReport(q,session.record,{engine:'offline-stub'});
+    session.record.hintLog.push(log('我改选B，因为只有铟满足发生条件'));
+    await store.putSession(snapshotSession(session));
+    const result=await call('/api/report?sessionId=revision-mismatch');
+    assert.equal(result.report.assessment.completion.completed,1);
+    assert.equal(result.report.assessment.subquestions[0].corrected,true);
+    const saved=await store.getSession('revision-mismatch');
+    assert.equal(saved.reportHistory.length,1);
+    const repeat=await call('/api/report?sessionId=revision-mismatch');
+    assert.deepEqual(repeat.report,result.report);
+  });
+});
+
+test('known wrong choice is never endorsed by chat; correcting to real B updates the report',async()=>{
+  await withServer(async({call})=>{
+    const id='choice-consistency',problemId='qbank-1';
+    await call('/api/session/start',{sessionId:id,problemId});
+    const wrong=await call('/api/chat',{sessionId:id,problemId,utterance:'我改选C，因为两种金属都能发生光电效应'});
+    assert.equal(wrong.status,200);
+    assert.match(wrong.message,/核验结果不一致/);
+    const correct=await call('/api/chat',{sessionId:id,problemId,utterance:'我改选B，因为只有铟满足条件'});
+    assert.equal(correct.status,200);
+    const result=await call('/api/report?sessionId='+id);
+    assert.equal(result.report.assessment.completion.completed,1);
+    assert.equal(result.report.assessment.subquestions[0].corrected,true);
   });
 });
