@@ -17,21 +17,20 @@
  * 这些都是纯静态就能查的：断言字符串与规则顺序，比在浏览器里点一遍快，也不会漏。
  */
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, it, assert, assertIncludes, assertNotIncludes } from './runner.js';
-import { ROOT } from '../src/core/env.js';
+import { pageCss, readPage } from './page-css.js';
 
-const read = (p) => readFileSync(join(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
-const html = read('public/index.html');
+const html = readPage('public/index.html');
 
 /** 所有内联脚本拼起来 —— 设置面板的行为都在这里 */
 const appJs = [...html.matchAll(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]).join('\n');
-/** 首屏那段（head 里、<style> 之前）—— 它只负责"第一帧就别闪" */
-const bootJs = [...html.slice(0, html.indexOf('<style')).matchAll(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/g)]
+/** 样式已经搬到 <link href="/index.css">，这里把外部样式表一起读进来 */
+const style = pageCss('public/index.html');
+/** 首屏那段（head 里、样式表之前）—— 它只负责"第一帧就别闪" */
+const stylesAt = html.search(/<style|<link[^>]+rel="stylesheet"/);
+const bootJs = [...html.slice(0, stylesAt >= 0 ? stylesAt : html.length).matchAll(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/g)]
   .map((m) => m[1])
   .join('\n');
-const style = (html.match(/<style>([\s\S]*?)<\/style>/) || [, ''])[1];
 
 /** 取某个选择器块的声明体（只认块内首层，够用） */
 function block(selectorPattern) {
@@ -96,9 +95,9 @@ describe('设置 · 入口与面板结构', () => {
 });
 
 describe('设置 · 首屏与落盘', () => {
-  it('首屏脚本必须在 <style> 之前跑，否则会先白闪一下', () => {
+  it('首屏脚本必须在样式表之前跑，否则会先白闪一下', () => {
     const firstScript = html.indexOf('<script');
-    const firstStyle = html.indexOf('<style>');
+    const firstStyle = html.search(/<style|<link[^>]+rel="stylesheet"/);
     assert(firstScript >= 0 && firstStyle > firstScript, '上色脚本应当排在样式之前');
   });
 

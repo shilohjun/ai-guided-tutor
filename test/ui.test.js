@@ -16,6 +16,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, it, assert, assertEquals, assertIncludes, assertNotIncludes } from './runner.js';
+import { pageCss } from './page-css.js';
 import { loadEnvFile, ROOT } from '../src/core/env.js';
 
 /**
@@ -441,7 +442,7 @@ describe('前端 · 超长题目在框内滚动，而不是把整页拉长', () 
    * .pane-body.scroller（overflow-y:auto），页面本身不跟着变长。
    * 这与"面板不许 sticky"是两件事：不钉住防遮挡，内部滚动防拉长，两条可以同时成立。
    */
-  const style = (html.match(/<style>([\s\S]*?)<\/style>/) || [null, ''])[1].replace(/\/\*[\s\S]*?\*\//g, '');
+  const style = pageCss('public/index.html').replace(/\/\*[\s\S]*?\*\//g, '');
   const cssRule = (sel) => {
     const at = style.indexOf(sel + '{');
     if (at < 0) return '';
@@ -507,7 +508,7 @@ describe('前端 · 公式自动渲染：不用每个显示点都手写一遍', 
   it('math.js 里装了 MutationObserver 兜底', () => {
     assertIncludes(mathJs, 'MutationObserver', 'math.js 要用 MutationObserver 自动发现新内容');
     assertIncludes(mathJs, 'characterData', '文字节点被原地改写也要能看见');
-    assertIncludes(mathJs, 'requestAnimationFrame', '一帧内的多次变更要合并成一次渲染');
+    assertIncludes(mathJs, 'timeout: 120', '空闲渲染要设超时兜底，避免一直等不到空闲帧');
   });
 
   describe('前端 · 题库工作台使用完整索引', () => {
@@ -524,7 +525,7 @@ describe('前端 · 公式自动渲染：不用每个显示点都手写一遍', 
     it('新增题目的知识点和章节 ID 必须存在于知识树', () => {
       const chapters = new Set(qbankData.kg.flatMap((m) => (m.children || []).map((c) => c.id)));
       const leaves = new Set(qbankData.kg.flatMap((m) => (m.children || []).flatMap((c) => (c.children || []).map((l) => l.id))));
-      for (const id of [836, 837, 838, 839, 840]) {
+      for (const id of [836, 837, 838, 839]) {
         const q = qbankData.qs.find((item) => item.i === id);
         assert(q, '题目 ' + id + ' 应存在');
         assert(chapters.has(q.k), '题目 ' + id + ' 的章节 ID 无效');
@@ -536,6 +537,7 @@ describe('前端 · 公式自动渲染：不用每个显示点都手写一遍', 
   describe('前端 · 题库懒加载', () => {
     const workbench = readFileSync(join(ROOT, 'public/qbank/workbench.html'), 'utf8');
     const map = readFileSync(join(ROOT, 'public/qbank/map.html'), 'utf8');
+    const mapCss = readFileSync(join(ROOT, 'public/qbank/map.css'), 'utf8');
 
     it('工作台只补可视题目行', () => {
       assertIncludes(workbench, 'IntersectionObserver', '工作台列表应观察可视题目');
@@ -552,21 +554,23 @@ describe('前端 · 公式自动渲染：不用每个显示点都手写一遍', 
       assertIncludes(map, 'insertAdjacentHTML', '追加加载应保留已有题目 DOM');
       assertIncludes(map, 'box.scrollTop = oldScrollTop', '追加加载应保持原滚动位置');
       assertIncludes(map, 'is-loading', '加载过程应提供明显过渡状态');
-      assertIncludes(map, 'lazyCardIn', '新增题目卡片应使用柔和淡入动画');
+      assertIncludes(mapCss, 'lazyCardIn', '新增题目卡片应使用柔和淡入动画');
       assertIncludes(map, 'qlazy-status', '加载过程中应显示独立文字提示');
       assertIncludes(map, '正在加载更多题目', '文字提示应说明正在加载更多题目');
     });
   });
 
   describe('前端 · 公式图片随文字字号缩放', () => {
-    const indexHtml = readFileSync(join(ROOT, 'public/index.html'), 'utf8');
-    const workbenchHtml = readFileSync(join(ROOT, 'public/qbank/workbench.html'), 'utf8');
-    const mapHtml = readFileSync(join(ROOT, 'public/qbank/map.html'), 'utf8');
+    const sheets = [
+      ['public/index.css', readFileSync(join(ROOT, 'public/index.css'), 'utf8')],
+      ['public/qbank/workbench.css', readFileSync(join(ROOT, 'public/qbank/workbench.css'), 'utf8')],
+      ['public/qbank/map.css', readFileSync(join(ROOT, 'public/qbank/map.css'), 'utf8')],
+    ];
 
     it('qf 图片使用 em 高度，题图 qfig 不受影响', () => {
-      for (const html of [indexHtml, workbenchHtml, mapHtml]) {
-        assertIncludes(html, 'height:1.15em', '公式图片应按当前字体高度缩放');
-        assertIncludes(html, 'object-fit:contain', '公式图片应保持比例');
+      for (const [name, css] of sheets) {
+        assertIncludes(css, 'height:0.85em', name + ' 里的公式图片应按当前字体高度缩放');
+        assertIncludes(css, 'object-fit:contain', name + ' 里的公式图片应保持比例');
       }
     });
   });

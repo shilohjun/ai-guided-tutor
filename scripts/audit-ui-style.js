@@ -10,16 +10,30 @@
  *   5. 装饰性微组件可例外（圆点、进度条、图标尺寸等不计入间距）
  */
 import { readFileSync } from 'node:fs';
-import { join, dirname, resolve } from 'node:path';
+import { join, dirname, resolve, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const file = resolve(process.argv[2] ?? join(ROOT, 'public/index.html'));
-const html = readFileSync(file, 'utf8');
+const source = readFileSync(file, 'utf8');
 
-const styles = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map((m) => m[1]);
+/**
+ * CSS 可能内联在 <style> 里，也可能被抽成独立文件、由 <link rel="stylesheet"> 引入。
+ * 两种形态都要审：只认 <style> 的话，抽完文件的页面会直接「找不到样式」而退化成红。
+ * 传 .css 文件本身也能用（方便单独复查抽出来的那份）。
+ */
+const styles = extname(file) === '.css'
+  ? [source]
+  : [
+      ...source.matchAll(/<style>([\s\S]*?)<\/style>/g),
+    ].map((m) => m[1]).concat(
+      [...source.matchAll(/<link[^>]*rel="stylesheet"[^>]*>/g)]
+        .map((m) => (m[0].match(/href="([^"]+)"/) || [])[1])
+        .filter((href) => href && href.startsWith('/') && !href.startsWith('/vendor/'))
+        .map((href) => readFileSync(join(ROOT, 'public', href.slice(1)), 'utf8'))
+    );
 if (!styles.length) {
-  console.error('找不到 <style>');
+  console.error('找不到样式（内联 <style> 或本地 <link rel="stylesheet">）');
   process.exit(1);
 }
 const css = styles.join('\n');

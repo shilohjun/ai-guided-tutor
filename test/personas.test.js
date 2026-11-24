@@ -13,6 +13,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, it, assert, assertEquals, assertIncludes } from './runner.js';
+import { pageCss } from './page-css.js';
 import {
   DEFAULT_PERSONA,
   PERSONAS,
@@ -35,6 +36,8 @@ import { getProblem } from '../src/core/problems.data.js';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 const html = read('public/index.html');
+/** 头像取景规则已经搬进 public/index.css，断言要读外部样式表 */
+const css = pageCss('public/index.html');
 
 /** 每份风格文稿的抬头，用来确认"只进来这一位" */
 const VOICE_TITLE = {
@@ -109,8 +112,8 @@ describe('陪学老师 · 规范以教研文稿为准', () => {
      * 结果一侧补上了、另一侧又空出来 —— 正解是按原图重裁素材。
      * 所以这里断言**没有**per-persona 的位移补丁，避免有人再用 CSS 去藏构图问题。
      */
-    assertIncludes(html, '.av-frame img', '缺少统一的头像取景规则');
-    assert(!/\[data-mentor="[a-z]+"\]\{--fx:/.test(html), '不要用 per-persona 的 --fx 位移去补：素材该重裁');
+    assertIncludes(css, '.av-frame img', '缺少统一的头像取景规则');
+    assert(!/\[data-mentor="[a-z]+"\]\{--fx:/.test(html + css), '不要用 per-persona 的 --fx 位移去补：素材该重裁');
     for (const fn of ['function avatarHtml', 'function pickHtml']) {
       const at = html.indexOf(fn);
       assert(at > 0, '找不到 ' + fn);
