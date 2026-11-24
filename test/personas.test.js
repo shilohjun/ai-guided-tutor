@@ -111,6 +111,7 @@ describe('陪学老师 · 规范以教研文稿为准', () => {
      */
     assertIncludes(html, '.av-frame img', '缺少统一的头像取景规则');
     assert(!/\[data-mentor="[a-z]+"\]\{--fx:/.test(html), '不要用 per-persona 的 --fx 位移去补：素材该重裁');
+    assert(!/\[data-mentor="[a-z]+"\] img\{/.test(html), '不要用 per-persona 的放大或 left/top 去补头像');
     for (const fn of ['function avatarHtml', 'function pickHtml']) {
       const at = html.indexOf(fn);
       assert(at > 0, '找不到 ' + fn);

@@ -205,6 +205,102 @@ describe('前端 · 四步流程契约（新版单文件）', () => {
     assert(!/disabled/.test(stepper), '步骤条不该再禁用任何一页 —— 没数据就进空态，不能把人弹回去');
   });
 
+  /**
+   * 手机上「查看学习报告」原先只在做完之后、而且画在对话滚动区里。
+   * 窄屏第一屏看不到它，学生只能结束使用。入口要在有过一轮真实对话后就常驻，
+   * 做完再强调，并且不靠把步骤条的滚动条藏起来才露出第 4 步。
+   */
+  it('解题页在至少一轮真实对话后就给出「查看报告」，做完再强调', () => {
+    assertIncludes(html, 'id="viewReportBtn"', '解题页要有稳定的查看报告按钮');
+    assertIncludes(html, '>查看报告<', '按钮必须带文字「查看报告」，不能只是图标');
+    assertIncludes(html, 'id="solveReport"', '入口要有自己的一块，不能只塞在对话气泡滚动区里');
+    const fnStart = appJs.indexOf('function syncSolveChrome');
+    const fnEnd = appJs.indexOf('function msgHtml');
+    assert(fnStart > 0 && fnEnd > fnStart, 'syncSolveChrome 应当存在，并且写在 msgHtml 之前');
+    const fn = appJs.slice(fnStart, fnEnd);
+    assertIncludes(fn, "m.role === 'me'", '有学生发出的一轮才算真实对话，不能一进解题页就亮');
+    assertIncludes(fn, '已完成，可查看报告', '做完后要在入口旁写明可以看报告');
+    assertIncludes(fn, 'btn-primary', '做完后入口要用主按钮强调');
+    assert(
+      !/if\s*\(\s*S\.done\s*\)[\s\S]{0,80}solveReport/.test(fn),
+      '常驻入口不能包在 if (S.done) 里 —— 没做完也要能点开报告',
+    );
+  });
+
+  it('做完后停用对话输入，并写明可以查看报告或重做', () => {
+    const fnStart = appJs.indexOf('function syncSolveChrome');
+    const fnEnd = appJs.indexOf('function msgHtml');
+    const fn = appJs.slice(fnStart, fnEnd);
+    assertIncludes(fn, '本题已完成，可以查看报告或重做', '完成态要有一句看得见的说明，不能只是发送没反应');
+    assertIncludes(fn, '.disabled = locked', '输入、发送和附件入口要跟着完成态停用');
+    assertIncludes(html, 'id="solveDoneHint"', '完成说明要有稳定落点，不能只改 placeholder');
+    assertIncludes(html, 'id="input3"', '对话输入框还在');
+  });
+
+  it('窄屏把模式开关收进设置，步骤条不再靠藏起来的横向滚动', () => {
+    assertIncludes(html, 'id="setModeSwitch"', '设置里要有一份模式开关，窄屏顶栏才腾得出第 4 步');
+    assertIncludes(html, 'id="setMode"', '模式开关要包在设置分组里');
+    const style = (html.match(/<style>([\s\S]*?)<\/style>/) || [null, ''])[1];
+    assert(
+      /@media \(max-width:760px\)\{[\s\S]*?#modeSwitch\{[^}]*display:\s*none\s*!important/.test(style),
+      '≤760px 顶栏里的「自主训练 / AI 伴学」必须让开',
+    );
+    assert(
+      /@media \(max-width:760px\)\{[\s\S]*?\.set-mode\{[^}]*display:\s*flex/.test(style),
+      '同一档宽度下，模式开关要出现在齿轮菜单里',
+    );
+    let stepperBody = '';
+    const mediaRe = /@media \(max-width:760px\)\{/g;
+    let mediaHit;
+    while ((mediaHit = mediaRe.exec(style))) {
+      const slice = style.slice(mediaHit.index, mediaHit.index + 2800);
+      const rule = slice.match(/\.stepper\{([^}]*)\}/);
+      if (rule) { stepperBody = rule[1]; break; }
+    }
+    assert(stepperBody, '窄屏应当有一条 .stepper 规则');
+    assert(!/scrollbar-width:\s*none/.test(stepperBody), '步骤条不该再把滚动条藏起来');
+    assert(!/overflow-x:\s*auto/.test(stepperBody), '步骤条不该再靠横向滚动才看得到第 4 步');
+    assert(/overflow:\s*hidden/.test(stepperBody), '放不下时收连接线，不要把第 4 步滚出屏幕');
+  });
+
+  it('窄屏题目用拖把手连续调高度，全文只留一个弹层入口', () => {
+    assertNotIncludes(html, 'id="stemLen"', '不再用短/展开开关');
+    assertNotIncludes(html, 'id="stemBar"', '题干末尾不再另放一个全文');
+    assertNotIncludes(html, 'id="stemPopXp"', '弹层里不放步骤圆点');
+    assertIncludes(html, 'id="stemOpen"', '要有一个打开全文的按钮');
+    assertIncludes(html, '>展开全部<', '按钮文案是「展开全部」');
+    assertEquals((html.match(/>全文</g) || []).length, 0, '「全文」不要再出现第二次');
+    assertIncludes(html, 'id="stemPop"', '完整题目仍是弹层');
+    assertIncludes(html, 'id="splitter"', '题目和对话之间要有可拖的分隔');
+    assertIncludes(appJs, 'bsj-stem-h', '拖过的高度记在这次访问里');
+    assertIncludes(appJs, 'sessionStorage.setItem(STEM_H_KEY', '只在松手时写入，不写进长期偏好');
+    assertIncludes(appJs, "addEventListener('pointerdown'", '鼠标和触摸都走 pointer');
+    assertIncludes(appJs, "addEventListener('touchmove'", 'iOS 上还要拦住 touchmove');
+    assertIncludes(appJs, '{ passive: false }', 'preventDefault 必须能生效');
+    const style = (html.match(/<style>([\s\S]*?)<\/style>/) || [null, ''])[1];
+    assert(
+      /@media \(max-width:760px\)\{[\s\S]*?#problemPane\{[^}]*height:\s*var\(--stem-h,\s*112px\)/.test(style),
+      '窄屏题目默认大约两行，高度连续可变',
+    );
+    assert(
+      /#splitter\{[^}]*min-height:\s*44px/.test(style),
+      '拖把手的可点高度至少 44px',
+    );
+    assert(/touch-action:\s*none/.test(style), '把手上要禁止浏览器接管滑动');
+  });
+
+  it('快捷问句是一行横滑，不换行、也不把整页撑宽', () => {
+    const style = (html.match(/<style>([\s\S]*?)<\/style>/) || [null, ''])[1];
+    const sugs = style.match(/\.sugs\{([^}]*)\}/);
+    assert(sugs, '要有 .sugs');
+    assert(/flex-wrap:\s*nowrap/.test(sugs[1]), '问句不要折成两行');
+    assert(/overflow-x:\s*auto/.test(sugs[1]), '放不下时在这一行里横滑');
+    assert(/touch-action:\s*pan-x/.test(sugs[1]), '手指要能横着滑');
+    assert(/min-width:\s*0/.test(sugs[1]), '这一行不能按内容把页面撑宽');
+    const foot = style.match(/\.chat-foot\{([^}]*)\}/);
+    assert(foot && /min-width:\s*0/.test(foot[1]), '输入区作为弹性子项也要能收缩');
+  });
+
   it('第 2 页：自主训练默认选中并标"推荐"，AI 伴学禁用并标"暂未更新"', () => {
     const selfAt = page2.indexOf('data-mode="self"');
     const aiAt = page2.indexOf('data-mode="ai"');

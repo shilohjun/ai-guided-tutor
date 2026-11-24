@@ -181,6 +181,21 @@ describe('试点入口 · 独立成页，不寄生在成品页里', () => {
     assertNotIncludes(s, '调试口令', '登录屏不该出现"调试"字样，那等于告诉学生有第二把钥匙');
     assertNotIncludes(s, '管理员口令', '同理：登录屏不该出现"管理员"');
   });
+
+  it('还没看过报告时，结束使用要同时给出「查看报告」和「直接结束」', () => {
+    const s = pilotHtml();
+    assertIncludes(s, 'id="endAsk"', '确认层要有稳定锚点');
+    assertIncludes(s, '先看学习报告', '文案要先问要不要看报告');
+    assertIncludes(s, 'id="endAskReport"', '「查看报告」要有自己的按钮');
+    assertIncludes(s, '>查看报告<', '按钮文字就是「查看报告」');
+    assertIncludes(s, 'id="endAskEnd"', '「直接结束」要有自己的按钮');
+    assertIncludes(s, '>直接结束<', '按钮文字就是「直接结束」');
+    assertIncludes(s, 'S.reportSeen', '这一次有没有看过报告要记在会话状态里');
+    assertIncludes(s, 'S.reportSeen = true', '走到产品页第 4 页才算看过');
+    assertIncludes(s, 'data-goto="4"', '查看报告要去点产品页第 4 步，不另造协议');
+    assertIncludes(s, 'if (!S.reportSeen)', '没看过报告才走这层；看过了仍用原来的结束确认');
+    assertNotIncludes(s, 'innerHTML', '确认层也不能用 innerHTML 拼');
+  });
 });
 
 // ===========================================================================
