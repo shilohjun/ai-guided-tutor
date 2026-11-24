@@ -18,12 +18,12 @@ test('legacy question identities and semantic knowledge paths survive the merge'
   for (const old of legacy.knowledge) assert.ok(paths.has(JSON.stringify(old.path)),old.path.join('/'));
 });
 
-test('picker, embedded map and report registry share the same 835 usable questions',()=>{
+test('picker, embedded map and report registry share the same formal question set',()=>{
   const data=JSON.parse(readFileSync(new URL('../public/qbank/data.json',import.meta.url),'utf8'));
   const map=readFileSync(new URL('../public/qbank/map.html',import.meta.url),'utf8');
   const embedded=JSON.parse(map.match(/<script type="application\/json" id="qdata">([\s\S]*?)<\/script>/)[1]);
   assert.deepEqual(embedded,data);
-  assert.equal(data.qs.length,835);
+  assert.equal(data.qs.length,QBANK_SOURCE.length);
   assert.deepEqual(data.qs.map(q=>q.i),QBANK_SOURCE.map(q=>q.i));
   const excluded=JSON.parse(readFileSync(new URL('../docs/qbank-import-excluded.json',import.meta.url),'utf8'));
   assert.equal(excluded.length,26);
@@ -51,8 +51,8 @@ test('chapter-only questions explicitly show unspecialized review without changi
   assert.ok(!getQbankProblem(`qbank-${tagged.i}`).reportReview.knowledge.some(k=>k.title.includes('未细分')));
 });
 
-test('all 835 source questions retain answers, full images and every knowledge/method association',()=>{
-  assert.equal(QBANK_IDS.length,835);
+test('all source questions retain answers, full images and every knowledge/method association',()=>{
+  assert.equal(QBANK_IDS.length,QBANK_SOURCE.length);
   assert.equal(QBANK_GRAPHS.knowledge.flatMap(m=>m.children.flatMap(c=>c.children)).length,94);
   assert.equal(QBANK_GRAPHS.methods.flatMap(m=>m.children).length,29);
   for (const source of QBANK_SOURCE) {
@@ -92,7 +92,7 @@ test('knowledge is selected by stable source ID and does not mutate another ques
   const first=getQbankProblem('qbank-1'), second=getQbankProblem('qbank-2');
   assert.ok(first.reportReview.knowledge.some(k=>k.title==='光电效应'));
   assert.ok(second.reportReview.knowledge.some(k=>/折射/.test(k.title)));
-  assert.equal(getQbankProblem('qbank-836'),null);
+  assert.equal(getQbankProblem('qbank-841'),null);
   const r=buildReport(first,createSessionRecord(first.id),{engine:'offline-stub'});
   r.review.knowledge[0].title='mutated';
   assert.ok(!first.reportReview.knowledge.some(k=>k.title==='mutated'));
@@ -141,7 +141,7 @@ test('every bank question has an API report even before the first chat turn',asy
       assert.equal(report.meta.recordMissing,true);
       assert.deepEqual(turns,[]);
     }
-    const invalid=await fetch(`${base}/api/report?sessionId=missing&problemId=qbank-836`);
+    const invalid=await fetch(`${base}/api/report?sessionId=missing&problemId=qbank-841`);
     assert.equal(invalid.status,404);
   } finally {
     if (prevLogin===undefined) delete process.env.PILOT_REQUIRE_LOGIN; else process.env.PILOT_REQUIRE_LOGIN=prevLogin;

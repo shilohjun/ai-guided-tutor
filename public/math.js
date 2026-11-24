@@ -13,6 +13,14 @@
     return { tex: inline, display: false };
   }
 
+  /* KaTeX 的数学字体没有部分 Unicode 兼容字符的字形指标；数学片段中
+     将罗马数字、带圈数字/字母等归一化为 ASCII，普通题干文本仍保留原字符。 */
+  function normalizeMathText(tex) {
+    return tex.replace(/[\u2160-\u217F\u2460-\u24FF\u2776-\u2793]/g, function (c) {
+      return c.normalize('NFKC');
+    });
+  }
+
   function hasMath(text) {
     PATTERN.lastIndex = 0;
     return PATTERN.test(text);
@@ -28,7 +36,7 @@
       out += escText(text.slice(last, m.index));
       var info = texOf(m, m[1], m[2], m[3], m[4]);
       try {
-        out += katex.renderToString(info.tex.trim(), {
+        out += katex.renderToString(normalizeMathText(info.tex.trim()), {
           displayMode: info.display,
           throwOnError: false,
           strict: false,
@@ -121,6 +129,7 @@
   function installAutoRender() {
     var pending = [];
     var scheduled = false;
+    var idleHandle = 0;
 
     function skipSubtree(el) {
       return !!(el.closest && el.closest('script, style, textarea, input, select, option, .katex'));
@@ -130,6 +139,8 @@
       if (!node) return;
       var el = node.nodeType === 1 ? node : (node.nodeType === 3 ? node.parentElement : null);
       if (!el) return;
+      if (pending.some(function (other) { return other === el || other.contains(el); })) return;
+      pending = pending.filter(function (other) { return !el.contains(other); });
       pending.push(el);
       schedule();
     }
@@ -137,6 +148,7 @@
     /* 一帧内的多次变更合成一次；嵌套的只留最外层，同一棵树不走两遍 */
     function flush() {
       scheduled = false;
+      idleHandle = 0;
       var list = pending;
       pending = [];
       if (!window.BsjMath.autoRender) return;
@@ -154,8 +166,13 @@
     function schedule() {
       if (scheduled) return;
       scheduled = true;
-      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(flush);
-      else setTimeout(flush, 16);
+      /* 公式渲染会替换大量文字节点，不要占用动画帧，也不要在批量
+         更新期间反复触发布局；空闲时一次性处理已合并的根节点。 */
+      if (typeof requestIdleCallback === 'function') {
+        idleHandle = requestIdleCallback(flush, { timeout: 120 });
+      } else {
+        idleHandle = setTimeout(flush, 50);
+      }
     }
 
     /* math.js 是在 body 里执行的，这时文档可能只解析了一半：

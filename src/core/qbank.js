@@ -34,9 +34,11 @@ export function getQbankProblem(id) {
     referenceSource:{code:q.code,answerHtml:q.answerHtml,analysisHtml:q.analysisHtml,
       knowledgeIds:[...q.knowledgeIds],methodIds:[...q.methodIds]},
     solutionGraphs:keysteps ? keystepsToGraphs(keysteps,{id:'g-main',name:'本题关键点'}) : skeleton.solutionGraphs,
-    graphQuality:keysteps ? 'source-analysis-keypoints' : 'source-tags-with-generic-tutoring-skeleton',
+    graphQuality:q.pilot ? 'pilot-generic-skeleton' : keysteps ? 'source-analysis-keypoints' : 'source-tags-with-generic-tutoring-skeleton',
   };
   cache.set(id,problem);
   return problem;
 }
-export const QBANK_IDS=Object.freeze([...records.keys()]);
+// Keep the legacy list stable for existing reports and coverage; pilot IDs are
+// exposed separately until their graphs receive the same review contract.
+export const QBANK_IDS=Object.freeze(QBANK_SOURCE.map(q=>`qbank-${q.i}`));

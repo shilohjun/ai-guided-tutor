@@ -1,0 +1,1704 @@
+/* =====================================================================
+   0. 设计 token
+   ---------------------------------------------------------------------
+   间距：只取 2 / 4 / 6 / 8 / 12 / 16 / 24 / 32，禁止 13、17、22 这类魔数
+   字号：只取 11 / 13 / 15 / 18 四档（11 标签、13 正文与题干、15 小节标题、18 页面标题）
+         —— 比 LeetCode 的 12/14 再收一档：中文笔画密，13px 读长题正好
+   字重：只取 400 / 600 / 700（700 只给标题与数字，600 只给标签与按钮）
+   圆角：内层 8 + 内边距 16 = 卡片 24；次级面 16；药丸 999
+   色彩：白底为基准 + 一个主色（靛蓝 54% 饱和），辅助色饱和度一律 ≤ 60%
+   ===================================================================== */
+:root{
+  --font-sans: "Nunito","Noto Sans SC","PingFang SC","Microsoft YaHei UI","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono: "JetBrains Mono","Cascadia Mono",Consolas,"SFMono-Regular",monospace;
+
+  /* —— 中性色：白为主 —— */
+  --paper:#F7F8FA;
+  --surface:#FFFFFF;
+  --surface-2:#F4F5F7;
+  --surface-3:#E9EBEF;
+  --line:#E6E8EC;
+  --line-strong:#D3D6DC;
+
+  /* —— 文字：正文固定 #1A1A1A，全站禁用纯黑 —— */
+  --ink:#1A1A1A;
+  --ink-2:#4A4A4A;
+  --ink-3:#6E6E6E;
+  --ink-4:#9A9A9A;   /* 只用于占位图形/描边，不承担文字 */
+
+  /* —— 主色：全站唯一强调色（HSL 243,54%,53%） —— */
+  --brand:#4F46C8;
+  --brand-strong:#3D3599;
+  --brand-tint:#EEEDFB;
+  --brand-line:#D5D2F2;
+  --brand-ink:#403AB0;
+
+  /* —— 辅助语义色：只用于状态，不作大面积主色 —— */
+  --mint:#1F7A5F;   --mint-tint:#EAF4F0;  --mint-line:#C9E2D9;
+  --amber:#8A6A2A;  --amber-tint:#FBF3E4; --amber-line:#EBD9B8;
+  --coral:#B23B3B;  --coral-tint:#FBEDED; --coral-line:#EDC9C9;
+
+  --shadow-1:0 1px 2px rgba(26,26,26,.04), 0 8px 24px rgba(26,26,26,.05);
+  --shadow-2:0 16px 40px rgba(26,26,26,.10);
+
+  /* —— 圆角三级：外 = 内 + 内边距，同心 —— */
+  --r-card:24px;
+  --r-sub:16px;
+  --r-inner:8px;
+  --r-pill:999px;
+  --r-circle:50%;
+  --r-sm:8px; --r-md:8px; --r-lg:24px; --r-xl:24px;  /* 兼容别名 */
+
+  /* —— 字号四档 + 行高（对齐 LeetCode：正文 14/21、标签 12、小节 16、大标题 20）
+        这一组是「中」档，也就是改造前的原样；小/大两档在下面 html[data-ux] 里整组覆盖 —— */
+  --fs-meta:11px;
+  --fs-body:13px;  --lh-body:1.45;
+  --fs-lead:13px;
+  --fs-sub:15px;   --lh-sub:1.35;
+  --fs-title:18px; --lh-title:1.25;
+
+  /* —— 盒子尺寸：只收「包着文字的固定盒子」。间距与圆角不跟档位走 ——
+        撑开版面靠盒子高度；留白跟着放大会让大档又大又稀，反而更难读 */
+  --topbar:52px;
+  /* 首页给固定底条留的呼吸位：底条 64px + 上下各 20px，不参与 8pt 节奏 */
+  --p1-bottom-space:104px;
+  --topbar-sm:46px;
+  --ctl:32px;
+  --input-h:48px;
+  --ico:30px;
+  --ico-lg:40px;
+  --ico-sm:24px;
+  --av:32px;
+  --av-img:26px;
+  --pane-head:44px;
+  /* 使用引导打开时首屏要给底部那张卡让出来的高度（卡片约 148 + 呼吸 32） */
+  --guide-lift:180px;
+}
+
+/* —— 档位：小。整组覆盖而不是乘一个系数，每个值都能逐行核对 —— */
+html[data-ux="s"]{
+  --fs-meta:10px;
+  --fs-body:12px;
+  --fs-lead:12px;
+  --fs-sub:14px;
+  --fs-title:16px;
+  --topbar:48px;
+  --topbar-sm:44px;
+  --ctl:30px;
+  --input-h:44px;
+  --ico:28px;
+  --ico-lg:36px;
+  --ico-sm:22px;
+  --av:30px;
+  --av-img:24px;
+  --pane-head:40px;
+}
+/* —— 档位：大 —— */
+html[data-ux="l"]{
+  --fs-meta:13px;
+  --fs-body:15px;
+  --fs-lead:15px;
+  --fs-sub:17px;
+  --fs-title:21px;
+  --topbar:58px;
+  --topbar-sm:50px;
+  --ctl:36px;
+  --input-h:54px;
+  --ico:34px;
+  --ico-lg:44px;
+  --ico-sm:28px;
+  --av:36px;
+  --av-img:30px;
+  --pane-head:48px;
+}
+
+html[data-theme="dark"]{
+  --paper:#121216;
+  --surface:#1A1A1F;
+  --surface-2:#232329;
+  --surface-3:#2C2C34;
+  --line:#33333B;
+  --line-strong:#45454F;
+
+  --ink:#F2F2F5;
+  --ink-2:#B4B4BE;
+  --ink-3:#8C8C99;
+  --ink-4:#66666F;
+
+  --brand:#837DDD;
+  --brand-strong:#9A95E8;
+  --brand-tint:#252347;
+  --brand-line:#3B3868;
+  --brand-ink:#A29DE8;
+
+  --mint:#5FC0A2;   --mint-tint:#14261F;  --mint-line:#265042;
+  --amber:#D9A85A;  --amber-tint:#2A2314; --amber-line:#4A3B1B;
+  --coral:#E07A7A;  --coral-tint:#2E1C1C; --coral-line:#553030;
+
+  --shadow-1:0 1px 2px rgba(0,0,0,.40), 0 8px 24px rgba(0,0,0,.32);
+  --shadow-2:0 16px 40px rgba(0,0,0,.50);
+}
+
+/* =====================================================================
+   1. 基础：整页固定视口，只有面板内部滚动
+   ===================================================================== */
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{height:100%}
+body{
+  margin:0;
+  height:100dvh;
+  overflow:hidden;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--font-sans);
+  font-size:var(--fs-body);
+  line-height:var(--lh-body);
+  -webkit-font-smoothing:antialiased;
+  display:flex;
+  flex-direction:column;
+  transition:background .25s ease,color .25s ease;
+}
+button{font-family:inherit;font-size:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+h1,h2,h3,p,ul,ol{margin:0;padding:0}
+ul,ol{list-style:none}
+img{display:block;max-width:100%}
+::selection{background:color-mix(in srgb,var(--brand) 18%,transparent)}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:var(--r-inner)}
+
+.scroller{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--line-strong) transparent}
+.scroller::-webkit-scrollbar{width:8px;height:8px}
+.scroller::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:var(--r-pill);border:2px solid transparent;background-clip:content-box}
+.scroller::-webkit-scrollbar-track{background:transparent}
+
+/* =====================================================================
+   2. 顶栏
+   ===================================================================== */
+.topbar{
+  position:relative;
+  z-index:30;
+  flex:none;
+  height:var(--topbar);
+  /* 三栏等分：中间那栏与视口中线对齐，不受左右两栏宽度差影响 */
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  align-items:center;
+  column-gap:16px;
+  padding:0 24px;
+  background:var(--paper);
+  border-bottom:1px solid var(--line);
+  backdrop-filter:blur(12px);
+}
+.tb-left{display:flex;align-items:center;gap:8px;flex:none;min-width:0}
+.brand{display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:var(--r-inner);transition:background .18s}
+.brand:hover{background:var(--surface-2)}
+.brand-mark{
+  width:var(--ico);height:var(--ico);flex:none;
+  display:grid;place-items:center;
+}
+.brand-mark img{width:var(--ico);height:var(--ico);display:block}
+.brand-name{font-weight:700;font-size:var(--fs-lead);letter-spacing:.02em}
+.brand-sub{font-size:var(--fs-meta);color:var(--ink-3);font-weight:400}
+
+.tb-div{width:1px;height:var(--ico-sm);background:var(--line)}
+
+/* 页面进度：普通态为带文字的步骤条 */
+.stepper{display:flex;align-items:center;gap:0}
+.pstep{
+  display:flex;align-items:center;gap:8px;
+  padding:4px 8px;border-radius:var(--r-inner);
+  color:var(--ink-3);font-size:var(--fs-body);font-weight:600;
+  transition:background .18s,color .18s;
+  white-space:nowrap;
+}
+.pstep i{
+  width:var(--ico-sm);height:var(--ico-sm);border-radius:var(--r-circle);flex:none;
+  display:grid;place-items:center;
+  font-style:normal;font-size:var(--fs-body);font-weight:700;
+  background:var(--surface-3);color:var(--ink-2);
+  border:1px solid transparent;
+  transition:.2s;
+}
+.pstep:hover:not(:disabled){background:var(--surface-2);color:var(--ink-2)}
+.pstep[data-state="done"]{color:var(--mint)}
+.pstep[data-state="done"] i{background:var(--mint-tint);color:var(--mint);border-color:var(--mint-line)}
+.pstep[data-state="now"]{color:var(--brand)}
+.pstep[data-state="now"] i{background:var(--brand);color:#fff;border-color:var(--brand)}
+.pstep:disabled{cursor:default;opacity:.55}
+.pstep .lbl{font-style:normal}
+.pstep-line{width:16px;height:1px;background:var(--line-strong);flex:none;margin:0 4px}
+
+.tb-center{display:flex;justify-content:center;min-width:0;justify-self:center}
+.tb-right{display:flex;align-items:center;gap:8px;flex:none;justify-self:end}
+.bank-tools{display:none;align-items:center;gap:12px;margin-right:6px}
+body[data-bank="1"] .bank-tools{display:flex}
+body[data-bank="1"] #modeSwitch{display:none!important}
+.bt{
+  display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 16px;
+  border:1px solid var(--line);border-radius:var(--r-pill);background:var(--surface);
+  color:var(--ink-2);font-size:12px;line-height:1;cursor:pointer;white-space:nowrap;
+  transition:border-color .18s,color .18s,background .18s;
+}
+.bt:hover{border-color:var(--brand-line);color:var(--brand-ink);background:var(--brand-tint)}
+.bt-seg{padding:2px;gap:2px}
+.bt-seg button{height:26px;padding:0 16px;font-size:12px}
+.lbl-mini{display:none}
+@media (max-width:720px){
+  .bt{padding:0 8px;height:26px}
+  .bt-seg button{padding:0 8px;height:22px}
+  .lbl-full{display:none}
+  .lbl-mini{display:inline}
+  .bank-tools{gap:6px}
+  .tb-right{gap:6px}
+  .brand-sub{display:none}
+  .brand-name{display:none}
+}
+
+.icon-btn{
+  width:var(--ctl);height:var(--ctl);border-radius:var(--r-inner);
+  display:grid;place-items:center;
+  color:var(--ink-2);
+  border:1px solid transparent;
+  transition:.18s;
+}
+.icon-btn:hover{background:var(--surface-2);color:var(--ink);border-color:var(--line)}
+.icon-btn svg{width:calc(var(--ctl) / 2);height:calc(var(--ctl) / 2)}
+.icon-btn.sm{width:var(--ctl);height:var(--ctl)}
+.icon-btn.sm svg{width:16px;height:16px}
+.icon-btn.is-off{opacity:.45;cursor:not-allowed}
+
+/* 页面三：紧凑顶栏（只保留"更矮"这一条，其余跟着全局档位走） */
+body[data-page="3"]{--topbar:var(--topbar-sm)}
+body[data-page="3"] .topbar{padding:0 16px;gap:8px}
+body[data-page="3"] .brand-name{font-size:var(--fs-body)}
+body[data-page="3"] .brand{padding:2px 4px}
+body[data-page="3"] .brand-sub{display:none}
+
+/* 解题进度：圆圈序号（页三挂在左栏「题目」旁） */
+.xp{display:flex;align-items:center;flex:0 1 auto;min-width:0}
+.xp-dot{
+  position:relative;flex:none;
+  width:var(--ico-sm);height:var(--ico-sm);border-radius:var(--r-circle);
+  display:grid;place-items:center;
+  font-size:var(--fs-body);font-weight:600;
+  background:var(--surface);
+  color:var(--ink-3);
+  border:2px solid var(--line-strong);
+  transition:.22s;
+  font-variant-numeric:tabular-nums;
+}
+.xp-line{width:16px;height:2px;background:var(--line-strong);flex:none;transition:.25s;margin:0 4px}
+.xp-line[data-done="1"]{background:var(--mint)}
+.xp-dot[data-state="done"]{background:var(--mint-tint);border-color:var(--mint);color:var(--mint)}
+/* 当前步：实心主色。不加外圈光晕 —— 24px 的圆套 4px 环会溢出成方块 */
+.xp-dot[data-state="now"]{
+  background:var(--brand);border-color:var(--brand);color:#fff;font-weight:700;
+  transform:scale(1.08);
+}
+/* 步骤被折叠处的省略号 */
+.xp-more{
+  flex:none;padding:0 4px;color:var(--ink-3);
+  font-size:var(--fs-body);font-weight:600;line-height:1;letter-spacing:.04em;
+  cursor:default;
+}
+.xp-dot::after{
+  content:attr(data-tip);
+  position:absolute;top:calc(100% + 8px);left:50%;
+  transform:translate(-50%,-4px);
+  background:var(--ink);color:var(--surface);
+  font-size:var(--fs-body);font-weight:400;line-height:1.4;
+  padding:4px 8px;border-radius:var(--r-inner);white-space:nowrap;
+  opacity:0;pointer-events:none;transition:.16s;
+  box-shadow:var(--shadow-2);z-index:40;
+}
+.xp-dot:hover::after{opacity:1;transform:translate(-50%,0)}
+/* 窗口首尾两个圆点：提示条改成贴边，避免被面板左右裁切 */
+.xp-dot[data-edge="start"]::after{left:0;transform:translate(0,-4px)}
+.xp-dot[data-edge="start"]:hover::after{transform:translate(0,0)}
+.xp-dot[data-edge="end"]::after{left:auto;right:0;transform:translate(0,-4px)}
+.xp-dot[data-edge="end"]:hover::after{transform:translate(0,0)}
+
+.seg{display:flex;align-items:center;gap:2px;padding:2px;background:var(--surface-3);border-radius:10px}
+.seg button{
+  padding:4px 8px;border-radius:var(--r-inner);font-size:var(--fs-body);font-weight:600;color:var(--ink-3);
+  transition:.18s;white-space:nowrap;
+}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--brand-ink);box-shadow:0 1px 2px rgba(26,26,26,.10)}
+html[data-theme="dark"] .seg button[aria-pressed="true"]{background:#3A3750;color:var(--brand-ink)}
+
+/* =====================================================================
+   3. 页面容器与按钮
+   ===================================================================== */
+#app{position:relative;flex:1;min-height:0}
+.page{position:absolute;inset:0;display:none;flex-direction:column;min-height:0}
+.page.is-active{display:flex;z-index:2;animation:pageIn .32s cubic-bezier(.22,.61,.36,1) both}
+/* 离开的那一页继续可见一小会儿，交叉淡出，换页不再是硬切 */
+.page.is-leaving{display:flex;z-index:1;pointer-events:none;animation:pageOut .16s ease both}
+@keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes pageOut{from{opacity:1;transform:none}to{opacity:0;transform:scale(.994)}}
+/* 首屏像 deepseek 那样一层一层浮上来：标 → 标题 → 输入框 → 底条 */
+@keyframes softIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes softFade{from{opacity:0}to{opacity:1}}
+.p1-ready .hero-mark{animation:softIn .5s cubic-bezier(.22,.61,.36,1) both}
+.p1-ready .hero-text{animation:softIn .58s .06s cubic-bezier(.22,.61,.36,1) both}
+.p1-ready .composer{animation:softIn .62s .14s cubic-bezier(.22,.61,.36,1) both}
+.p1-ready .p1-down{animation:softFade .5s .3s ease both}  /* 底条靠 translateX(-50%) 居中，不能动 transform */
+@media (prefers-reduced-motion:reduce){
+  .page.is-active,.page.is-leaving{animation:none}
+  .p1-ready .hero-mark,.p1-ready .hero-text,.p1-ready .composer,.p1-ready .p1-down{animation:none}
+}
+
+.btn-primary{
+  display:inline-flex;align-items:center;gap:8px;
+  min-height:28px;padding:4px 16px;border-radius:var(--r-inner);
+  background:var(--brand);color:#fff;
+  font-weight:500;font-size:var(--fs-body);line-height:var(--lh-body);
+  transition:.18s;
+}
+.btn-primary:hover:not(:disabled){background:var(--brand-strong)}
+.btn-primary:disabled{background:var(--surface-3);color:var(--ink-3);cursor:not-allowed}
+
+.btn-ghost{
+  min-height:28px;padding:4px 12px;border-radius:var(--r-inner);border:1px solid var(--line-strong);
+  font-weight:500;font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink-2);background:var(--surface);
+  transition:.18s;
+}
+.btn-ghost:hover{border-color:var(--ink-3);color:var(--ink)}
+
+.tag{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 6px;border-radius:var(--r-pill);
+  font-size:var(--fs-meta);font-weight:600;line-height:1.4;
+  background:var(--surface-2);color:var(--ink-3);
+  border:1px solid var(--line);
+}
+.tag.brand{background:var(--brand-tint);color:var(--brand-ink);border-color:var(--brand-line)}
+
+/* =====================================================================
+   4. 页面一：题目输入
+   ===================================================================== */
+.p1{flex:1;min-height:0;display:block;overflow-y:auto;overflow-x:hidden;scroll-behavior:smooth}
+.p1-screen{
+  position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:calc(100dvh - var(--topbar));padding:0 24px;
+}
+/* 首页回到垂直居中（上移 1/5 已撤回） */
+.p1-map{padding:0;min-height:calc(100dvh - var(--topbar))}
+.p1-map iframe{display:block;width:100%;height:calc(100dvh - var(--topbar));border:0;background:var(--paper)}
+.p1-list{
+  min-height:calc(100dvh - var(--topbar));display:flex;align-items:center;justify-content:center;
+  padding:24px;
+}
+.p1-list .bank{flex:none;width:min(748px,100%);height:min(72dvh,640px);margin-top:0}
+/* 标题区：图标与标题并排（同一行），整组在栏内水平居中 */
+.p1-hero{
+  flex:none;width:min(748px,100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  text-align:center;padding:0 0 24px;
+  transition:opacity .28s ease,transform .28s ease;
+}
+.hero-mark{
+  width:var(--ico-lg);height:var(--ico-lg);flex:none;
+  display:grid;place-items:center;
+}
+.hero-mark img{width:var(--ico-lg);height:var(--ico-lg);display:block}
+.hero-text{min-width:0}
+.p1-hero h1{font-size:var(--fs-sub);font-weight:700;line-height:var(--lh-sub);letter-spacing:0}
+.p1-hero h1 span{color:var(--brand)}
+
+/* ===== 首页改成 deepseek 式首屏 ===== */
+.p1-hero{
+  flex-direction:column;gap:12px;text-align:center;padding:24px 0 16px;
+}
+.hero-mark{width:var(--ico-lg);height:var(--ico-lg)}
+.hero-mark img{width:var(--ico-lg);height:var(--ico-lg)}
+.p1-hero h1{
+  font-size:clamp(24px,3.2vw,32px);line-height:1.28;font-weight:600;letter-spacing:-.012em;
+}
+.p1-hero p{margin-top:8px;font-size:var(--fs-lead);color:var(--ink-3)}
+
+.p1-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:16px 0 0}
+.p1-chips button{
+  height:30px;padding:0 12px;border-radius:var(--r-pill);border:1px solid var(--line);
+  background:var(--surface);color:var(--ink-3);font-size:var(--fs-meta);cursor:pointer;
+  transition:color .18s ease,border-color .18s ease;
+}
+.p1-chips button:hover{color:var(--ink);border-color:var(--line-strong)}
+
+/* 首页底部不再有「好题精练」按钮：留一行不可点的静态暗示，往下滑就进题库。
+   入口由先看一次的使用引导讲清楚（见第 11 节），这一行只负责"下面还有东西"。 */
+.p1-down{
+  position:absolute;left:50%;bottom:22px;transform:translateX(-50%);
+  display:flex;align-items:center;gap:6px;
+  color:var(--ink-3);font-size:var(--fs-meta);white-space:nowrap;
+  pointer-events:none;
+}
+.p1-down i{font-style:normal;display:inline-block;animation:downNudge 2s ease-in-out infinite}
+@keyframes downNudge{0%,100%{transform:translateY(0)}50%{transform:translateY(2px)}}
+.bank-head .bank-map{display:none}
+@media (prefers-reduced-motion:reduce){.p1-down i{animation:none}.p1-hero{transition:none}}
+/* ===== 首屏极简：宋体标题，去掉示例与提示语 ===== */
+/* ===== 首屏标题字体：思源宋体子集（仅标题用到的 12 个字，3.4KB）===== */
+@font-face{
+  font-family:"SH Serif Title";
+  src:url("/fonts/serif-title-600.woff2") format("woff2");
+  font-weight:600;font-display:swap;
+}
+.p1-hero h1{
+  font-family:"SH Serif Title","Source Han Serif SC","Source Han Serif CN","Noto Serif SC","Songti SC",SimSun,serif;
+  font-weight:600;letter-spacing:.01em;
+}
+.p1-chips{display:none}
+.composer.is-picked .composer-main textarea{display:none}
+/* 读题中：把输入区换成一行加载态，原地等，不闪屏 */
+.composer.is-reading .composer-main textarea,
+.composer.is-reading .picked,
+.composer.is-reading .shot,
+.composer.is-reading .composer-bar{display:none}
+.reading{display:none;align-items:center;gap:12px;padding:16px 2px}
+.composer.is-reading .reading{display:flex}
+.reading .spin{
+  flex:none;width:18px;height:18px;border-radius:50%;
+  border:2px solid var(--brand-line);border-top-color:var(--brand);
+  animation:spin .8s linear infinite;
+}
+.reading-retry{
+  margin-left:auto;flex:none;height:28px;padding:0 12px;border-radius:var(--r-pill);
+  border:1px solid var(--brand-line);background:var(--surface);color:var(--brand-ink);font-size:var(--fs-meta);
+}
+.reading div{display:flex;flex-direction:column;gap:4px}
+.reading b{font-size:var(--fs-lead);font-weight:600;color:var(--ink);line-height:1.2}
+.reading em{font-style:normal;font-size:var(--fs-meta);color:var(--ink-3);line-height:1.3}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.reading .spin{animation:none;border-top-color:var(--brand-line)}.reading .spin::after{content:"";display:block;width:100%;height:100%;border-radius:50%;background:var(--brand);transform:scale(.45)}}
+.mathprev{
+  flex:0 0 100%;order:9;padding-top:12px;border-top:1px solid var(--line);
+  max-height:32dvh;overflow:auto;font-size:var(--fs-body);line-height:1.55;color:var(--ink);
+}
+.mathprev p{margin:0 0 8px}
+.mathprev p:last-child{margin-bottom:0}
+.mathprev .katex{font-size:1.02em}
+.mathprev .katex-display{margin:8px 0}
+.picked{padding:2px 2px 2px;max-height:min(36dvh,calc(100dvh - var(--topbar) - 320px));overflow:auto}
+/* 首屏内容与底部「好题精练」之间留出固定呼吸位，卡片再长也不会压到它 */
+#p1Home{padding-bottom:32px}
+.picked-body{font-size:var(--fs-body);line-height:1.7;color:var(--ink)}
+.picked-body .qstem p{margin:0 0 .5em}
+.picked-body .qstem p:last-child{margin-bottom:0}
+.picked-loading{color:var(--ink-3);font-size:var(--fs-body);margin:2px 0}
+.picked-clear{
+  height:22px;padding:0 8px;border-radius:var(--r-pill);border:1px solid var(--line);
+  background:var(--surface);color:var(--ink-3);font-size:var(--fs-meta);cursor:pointer;
+}
+.picked-clear:hover{border-color:var(--brand-line);color:var(--brand-ink)}
+.composer .c-chip,.composer .c-hint{display:none}
+/* ===== 题库在地图里，下滑就上来：悬浮抬升，不换页 ===== */
+.p1{overflow-y:auto;overscroll-behavior:contain}
+.p1-map{
+  opacity:0;transform:translateY(34px) scale(.995);
+  transition:opacity .42s cubic-bezier(.22,.61,.36,1),transform .42s cubic-bezier(.22,.61,.36,1);
+}
+.p1-map.is-in{opacity:1;transform:none}
+.p1-map{position:relative}
+.p1-map::after{
+  content:"正在铺开题库…";position:absolute;inset:0;display:grid;place-items:center;
+  background:var(--paper);color:var(--ink-3);font-size:var(--fs-body);
+  opacity:1;transition:opacity .3s ease;
+}
+.p1-map.is-ready::after{opacity:0;pointer-events:none}
+.p1-map iframe{height:calc(100dvh - var(--topbar))}
+@media (prefers-reduced-motion:reduce){.p1-map{transition:none;opacity:1;transform:none}}
+/* 点「好题精练」时，那一条自己先抬一下 */
+/* 顶栏步骤条只在真正做题时出现 */
+.tb-center{transition:opacity .2s ease}
+body[data-page="1"] .tb-center,body[data-page="2"] .tb-center{opacity:0;pointer-events:none}
+
+
+.p1-hero p{margin-top:4px;font-size:var(--fs-body);color:var(--ink-3);font-weight:400}
+
+.p1-col{width:min(748px,100%);flex:none;display:flex;flex-direction:column}
+
+/* 输入框 */
+.composer{
+  flex:none;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--r-card);
+  padding:16px;
+  box-shadow:var(--shadow-1);
+  transition:border-color .2s,box-shadow .2s;
+}
+.composer:focus-within{
+  border-color:var(--brand-line);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 12%,transparent),var(--shadow-1);
+}
+.composer textarea{
+  width:100%;min-height:var(--input-h);height:var(--input-h);border:0;outline:none;resize:none;overflow-y:hidden;
+  background:transparent;color:var(--ink);
+  font-family:inherit;font-size:var(--fs-body);line-height:var(--lh-body);
+}
+.composer textarea::placeholder{color:var(--ink-3)}
+.composer-bar{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-top:12px}
+.c-left{display:flex;align-items:center;gap:8px;min-width:0}
+.c-chip{
+  display:inline-flex;align-items:center;gap:4px;flex:none;white-space:nowrap;
+  padding:2px 8px;border-radius:var(--r-pill);
+  font-size:var(--fs-body);font-weight:600;line-height:1.4;color:var(--brand-ink);
+  background:var(--brand-tint);border:1px solid var(--brand-line);
+}
+.c-chip svg{width:14px;height:14px}
+.c-hint{font-size:var(--fs-meta);color:var(--ink-3);font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.c-right{display:flex;align-items:center;gap:8px;flex:none}
+.send-btn{
+  width:var(--ctl);height:var(--ctl);border-radius:var(--r-circle);
+  display:grid;place-items:center;
+  background:var(--brand);color:#fff;
+  transition:.18s;
+}
+.send-btn svg{width:calc(var(--ctl) / 2);height:calc(var(--ctl) / 2)}
+.send-btn:hover{background:var(--brand-strong)}
+.send-btn[disabled]{background:var(--surface-3);color:var(--ink-3);cursor:not-allowed}
+
+/* =====================================================================
+   符号面板
+   ---------------------------------------------------------------------
+   物理公式里的 ² μ Ω √ 在普通键盘上打不出来 —— 写不出来，学生就只能用文字绕，
+   思路的表达精度直接下降。面板是给"不会打"的人兜底的，不是唯一入口。
+
+   两点和旧版不同，都是被现在的布局逼出来的：
+   1) 浮层挂在 <body> 上、fixed 定位。第 3 页的输入框长在 .pane{overflow:hidden}
+      里，第 1 页长在 .p1{overflow-y:auto} 里 —— 绝对定位的浮层在这两处都会被裁掉，
+      表现就是"点开了只看到一条边"。
+   2) 两页共用同一个面板，靠 data-sym-trigger 指向各自的输入框。
+   ===================================================================== */
+.sym-trigger{font-family:var(--font-sans);font-size:var(--fs-body);font-weight:700;line-height:1}
+/* 题库的题已经灌进输入框时，文本框被只读卡片顶掉，符号与语音都没有落点 —— 入口跟着一起收起来 */
+.composer.is-picked .sym-trigger,
+.composer.is-picked .mic-btn{display:none}
+
+.sympanel{
+  position:fixed;left:0;top:0;z-index:45;
+  width:min(480px,calc(100vw - 32px));
+  display:flex;flex-direction:column;gap:6px;padding:8px;
+  background:var(--surface);border:1px solid var(--line-strong);
+  border-radius:var(--r-sub);box-shadow:var(--shadow-2);
+  /* 高度由 public/symbolpanel.js 钳到"输入框上方还剩多少"，超出的部分格子自己滚 */
+  overflow:hidden;
+}
+.sympanel[hidden]{display:none}
+.symgrid{display:flex;flex-direction:column;gap:6px;min-height:0;overflow-y:auto}
+.symgroup{display:flex;align-items:center;gap:8px}
+.symgroup-label{flex:none;width:32px;text-align:right;font-size:var(--fs-meta);font-weight:400;color:var(--ink-3)}
+.symrow{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
+.symcell{
+  min-width:32px;height:32px;padding:0 6px;
+  display:grid;place-items:center;
+  font-family:var(--font-sans);font-size:var(--fs-body);font-weight:600;line-height:1;color:var(--ink);
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-inner);
+  cursor:pointer;transition:background .12s,border-color .12s,color .12s;
+}
+.symcell:hover{background:var(--brand-tint);border-color:var(--brand-line);color:var(--brand-ink)}
+.symcell:active{background:var(--brand-tint)}
+/* 手机：格子放大到能稳妥点中的尺寸（44px），分组标签收窄一点省宽度 */
+@media (max-width:640px){
+  .sympanel{width:min(100%,calc(100vw - 24px));gap:8px}
+  .symgroup-label{width:24px}
+  .symcell{min-width:44px;height:44px;padding:0 8px}
+}
+
+/* 识别成功：图挂在输入框右侧、文字直接落进输入框本体 */
+.composer-main{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.composer-main textarea{flex:1;min-width:0}
+.shot{
+  position:relative;flex:none;
+  width:48px;height:48px;border-radius:var(--r-inner);overflow:hidden;
+  background:var(--surface-2);border:1px solid var(--line);
+  animation:pop .2s ease both;
+}
+.shot{cursor:zoom-in}
+.shot img{width:100%;height:100%;object-fit:cover}
+.viewer{
+  position:fixed;inset:0;z-index:70;display:grid;place-items:center;padding:32px;
+  background:rgba(20,20,22,.6);animation:viewerIn .18s ease both;
+}
+.viewer[hidden]{display:none}
+.viewer img{
+  max-width:min(92vw,760px);max-height:78vh;border-radius:16px;object-fit:contain;
+  background:#fff;box-shadow:0 24px 64px rgba(0,0,0,.32);
+}
+.viewer-x{
+  position:absolute;top:calc(var(--topbar) + 18px);right:18px;width:36px;height:36px;border-radius:50%;
+  display:grid;place-items:center;background:rgba(255,255,255,.94);color:#1a1a1a;
+  box-shadow:0 6px 18px rgba(0,0,0,.22);cursor:pointer;transition:.16s;
+}
+.viewer-x:hover{background:#fff;transform:scale(1.04)}
+@keyframes viewerIn{from{opacity:0}to{opacity:1}}
+html[data-theme="dark"] .viewer{background:rgba(0,0,0,.72)}
+html[data-theme="dark"] .viewer img{background:#111}
+
+/* ---- 同类题抽屉（页五） ---- */
+.rel-scrim{
+  position:fixed;inset:0;z-index:55;background:rgba(20,20,22,.32);
+  animation:viewerIn .2s ease both;
+}
+.rel-scrim[hidden]{display:none}
+.rel-drawer{
+  position:fixed;top:0;right:0;bottom:0;z-index:56;width:min(430px,100%);
+  display:flex;flex-direction:column;background:var(--surface);
+  border-left:1px solid var(--line);box-shadow:-18px 0 44px rgba(20,20,22,.14);
+  transform:translateX(102%);visibility:hidden;
+  transition:transform .28s cubic-bezier(.22,.61,.36,1),visibility .28s;
+}
+.rel-drawer.on{transform:none;visibility:visible}
+.rel-head{display:flex;align-items:flex-start;gap:12px;padding:16px 16px 12px}
+.rel-title h2{margin:0;font-size:var(--fs-sub);font-weight:600;color:var(--ink)}
+.rel-title p{margin:4px 0 0;font-size:var(--fs-meta);color:var(--ink-3)}
+.rel-x{
+  margin-left:auto;flex:none;width:30px;height:30px;border-radius:50%;
+  display:grid;place-items:center;color:var(--ink-3);background:var(--surface-2);transition:.16s;
+}
+.rel-x:hover{background:var(--surface-3);color:var(--ink)}.rel-seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line);border-radius:var(--r-pill);background:var(--paper)}.rel-seg button[aria-pressed="true"]{background:var(--brand-tint);color:var(--brand-ink);font-weight:600}.rel-all{
+  margin-left:auto;flex:none;height:26px;padding:0 12px;border-radius:var(--r-pill);
+  border:1px solid var(--line);background:var(--surface);color:var(--ink-2);font-size:var(--fs-meta);
+}
+.rel-all[aria-pressed="true"]{border-color:var(--brand-line);color:var(--brand-ink);background:var(--brand-tint);font-weight:600}
+.rel-filters{display:flex;gap:8px;padding:0 16px 8px}
+.rel-f{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.rel-f>span{font-size:var(--fs-meta);color:var(--ink-3)}
+.rel-f select{
+  width:100%;height:30px;padding:0 8px;border-radius:var(--r-inner);
+  border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:var(--fs-meta);
+}.rel-ctx b{color:var(--brand-ink);font-weight:600}
+.rel-list{flex:1;min-height:0;overflow:auto;padding:0 12px 12px;display:flex;flex-direction:column;gap:8px}
+.rel-item{
+  display:block;width:100%;text-align:left;padding:12px 12px;border-radius:var(--r-inner);
+  border:1px solid var(--line);background:var(--surface);transition:.16s;
+}
+.rel-item:hover{border-color:var(--brand-line);background:var(--brand-tint)}
+.rel-item .m{font-size:var(--fs-meta);color:var(--ink-3);display:flex;gap:8px;flex-wrap:wrap}
+.rel-item .m b{color:var(--brand-ink);font-weight:600}
+.rel-busy{
+  position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:8px;text-align:center;
+  background:color-mix(in srgb,var(--surface) 94%,transparent);backdrop-filter:blur(2px);
+  border-radius:var(--r-card);
+}
+.rel-busy .spin{
+  width:22px;height:22px;border-radius:50%;
+  border:2px solid var(--brand-line);border-top-color:var(--brand);animation:spin .8s linear infinite;
+}
+.rel-busy b{font-size:var(--fs-lead);font-weight:600;color:var(--ink)}
+.rel-busy em{font-style:normal;font-size:var(--fs-meta);color:var(--ink-3)}
+@media (prefers-reduced-motion:reduce){.rel-busy .spin{animation:none;border-top-color:var(--brand-line)}}
+.rel-item .s{
+  margin-top:6px;font-size:var(--fs-body);color:var(--ink-2);line-height:1.5;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.rel-foot{
+  flex:none;display:flex;align-items:center;gap:12px;padding:12px 16px;
+  border-top:1px solid var(--line);font-size:var(--fs-meta);color:var(--ink-3);
+}
+.rel-foot .btn-ghost{margin-left:auto}
+@media (max-width:720px){
+  .rel-drawer{
+    top:auto;left:0;right:0;width:100%;height:76dvh;
+    border-left:0;border-top:1px solid var(--line);border-radius:var(--r-sub) var(--r-sub) 0 0;
+    transform:translateY(102%);box-shadow:0 -18px 44px rgba(20,20,22,.18);
+  }
+  .rel-drawer.on{transform:none}
+}
+@media (max-width:720px){
+  .viewer{padding:16px}
+  .viewer img{max-width:96vw;max-height:72vh;border-radius:10px}
+  .viewer-x{top:calc(var(--topbar) + 10px);right:12px;width:32px;height:32px}
+}
+.shot-x{
+  position:absolute;top:2px;right:2px;
+  width:16px;height:16px;border-radius:var(--r-circle);
+  display:grid;place-items:center;
+  background:rgba(26,26,26,.58);color:#fff;
+  transition:.16s;
+}
+.shot-x:hover{background:rgba(26,26,26,.82)}
+.ocr-retry{
+  flex:none;
+  font-size:var(--fs-body);font-weight:600;
+  color:var(--brand-ink);background:var(--brand-tint);
+  padding:2px 8px;border-radius:var(--r-inner);
+}
+.ocr-retry:hover{background:var(--brand-line)}
+@keyframes pop{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:none}}
+
+/* 题库 */
+.bank{
+  flex:1;min-height:0;
+  margin-top:16px;
+  display:flex;flex-direction:column;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--r-card);
+  box-shadow:var(--shadow-1);
+  overflow:hidden;
+}
+.bank-head{
+  flex:none;display:flex;align-items:center;gap:8px;
+  padding:12px 16px;border-bottom:1px solid var(--line);
+}
+.bank-head strong{font-size:var(--fs-lead);font-weight:700;line-height:var(--lh-body)}
+.bank-head .tag{margin-left:auto}
+.bank-head .tag + .tag{margin-left:0}
+.bank-list{flex:1;min-height:0;padding:12px 16px;display:flex;flex-direction:column;gap:4px}
+.q-item{
+  display:flex;align-items:center;gap:8px;
+  width:100%;text-align:left;
+  padding:8px 12px;border-radius:var(--r-inner);
+  border:1px solid transparent;
+  transition:.16s;
+}
+.q-item:hover{background:var(--surface-2)}
+.q-item[aria-pressed="true"]{
+  background:var(--brand-tint);
+  border-color:var(--brand-line);
+}
+.q-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.q-meta{display:flex;align-items:center;gap:8px;font-size:var(--fs-meta);font-weight:400;color:var(--ink-3)}
+.q-meta .kind{color:var(--ink-3);background:var(--surface-2);border:1px solid var(--line);padding:2px 8px;border-radius:var(--r-pill);font-size:var(--fs-meta);font-weight:600;line-height:1.4;white-space:nowrap}
+.q-item[aria-pressed="true"] .q-meta .kind{background:var(--surface);border-color:var(--brand-line);color:var(--brand-ink)}
+.q-text{
+  font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.q-check{
+  width:var(--ico-sm);height:var(--ico-sm);border-radius:var(--r-circle);flex:none;
+  border:2px solid var(--line-strong);color:transparent;
+  display:grid;place-items:center;transition:.16s;
+}
+.q-check svg{width:calc(var(--ico-sm) / 2);height:calc(var(--ico-sm) / 2)}
+.q-item[aria-pressed="true"] .q-check{background:var(--brand);border-color:var(--brand);color:#fff}
+
+.p1-foot{
+  flex:none;margin-top:2px;display:flex;align-items:center;justify-content:center;
+  gap:8px;padding:12px 0 0;width:min(748px,100%);min-height:18px;
+}
+/* 首屏只留一行提示，确认动作交给输入框里的 ↑，避免两只同样的按钮 */
+.p1-foot .btn-primary{display:none}
+.p1-foot{justify-content:center}
+.p1-foot .note{margin-right:0;text-align:center}
+.p1-foot .note{font-size:var(--fs-meta);color:var(--ink-3);font-weight:400;margin-right:0}
+.note.bad{color:var(--coral)}
+
+.bank-empty{padding:24px 16px;text-align:center;color:var(--ink-3);font-size:var(--fs-body);line-height:var(--lh-body)}
+.bank-empty p{margin:0 0 16px}
+
+/* 题库地图：主应用里以 sheet 形式打开 public/qbank/map.html */
+.bank-head .bank-map{
+  margin-left:auto;display:inline-flex;align-items:center;gap:4px;
+  height:24px;padding:0 8px;border-radius:var(--r-pill);
+  border:1px solid var(--brand-line);background:var(--brand-tint);color:var(--brand-ink);
+  font-size:var(--fs-meta);font-weight:600;cursor:pointer;white-space:nowrap;
+}
+.bank-head .bank-map:hover{background:var(--brand);border-color:var(--brand);color:#fff}
+.bank-head .bank-map + .tag{margin-left:8px}
+.bank-search{width:100%;height:32px;margin:0 0 8px;padding:0 12px;border:1px solid var(--line);border-radius:var(--r-inner);background:var(--surface);color:var(--ink);font:inherit}
+.bank-search:focus{border-color:var(--brand-line)}
+.qb-mask{
+  position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;
+  padding:24px;background:rgba(18,18,24,.36);
+}
+.qb-mask[hidden]{display:none}
+.qb-sheet{
+  width:100%;height:100%;max-width:1400px;overflow:hidden;
+  border-radius:var(--r-card);background:var(--surface);box-shadow:0 30px 90px rgba(16,16,28,.35);
+  animation:qbIn .18s ease-out both;
+}
+#qbFrame{display:block;width:100%;height:calc(100dvh - var(--topbar));border:0;background:var(--paper)}
+.qb-close{
+  position:absolute;top:16px;left:16px;z-index:2;width:32px;height:32px;border-radius:50%;
+  border:1px solid var(--line);background:var(--surface);color:var(--ink-3);cursor:pointer;
+  font-size:13px;line-height:1;display:grid;place-items:center;box-shadow:var(--shadow-1);
+}
+.qb-close:hover{color:var(--ink);border-color:var(--line-strong)}
+.qb-sheet{position:relative}
+@keyframes qbIn{from{opacity:0;transform:translateY(8px) scale(.995)}to{opacity:1;transform:none}}
+body.is-qb{overflow:hidden}
+@media (max-width:760px){
+  .qb-mask{padding:0}
+  .qb-sheet{max-width:none;border-radius:0;box-shadow:none}
+}
+@media (prefers-reduced-motion:reduce){.qb-sheet{animation:none}}
+
+/* =====================================================================
+   5. 页面二：模式选择（上下两个长条）
+   ===================================================================== */
+.p2{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;padding:0 24px}
+.p2-col{width:min(748px,100%);flex:1;min-height:0;display:flex;flex-direction:column;justify-content:safe center;gap:16px}
+.p2-head{text-align:center;margin-bottom:8px}
+.p2-head h2{font-size:var(--fs-sub);font-weight:700;line-height:var(--lh-sub)}
+.p2-head p{margin-top:8px;font-size:var(--fs-body);color:var(--ink-3);font-weight:400}
+.p2-quote{
+  display:flex;align-items:center;gap:8px;
+  padding:16px;border-radius:var(--r-sub);
+  background:var(--surface-2);border:1px solid var(--line);
+  min-width:0;
+}
+.p2-quote span{flex:none;font-size:var(--fs-body);font-weight:600;color:var(--ink-3)}
+.p2-quote p{
+  font-size:var(--fs-body);color:var(--ink-2);font-weight:400;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.p2-modes{display:flex;flex-direction:column;gap:16px}
+.mode-bar{
+  display:flex;align-items:center;gap:16px;
+  width:100%;text-align:left;
+  padding:16px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--r-card);
+  box-shadow:var(--shadow-1);
+  transition:.2s;
+}
+.mode-bar:hover{border-color:var(--line-strong);box-shadow:var(--shadow-2)}
+.mode-bar[aria-pressed="true"]{
+  border-color:var(--brand);
+  background:var(--brand-tint);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 16%,transparent);
+}
+.mode-ico{
+  width:48px;height:48px;border-radius:var(--r-inner);flex:none;
+  display:grid;place-items:center;
+  background:var(--surface-2);color:var(--ink-2);
+  border:1px solid var(--line);
+  transition:.2s;
+}
+.mode-ico svg{width:24px;height:24px}
+.mode-bar[aria-pressed="true"] .mode-ico{background:var(--brand);color:#fff;border-color:var(--brand)}
+.mode-copy{flex:1;min-width:0}
+.mode-title{display:flex;align-items:center;gap:8px;font-size:var(--fs-sub);font-weight:700;line-height:var(--lh-sub)}
+.mode-desc{margin-top:4px;font-size:var(--fs-body);color:var(--ink-3);font-weight:400}
+.mode-arrow{color:var(--ink-3);flex:none;transition:.2s}
+.mode-arrow svg{width:16px;height:16px}
+.mode-bar[aria-pressed="true"] .mode-arrow{color:var(--brand);transform:translateX(2px)}
+.p2-foot{
+  flex:none;display:flex;align-items:center;justify-content:space-between;
+  gap:8px;padding:0 0 16px;width:min(748px,100%);
+}
+.p2-foot .note{font-size:var(--fs-body);color:var(--ink-3);font-weight:400}
+
+/* =====================================================================
+   5.1 陪学老师：两张模式卡下面的一行「讲法的人」
+   ---------------------------------------------------------------------
+   四位老师是"同一道题的不同讲法"，不是第三种做题方式 —— 所以它不该长成
+   第三张等大的卡。这一行只有头像和名字，四人同屏、点谁就是谁，不开浮层；
+   浮层只留给第 3 页栏头那个位置（那里排不开四个人）。
+   默认派蒙，选过就记住（bsj-mentor）。
+   ===================================================================== */
+
+/* —— 头像取景 ——
+   四张素材各自是独立裁的去底头像。做头像时素材本身就得是"脸在正中"的方图：
+   靠 CSS 平移只在 s=1 时管用，而一平移，另一侧就没有像素补上（会长出一条空白），
+   单纯放大又会把头顶切掉。所以取景问题在**素材层**解决，这里只负责圆形裁切与留白。
+   建华的素材曾偏左 60px，已按 characters/body 的原图重裁（脸居中、且裁掉了左侧的板子）；
+   其余三位目前的构图可以直接用。 */
+.av-frame{
+  position:relative;overflow:hidden;flex:none;
+  border-radius:var(--r-circle);
+}
+.av-frame img{
+  position:absolute;inset:0;
+  width:100%;height:100%;
+  object-fit:cover;
+  /* 留给"确实需要微调"的极端情况；正常情况下不设 --fx/--fy，等于不位移 */
+  transform:translate(var(--fx,0),var(--fy,0));
+}
+
+/* —— 页面二：一行头像，不占卡片的位置 ——
+   没有外框、没有背景：它要看起来像一句注解，不像第三张卡。
+   hover 才给一块浅底，让"能点"这件事在指针下显形。 */
+.mentor-row{display:flex;align-items:center;gap:12px;min-height:48px;flex-wrap:wrap}
+.mr-label{flex:none;font-size:var(--fs-body);color:var(--ink-3);font-weight:400}
+.mr-pick{
+  display:inline-flex;align-items:center;gap:6px;flex:none;
+  padding:4px 8px 4px 4px;border-radius:var(--r-pill);
+  border:1px solid transparent;background:transparent;
+  color:var(--ink-3);font-size:var(--fs-meta);font-weight:400;
+  transition:.16s;
+}
+.mr-pick:hover{background:var(--surface-2);color:var(--ink-2)}
+.mr-pick[aria-checked="true"]{
+  border-color:var(--brand-line);background:var(--brand-tint);
+  color:var(--brand-ink);font-weight:600;
+}
+.mr-pick .av-frame{width:var(--av);height:var(--av)}
+.mr-pick:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+/* —— 选老师层：居中浮层，点谁就是谁，点完即关 —— */
+.mentor-mask{position:fixed;inset:0;z-index:60;background:rgba(17,17,22,.40)}
+.mentor{
+  position:fixed;z-index:61;left:50%;top:50%;
+  transform:translate(-50%,-50%);
+  width:min(720px,calc(100vw - 32px));
+  max-height:calc(100% - 32px);
+  display:flex;flex-direction:column;gap:16px;
+  padding:24px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--r-card);
+  box-shadow:var(--shadow-2);
+}
+.mentor-head{display:flex;align-items:flex-start;gap:16px}
+.mentor-head h2{font-size:var(--fs-sub);font-weight:700;line-height:var(--lh-sub)}
+.mentor-head p{margin-top:4px;font-size:var(--fs-body);color:var(--ink-3)}
+.mentor-head .icon-btn{margin-left:auto}
+.mentor-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;overflow:auto}
+.pick{
+  display:flex;align-items:center;gap:8px;
+  padding:8px;
+  background:var(--surface-2);
+  border:1px solid var(--line);
+  border-radius:var(--r-sub);
+  color:var(--ink-2);
+  font-size:var(--fs-body);font-weight:600;
+  text-align:left;
+  transition:.16s;
+}
+.pick:hover{border-color:var(--line-strong);background:var(--surface)}
+.pick[aria-checked="true"]{border-color:var(--brand);background:var(--brand-tint);color:var(--brand-ink)}
+.pick .av-frame{width:48px;height:48px}
+.pick-copy{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pick-copy b{font-weight:700}
+.pick-copy em{font-style:normal;font-size:var(--fs-meta);font-weight:400;color:var(--ink-3)}
+
+/* —— 对话里的老师标识：谁在说话，点一下就能换 —— */
+.chat-mentor{
+  display:inline-flex;align-items:center;gap:4px;flex:none;
+  padding:2px 8px 2px 2px;
+  background:var(--surface-2);
+  border:1px solid var(--line);
+  border-radius:var(--r-pill);
+  color:var(--ink-2);
+  font-size:var(--fs-meta);font-weight:600;
+  transition:.16s;
+}
+.chat-mentor:hover{border-color:var(--line-strong);color:var(--ink)}
+.chat-mentor .av-frame{width:var(--ico-sm);height:var(--ico-sm)}
+.chat-mentor[aria-expanded="true"]{border-color:var(--brand);color:var(--brand-ink)}
+/* 气泡旁的头像跟着老师走，尺寸沿用原有的 26px 槽位 */
+.msg .av .av-frame{width:var(--av-img);height:var(--av-img)}
+@container (max-width:380px){
+  .chat-mentor .cm-name{display:none}
+}
+
+/* =====================================================================
+   6. 页面三：左右分栏工作台
+   ===================================================================== */
+.work{
+  flex:1;min-height:0;
+  display:grid;
+  grid-template-columns:var(--split,50%) 16px minmax(0,1fr);
+  padding:16px 24px 24px;
+  gap:0;
+}
+.pane{
+  min-width:0;min-height:0;
+  display:flex;flex-direction:column;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--r-card);
+  overflow:hidden;
+  box-shadow:var(--shadow-1);
+  container-type:inline-size;  /* 供下面按左栏实际宽度做降级 */
+}
+.pane-head{
+  position:relative;z-index:2;   /* 抬一层，圆点的悬停提示才不会被下面的 pane-body 盖住 */
+  flex:none;display:flex;align-items:center;gap:8px;
+  padding:6px 16px;border-bottom:1px solid var(--line);
+  min-height:var(--pane-head);
+}
+.pane-head strong{flex:none;white-space:nowrap;font-size:var(--fs-lead);font-weight:700;line-height:var(--lh-body);letter-spacing:.02em}
+.pane-head .tag{flex:none;white-space:nowrap}
+.pane-head .tag:first-of-type{margin-left:auto}
+/* 做题进度紧挨着「题目」。这里不能裁切 —— 悬停提示是 .xp-dot 的 ::after，
+   一旦 overflow:hidden，提示条会被剪掉，看起来就是"鼠标移上去没反应" */
+.pane-head .xp{margin-left:8px;padding:4px 0}
+.pane-head .xp-line{width:8px;margin:0 4px}
+/* 左栏变窄时依次降级：先缩圆点，再收标签 —— 不能让「题目」折成两行 */
+@container (max-width:560px){
+  .pane-head .xp-dot{width:calc(var(--ico-sm) - 4px);height:calc(var(--ico-sm) - 4px)}
+}
+@container (max-width:380px){
+  .pane-head .tag{display:none}
+}
+.pane-body{flex:1;min-height:0;padding:16px}
+
+/* 窄屏才出现「展开全部」。桌面左栏本来就是整题。 */
+.stem-open{display:none}
+.stem-mask{position:fixed;inset:0;z-index:60;background:rgba(17,17,22,.40)}
+.stem-mask[hidden],.stem-pop[hidden]{display:none}
+.stem-pop{
+  position:fixed;z-index:61;left:16px;right:16px;top:8vh;bottom:8vh;
+  display:flex;flex-direction:column;min-height:0;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);
+  box-shadow:var(--shadow-2);overflow:hidden;
+}
+.stem-pop-head{flex:none;display:flex;align-items:flex-start;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.stem-pop-head h2{font-size:var(--fs-sub);font-weight:700;line-height:var(--lh-sub)}
+.stem-pop-head p{margin-top:4px;font-size:var(--fs-meta);color:var(--ink-3)}
+.stem-pop-head .icon-btn{margin-left:auto}
+.stem-pop-body{flex:1;min-height:0;padding:16px}
+
+/* 左栏题目 */
+.q-rich img.qf{
+  height:0.85em;
+  width:auto;
+  max-width: 100%;
+  margin:0 0.2em;
+  object-fit:contain;
+  display:inline-block
+}
+.q-rich img.qfig{display:block;margin:12px auto;max-width:100%;height:auto;border:1px solid var(--line);border-radius:10px}
+.q-opts-r{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:8px}
+.q-opts-r li{display:flex;gap:12px;align-items:center;font-size:var(--fs-body);line-height:1.6;color:var(--ink-2)}
+.q-opts-r li b{flex:none;width:19px;height:19px;border-radius:50%;background:var(--brand-tint);color:var(--brand-ink);
+  font-size:var(--fs-meta);font-weight:600;display:flex;align-items:center;justify-content:center}
+.q-opts-r img.qf{
+  height:0.85em;
+  width:auto;
+  max-width: 100%;
+  margin:0 0.2em;
+  object-fit:contain;
+  display:inline-block
+}
+.q-opts-r img.qfig{max-width:100%;border-radius:8px;margin:4px 0}
+.q-text-full{font-size:var(--fs-lead);line-height:var(--lh-body);color:var(--ink)}
+.fig{
+  margin:16px 0;
+  padding:16px;border-radius:var(--r-inner);
+  background:var(--surface-2);border:1px solid var(--line);
+}
+.fig svg{width:100%;max-width:432px;height:auto;margin:0 auto;display:block}
+.known{margin-top:16px;display:flex;flex-direction:column;gap:8px}
+.known ul{display:flex;flex-direction:column;gap:8px}
+.known h3,.ask h3{font-size:var(--fs-lead);font-weight:700;line-height:var(--lh-body);color:var(--ink-2);margin-bottom:4px}
+.known li{
+  display:flex;gap:8px;align-items:baseline;
+  font-size:var(--fs-body);color:var(--ink-2);
+  padding-left:16px;position:relative;
+}
+.known li::before{
+  content:"";position:absolute;left:0;top:.66em;
+  width:4px;height:4px;border-radius:var(--r-circle);background:var(--brand);
+}
+.known code{font-family:var(--font-mono);font-size:var(--fs-body);background:var(--surface-3);padding:2px 4px;border-radius:4px;border:1px solid var(--line)}
+.ask{margin-top:16px;padding-top:16px;border-top:1px dashed var(--line)}
+.ask p{font-size:var(--fs-body);color:var(--ink);font-weight:400}
+.ask code{font-family:var(--font-mono);font-size:var(--fs-body);color:var(--brand-ink);background:var(--brand-tint);padding:2px 4px;border-radius:4px}
+
+/* 受力示意图：颜色一律走 class，避免属性里写 var() 不生效 */
+.fig svg text{font-family:var(--font-mono);font-weight:700}
+.fig .ground{stroke:var(--ink-3)}
+.fig .hatch{stroke:var(--ink-4);opacity:.8}
+.fig .block{fill:var(--brand-tint);stroke:var(--brand)}
+.fig .t-brand{fill:var(--brand-ink)}
+.fig .t-mint{fill:var(--mint)}
+.fig .t-coral{fill:var(--coral)}
+.fig .t-amber{fill:var(--amber)}
+.fig .t-muted{fill:var(--ink-3)}
+.fig .l-brand{stroke:var(--brand)}
+.fig .l-mint{stroke:var(--mint)}
+.fig .l-coral{stroke:var(--coral)}
+.fig .l-amber{stroke:var(--amber)}
+.fig .ah-brand{fill:var(--brand)}
+.fig .ah-mint{fill:var(--mint)}
+.fig .ah-coral{fill:var(--coral)}
+.fig .ah-amber{fill:var(--amber)}
+
+.fig-note{padding:16px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-inner)}
+.fig-note b{display:block;font-size:var(--fs-body);letter-spacing:.06em;color:var(--ink-3);font-weight:600;margin-bottom:8px}
+.fig-note p{margin:0;font-size:var(--fs-meta);line-height:var(--lh-body);color:var(--ink-2)}
+
+.left-block + .left-block{margin-top:16px;padding-top:16px;border-top:1px dashed var(--line)}
+.done-row{display:flex;justify-content:flex-end;margin:0 0 8px}
+.done-row .btn-primary{padding:8px 16px}
+/* 解题页常驻报告入口：放在对话栏头里，窄屏不再多占一行把回复挤没 */
+.solve-report{flex:none;display:flex;align-items:center;gap:8px;min-width:0}
+.solve-report:not([hidden]){margin-left:auto}
+.solve-report:not([hidden]) + .chat-next{margin-left:0}
+.solve-report-note{margin:0 0 4px;font-size:var(--fs-meta);font-weight:600;line-height:var(--lh-body);color:var(--brand-ink)}
+.solve-done-hint{margin:0 0 8px;font-size:var(--fs-meta);font-weight:600;line-height:var(--lh-body);color:var(--brand-ink)}
+.chat-foot .icon-btn:disabled,
+.composer.sm .send-btn:disabled{opacity:.45;cursor:not-allowed}
+.composer.sm textarea:disabled{color:var(--ink-3);cursor:not-allowed}
+
+/* 分隔条 */
+.splitter{
+  position:relative;
+  cursor:col-resize;
+  display:grid;place-items:center;
+  touch-action:none;
+  background:transparent;
+}
+.splitter::before{
+  content:"";
+  width:4px;height:48px;border-radius:var(--r-pill);
+  background:var(--line-strong);
+  transition:.18s;
+}
+.splitter:hover::before,.splitter.is-drag::before{
+  height:72px;background:var(--brand);
+}
+body.resizing{cursor:col-resize;user-select:none}
+body.resizing *{cursor:col-resize !important}
+
+/* 右栏对话 */
+.chat-wrap{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 24px;grid-template-rows:minmax(0,1fr);padding-right:8px;overflow:hidden}
+.chat-body{padding:16px 8px 16px 16px;display:flex;flex-direction:column;min-height:0}
+.msg{display:flex;gap:8px;margin-bottom:16px;animation:msgIn .22s ease both}
+.msg:last-child{margin-bottom:4px}
+@keyframes msgIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.msg .av{
+  width:var(--av);height:var(--av);flex:none;
+  display:grid;place-items:center;
+  margin-top:2px;
+}
+.msg .av img{width:var(--av-img);height:var(--av-img);display:block}
+.bubble{
+  max-width:min(84%,460px);
+  padding:8px 16px;border-radius:var(--r-sub);
+  font-size:var(--fs-body);line-height:var(--lh-body);
+  background:var(--surface-2);
+  border:1px solid var(--line);
+  color:var(--ink);
+}
+.bubble p{margin:0}
+.bubble p + p{margin-top:8px}
+.bubble code{font-family:var(--font-mono);font-size:var(--fs-body);background:var(--brand-tint);color:var(--brand-ink);padding:2px 4px;border-radius:4px}
+.msg.me{flex-direction:row-reverse}
+.msg.me .bubble{
+  background:var(--brand);border-color:var(--brand);color:#fff;
+}
+.msg.me .bubble code{background:rgba(255,255,255,.22);color:#fff}
+.msg.flash .bubble{box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 24%,transparent)}
+.msg.err .bubble{background:var(--coral-tint);border-color:var(--coral-line);color:var(--coral)}
+.bubble .katex{font-size:1.02em}
+.bubble .katex-display{margin:8px 0;overflow-x:auto;overflow-y:hidden;max-width:100%}
+.bubble.dots{gap:8px}
+.dots-label{font-size:var(--fs-meta);color:var(--ink-3)}
+.bubble.dots{display:flex;gap:4px;align-items:center;min-height:24px}
+.bubble.dots i{width:4px;height:4px;border-radius:var(--r-circle);background:var(--ink-3);animation:blink 1.1s infinite}
+.bubble.dots i:nth-child(2){animation-delay:.18s}
+.bubble.dots i:nth-child(3){animation-delay:.36s}
+@keyframes blink{0%,60%,100%{opacity:.28;transform:translateY(0)}30%{opacity:1;transform:translateY(-2px)}}
+.next-ask{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:var(--fs-meta);color:var(--ink-3)}
+
+.chat-empty{padding:32px 16px;text-align:center;color:var(--ink-3)}
+.chat-empty p{margin:0 0 8px;font-size:var(--fs-body);line-height:var(--lh-body)}
+.chat-empty .sub{font-size:var(--fs-meta);color:var(--ink-3)}
+
+/* 提问索引 */
+/* 提问索引：整条竖向居中，圆点从中心向上下两端对称扩张 */
+.rail{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  padding:16px 0;
+  min-height:0;
+}
+.rail-dot{
+  position:relative;
+  width:8px;height:8px;border-radius:var(--r-circle);
+  background:var(--line-strong);
+  transition:.18s;
+}
+.rail-dot:hover{background:var(--brand);transform:scale(1.25)}
+.rail-dot::after{
+  content:attr(data-tip);
+  position:absolute;right:calc(100% + 8px);top:50%;transform:translateY(-50%) translateX(4px);
+  background:var(--ink);color:var(--surface);
+  font-size:var(--fs-body);line-height:1.4;font-weight:400;
+  padding:4px 8px;border-radius:var(--r-inner);
+  max-width:220px;white-space:normal;width:max-content;
+  opacity:0;pointer-events:none;transition:.16s;
+  box-shadow:var(--shadow-2);z-index:5;
+}
+.rail-dot:hover::after{opacity:1;transform:translateY(-50%) translateX(0)}
+
+/* 输入区 */
+.chat-foot{flex:none;min-width:0;border-top:1px solid var(--line);padding:8px 16px 16px;background:var(--surface)}
+.sugs{
+  /* 一行横滑：换行会把对话区再吃掉一截。滚动留在这一行里，不把整页撑宽。 */
+  display:flex;flex-wrap:nowrap;gap:8px;min-width:0;max-width:100%;
+  overflow-x:auto;overflow-y:hidden;padding-bottom:8px;
+  touch-action:pan-x;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;
+}
+.sug{
+  flex:none;
+  padding:4px 12px;border-radius:var(--r-pill);
+  font-size:var(--fs-body);font-weight:500;line-height:var(--lh-body);color:var(--ink-2);
+  background:var(--surface-2);border:1px solid var(--line);
+  transition:.16s;white-space:nowrap;
+}
+.sug:hover{border-color:var(--brand-line);color:var(--brand-ink);background:var(--brand-tint)}
+.composer.sm{border-radius:var(--r-sub);padding:8px;box-shadow:none}
+.composer.sm textarea{height:calc(var(--ctl) - 8px);font-size:var(--fs-body);max-height:72px}
+.composer.sm .send-btn,.composer.sm .icon-btn{width:var(--ctl);height:var(--ctl)}
+.composer.sm .send-btn svg{width:calc(var(--ctl) / 2);height:calc(var(--ctl) / 2)}
+.attach-chip{
+  display:inline-flex;align-items:center;gap:4px;
+  margin-bottom:8px;padding:4px 8px;border-radius:var(--r-inner);
+  background:var(--surface-2);border:1px solid var(--line);
+  font-size:var(--fs-body);font-weight:600;line-height:1.4;color:var(--ink-2);
+}
+.attach-chip img{width:24px;height:24px;border-radius:4px;object-fit:cover}
+.attach-chip button{color:var(--ink-3);display:grid;place-items:center;width:16px;height:16px}
+.recording .mic-btn{background:var(--coral-tint);color:var(--coral);border-color:var(--coral-line)}
+.mic-btn.is-rec{animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--coral) 32%,transparent)}50%{box-shadow:0 0 0 4px transparent}}
+
+/* =====================================================================
+   7. 页面四：学习报告
+   ===================================================================== */
+.p4{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;padding:0 24px}
+.p4-scroll{width:min(860px,100%);flex:1;min-height:0;padding:24px 0 8px;display:flex;flex-direction:column;justify-content:safe center;gap:16px}
+.report-card{
+  background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r-card);box-shadow:var(--shadow-1);
+  padding:16px;
+}
+.rc-head{display:flex;align-items:center;gap:8px;margin-bottom:16px}
+.rc-head h2{font-size:var(--fs-sub);font-weight:700;line-height:var(--lh-sub)}
+.rc-head .tag{margin-left:auto}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px}
+.metric{
+  padding:16px;border-radius:var(--r-inner);
+  background:var(--surface-2);border:1px solid var(--line);
+}
+.metric span{display:block;font-size:var(--fs-meta);font-weight:600;color:var(--ink-3)}
+.metric strong{display:block;margin-top:4px;font-size:var(--fs-sub);font-weight:700;line-height:var(--lh-sub);font-variant-numeric:tabular-nums}
+.metric strong em{font-size:var(--fs-body);font-style:normal;font-weight:600;color:var(--ink-3);margin-left:4px}
+.metric.warn strong{color:var(--amber)}
+.metric strong > span{display:inline;font-size:inherit;font-weight:inherit;letter-spacing:inherit}
+.metric-weak{display:block;margin-top:4px;font-size:var(--fs-body);line-height:var(--lh-body);font-weight:600;color:var(--ink)}
+
+.levels{display:flex;flex-direction:column;gap:8px}
+.level{
+  display:flex;align-items:flex-start;gap:8px;
+  padding:16px;border-radius:var(--r-inner);
+  border:1px solid var(--line);
+  background:var(--surface-2);
+}
+.level .lv{font-size:var(--fs-meta);font-weight:600;flex:none;white-space:nowrap;line-height:var(--lh-body)}
+.level .lv-body{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:8px}
+.level.ok{background:var(--mint-tint);border-color:var(--mint-line)}
+.level.ok .lv{color:var(--mint)}
+.level.warn{background:var(--amber-tint);border-color:var(--amber-line)}
+.level.warn .lv{color:var(--amber)}
+.level.bad{background:var(--coral-tint);border-color:var(--coral-line)}
+.level.bad .lv{color:var(--coral)}
+.k-chip{
+  font-size:var(--fs-body);font-weight:600;color:var(--ink-2);line-height:1.4;
+  background:var(--surface);border:1px solid var(--line);
+  padding:2px 8px;border-radius:var(--r-pill);
+}
+.level.ok .k-chip{border-color:var(--mint-line);color:var(--mint)}
+.level.warn .k-chip{border-color:var(--amber-line);color:var(--amber)}
+.level.bad .k-chip{border-color:var(--coral-line);color:var(--coral)}
+.k-chip.muted{color:var(--ink-3);border-style:dashed;background:transparent}
+
+.wrong{display:flex;flex-direction:column;gap:8px}
+.wrong-item{
+  padding:16px;border-radius:var(--r-inner);
+  border:1px solid var(--line);background:var(--surface-2);
+  border-left:4px solid var(--coral);
+}
+.wrong-line{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;font-size:var(--fs-meta);line-height:var(--lh-body)}
+.wrong-line .k{flex:none;font-weight:600;color:var(--ink-3);font-size:var(--fs-meta)}
+.wrong-line .v{color:var(--ink);font-weight:400}
+.wrong-line .cause{color:var(--coral);font-weight:600}
+.wrong-formula{
+  margin-top:8px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+  font-size:var(--fs-body);color:var(--ink-3);font-weight:400;
+}
+.wrong-formula code{
+  font-family:var(--font-mono);font-size:var(--fs-body);
+  background:var(--surface);border:1px solid var(--line);
+  color:var(--brand-ink);padding:2px 8px;border-radius:4px;
+}
+.wrong-empty{padding:16px 0;color:var(--ink-3);font-size:var(--fs-body)}
+.report-load{display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:8px 16px;border-radius:var(--r-inner);background:var(--brand-tint);border:1px solid var(--brand-line);color:var(--brand-ink);font-size:var(--fs-body)}
+.report-load .spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--brand-line);border-top-color:var(--brand);animation:spin .8s linear infinite}
+@media (prefers-reduced-motion:reduce){.report-load .spin{animation:none;border-top-color:var(--brand-line)}}
+.report-alert{margin-bottom:8px;padding:8px 16px;border-radius:var(--r-inner);background:var(--amber-tint);border:1px solid var(--amber-line);color:var(--amber);font-size:var(--fs-body);line-height:var(--lh-body)}
+
+/* 卡点使用状态文字和图标，不只靠颜色区分；不影响学习小结布局。 */
+.p4 .wrong-item.is-pending{border-left-color:var(--amber)}
+.p4 .wrong-item.is-corrected{border-left-color:var(--mint)}
+/* 报告页专用：精简知识与方法，不影响其他四页。 */
+.p4 .report-card{flex-shrink:0}
+.p4 .review-note{font-size:var(--fs-meta);line-height:var(--lh-body);color:var(--ink-3);margin:8px 0 0}
+.p4 .review-more{grid-column:1/-1}
+.p4 .review-more>div{margin-top:8px}
+.p4 .review-part+.review-part{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.p4 .review-part h3{font-size:var(--fs-sub);line-height:var(--lh-sub);font-weight:600;margin-bottom:8px}
+.p4 .review-knowledge{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.p4 .review-item{padding:12px 16px;border:1px solid var(--line);border-radius:var(--r-inner);background:var(--surface-2)}
+.p4 .review-title{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;font-size:var(--fs-body);font-weight:600;line-height:var(--lh-body)}
+.p4 .review-formula{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:4px;color:var(--ink);font-weight:400;font-family:"Cambria Math","STIX Two Math","Noto Sans Math",var(--font-sans);line-height:1.8}
+.p4 .review-formula math{font-family:"Cambria Math","STIX Two Math","Noto Sans Math",serif;font-size:var(--fs-sub)}
+.p4 .review-formula mtext{font-family:var(--font-sans)}
+.p4 .review-copy{font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink-2);margin-top:4px}
+.p4 .review-methods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.p4 .review-method{padding:16px;border:1px solid var(--line);border-radius:var(--r-inner);min-width:0}
+.p4 .review-method h4{font-size:var(--fs-body);font-weight:600;line-height:var(--lh-body);margin:0 0 8px;color:var(--ink)}
+.p4 .review-family{font-size:var(--fs-meta);line-height:var(--lh-body);color:var(--ink-3);margin-bottom:8px}
+.p4 .review-method p{font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink-2)}
+.p4 .review-method p+p{margin-top:8px}
+.p4 .review-detail{margin-top:8px;font-size:var(--fs-body);line-height:var(--lh-body)}
+.p4 .review-detail summary{cursor:pointer;color:var(--brand-ink);font-size:var(--fs-meta);font-weight:600;width:fit-content}
+.p4 .review-detail p{margin-top:8px;color:var(--ink-2)}
+.p4 .review-detail summary:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+@media(max-width:760px){.p4 .review-methods,.p4 .review-knowledge{grid-template-columns:1fr}}
+
+.p4-foot{
+  flex:none;display:flex;align-items:center;justify-content:space-between;
+  gap:8px;padding:16px 0;width:min(860px,100%);
+}
+.duration{font-size:var(--fs-body);font-weight:400;color:var(--ink-3)}
+.duration strong{color:var(--ink);font-size:var(--fs-lead);font-weight:700;font-variant-numeric:tabular-nums}
+
+/* =====================================================================
+   8. 页面五：迁移练习（上下两个长条）
+   ===================================================================== */
+.p5{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;padding:0 24px}
+.p5-col{width:min(748px,100%);flex:1;min-height:0;padding:24px 0 0;display:flex;flex-direction:column;justify-content:safe center;gap:16px;overflow-y:auto}
+.bar-card{
+  flex:none;
+  background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r-card);box-shadow:var(--shadow-1);
+  padding:16px;
+  transition:.2s;
+}
+.bar-card.open{border-color:var(--brand-line);box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 10%,transparent),var(--shadow-1)}
+.bar-row{display:flex;align-items:center;gap:16px;width:100%;text-align:left;border-radius:var(--r-sub)}
+.bar-ico{
+  width:40px;height:40px;border-radius:var(--r-inner);flex:none;
+  display:grid;place-items:center;
+  background:var(--brand-tint);color:var(--brand-ink);
+  border:1px solid var(--brand-line);
+}
+.bar-ico svg{width:24px;height:24px}
+.bar-copy{flex:1;min-width:0}
+.bar-title{display:block;font-size:var(--fs-sub);font-weight:700;line-height:var(--lh-sub);transition:color .18s}
+.bar-desc{display:block;margin-top:4px;font-size:var(--fs-body);color:var(--ink-3);font-weight:400}
+/* 整块可点：悬停反馈与页面二的方式长条保持一致 */
+.bar-card:hover{border-color:var(--brand-line)}
+.bar-row:hover .bar-title{color:var(--brand)}
+.bar-arrow{color:var(--ink-3);flex:none;transition:.2s}
+.bar-arrow svg{width:16px;height:16px;display:block}
+.bar-card:hover .bar-arrow{color:var(--brand);transform:translateX(2px)}
+.bar-row[aria-busy="true"]{opacity:.6;cursor:progress}
+.bar-row:disabled{cursor:not-allowed}
+.bar-row:disabled .bar-ico{background:var(--surface-2);color:var(--ink-3);border-color:var(--line)}
+.bar-row:disabled .bar-title{color:var(--ink-3)}
+
+.p5-foot{
+  flex:none;display:flex;align-items:center;justify-content:space-between;
+  gap:8px;padding:16px 0;width:min(748px,100%);
+}
+.p5-foot .note{font-size:var(--fs-meta);color:var(--ink-3);font-weight:400}
+
+/* 小屏兜底 */
+@media (max-width:760px){
+  .brand-sub,.pstep .lbl{display:none}
+  /* 题目高度由 --stem-h 连续决定，默认大约两行。中间那条是可拖的把手。 */
+  .work{grid-template-columns:1fr;grid-template-rows:auto 44px minmax(0,1fr);grid-template-areas:"problem" "split" "chat"}
+  #problemPane{grid-area:problem;height:var(--stem-h,112px)}
+  #problemPane .pane-body{padding:8px 16px}
+  #splitter{grid-area:split;display:flex;align-items:center;justify-content:center;height:44px;min-height:44px;touch-action:none;cursor:row-resize}
+  #splitter::before{width:48px;height:4px}
+  #chatPane{grid-area:chat;min-height:0}
+  #problemPane .pane-head .tag{display:none}
+  .stem-open{display:inline-flex;margin-left:auto}
+  body.resizing-y{cursor:row-resize;user-select:none}
+  body.resizing-y *{cursor:row-resize !important}
+  .metrics{grid-template-columns:1fr}
+  /**
+   * 顶栏原来是三栏等分网格：中间步骤条是 auto 宽度，窄屏下它和右边的模式开关
+   * 谁都不肯让，"1fr" 的两侧被压成 0 —— 品牌名竖着排、整页横向溢出。
+   * 窄屏改成 flex：两侧固定。模式开关收进齿轮，步骤条用可收缩的连接线，第 4 步留在屏内。
+   */
+  .topbar{display:flex;padding:0 16px;gap:8px}
+  .tb-left,.tb-right{flex:none}
+  .tb-div{display:none}
+  /* 模式开关让到齿轮里，步骤条才放得下第 4 步。连接线可缩，圆点不滚出屏幕。 */
+  #modeSwitch{display:none !important}
+  .tb-center{flex:1 1 auto;min-width:0}
+  .stepper{
+    flex:1;min-width:0;width:100%;justify-content:flex-start;
+    overflow:hidden;
+  }
+  .pstep{flex:none;padding:4px 4px;gap:4px}
+  .pstep-line{flex:1 1 8px;width:auto;min-width:4px;max-width:16px;margin:0 2px}
+  .brand-name{white-space:nowrap}
+  .p1,.p2-col,.p3,.p4,.p5{padding-left:16px;padding-right:16px}
+  .work{padding:16px}
+  .composer,.bank,.p1-hero,.p1-foot,.p2-head,.p2-foot,.p5-col,.p5-foot{width:100%}
+  .p4-card,.p4-card .metrics{margin-left:0;margin-right:0}
+}
+
+/* 深色下主色变浅，实心面改用更实的紫，保证白字对比 */
+html[data-theme="dark"] .btn-primary,
+html[data-theme="dark"] .send-btn,
+html[data-theme="dark"] .msg.me .bubble,
+html[data-theme="dark"] .mode-bar[aria-pressed="true"] .mode-ico,
+html[data-theme="dark"] .q-item[aria-pressed="true"] .q-check,
+html[data-theme="dark"] .pstep[data-state="now"] i{
+  background:#5F58C9;
+  border-color:#5F58C9;
+  color:#fff;
+}
+html[data-theme="dark"] .btn-primary:hover:not(:disabled),
+html[data-theme="dark"] .send-btn:hover{background:#6E67D8}
+html[data-theme="dark"] .pbar[data-state="now"]{background:var(--brand)}
+  /* 未上线的模式：留在原位、置灰、标「暂未更新」——比整块藏起来更说明"以后会有" */
+  .mode-bar[disabled]{opacity:.6;cursor:not-allowed;box-shadow:none}
+  .mode-bar[disabled]:hover{border-color:var(--line);box-shadow:none}
+  .mode-bar[disabled] .mode-arrow{display:none}
+  .tag.muted{background:var(--surface-2);color:var(--ink-3);border-color:var(--line)}
+  /* 空态：五页都能点到，没数据时在这里说清楚下一步做什么 */
+  .pane-empty{padding:32px 24px;text-align:center;color:var(--ink-3);font-size:var(--fs-body);line-height:1.9}
+
+/* =====================================================================
+   10. 设置：主题三选 + 字号三档
+   ---------------------------------------------------------------------
+   桌面锚在齿轮下方（fixed，所以不受顶栏 grid 与 backdrop-filter 影响），
+   ≤760px 改成贴底整宽抽屉 —— 见上面的小屏兜底
+   ===================================================================== */
+.set{
+  position:fixed;z-index:41;
+  top:calc(var(--topbar) + 8px);right:24px;
+  width:288px;
+  display:flex;flex-direction:column;gap:16px;
+  padding:16px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--r-card);
+  box-shadow:var(--shadow-2);
+  animation:setIn .16s ease both;
+}
+.set[hidden]{display:none}
+@keyframes setIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.set-mask{position:fixed;inset:0;z-index:40;display:none;background:rgba(17,17,22,.32)}
+.set-mask[hidden]{display:none}
+
+.set-grp{display:flex;flex-direction:column;gap:8px}
+.set-label{font-size:var(--fs-meta);font-weight:600;color:var(--ink-3);letter-spacing:.04em}
+
+/* 三选：复用 .seg 的观感，只把圆角收到与面板闭合的那一档（24 = 8 + 16） */
+.set-seg{display:grid;grid-template-columns:repeat(3,1fr);border-radius:var(--r-inner)}
+.set-seg button{padding:4px 2px;text-align:center}
+.set-seg button[aria-checked="true"]{background:var(--surface);color:var(--brand-ink);box-shadow:0 1px 2px rgba(26,26,26,.10)}
+html[data-theme="dark"] .set-seg button[aria-checked="true"]{background:#3A3750}
+.set-seg button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+/* 字号滑块：原生 range，只把轨道和滑块画成我们自己的样子 */
+.set-range{
+  -webkit-appearance:none;appearance:none;
+  width:100%;height:24px;margin:0;
+  background:transparent;cursor:pointer;
+}
+.set-range:focus-visible{outline:2px solid var(--brand);outline-offset:4px;border-radius:var(--r-inner)}
+.set-range::-webkit-slider-runnable-track{
+  height:4px;border-radius:var(--r-pill);
+  background:linear-gradient(to right,var(--brand) var(--fill,50%),var(--line-strong) var(--fill,50%));
+}
+.set-range::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:16px;height:16px;border-radius:var(--r-circle);
+  background:var(--surface);border:2px solid var(--brand);
+  box-shadow:var(--shadow-1);
+  margin-top:calc((4px - 16px) / 2);
+  transition:transform .12s;
+}
+.set-range:active::-webkit-slider-thumb{transform:scale(1.12)}
+.set-range::-moz-range-track{height:4px;border-radius:var(--r-pill);background:var(--line-strong)}
+.set-range::-moz-range-progress{height:4px;border-radius:var(--r-pill);background:var(--brand)}
+.set-range::-moz-range-thumb{width:16px;height:16px;border-radius:var(--r-circle);background:var(--surface);border:2px solid var(--brand);box-shadow:var(--shadow-1)}
+.set-ticks{display:flex;justify-content:space-between;font-size:var(--fs-meta);color:var(--ink-3);font-weight:600}
+.set-ticks .is-on{color:var(--brand-ink)}
+
+/* 窄屏才把做题方式放进齿轮；桌面仍用顶栏那一枚 */
+.set-mode{display:none}
+.set-mode-seg{display:grid;grid-template-columns:1fr 1fr;width:100%}
+
+/* 小屏：贴底整宽抽屉。必须排在基础规则之后，否则桌面数值先到先赢 */
+@media (max-width:760px){
+  .set{
+    top:auto;left:0;right:0;bottom:0;width:auto;
+    border-radius:var(--r-card) var(--r-card) 0 0;
+    padding:16px 16px 24px;
+    animation:setUp .18s ease both;
+  }
+  .set-mask{display:block;background:rgba(17,17,22,.40)}
+  @keyframes setUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+}
+@media (max-width:760px){
+  .set-mode{display:flex}
+}
+
+/* Report controls stay outside the report's scrolling region. */
+.p4 .report-toolbar{width:min(860px,100%);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid var(--line);background:var(--paper)}
+.report-toolbar>div{display:flex;align-items:center;gap:16px}
+.report-toolbar strong{font-size:var(--fs-body);line-height:var(--lh-body)}
+.report-toolbar .duration{font-size:var(--fs-meta);color:var(--ink-3)}
+.p4 .p4-scroll{justify-content:flex-start;padding-top:16px;padding-bottom:24px}
+.p4 .review-practice{display:inline-flex;margin-top:12px;padding:4px 8px;border:1px solid var(--brand-line);border-radius:var(--r-inner);background:var(--surface);color:var(--brand-ink);font-family:var(--font-sans);font-size:var(--fs-meta);line-height:var(--lh-body);cursor:pointer}
+.p4 .review-practice:hover{background:var(--brand-tint)}
+.p4 .practice-empty{font-size:var(--fs-meta);line-height:var(--lh-body);color:var(--ink-3);margin-top:8px}
+.rel-item .rel-reason{display:block;font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink-2);margin-top:8px}
+.rel-error{font-size:var(--fs-body);line-height:var(--lh-body);color:var(--coral);padding:8px 16px}
+.pane-head .chat-next{margin-left:auto;white-space:nowrap;font-size:var(--fs-meta)}
+@media(max-width:600px){.p4 .report-toolbar{align-items:flex-start;gap:8px;padding:12px 0}.report-toolbar>div:first-child{flex-direction:column;align-items:flex-start;gap:4px}.report-toolbar .report-actions{gap:8px}.report-actions button{padding-left:8px;padding-right:8px}.tb-right #reportReturnBtn{font-size:var(--fs-meta);padding:4px 8px}}
+
+/* Recommended questions: full preview before starting a session. */
+.rel-preview{margin:auto;padding:0;width:min(840px,calc(100vw - 32px));height:min(88vh,900px);max-height:88vh;max-width:none;overflow:hidden;border:1px solid var(--line-strong);border-radius:var(--r-card);background:var(--surface);color:var(--ink);box-shadow:var(--shadow-2)}
+.rel-preview::backdrop{background:rgba(17,17,22,.42)}
+.rel-preview-shell{height:100%;min-height:0;display:flex;flex-direction:column}
+.rel-preview-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-shrink:0;padding:16px 24px;border-bottom:1px solid var(--line)}
+.rel-preview-head h2{font-size:var(--fs-sub);line-height:var(--lh-sub);font-weight:600}
+.rel-preview-head p{font-size:var(--fs-meta);line-height:var(--lh-body);color:var(--ink-3);margin-top:4px}
+.rel-preview-body{flex:1;min-height:0;padding:16px 24px;overscroll-behavior:contain}
+.rel-preview-reason{padding:8px 16px;margin-bottom:16px;background:var(--brand-tint);color:var(--ink-2);border:1px solid var(--brand-line);border-radius:var(--r-inner);font-size:var(--fs-body);line-height:var(--lh-body)}
+.rel-preview .q-rich,.rel-preview .q-opts-r{font-size:var(--fs-sub);line-height:2;overflow-wrap:anywhere}
+.rel-preview .q-rich p{margin:8px 0 16px}
+.rel-preview .q-rich img.qf,.rel-preview .q-opts-r img.qf{
+  height:0.85em;
+  width:auto;
+  max-width: 100%;
+  margin:0 0.2em;
+  object-fit:contain;
+  display:inline-block
+}
+.rel-preview .q-rich img.qfig,.rel-preview .q-opts-r img.qfig{display:block;max-width:100%;max-height:260px;width:auto;height:auto;margin:16px auto;object-fit:contain;border:0;border-radius:var(--r-inner)}
+.rel-preview-options{font-size:var(--fs-body);line-height:var(--lh-body);font-weight:600;margin:16px 0 8px}
+.rel-preview .q-opts-r{list-style:none;padding:0;margin:0}
+.rel-preview .q-opts-r li{display:flex;align-items:baseline;gap:12px;padding:12px 16px;margin:8px 0;border:1px solid var(--line);border-radius:var(--r-inner);background:var(--surface)}
+.rel-preview .q-opts-r li>b{flex:none;color:var(--brand-ink);font-family:var(--font-sans);font-size:var(--fs-body)}
+.rel-preview .q-opts-r li>span{min-width:0;flex:1}
+.rel-preview-footer{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:12px 24px;border-top:1px solid var(--line);background:var(--surface)}
+.rel-preview-note{font-size:var(--fs-meta);line-height:var(--lh-body);color:var(--ink-3)}
+.rel-preview-error{flex-basis:100%;font-size:var(--fs-body);line-height:var(--lh-body);color:var(--coral);margin:0}
+.rel-preview-head .rel-x{font-size:var(--fs-title);line-height:1}
+@media(max-width:600px){.rel-preview{width:calc(100vw - 16px);height:92vh;max-height:92vh}.rel-preview-head{padding:12px 16px}.rel-preview-body{padding:12px 16px}.rel-preview-footer{padding:12px 16px}.rel-preview .q-opts-r li{padding:8px 12px;gap:8px}.rel-preview-footer .btn-primary{white-space:nowrap}}
+html[data-theme="dark"] .rel-preview img{background:var(--ink);border-radius:var(--r-inner)}
+
+/* =====================================================================
+   11. 使用引导：一张卡 + 一圈高亮，没有遮罩
+   ---------------------------------------------------------------------
+   1) 三步共用一个进度值（localStorage bsj-guide：空 → 1 → 2 → done）。
+      由 syncGuide() 按「当前页 + 进度」决定装哪一步，切页先卸上一步 ——
+      所以不会出现两张卡同屏。
+   2) 卡片/高亮/提示条都挂 body 上：放进 .page 会在切页时被 display:none 掉。
+   3) z-index 39：在页面内容(2)与顶栏(30)之上，在所有**用户主动打开**的
+      浮层之下（40 设置 / 45 符号 / 55 同类题 / 60 老师 / 70 查看器 / 80 题库）。
+      因此不需要写"打开浮层就收起卡片"那种会抖的逻辑。
+   4) 卡片靠 translateX(-50%) 居中，入场只能淡入、不能动 transform。
+   ===================================================================== */
+.guide-ring{
+  position:fixed;z-index:39;pointer-events:none;
+  border-radius:var(--r-card);
+  box-shadow:0 0 0 3px var(--brand);
+}
+.guide-ring[hidden]{display:none}
+
+.guide{
+  position:fixed;z-index:39;left:50%;bottom:24px;transform:translateX(-50%);
+  width:min(560px,calc(100vw - 32px));
+  display:flex;flex-direction:column;gap:12px;
+  padding:16px;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);
+  box-shadow:var(--shadow-2);
+  animation:guideFade .2s ease both;
+}
+.guide[hidden]{display:none}
+@keyframes guideFade{from{opacity:0}to{opacity:1}}
+
+.guide-head{display:flex;align-items:flex-start;gap:8px}
+.guide-head b{flex:1;min-width:0;font-size:var(--fs-sub);font-weight:700;line-height:var(--lh-sub)}
+.guide-x{
+  flex:none;width:24px;height:24px;border-radius:var(--r-circle);
+  display:grid;place-items:center;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--ink-3);
+  font-size:var(--fs-meta);line-height:1;
+}
+.guide-x:hover{color:var(--ink);border-color:var(--line-strong)}
+.guide-txt{margin:0;font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink-2);font-weight:400}
+
+.guide-opts{display:flex;flex-direction:column;gap:8px}
+.guide-opt{
+  display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  padding:12px;border-radius:var(--r-inner);
+  background:var(--surface-2);border:1px solid var(--line);
+  transition:.16s;
+}
+.guide-opt:hover{border-color:var(--line-strong);background:var(--surface)}
+.guide-opt.is-main{background:var(--brand-tint);border-color:var(--brand-line)}
+.guide-opt.is-main:hover{border-color:var(--brand)}
+.guide-ico{
+  flex:none;width:24px;height:24px;border-radius:var(--r-circle);
+  display:grid;place-items:center;
+  background:var(--surface);border:1px solid var(--line);color:var(--ink-3);
+  font-size:var(--fs-meta);line-height:1;
+}
+.guide-opt.is-main .guide-ico{background:var(--brand);border-color:var(--brand);color:#fff}
+.guide-copy{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.guide-copy b{display:flex;align-items:center;gap:6px;font-size:var(--fs-body);font-weight:700;line-height:var(--lh-body);color:var(--ink)}
+.guide-copy em{font-style:normal;font-size:var(--fs-meta);color:var(--ink-3);font-weight:400}
+
+.guide-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.guide-dots{display:flex;align-items:center;gap:6px}
+.guide-dots i{width:6px;height:6px;border-radius:var(--r-circle);background:var(--surface-3)}
+.guide-dots i.is-on{background:var(--brand)}
+.guide-skip{
+  flex:none;min-height:28px;padding:4px 8px;border:0;border-radius:var(--r-inner);
+  background:transparent;color:var(--ink-3);font-size:var(--fs-meta);
+}
+.guide-skip:hover{color:var(--ink);background:var(--surface-2)}
+.guide-next{
+  flex:none;min-height:28px;padding:4px 16px;border-radius:var(--r-inner);
+  background:var(--brand);color:#fff;font-size:var(--fs-body);font-weight:500;
+}
+.guide-next:hover{background:var(--brand-strong)}
+
+/* —— 第 3 步：六秒自己退的一条提示，不拦操作 —— */
+.guide-toast{
+  position:fixed;z-index:39;left:50%;bottom:24px;transform:translateX(-50%);
+  width:min(560px,calc(100vw - 32px));
+  display:flex;align-items:center;gap:12px;
+  padding:12px 16px;
+  background:var(--surface);border:1px solid var(--line);border-left:2px solid var(--brand);
+  border-radius:var(--r-sub);
+  box-shadow:var(--shadow-2);
+  font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink-2);
+  animation:guideFade .2s ease both;
+}
+.guide-toast[hidden]{display:none}
+.guide-toast b{color:var(--brand-ink);font-weight:600}
+/* 叉掉键：整条本来点哪都能关，但"能点"看不见 —— 给一个看得见的出口 */
+.guide-toast-x{
+  flex:none;margin-left:auto;width:24px;height:24px;border-radius:var(--r-circle);
+  display:grid;place-items:center;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--ink-3);
+  font-size:var(--fs-meta);line-height:1;
+}
+.guide-toast-x:hover{color:var(--ink);border-color:var(--line-strong)}
+
+/* 引导打开时首屏让位：卡片贴底，内容整体上推，别压住输入框与发送键 */
+body[data-guide="1"] #p1Home{padding-bottom:var(--guide-lift)}
+/* 用 display 而不是 opacity：.p1-down 身上还挂着一个 fill:both 的入场动画，
+   动画值会盖过普通声明 —— 只写 opacity:0 的时候，引导刚打开的那半秒它还看得见 */
+body[data-guide="1"] .p1-down{display:none}
+
+@media (max-width:760px){
+  .guide,.guide-toast{bottom:16px}
+}
+@media (prefers-reduced-motion:reduce){
+  .guide,.guide-toast{animation:none}
+}

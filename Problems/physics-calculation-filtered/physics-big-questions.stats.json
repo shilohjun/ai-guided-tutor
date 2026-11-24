@@ -1,0 +1,60 @@
+{
+  "generatedAt": "2026-11-09T08:05:11.409Z",
+  "input": "Problems\\id_29_records.jsonl",
+  "outputDir": "Problems\\physics-calculation-filtered",
+  "options": {
+    "input": "I:\\MoyuanCodes\\ai-guided-tutor\\Problems\\id_29_records.jsonl",
+    "outputDir": "I:\\MoyuanCodes\\ai-guided-tutor\\Problems\\physics-calculation-filtered",
+    "minScore": 0,
+    "limit": null,
+    "subjectId": "29",
+    "includeAnswers": true,
+    "calculationOnly": true,
+    "perType": null,
+    "typeId": null,
+    "index": null,
+    "outputDirExplicit": true,
+    "ai": false,
+    "aiLimit": 100,
+    "aiThreshold": 70
+  },
+  "stats": {
+    "totalRecords": 110100,
+    "uniqueRecords": 36746,
+    "duplicates": 73354,
+    "selected": 3528,
+    "excludedChoices": 28028,
+    "excludedExperiments": 3122,
+    "excludedNonCalculation": 2068,
+    "byType": {
+      "2": 2,
+      "3": 2,
+      "2904": 3410,
+      "2909": 114
+    },
+    "byReason": {
+      "多小问(12)": 2,
+      "小问较多": 182,
+      "题干较长": 3194,
+      "参数较密集": 3454,
+      "含题图": 3300,
+      "含公式": 2598,
+      "含表格": 46,
+      "综合求解语义": 236,
+      "计算求解语义": 3528,
+      "多小问(5)": 20,
+      "多小问(4)": 130,
+      "多小问(8)": 10,
+      "多小问(9)": 4,
+      "多小问(6)": 4,
+      "多小问(2)": 1664,
+      "多小问(3)": 1398,
+      "多小问(7)": 6,
+      "实验语义": 4,
+      "多小问(13)": 2,
+      "多小问(11)": 4
+    },
+    "aiReviewed": 0,
+    "aiRejected": 0
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "totalRecords": 110100,
+  "uniqueRecords": 36746,
+  "duplicates": 73354,
+  "byCategory": {
+    "填空题": 7536,
+    "判断题": 1592,
+    "作图题": 602,
+    "选择题": 11772,
+    "实验题": 8453,
+    "解答题": 5522,
+    "综合题": 1269
+  },
+  "generatedAt": "2026-11-09T08:19:10.357Z",
+  "input": "I:\\MoyuanCodes\\ai-guided-tutor\\Problems\\id_29_records.jsonl"
+}

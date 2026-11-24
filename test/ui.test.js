@@ -16,6 +16,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, it, assert, assertEquals, assertIncludes, assertNotIncludes } from './runner.js';
+import { pageCss } from './page-css.js';
 import { loadEnvFile, ROOT } from '../src/core/env.js';
 
 /**
@@ -136,7 +137,7 @@ describe('前端 · 布局不许出现"钉住的面板遮挡内容"', () => {
    * 新版把这条当成硬约束：整页走普通文档流，全站只有顶栏允许 sticky。
    */
   it('样式里除顶栏外没有 sticky 元素', () => {
-    const style = (html.match(/<style>([\s\S]*?)<\/style>/) || [null, ''])[1];
+    const style = pageCss('public/index.html');
     const stripped = style.replace(/\/\*[\s\S]*?\*\//g, '');
     const offenders = [];
     for (const m of stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
@@ -240,7 +241,7 @@ describe('前端 · 四步流程契约（新版单文件）', () => {
   it('窄屏把模式开关收进设置，步骤条不再靠藏起来的横向滚动', () => {
     assertIncludes(html, 'id="setModeSwitch"', '设置里要有一份模式开关，窄屏顶栏才腾得出第 4 步');
     assertIncludes(html, 'id="setMode"', '模式开关要包在设置分组里');
-    const style = (html.match(/<style>([\s\S]*?)<\/style>/) || [null, ''])[1];
+    const style = pageCss('public/index.html');
     assert(
       /@media \(max-width:760px\)\{[\s\S]*?#modeSwitch\{[^}]*display:\s*none\s*!important/.test(style),
       '≤760px 顶栏里的「自主训练 / AI 伴学」必须让开',
@@ -277,7 +278,7 @@ describe('前端 · 四步流程契约（新版单文件）', () => {
     assertIncludes(appJs, "addEventListener('pointerdown'", '鼠标和触摸都走 pointer');
     assertIncludes(appJs, "addEventListener('touchmove'", 'iOS 上还要拦住 touchmove');
     assertIncludes(appJs, '{ passive: false }', 'preventDefault 必须能生效');
-    const style = (html.match(/<style>([\s\S]*?)<\/style>/) || [null, ''])[1];
+    const style = pageCss('public/index.html');
     assert(
       /@media \(max-width:760px\)\{[\s\S]*?#problemPane\{[^}]*height:\s*var\(--stem-h,\s*112px\)/.test(style),
       '窄屏题目默认大约两行，高度连续可变',
@@ -290,7 +291,7 @@ describe('前端 · 四步流程契约（新版单文件）', () => {
   });
 
   it('快捷问句是一行横滑，不换行、也不把整页撑宽', () => {
-    const style = (html.match(/<style>([\s\S]*?)<\/style>/) || [null, ''])[1];
+    const style = pageCss('public/index.html');
     const sugs = style.match(/\.sugs\{([^}]*)\}/);
     assert(sugs, '要有 .sugs');
     assert(/flex-wrap:\s*nowrap/.test(sugs[1]), '问句不要折成两行');
@@ -537,7 +538,7 @@ describe('前端 · 超长题目在框内滚动，而不是把整页拉长', () 
    * .pane-body.scroller（overflow-y:auto），页面本身不跟着变长。
    * 这与"面板不许 sticky"是两件事：不钉住防遮挡，内部滚动防拉长，两条可以同时成立。
    */
-  const style = (html.match(/<style>([\s\S]*?)<\/style>/) || [null, ''])[1].replace(/\/\*[\s\S]*?\*\//g, '');
+  const style = pageCss('public/index.html').replace(/\/\*[\s\S]*?\*\//g, '');
   const cssRule = (sel) => {
     const at = style.indexOf(sel + '{');
     if (at < 0) return '';
@@ -603,12 +604,106 @@ describe('前端 · 公式自动渲染：不用每个显示点都手写一遍', 
   it('math.js 里装了 MutationObserver 兜底', () => {
     assertIncludes(mathJs, 'MutationObserver', 'math.js 要用 MutationObserver 自动发现新内容');
     assertIncludes(mathJs, 'characterData', '文字节点被原地改写也要能看见');
-    assertIncludes(mathJs, 'requestAnimationFrame', '一帧内的多次变更要合并成一次渲染');
+    assertIncludes(mathJs, 'timeout: 120', '空闲渲染要设超时兜底，避免一直等不到空闲帧');
+  });
+
+  describe('前端 · 题库工作台使用完整索引', () => {
+    const qbankData = JSON.parse(readFileSync(join(ROOT, 'public/qbank/data.json'), 'utf8'));
+    const workbench = readFileSync(join(ROOT, 'public/qbank/workbench.html'), 'utf8');
+
+    it('工作台从完整前端索引加载，而不是依赖旧的固定题数', () => {
+      assert(qbankData.qs.some((q) => q.i === 836), '前端索引应包含新增题 836');
+      assertIncludes(workbench, "fetchQbankAsset('data.json')", '工作台应读取正式题库索引');
+      assertIncludes(workbench, "var urls = ['/qbank/' + path, path]", '工作台应兼容子路径部署');
+      assert(!workbench.includes('835 道'), '工作台不应保留旧的固定题数');
+    });
+
+    it('新增题目的知识点和章节 ID 必须存在于知识树', () => {
+      const chapters = new Set(qbankData.kg.flatMap((m) => (m.children || []).map((c) => c.id)));
+      const leaves = new Set(qbankData.kg.flatMap((m) => (m.children || []).flatMap((c) => (c.children || []).map((l) => l.id))));
+      for (const id of [836, 837, 838, 839]) {
+        const q = qbankData.qs.find((item) => item.i === id);
+        assert(q, '题目 ' + id + ' 应存在');
+        assert(chapters.has(q.k), '题目 ' + id + ' 的章节 ID 无效');
+        assert(leaves.has(q.l), '题目 ' + id + ' 的知识点 ID 无效');
+      }
+    });
+  });
+
+  describe('前端 · 题库懒加载', () => {
+    const workbench = readFileSync(join(ROOT, 'public/qbank/workbench.html'), 'utf8');
+    const map = readFileSync(join(ROOT, 'public/qbank/map.html'), 'utf8');
+    const mapCss = readFileSync(join(ROOT, 'public/qbank/map.css'), 'utf8');
+
+    it('工作台只补可视题目行', () => {
+      assertIncludes(workbench, 'IntersectionObserver', '工作台列表应观察可视题目');
+      assertIncludes(workbench, 'rootMargin: \'300px 0px\'', '工作台应预取可视边界附近题目');
+      assertIncludes(workbench, 'hydrateObserver.unobserve(entry.target)', '已加载题目行应停止观察');
+    });
+
+    it('地图列表分批渲染并提供加载更多', () => {
+      assertIncludes(map, 'panelLimit = 30', '地图右侧题库应每批渲染 30 张');
+      assertIncludes(map, 'qlazy-more', '地图应提供加载更多入口');
+      assertIncludes(map, 'panelLimit += 30', '地图应按批追加题目');
+      assertIncludes(map, 'scrollHeight - box.scrollTop - box.clientHeight', '地图应在滚动到底部时追加题目');
+      assertIncludes(map, 'remaining <= 180', '地图应在接近底部时提前加载');
+      assertIncludes(map, 'insertAdjacentHTML', '追加加载应保留已有题目 DOM');
+      assertIncludes(map, 'box.scrollTop = oldScrollTop', '追加加载应保持原滚动位置');
+      assertIncludes(map, 'is-loading', '加载过程应提供明显过渡状态');
+      assertIncludes(mapCss, 'lazyCardIn', '新增题目卡片应使用柔和淡入动画');
+      assertIncludes(map, 'qlazy-status', '加载过程中应显示独立文字提示');
+      assertIncludes(map, '正在加载更多题目', '文字提示应说明正在加载更多题目');
+    });
+  });
+
+  describe('前端 · 公式图片随文字字号缩放', () => {
+    const sheets = [
+      ['public/index.css', readFileSync(join(ROOT, 'public/index.css'), 'utf8')],
+      ['public/qbank/workbench.css', readFileSync(join(ROOT, 'public/qbank/workbench.css'), 'utf8')],
+      ['public/qbank/map.css', readFileSync(join(ROOT, 'public/qbank/map.css'), 'utf8')],
+    ];
+
+    it('qf 图片使用 em 高度，题图 qfig 不受影响', () => {
+      for (const [name, css] of sheets) {
+        assertIncludes(css, 'height:0.85em', name + ' 里的公式图片应按当前字体高度缩放');
+        assertIncludes(css, 'object-fit:contain', name + ' 里的公式图片应保持比例');
+      }
+    });
+  });
+
+  describe('前端 · 题库页面使用独立 CSS 文件', () => {
+    const pages = [
+      ['public/index.html', 'index.css'],
+      ['public/qbank/map.html', 'map.css'],
+      ['public/qbank/workbench.html', 'workbench.css'],
+    ];
+
+    it('页面引用外部 CSS，且提取后的样式文件存在', () => {
+      for (const [page, css] of pages) {
+        const html = readFileSync(join(ROOT, page), 'utf8');
+        assertIncludes(html, `rel="stylesheet" href="/${page.includes('qbank/') ? 'qbank/' : ''}${css}"`, page + ' 应引用独立 CSS');
+        assert(!/<style(?:\s|>)/.test(html), page + ' 不应继续保留内联 CSS');
+        const extracted = readFileSync(join(ROOT, 'public', page.includes('qbank/') ? 'qbank' : '', css), 'utf8');
+        assert(extracted.length > 0, css + ' 不应为空');
+      }
+    });
   });
 
   it('可以一键关掉，观察器句柄也拿得到（出问题时能排查）', () => {
     assertIncludes(mathJs, 'autoRender', '要有 BsjMath.autoRender 这样的开关');
     assertIncludes(mathJs, 'BsjMath.observer', '观察器要挂在 BsjMath 上');
+  });
+
+  it('数学片段中的 Unicode 兼容字符不会交给 KaTeX 字体渲染', () => {
+    assertIncludes(mathJs, 'normalizeMathText', '数学文本需要先做 KaTeX 字符兼容处理');
+    assertIncludes(mathJs, "'NFKC'", '罗马数字和带圈数字应归一化为 KaTeX 支持的 ASCII 字符');
+    assertIncludes(mathJs, '\\u2460-\\u24FF', '应覆盖带圈数字和带圈字母');
+  });
+
+  it('自动公式渲染不占用动画帧并会合并重复根节点', () => {
+    assertIncludes(mathJs, 'requestIdleCallback', '批量公式渲染应安排在空闲时间');
+    assertIncludes(mathJs, 'pending.some', '重复的观察节点应合并');
+    assertIncludes(mathJs, 'pending.filter', '子树节点应从待处理列表中去重');
   });
 
   it('全局扫描不许闯进输入框', () => {

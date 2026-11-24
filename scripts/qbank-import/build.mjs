@@ -573,7 +573,10 @@ function patchMap(html, data) {
   const from = at + open.length;
   const to = html.indexOf('</script>', from);
   if (to < 0) throw new Error('qdata 没有闭合');
-  return html.slice(0, from) + JSON.stringify(data) + html.slice(to);
+  // 题干可能包含 HTML 片段；转义 "<" 防止其中的 "</script>" 提前
+  // 关闭 JSON script 标签，避免剩余数据被浏览器当成页面内容执行。
+  const json = JSON.stringify(data).replace(/</g, '\\u003C');
+  return html.slice(0, from) + json + html.slice(to);
 }
 
 if (!DRY) {

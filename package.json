@@ -24,7 +24,13 @@
     "preview:verify": "node scripts/verify-preview.cjs",
     "all": "node test/run.js && node scripts/eval.js",
     "test:ui": "node test/run.js ui",
-    "verify": "node test/run.js && node scripts/audit-ui-style.js"
+    "verify": "node test/run.js && node scripts/audit-ui-style.js",
+    "qbank:list": "node scripts/qbank-import/manage.mjs list",
+    "qbank:template": "node scripts/qbank-import/manage.mjs template --out qbank-question-template.json",
+    "qbank:add": "node scripts/qbank-import/manage.mjs add --file",
+    "qbank:update": "node scripts/qbank-import/manage.mjs update --id",
+    "qbank:delete": "node scripts/qbank-import/manage.mjs delete --id",
+    "test:qbank-manage": "node --test test/qbank-manage.test.mjs"
   },
   "keywords": [
     "education",
